@@ -111,19 +111,34 @@ export class StorageService implements OnModuleInit {
 
   proxyUrl(key: string): string {
     const port = this.config.get<string>('API_PORT') || '3001';
+    const railway =
+      this.config.get<string>('RAILWAY_PUBLIC_DOMAIN') ||
+      this.config.get<string>('RAILWAY_STATIC_URL');
     const base = (
-      this.config.get<string>('API_PUBLIC_URL') || `http://localhost:${port}`
+      this.config.get<string>('API_PUBLIC_URL') ||
+      (railway ? `https://${railway.replace(/^https?:\/\//, '')}` : null) ||
+      `http://localhost:${port}`
     ).replace(/\/$/, '');
     return `${base}/api/storage/file?key=${encodeURIComponent(key)}`;
   }
 
   /** Stable URL for <img src> — avoids expired MinIO signatures. */
   mediaUrl(photoKey?: string | null, photoUrl?: string | null): string | null {
-    if (photoKey && this.isSafeKey(photoKey)) return this.proxyUrl(photoKey);
+    // Prefer embedded data URLs (MinIO-less deploys store captures this way).
+    if (photoUrl?.startsWith('data:') || photoUrl?.startsWith('blob:')) {
+      return photoUrl;
+    }
+    // Only proxy by key when object storage is actually available.
+    if (this.ready && photoKey && this.isSafeKey(photoKey)) {
+      return this.proxyUrl(photoKey);
+    }
     if (!photoUrl) return null;
-    if (photoUrl.startsWith('data:')) return photoUrl;
     const fromSigned = this.extractKeyFromUrl(photoUrl);
-    if (fromSigned) return this.proxyUrl(fromSigned);
+    if (fromSigned && this.ready) return this.proxyUrl(fromSigned);
+    // Rewrite broken localhost proxy URLs when we still have a key but no MinIO.
+    if (photoKey && this.isSafeKey(photoKey) && photoUrl.includes('/api/storage/file')) {
+      return null;
+    }
     return photoUrl;
   }
 
