@@ -3461,8 +3461,19 @@ export class AttendanceService {
 
     let employeeId = dto.employeeId ?? null;
     if (!employeeId && dto.employeeExternalId) {
+      const ext = dto.employeeExternalId.trim();
       const emp = await this.prisma.employee.findFirst({
-        where: { tenantId, externalId: dto.employeeExternalId },
+        where: {
+          tenantId,
+          OR: [
+            { externalId: ext },
+            { tabNumber: ext },
+            // Hikvision often sends "1"; HR may store "0001"
+            ...(ext.match(/^\d+$/)
+              ? [{ tabNumber: ext.padStart(4, '0') }, { tabNumber: ext.padStart(10, '0') }]
+              : []),
+          ],
+        },
       });
       employeeId = emp?.id ?? null;
     }
