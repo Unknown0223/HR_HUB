@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.build.json --noCheck",
-    "start": "nest start",
+    "start": "prisma db push --skip-generate && node dist/main",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
