@@ -1,0 +1,259 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tab,
+.tabOn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #5e6278;
+}
+
+.tabOn {
+  background: #3699ff;
+  color: #fff;
+}
+
+.btnBlue {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnGhost {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  padding: 0.55rem 1.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled,
+.btnBlue:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.exportLinks {
+  display: flex;
+  gap: 0.65rem;
+  margin-left: auto;
+  align-items: center;
+}
+
+.exportLinks button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.exportLinks button:hover {
+  text-decoration: underline;
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+
+.ok {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  color: #0d9488;
+  background: #ecfdf5;
+  border-radius: 4px;
+}
+
+.muted {
+  margin: 0;
+  color: #95a5a6;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 720px;
+}
+
+.dateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .dateRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field label {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.req {
+  color: #e8534a;
+}
+
+.field input {
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.65rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #3f4254;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.checkRow {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: #3699ff;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.viewArea {
+  background: #f1f3f6;
+  border-radius: 6px;
+  min-height: 280px;
+  padding: 0.75rem;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.65rem;
+  color: #3f4254;
+  font-size: 0.88rem;
+}
+
+.tableWrap {
+  overflow: auto;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.table th,
+.table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
+}
+
+.table th {
+  background: #f9fafb;
+  color: #6b7280;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 1.5rem !important;
+}

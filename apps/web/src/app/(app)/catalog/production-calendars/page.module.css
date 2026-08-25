@@ -1,0 +1,171 @@
+.wrap {
+  animation: fadeUp 0.22s ease both;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.leftActions,
+.rightTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.createBtn {
+  appearance: none;
+  border: none;
+  border-radius: 4px;
+  background: #0d9488;
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 0.5rem 0.9rem;
+}
+
+.createBtn:hover {
+  background: #0f766e;
+}
+
+.closeBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 0.5rem 0.85rem;
+}
+
+.search {
+  min-width: 180px;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.65rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.toolBtn {
+  appearance: none;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  padding: 0 0.7rem;
+  cursor: pointer;
+}
+
+.pagerMeta {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.error {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 0.88rem;
+}
+
+.tableWrap {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid #eef0f4;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+}
+
+.table th {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: #fafbfc;
+}
+
+.checkCol {
+  width: 36px;
+}
+
+.rowSelected {
+  background: #f0f9ff;
+}
+
+.actionsRow td {
+  background: #f8fafc;
+  padding: 0.45rem 0.65rem 0.65rem;
+}
+
+.rowActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rowActions a,
+.rowActions button {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.rowActions button {
+  color: #e8534a;
+}
+
+.empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 1.5rem !important;
+}

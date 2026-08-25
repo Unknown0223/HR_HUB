@@ -1,0 +1,281 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: fade 0.18s ease both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btnSave {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnClose {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+
+.ok {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  color: #0d9488;
+  background: #ecfdf5;
+  border-radius: 4px;
+}
+
+.muted {
+  color: #95a5a6;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.section {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.section h2 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.inlineActions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.72rem;
+  color: #95a5a6;
+  margin-bottom: 0.2rem;
+}
+
+.req {
+  color: #e8534a;
+}
+
+.field input,
+.field select,
+.table input,
+.table select {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.weekRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.toolBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+}
+
+.toolBtn:disabled {
+  opacity: 0.45;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid #eef0f4;
+  padding: 0.35rem;
+  text-align: left;
+}
+
+.table th {
+  color: #95a5a6;
+  font-size: 0.72rem;
+}
+
+.rowSelected {
+  background: #f0f9ff;
+}
+
+.empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 1rem !important;
+}
+
+.side {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  min-height: 280px;
+}
+
+.sideHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.sideHead h2 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.sideEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+  color: #95a5a6;
+  font-size: 0.85rem;
+  padding: 2rem 0.5rem;
+}
+
+.sideIcon {
+  font-size: 2rem;
+  opacity: 0.5;
+}
+
+.totals {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.totals dt {
+  color: #95a5a6;
+}
+
+.totals dd {
+  margin: 0;
+  font-weight: 700;
+  color: #2c3e50;
+}

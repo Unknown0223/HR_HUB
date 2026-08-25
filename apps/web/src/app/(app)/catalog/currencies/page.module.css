@@ -1,0 +1,221 @@
+.statusWrap {
+  position: relative;
+}
+
+.btnStatus {
+  appearance: none;
+  border: none;
+  border-radius: 4px;
+  background: #5d78ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.btnStatus:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.statusMenu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+  padding: 0.2rem 0;
+}
+
+.statusMenu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #3f4254;
+  padding: 0.42rem 0.75rem;
+  cursor: pointer;
+}
+
+.statusMenu button:hover {
+  background: #eef6ff;
+  color: #3699ff;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #d1f7ea;
+  color: #0d9488;
+}
+
+.badgeOff {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.sideName {
+  font-weight: 650;
+  color: #3f4254;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.sideId {
+  font-size: 0.78rem;
+  color: #95a5a6;
+}
+
+.cardWide {
+  max-width: none;
+  min-height: 0;
+}
+
+.viewGrid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 960px) {
+  .viewGrid3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .viewGrid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: #95a5a6;
+  line-height: 1.35;
+}
+
+.hint a {
+  color: #3699ff;
+}
+
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.dateField span {
+  font-size: 0.7rem;
+  color: #95a5a6;
+}
+
+.dateField input {
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.86rem;
+  color: #3f4254;
+  background: #fff;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 1rem;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  width: min(420px, 100%);
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.18);
+  padding: 1rem 1.1rem 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.modalWide {
+  width: min(520px, 100%);
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #3f4254;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.historyHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.histLinks {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.histLinks button,
+.histOn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #3699ff;
+  cursor: pointer;
+  padding: 0;
+}
+
+.histOn {
+  font-weight: 650;
+  text-decoration: underline;
+}
+
+.ratesCard {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 6px;
+  padding: 0.75rem 0.85rem 1rem;
+  min-height: 280px;
+}
+
+.isoWiki {
+  word-break: break-all;
+}

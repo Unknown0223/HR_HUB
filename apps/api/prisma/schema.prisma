@@ -1,0 +1,3766 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  platform_admin
+  tenant_admin
+  hr
+  manager
+  employee
+}
+
+enum EmploymentStatus {
+  active
+  dismissed
+  leave
+}
+
+enum SalaryMarketLevel {
+  below_market
+  at_market
+  above_market
+}
+
+enum EmploymentType {
+  staff
+  gph
+}
+
+enum PunchDirection {
+  IN
+  OUT
+  AUTO
+}
+
+enum DayStatus {
+  on_time
+  late
+  absent
+  not_started
+  day_off
+  leave
+}
+
+enum RequestStatus {
+  draft
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum RequestType {
+  absence
+  schedule_change
+  roster_change
+  overtime
+  location
+  hr_change
+}
+
+/// Verifix «Заявки на кадровые изменения» kinds
+enum HrChangeKind {
+  open_position
+  hire
+  transfer
+  transfer_batch
+  dismiss
+}
+
+enum DocumentType {
+  hire
+  transfer
+  dismiss
+  name_change
+  wage_change
+  other
+}
+
+enum FaceSyncStatus {
+  pending
+  syncing
+  synced
+  failed
+}
+
+enum PayrollPeriodStatus {
+  open
+  calculated
+  closed
+}
+
+/// Verifix document «провести» lifecycle (draft → posted)
+enum DocumentLifecycle {
+  draft
+  posted
+  cancelled
+}
+
+enum AdvanceStatus {
+  draft
+  paid
+  cancelled
+}
+
+enum PayrollLineType {
+  base
+  bonus
+  penalty
+  advance
+  deduction
+  overtime
+  one_time
+  other
+}
+
+/// Verifix «Все начисления» document kinds
+enum PayrollAccrualKind {
+  salary_contributions
+  sick_leave
+  travel
+  vacation
+  all_types
+}
+
+enum IntegrationType {
+  hikvision
+  webhook
+  onec
+  bank
+  custom
+}
+
+enum ClearanceStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum ClearanceItemStatus {
+  pending
+  done
+  skipped
+}
+
+enum IncidentSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum IncidentStatus {
+  open
+  investigating
+  resolved
+  closed
+}
+
+/// Verifix: Действия по инциденту
+enum IncidentAction {
+  verbal_warning
+  written_warning
+  fine
+}
+
+enum NotificationKind {
+  approval
+  info
+  alert
+  system
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users          User[]
+  divisions      Division[]
+  positions      Position[]
+  employees      Employee[]
+  persons        Person[]
+  locations      Location[]
+  devices        Device[]
+  attendanceMarks AttendanceMark[]
+  attendanceDays AttendanceDay[]
+  problemMarks   ProblemMark[]
+  absenceTypes   AbsenceType[]
+  absences       Absence[]
+  hrRequests     HrRequest[]
+  hrDocuments    HrDocument[]
+  hrChangeRequests HrChangeRequest[]
+  workSchedules  WorkSchedule[]
+  productionCalendars ProductionCalendar[]
+  qrCodes        QrCode[]
+  payrollPolicies PayrollPolicy[]
+  finePolicies    FinePolicy[]
+  allowancePolicies AllowancePolicy[]
+  timesheetSheets TimesheetSheet[]
+  payrollPeriods  PayrollPeriod[]
+  payrollLines    PayrollLine[]
+  payrollAdvances PayrollAdvance[]
+  payrollAccrualDocs PayrollAccrualDoc[]
+  payrollLedgerEntries PayrollLedgerEntry[]
+  settlementAudits   SettlementAudit[]
+  payrollSheets      PayrollSheet[]
+  payrollSheetAudits PayrollSheetAudit[]
+  payrollSheetSetting PayrollSheetSetting?
+  payrollManualOps    PayrollManualOp[]
+  payrollManualAudits PayrollManualAudit[]
+  tenantSetting   TenantSetting?
+  dictionaries    Dictionary[]
+  personDocuments PersonDocument[]
+  integrations    ExternalIntegration[]
+  auditLogs       AuditLog[]
+  clearanceTemplates ClearanceTemplate[]
+  clearanceSheets    ClearanceSheet[]
+  incidentTypes      IncidentType[]
+  incidents          Incident[]
+  notifications      Notification[]
+
+  divisionGroups     DivisionGroup[]
+  positionGroups     PositionGroup[]
+  grades             Grade[]
+  employeeGradeHistory EmployeeGradeHistory[]
+  gradePromotions    GradePromotion[]
+  gradePromotionRecommendations GradePromotionRecommendation[]
+  careerPaths        CareerPath[]
+  tariffGroups       TariffGroup[]
+  tariffApprovals    TariffGroupApproval[]
+  staffPositions     StaffPosition[]
+  dismissalReasons   DismissalReason[]
+  gphContracts       GphContract[]
+  gphServices        GphService[]
+  nameChanges        EmployeeNameChange[]
+  wageChanges        WageChange[]
+  locationTypes      LocationType[]
+  timesheetAdjustments TimesheetAdjustment[]
+  timesheetCorrections TimesheetCorrection[]
+  scheduleShifts     ScheduleShift[]
+  scheduleShiftAssignments ScheduleShiftAssignment[]
+  scheduleOverrides  EmployeeScheduleOverride[]
+  individualSchedules IndividualSchedule[]
+  positionSchedules  PositionSchedule[]
+  positionScheduleDocs PositionScheduleDoc[]
+  workRosters        WorkRoster[]
+  internalTrips      InternalTrip[]
+  gpsTrackPoints     GpsTrackPoint[]
+  paymentOrders      PaymentOrder[]
+  accountPairs       AccountPair[]
+  settlements        Settlement[]
+  salesCommissionPolicies SalesCommissionPolicy[]
+  salesCommissionAccruals SalesCommissionAccrual[]
+  oneTimeAccrualDocs OneTimeAccrualDoc[]
+  bonusAccrualDocs   BonusAccrualDoc[]
+  employeeLoans      EmployeeLoan[]
+  travelExpenseReports TravelExpenseReport[]
+  candidates         Candidate[]
+  vacancies          Vacancy[]
+  employeeRelatives  EmployeeRelative[]
+  employeeCertificates EmployeeCertificate[]
+  employeeTenures      EmployeeTenure[]
+  employeeWorkplaces   EmployeeWorkplace[]
+  employeeAwards       EmployeeAward[]
+  employeeFiles        EmployeeFile[]
+  employeeInventory    EmployeeInventory[]
+  employeeCars         EmployeeCar[]
+  employeeMarkBlocks   EmployeeMarkBlock[]
+  employeeAccessGrants EmployeeAccessGrant[]
+  employeeBankAccounts EmployeeBankAccount[]
+  employeeBankCards    EmployeeBankCard[]
+  timeTypes          TimeType[]
+  reportTemplates    ReportTemplate[]
+  positionTemplates  PositionTemplate[]
+  dynamicFields      DynamicField[]
+  dynamicObjects     DynamicObject[]
+  factTypes          FactType[]
+  facts              Fact[]
+  accrualTypes       AccrualType[]
+  deductionTypes     DeductionType[]
+  hireDocumentExceptions HireDocumentException[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String?  @map("tenant_id") @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         Role     @default(employee)
+  isActive     Boolean  @default(true) @map("is_active")
+  /// Verifix profile: login, photo, orgs, catalog roles, phone…
+  meta         Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Division {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  parentId        String?   @map("parent_id") @db.Uuid
+  managerId       String?   @map("manager_id") @db.Uuid
+  divisionGroupId String?   @map("division_group_id") @db.Uuid
+  locationId      String?   @map("location_id") @db.Uuid
+  scheduleId      String?   @map("schedule_id") @db.Uuid
+  code            String
+  name            String
+  sortOrder       Int       @default(0) @map("sort_order")
+  openedAt        DateTime? @map("opened_at") @db.Date
+  closedAt        DateTime? @map("closed_at") @db.Date
+  legalEntity     String?   @map("legal_entity")
+  createdByLabel  String?   @map("created_by_label")
+  updatedByLabel  String?   @map("updated_by_label")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent        Division?      @relation("DivisionTree", fields: [parentId], references: [id])
+  children      Division[]     @relation("DivisionTree")
+  manager       Employee?      @relation("DivisionManager", fields: [managerId], references: [id], onDelete: SetNull)
+  divisionGroup DivisionGroup? @relation(fields: [divisionGroupId], references: [id])
+  location      Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  schedule      WorkSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  employees     Employee[]
+  staffPositions StaffPosition[]
+  gphContracts  GphContract[]
+  timesheetCorrections TimesheetCorrection[]
+  timesheetSheets TimesheetSheet[]
+  payrollAccrualDocs PayrollAccrualDoc[]
+  payrollSheets PayrollSheet[]
+  salesCommissionAccruals SalesCommissionAccrual[]
+  oneTimeAccrualDocs OneTimeAccrualDoc[]
+  bonusAccrualDocs   BonusAccrualDoc[]
+  individualSchedules IndividualSchedule[]
+  positionScheduleDocs PositionScheduleDoc[]
+  hrChangeRequests HrChangeRequest[]
+  clearanceTemplates ClearanceTemplate[]
+  gradePromotions GradePromotion[]
+  gradePromotionRecommendations GradePromotionRecommendation[]
+  tripsAsRecipient InternalTrip[] @relation("TripRecipient")
+  tripsAsSender    InternalTrip[] @relation("TripSender")
+  positionTemplates PositionTemplate[]
+  facts            Fact[]
+  hireDocumentExceptions HireDocumentException[]
+  finePolicies           FinePolicy[]
+  allowancePolicies      AllowancePolicy[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([managerId])
+  @@index([locationId])
+  @@index([scheduleId])
+  @@map("divisions")
+}
+
+model Position {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  positionGroupId String?  @map("position_group_id") @db.Uuid
+  code            String
+  name            String
+  sortOrder       Int      @default(0) @map("sort_order")
+  description     String?
+  /// Роль (Verifix)
+  role            String?
+  /// Счет затрат
+  costAccount     String?  @map("cost_account")
+  /// Классификатор mehnat
+  laborClassifier String?  @map("labor_classifier")
+  /// Псевдонимы: [{ grade, alias }]
+  aliases         Json?
+  createdByLabel  String?  @map("created_by_label")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  positionGroup PositionGroup? @relation(fields: [positionGroupId], references: [id])
+  employees     Employee[]
+  staffPositions StaffPosition[]
+  careerSteps   CareerPathStep[]
+  positionSchedules PositionSchedule[]
+  positionScheduleDocLines PositionScheduleDocLine[]
+  positionTemplates PositionTemplate[]
+  hrChangeRequests HrChangeRequest[]
+  clearanceTemplates ClearanceTemplate[]
+  gradePromotionRecommendations GradePromotionRecommendation[]
+  internalTrips InternalTrip[]
+  hireDocumentExceptions HireDocumentException[]
+  finePolicies           FinePolicy[]
+  salesCommissionPolicies SalesCommissionPolicy[]
+  salesCommissionAccruals SalesCommissionAccrual[]
+  salesCommissionLines    SalesCommissionLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("positions")
+}
+
+model Person {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  firstName  String   @map("first_name")
+  lastName   String   @map("last_name")
+  middleName String?  @map("middle_name")
+  birthDate  DateTime? @map("birth_date") @db.Date
+  gender     String?
+  pinfl      String?
+  passport   String?
+  phone      String?
+  email      String?
+  /// Verifix directory fields
+  code                 String?  @map("code")
+  inn                  String?
+  inps                 String?
+  nationality          String?
+  regionId             String?  @map("region_id") @db.Uuid
+  addressResidence     String?  @map("address_residence") @db.Text
+  addressRegistration  String?  @map("address_registration") @db.Text
+  photoUrl             String?  @map("photo_url")
+  useForFaceRecognition Boolean @default(true) @map("use_for_face_recognition")
+  isKeyPerson          Boolean  @default(false) @map("is_key_person")
+  accessAllEmployees   Boolean  @default(false) @map("access_all_employees")
+  isBlacklisted        Boolean  @default(false) @map("is_blacklisted")
+  isActive             Boolean  @default(true) @map("is_active")
+  isPinned             Boolean  @default(false) @map("is_pinned")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  region    DictionaryItem?  @relation(fields: [regionId], references: [id])
+  employees Employee[]
+  documents PersonDocument[]
+  gphContracts GphContract[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, isPinned])
+  @@map("persons")
+}
+
+model Employee {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  personId       String?          @map("person_id") @db.Uuid
+  tabNumber      String           @map("tab_number")
+  firstName      String           @map("first_name")
+  lastName       String           @map("last_name")
+  middleName     String?          @map("middle_name")
+  email          String?
+  phone          String?
+  divisionId     String?          @map("division_id") @db.Uuid
+  positionId     String?          @map("position_id") @db.Uuid
+  gradeId        String?          @map("grade_id") @db.Uuid
+  regionId       String?          @map("region_id") @db.Uuid
+  staffPositionId String?         @map("staff_position_id") @db.Uuid
+  dismissalReasonId String?       @map("dismissal_reason_id") @db.Uuid
+  status         EmploymentStatus @default(active)
+  employmentType EmploymentType   @default(staff) @map("employment_type")
+  hiredAt        DateTime?        @map("hired_at") @db.Date
+  dismissedAt    DateTime?        @map("dismissed_at") @db.Date
+  /// Откуда пришел (Verifix analytics)
+  employmentSource String?        @map("employment_source")
+  /// Куда ушел после увольнения
+  dismissalDestination String?    @map("dismissal_destination")
+  /// Ключевой сотрудник
+  isKeyEmployee  Boolean          @default(false) @map("is_key_employee")
+  /// Уровень зарплаты относительно рынка
+  salaryMarketLevel SalaryMarketLevel? @map("salary_market_level")
+  externalId     String?          @map("external_id")
+  scheduleId     String?          @map("schedule_id") @db.Uuid
+  baseSalary     Decimal?         @map("base_salary") @db.Decimal(14, 2)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  person   Person?       @relation(fields: [personId], references: [id])
+  division Division?     @relation(fields: [divisionId], references: [id])
+  position Position?     @relation(fields: [positionId], references: [id])
+  schedule WorkSchedule? @relation(fields: [scheduleId], references: [id])
+  grade            Grade?           @relation(fields: [gradeId], references: [id])
+  region           DictionaryItem?  @relation(fields: [regionId], references: [id])
+  staffPosition    StaffPosition?   @relation(fields: [staffPositionId], references: [id])
+  dismissalReason  DismissalReason? @relation(fields: [dismissalReasonId], references: [id])
+
+  marks      AttendanceMark[]
+  days       AttendanceDay[]
+  absences   Absence[]
+  requests   HrRequest[]
+  documents  HrDocument[]
+  hrChangeRequests HrChangeRequest[]
+  hrChangeRequestLines HrChangeRequestLine[]
+  personDocuments PersonDocument[]
+  faceProfile FaceProfile?
+  payrollLines    PayrollLine[]
+  payrollAdvances PayrollAdvance[]
+  payrollAccrualLines PayrollAccrualLine[]
+  payrollAccrualDeductions PayrollAccrualDeduction[]
+  payrollSheetLines PayrollSheetLine[]
+  clearanceSheets ClearanceSheet[]
+  clearanceTemplateEmployees ClearanceTemplateEmployee[]
+  absenceTypeEmployees AbsenceTypeEmployee[]
+  incidents       Incident[]
+  managedIncidents Incident[] @relation("IncidentManager")
+  gradeHistory     EmployeeGradeHistory[]
+  gradePromotionLines GradePromotionLine[]
+  gradePromotionRecommendations GradePromotionRecommendation[]
+  gphContracts     GphContract[]
+  nameChanges      EmployeeNameChange[]
+  wageChanges      WageChange[]
+  timesheetAdjustments TimesheetAdjustment[]
+  timesheetCorrectionLines TimesheetCorrectionLine[]
+  timesheetSheetLines TimesheetSheetLine[]
+  scheduleOverrides EmployeeScheduleOverride[]
+  individualScheduleLines IndividualScheduleLine[]
+  positionScheduleDocLines PositionScheduleDocLine[]
+  workRosterLines WorkRosterLine[]
+  shiftAssignments ScheduleShiftAssignment[]
+  shiftReplacements ScheduleShiftAssignment[] @relation("ShiftReplacedBy")
+  internalTrips    InternalTrip[]
+  gpsTrackPoints   GpsTrackPoint[]
+  paymentOrders    PaymentOrder[]
+  settlements      Settlement[]
+  salesCommissionLines SalesCommissionLine[]
+  oneTimeAccrualLines OneTimeAccrualLine[]
+  bonusAccrualLines   BonusAccrualLine[]
+  facts            Fact[]
+  loans            EmployeeLoan[]
+  travelReports    TravelExpenseReport[]
+  relatives        EmployeeRelative[]
+  certificates     EmployeeCertificate[]
+  tenures          EmployeeTenure[]
+  workplaces       EmployeeWorkplace[]
+  awards           EmployeeAward[]
+  files            EmployeeFile[]
+  inventoryItems   EmployeeInventory[]
+  cars             EmployeeCar[]
+  markBlocks       EmployeeMarkBlock[]
+  accessGrants     EmployeeAccessGrant[]
+  bankAccounts     EmployeeBankAccount[]
+  bankCards        EmployeeBankCard[]
+  managedDivisions Division[] @relation("DivisionManager")
+
+  @@unique([tenantId, tabNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, status, dismissedAt])
+  @@index([tenantId, employmentType])
+  @@index([tenantId, externalId])
+  @@index([tenantId, regionId])
+  @@index([tenantId, lastName, firstName])
+  @@map("employees")
+}
+
+/// Verifix: ordinary | hourly | advanced | multi_shift | advanced_multi_shift
+enum WorkScheduleKind {
+  ordinary
+  hourly
+  advanced
+  multi_shift
+  advanced_multi_shift
+}
+
+model WorkSchedule {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  kind      WorkScheduleKind @default(ordinary)
+  startTime String           @default("09:00") @map("start_time")
+  endTime   String           @default("18:00") @map("end_time")
+  graceMinutes Int           @default(15) @map("grace_minutes")
+  /// Verifix schedule knobs: weekPattern, graceOut, trackLate/Early, delayMode, yearGrid, …
+  settings  Json?
+  isActive  Boolean          @default(true) @map("is_active")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees Employee[]
+  divisions Division[]
+  shifts    ScheduleShift[]
+  overrides EmployeeScheduleOverride[]
+  positionSchedules PositionSchedule[]
+  staffPositions StaffPosition[]
+  workRosters WorkRoster[]
+  shiftAssignments ScheduleShiftAssignment[]
+  internalTrips InternalTrip[]
+  positionTemplates PositionTemplate[]
+  allowancePolicies AllowancePolicy[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, kind])
+  @@map("work_schedules")
+}
+
+/// Verifix «Производственные календари»
+model ProductionCalendar {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  code                 String
+  name                 String
+  year                 Int
+  /// Weekend weekday numbers: 0=Sun … 6=Sat (JSON number[])
+  weekendDays          Json     @default("[0,6]") @map("weekend_days")
+  preHolidayHours      String?  @map("pre_holiday_hours")
+  holidayHours         String?  @map("holiday_hours")
+  dailyAttendance      String   @default("08:00") @map("daily_attendance")
+  monthlyLimit         Boolean  @default(false) @map("monthly_limit")
+  dailyLimit           Boolean  @default(false) @map("daily_limit")
+  /// Cached totals from recalculate
+  totals               Json?
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  days   ProductionCalendarDay[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, year])
+  @@map("production_calendars")
+}
+
+enum ProdCalendarDayType {
+  holiday
+  day_off
+  transfer
+  short_day
+  workday
+}
+
+model ProductionCalendarDay {
+  id              String              @id @default(uuid()) @db.Uuid
+  calendarId      String              @map("calendar_id") @db.Uuid
+  day             DateTime            @db.Date
+  dayType         ProdCalendarDayType @default(holiday) @map("day_type")
+  name            String?
+  replacementDay  DateTime?           @map("replacement_day") @db.Date
+  hours           Decimal?            @db.Decimal(5, 2)
+
+  calendar ProductionCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, day])
+  @@index([calendarId])
+  @@map("production_calendar_days")
+}
+
+model Location {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  locationTypeId String?  @map("location_type_id") @db.Uuid
+  code           String
+  name           String
+  address        String?
+  timezone       String   @default("Asia/Tashkent")
+  latitude       Float?
+  longitude      Float?
+  geoRadiusM     Int      @default(150) @map("geo_radius_m")
+  isActive       Boolean  @default(true) @map("is_active")
+  /// Verifix extras: region, bssid, restrictMarks, polygonalAnalysis,
+  /// createdByLabel, updatedByLabel, changeHistory[]
+  meta           Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationType  LocationType?  @relation(fields: [locationTypeId], references: [id])
+  devices       Device[]
+  qrCodes       QrCode[]
+  internalTrips InternalTrip[]
+  divisions     Division[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("locations")
+}
+
+model QrCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  locationId String?   @map("location_id") @db.Uuid
+  code       String
+  label      String
+  expiresAt  DateTime? @map("expires_at")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("qr_codes")
+}
+
+model Device {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  locationId   String?   @map("location_id") @db.Uuid
+  name         String
+  serialNumber String    @map("serial_number")
+  model        String?
+  adapterType  String    @default("mock") @map("adapter_type")
+  host         String?
+  port         Int?
+  username     String?
+  passwordEnc  String?   @map("password_enc")
+  status       String    @default("offline")
+  lastSeenAt   DateTime? @map("last_seen_at")
+  gatewayRef   String?   @map("gateway_ref")
+  isActive     Boolean   @default(true) @map("is_active")
+  /// Verifix extras: deviceType, timezone, battery, trackingType, autoIn/Out,
+  /// hikCentral {gatewayHost,gatewayPort,deviceId,isupKey}, ignoredPersonIds[],
+  /// ignoredDivisionIds[], commands[]
+  meta         Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location  Location?        @relation(fields: [locationId], references: [id])
+  marks     AttendanceMark[]
+  faceSyncs DeviceFaceSync[]
+
+  @@unique([tenantId, serialNumber])
+  @@index([tenantId])
+  @@map("devices")
+}
+
+model FaceProfile {
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String         @map("tenant_id") @db.Uuid
+  employeeId   String         @unique @map("employee_id") @db.Uuid
+  syncStatus   FaceSyncStatus @default(pending) @map("sync_status")
+  photoUrl     String?        @map("photo_url")
+  photoKey     String?        @map("photo_key")
+  contentType  String?        @map("content_type")
+  lastError    String?        @map("last_error")
+  lastSyncedAt DateTime?      @map("last_synced_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  employee  Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  deviceSyncs DeviceFaceSync[]
+
+  @@index([tenantId])
+  @@map("face_profiles")
+}
+
+model DeviceFaceSync {
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @map("tenant_id") @db.Uuid
+  deviceId      String         @map("device_id") @db.Uuid
+  faceProfileId String         @map("face_profile_id") @db.Uuid
+  employeeId    String         @map("employee_id") @db.Uuid
+  syncStatus    FaceSyncStatus @default(pending) @map("sync_status")
+  lastError     String?        @map("last_error")
+  lastSyncedAt  DateTime?      @map("last_synced_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  device      Device      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  faceProfile FaceProfile @relation(fields: [faceProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, faceProfileId])
+  @@index([tenantId])
+  @@index([employeeId])
+  @@map("device_face_syncs")
+}
+
+model AttendanceMark {
+  id                  String         @id @default(uuid()) @db.Uuid
+  tenantId            String         @map("tenant_id") @db.Uuid
+  employeeId          String?        @map("employee_id") @db.Uuid
+  deviceId            String?        @map("device_id") @db.Uuid
+  employeeExternalId  String?        @map("employee_external_id")
+  direction           PunchDirection @default(AUTO)
+  occurredAt          DateTime       @map("occurred_at")
+  source              String         @default("manual")
+  rawPayload          Json?          @map("raw_payload")
+  createdAt           DateTime       @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id])
+  device   Device?   @relation(fields: [deviceId], references: [id])
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, employeeId, occurredAt])
+  @@map("attendance_marks")
+}
+
+model AttendanceDay {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  workDate   DateTime  @map("work_date") @db.Date
+  status     DayStatus @default(not_started)
+  firstInAt  DateTime? @map("first_in_at")
+  lastOutAt  DateTime? @map("last_out_at")
+  lateMinutes Int      @default(0) @map("late_minutes")
+  earlyLeaveMinutes Int @default(0) @map("early_leave_minutes")
+  /// Official hours after timesheet correction post (Verifix)
+  plannedHours  Decimal? @map("planned_hours") @db.Decimal(8, 2)
+  onTimeHours   Decimal? @map("on_time_hours") @db.Decimal(8, 2)
+  outsideHours  Decimal? @map("outside_hours") @db.Decimal(8, 2)
+  workedHours   Decimal? @map("worked_hours") @db.Decimal(8, 2)
+  overtimeHours Decimal? @map("overtime_hours") @db.Decimal(8, 2)
+  beforeHours   Decimal? @map("before_hours") @db.Decimal(8, 2)
+  afterHours    Decimal? @map("after_hours") @db.Decimal(8, 2)
+  correctionId  String?  @map("correction_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId, workDate])
+  @@index([tenantId, workDate])
+  @@index([tenantId, status, workDate])
+  @@map("attendance_days")
+}
+
+model ProblemMark {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  reason     String
+  payload    Json
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, resolved])
+  @@map("problem_marks")
+}
+
+model AbsenceType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  /// Годовой | Разовый (Вид вычисления / вид начисления)
+  calcKind    String   @default("annual") @map("calc_kind")
+  description String?
+  /// Начисления (label)
+  accrualName String?  @map("accrual_name")
+  timeTypeId  String?  @map("time_type_id") @db.Uuid
+  paid        Boolean  @default(true)
+  isActive    Boolean  @default(true) @map("is_active")
+  /// Verifix: allow employees to create requests for this type
+  allowEmployeeRequest Boolean @default(true) @map("allow_employee_request")
+  /// Учитывать неиспользованное время
+  trackUnusedTime Boolean @default(false) @map("track_unused_time")
+  /// Ограничение времени запроса
+  requestTimeLimit Boolean @default(false) @map("request_time_limit")
+  /// calendar | working | production
+  providedIn  String   @default("working") @map("provided_in")
+  /// Является ежегодным
+  isAnnual    Boolean  @default(false) @map("is_annual")
+  daysPerYear Int?     @map("days_per_year")
+  limitDays   Int?     @map("limit_days")
+  monthlyQtyLimit  Boolean @default(false) @map("monthly_qty_limit")
+  monthlyHourLimit Boolean @default(false) @map("monthly_hour_limit")
+  carryoverPolicy  String? @map("carryover_policy")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeType TimeType? @relation(fields: [timeTypeId], references: [id], onDelete: SetNull)
+  absences Absence[]
+  employees AbsenceTypeEmployee[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([timeTypeId])
+  @@map("absence_types")
+}
+
+/// Verifix: Вид отсутствия (сотрудники) — assigned employees + accrual period
+model AbsenceTypeEmployee {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  absenceTypeId String    @map("absence_type_id") @db.Uuid
+  employeeId    String    @map("employee_id") @db.Uuid
+  /// planned | carryover
+  accrualKind   String    @default("planned") @map("accrual_kind")
+  periodStart   DateTime? @map("period_start") @db.Date
+  periodEnd     DateTime? @map("period_end") @db.Date
+  accrued       Decimal   @default(0) @db.Decimal(10, 2)
+  sortOrder     Int       @default(0) @map("sort_order")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  absenceType AbsenceType @relation(fields: [absenceTypeId], references: [id], onDelete: Cascade)
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([absenceTypeId, employeeId, accrualKind])
+  @@index([tenantId])
+  @@index([absenceTypeId])
+  @@index([employeeId])
+  @@map("absence_type_employees")
+}
+
+model Absence {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  employeeId    String        @map("employee_id") @db.Uuid
+  absenceTypeId String        @map("absence_type_id") @db.Uuid
+  startDate     DateTime      @map("start_date") @db.Date
+  endDate       DateTime      @map("end_date") @db.Date
+  /// HH:mm for part-day absences
+  startTime     String?       @map("start_time")
+  endTime       String?       @map("end_time")
+  status        RequestStatus @default(pending)
+  note          String?
+  managerNote   String?       @map("manager_note")
+  /// Extra Verifix fields: number, requestKind, completed, audit names…
+  meta          Json?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  absenceType AbsenceType @relation(fields: [absenceTypeId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("absences")
+}
+
+model HrRequest {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  employeeId      String        @map("employee_id") @db.Uuid
+  type            RequestType
+  status          RequestStatus @default(pending)
+  title           String
+  payload         Json?
+  /// personal | shared | inbox — drives mega-nav scopes (mine / общие / запросы мне)
+  visibility      String        @default("shared")
+  createdByUserId String?       @map("created_by_user_id") @db.Uuid
+  assigneeUserId  String?       @map("assignee_user_id") @db.Uuid
+  reviewedBy      String?       @map("reviewed_by")
+  reviewNote      String?       @map("review_note")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@map("hr_requests")
+}
+
+model HrDocument {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  employeeId   String            @map("employee_id") @db.Uuid
+  type         DocumentType      @default(other)
+  status       DocumentLifecycle @default(draft)
+  number       String?
+  title        String
+  documentDate DateTime          @map("document_date") @db.Date
+  note         String?
+  /// Side-effect payload for post (divisionId, positionId, baseSalary, new names, …)
+  payload      Json?
+  postedAt     DateTime?         @map("posted_at")
+  postedBy     String?           @map("posted_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("hr_documents")
+}
+
+/// Заявки на кадровые изменения (Verifix)
+model HrChangeRequest {
+  id                 String        @id @default(uuid()) @db.Uuid
+  tenantId           String        @map("tenant_id") @db.Uuid
+  kind               HrChangeKind
+  status             RequestStatus @default(draft)
+  number             String?
+  requestDate        DateTime      @map("request_date") @db.Date
+  title              String?
+  divisionId         String?       @map("division_id") @db.Uuid
+  positionId         String?       @map("position_id") @db.Uuid
+  staffPositionId    String?       @map("staff_position_id") @db.Uuid
+  employeeId         String?       @map("employee_id") @db.Uuid
+  effectiveDate      DateTime?     @map("effective_date") @db.Date
+  quantity           Int?
+  employmentType     String?       @map("employment_type")
+  dismissalReasonId  String?       @map("dismissal_reason_id") @db.Uuid
+  note               String?
+  candidateGender    String?       @map("candidate_gender")
+  candidateFirstName String?       @map("candidate_first_name")
+  candidateLastName  String?       @map("candidate_last_name")
+  candidateMiddleName String?      @map("candidate_middle_name")
+  createdByUserId    String?       @map("created_by_user_id") @db.Uuid
+  createdByLabel     String?       @map("created_by_label")
+  reviewedBy         String?       @map("reviewed_by")
+  reviewNote         String?       @map("review_note")
+  reviewedAt         DateTime?     @map("reviewed_at")
+  payload            Json?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division        Division?              @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  position        Position?              @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  staffPosition   StaffPosition?         @relation(fields: [staffPositionId], references: [id], onDelete: SetNull)
+  employee        Employee?              @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  dismissalReason DismissalReason?       @relation(fields: [dismissalReasonId], references: [id], onDelete: SetNull)
+  lines           HrChangeRequestLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, kind])
+  @@index([tenantId, requestDate])
+  @@map("hr_change_requests")
+}
+
+model HrChangeRequestLine {
+  id              String    @id @default(uuid()) @db.Uuid
+  requestId       String    @map("request_id") @db.Uuid
+  sortOrder       Int       @default(0) @map("sort_order")
+  employeeId      String    @map("employee_id") @db.Uuid
+  effectiveDate   DateTime? @map("effective_date") @db.Date
+  staffPositionId String?   @map("staff_position_id") @db.Uuid
+  divisionId      String?   @map("division_id") @db.Uuid
+  positionId      String?   @map("position_id") @db.Uuid
+  employmentType  String?   @map("employment_type")
+  note            String?
+
+  request       HrChangeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  staffPosition StaffPosition?  @relation(fields: [staffPositionId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([employeeId])
+  @@map("hr_change_request_lines")
+}
+
+model PayrollPolicy {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  code                 String
+  name                 String
+  latePenaltyPerMin    Decimal  @default(500) @map("late_penalty_per_min") @db.Decimal(14, 2)
+  absencePenalty       Decimal  @default(100000) @map("absence_penalty") @db.Decimal(14, 2)
+  overtimeBonusPerHour Decimal  @default(25000) @map("overtime_bonus_per_hour") @db.Decimal(14, 2)
+  baseSalaryDefault    Decimal  @default(5000000) @map("base_salary_default") @db.Decimal(14, 2)
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("payroll_policies")
+}
+
+/// Verifix «Политики штрафов» — scoped monthly rules (company / division / position / employee)
+model FinePolicy {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  /// company | division | position | employee
+  scope       String
+  month       DateTime @db.Date
+  name        String   @default("")
+  isActive    Boolean  @default(true) @map("is_active")
+  divisionId  String?  @map("division_id") @db.Uuid
+  positionId  String?  @map("position_id") @db.Uuid
+  /// string[] of employee ids when scope = employee
+  employeeIds Json?    @map("employee_ids")
+  /// { late, early, absence, missed_day, missed_mark: FineRule[] }
+  rules       Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  position Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, scope])
+  @@index([tenantId, month])
+  @@map("fine_policies")
+}
+
+/// Verifix «Политика доплат» — scoped monthly overtime/surcharge coefficients
+model AllowancePolicy {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  /// company | division | schedule
+  scope      String
+  month      DateTime @db.Date
+  name       String   @default("")
+  isActive   Boolean  @default(true) @map("is_active")
+  divisionId String?  @map("division_id") @db.Uuid
+  scheduleId String?  @map("schedule_id") @db.Uuid
+  /// [{ id, startTime, endTime, coefficient }]
+  rules      Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?    @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  schedule WorkSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, scope])
+  @@index([tenantId, month])
+  @@map("allowance_policies")
+}
+
+model PayrollPeriod {
+  id        String              @id @default(uuid()) @db.Uuid
+  tenantId  String              @map("tenant_id") @db.Uuid
+  year      Int
+  month     Int
+  status    PayrollPeriodStatus @default(open)
+  note      String?
+  closedAt  DateTime?           @map("closed_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines    PayrollLine[]
+  advances PayrollAdvance[]
+
+  @@unique([tenantId, year, month])
+  @@index([tenantId])
+  @@map("payroll_periods")
+}
+
+model PayrollLine {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  periodId     String            @map("period_id") @db.Uuid
+  employeeId   String            @map("employee_id") @db.Uuid
+  type         PayrollLineType   @default(base)
+  status       DocumentLifecycle @default(posted)
+  description  String?
+  amount       Decimal           @db.Decimal(14, 2)
+  workDays     Int?              @map("work_days")
+  lateMinutes  Int?              @map("late_minutes")
+  absenceDays  Int?              @map("absence_days")
+  postedAt     DateTime?         @map("posted_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  period   PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, periodId])
+  @@index([tenantId, employeeId])
+  @@map("payroll_lines")
+}
+
+model PayrollAdvance {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  periodId      String?       @map("period_id") @db.Uuid
+  employeeId    String        @map("employee_id") @db.Uuid
+  amount        Decimal       @db.Decimal(14, 2)
+  status        AdvanceStatus @default(paid)
+  paidAt        DateTime?     @map("paid_at")
+  note          String?
+  sourceSheetId String?       @map("source_sheet_id") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  period      PayrollPeriod? @relation(fields: [periodId], references: [id])
+  employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  sourceSheet PayrollSheet?  @relation(fields: [sourceSheetId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([sourceSheetId])
+  @@map("payroll_advances")
+}
+
+enum PayrollSheetKind {
+  vedomost
+  advance_salary
+}
+
+enum PayrollSheetPayType {
+  cash
+  bank
+}
+
+enum PayrollSheetStatus {
+  draft
+  completed
+}
+
+/// VERIFIX «Ведомость» / «Аванс по официальному окладу»
+model PayrollSheet {
+  id            String              @id @default(uuid()) @db.Uuid
+  tenantId      String              @map("tenant_id") @db.Uuid
+  kind          PayrollSheetKind
+  status        PayrollSheetStatus  @default(draft)
+  payType       PayrollSheetPayType @default(cash) @map("pay_type")
+  month         DateTime            @db.Date
+  issueDate     DateTime            @map("issue_date") @db.Date
+  number        String?
+  divisionId    String?             @map("division_id") @db.Uuid
+  cashbox       String?
+  bankAccount   String?             @map("bank_account")
+  currency      String              @default("UZS")
+  note          String?
+  totalAmount   Decimal             @default(0) @db.Decimal(14, 2) @map("total_amount")
+  rounding      String              @default("###.000000")
+  enableLimit   Boolean             @default(false) @map("enable_limit")
+  createdByName String?             @map("created_by_name")
+  completedAt   DateTime?           @map("completed_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?          @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    PayrollSheetLine[]
+  audits   PayrollSheetAudit[]
+  generatedAdvances PayrollAdvance[]
+
+  @@index([tenantId, kind])
+  @@index([tenantId, createdAt])
+  @@map("payroll_sheets")
+}
+
+model PayrollSheetLine {
+  id                 String  @id @default(uuid()) @db.Uuid
+  sheetId            String  @map("sheet_id") @db.Uuid
+  employeeId         String  @map("employee_id") @db.Uuid
+  debt               Decimal @default(0) @db.Decimal(14, 2)
+  limitAmount        Decimal @default(0) @db.Decimal(14, 2) @map("limit_amount")
+  accruedAdvance     Decimal @default(0) @db.Decimal(14, 2) @map("accrued_advance")
+  amount             Decimal @default(0) @db.Decimal(14, 2)
+  note               String?
+  bank               String?
+  bankCode           String? @map("bank_code")
+  settlementAccount  String? @map("settlement_account")
+  sortOrder          Int     @default(0) @map("sort_order")
+
+  sheet    PayrollSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  employee Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+  @@map("payroll_sheet_lines")
+}
+
+model PayrollSheetAudit {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  sheetId      String?  @map("sheet_id") @db.Uuid
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+  userName     String   @map("user_name")
+  eventType    String   @map("event_type")
+  organization String   @default("Demo")
+  product      String   @default("HR HUB")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sheet  PayrollSheet? @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@map("payroll_sheet_audits")
+}
+
+model PayrollSheetSetting {
+  id                      String  @id @default(uuid()) @db.Uuid
+  tenantId                String  @unique @map("tenant_id") @db.Uuid
+  rounding                String  @default("####.000000")
+  countPaidAdvances       Boolean @default(true) @map("count_paid_advances")
+  generateNote            Boolean @default(true) @map("generate_note")
+  monthlyDayLimit         Decimal @default(0) @db.Decimal(14, 2) @map("monthly_day_limit")
+  percent                 Decimal @default(40) @db.Decimal(7, 2)
+  deductionPercent        Decimal @default(0) @db.Decimal(7, 2) @map("deduction_percent")
+  postedAccrualsOnly      Boolean @default(true) @map("posted_accruals_only")
+  postedDeductionsOnly    Boolean @default(true) @map("posted_deductions_only")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_sheet_settings")
+}
+
+enum PayrollManualStatus {
+  draft
+  posted
+}
+
+/// VERIFIX «Ручные операции» — journal document with postings
+model PayrollManualOp {
+  id            String              @id @default(uuid()) @db.Uuid
+  tenantId      String              @map("tenant_id") @db.Uuid
+  status        PayrollManualStatus @default(draft)
+  number        String?
+  docDate       DateTime            @map("doc_date")
+  note          String?
+  totalAmount   Decimal             @default(0) @db.Decimal(14, 2) @map("total_amount")
+  createdByName String?             @map("created_by_name")
+  postedAt      DateTime?           @map("posted_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines  PayrollManualLine[]
+  audits PayrollManualAudit[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, docDate])
+  @@map("payroll_manual_ops")
+}
+
+model PayrollManualLine {
+  id             String  @id @default(uuid()) @db.Uuid
+  opId           String  @map("op_id") @db.Uuid
+  debitAccount   String  @map("debit_account")
+  debitName      String? @map("debit_name")
+  creditAccount  String  @map("credit_account")
+  creditName     String? @map("credit_name")
+  quantity       Decimal @default(0) @db.Decimal(14, 4)
+  amount         Decimal @default(0) @db.Decimal(14, 2)
+  amountBase     Decimal @default(0) @db.Decimal(14, 2) @map("amount_base")
+  sortOrder      Int     @default(0) @map("sort_order")
+
+  op PayrollManualOp @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+  @@map("payroll_manual_lines")
+}
+
+model PayrollManualAudit {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  opId         String?  @map("op_id") @db.Uuid
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+  userName     String   @map("user_name")
+  eventType    String   @map("event_type")
+  organization String   @default("Demo")
+  product      String   @default("HR HUB")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  op     PayrollManualOp? @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@map("payroll_manual_audits")
+}
+
+/// Verifix «Все начисления» — document header
+model PayrollAccrualDoc {
+  id             String             @id @default(uuid()) @db.Uuid
+  tenantId       String             @map("tenant_id") @db.Uuid
+  kind           PayrollAccrualKind
+  status         DocumentLifecycle  @default(draft)
+  month          DateTime           @db.Date
+  docDate        DateTime           @map("doc_date") @db.Date
+  number         String?
+  title          String?
+  divisionId     String?            @map("division_id") @db.Uuid
+  currency       String             @default("UZS")
+  note           String?
+  mergeAccruals  Boolean            @default(false) @map("merge_accruals")
+  accruedTotal   Decimal            @default(0) @map("accrued_total") @db.Decimal(14, 2)
+  deductedTotal  Decimal            @default(0) @map("deducted_total") @db.Decimal(14, 2)
+  ndflTotal      Decimal            @default(0) @map("ndfl_total") @db.Decimal(14, 2)
+  inpsTotal      Decimal            @default(0) @map("inps_total") @db.Decimal(14, 2)
+  espTotal       Decimal            @default(0) @map("esp_total") @db.Decimal(14, 2)
+  attachments    Json?
+  postedAt       DateTime?          @map("posted_at")
+  postedBy       String?            @map("posted_by")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division    Division?                  @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines       PayrollAccrualLine[]
+  deductions  PayrollAccrualDeduction[]
+  entries     PayrollLedgerEntry[]
+  audits      PayrollAccrualAudit[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, month])
+  @@index([tenantId, kind])
+  @@map("payroll_accrual_docs")
+}
+
+model PayrollAccrualLine {
+  id            String   @id @default(uuid()) @db.Uuid
+  docId         String   @map("doc_id") @db.Uuid
+  employeeId    String   @map("employee_id") @db.Uuid
+  sortOrder     Int      @default(0) @map("sort_order")
+  accrualTypeId String?  @map("accrual_type_id") @db.Uuid
+  accrualName   String?  @map("accrual_name")
+  accrued       Decimal  @default(0) @db.Decimal(14, 2)
+  toPay         Decimal  @default(0) @map("to_pay") @db.Decimal(14, 2)
+  ndfl          Decimal  @default(0) @db.Decimal(14, 2)
+  inps          Decimal  @default(0) @db.Decimal(14, 2)
+  esp           Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  doc      PayrollAccrualDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@index([employeeId])
+  @@map("payroll_accrual_lines")
+}
+
+model PayrollAccrualDeduction {
+  id              String   @id @default(uuid()) @db.Uuid
+  docId           String   @map("doc_id") @db.Uuid
+  employeeId      String   @map("employee_id") @db.Uuid
+  sortOrder       Int      @default(0) @map("sort_order")
+  deductionTypeId String?  @map("deduction_type_id") @db.Uuid
+  deductionName   String?  @map("deduction_name")
+  amount          Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  doc      PayrollAccrualDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@index([employeeId])
+  @@map("payroll_accrual_deductions")
+}
+
+/// Verifix «Проводки» / transactions.xlsx journal
+model PayrollLedgerEntry {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  docId          String   @map("doc_id") @db.Uuid
+  createdDate    DateTime @map("created_date")
+  transDate      DateTime @map("trans_date") @db.Date
+  debitAccount   String   @map("debit_account")
+  debitSubconto  String?  @map("debit_subconto")
+  creditAccount  String   @map("credit_account")
+  creditSubconto String?  @map("credit_subconto")
+  quantity       Decimal? @db.Decimal(14, 4)
+  currency       String?
+  note           String?
+  amount         Decimal  @default(0) @db.Decimal(14, 2)
+  exchangeRate   Decimal? @map("exchange_rate") @db.Decimal(14, 6)
+  amountFx       Decimal? @map("amount_fx") @db.Decimal(14, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  doc    PayrollAccrualDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, transDate])
+  @@index([docId])
+  @@map("payroll_ledger_entries")
+}
+
+model PayrollAccrualAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  docId      String   @map("doc_id") @db.Uuid
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  userName   String   @map("user_name")
+  event      String
+  month      DateTime? @db.Date
+  number     String?
+  title      String?
+  posted     Boolean  @default(false)
+
+  doc PayrollAccrualDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, occurredAt])
+  @@map("payroll_accrual_audits")
+}
+
+model TenantSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @unique @map("tenant_id") @db.Uuid
+  orgName   String?  @map("org_name")
+  legalName String?  @map("legal_name")
+  inn       String?
+  address   String?
+  phone     String?
+  timezone  String   @default("Asia/Tashkent")
+  currency  String   @default("UZS")
+  locale    String   @default("uz")
+  extras    Json?
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+model Dictionary {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  /// core | extra — primary vs дополнительные справочники
+  kind      String   @default("core")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  DictionaryItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("dictionaries")
+}
+
+/// Verifix «Динамические поля»
+model DynamicField {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  code             String
+  name             String
+  /// number | date | string | checkbox | select | select_multi | ref | ref_multi | file | photo | video
+  dataType         String   @map("data_type")
+  /// Справочник-источник для ref / ref_multi (код или имя)
+  referenceSource  String?  @map("reference_source")
+  /// Привязка к объекту (код DynamicObject)
+  objectCode       String?  @map("object_code")
+  /// Опции для select: string[] или { code, name }[]
+  options          Json?
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, objectCode])
+  @@map("dynamic_fields")
+}
+
+/// Verifix «Объекты» / «Факты» — сущности с динамическими полями
+model DynamicObject {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  /// entity | fact
+  kind      String   @default("entity")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, kind])
+  @@map("dynamic_objects")
+}
+
+model DictionaryItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  dictionaryId String  @map("dictionary_id") @db.Uuid
+  code         String
+  name         String
+  sortOrder    Int     @default(0) @map("sort_order")
+  isActive     Boolean @default(true) @map("is_active")
+  /// Ext fields: cars → { plate, vin }; coa → { isDebit, isCredit, currency }; etc.
+  meta         Json?
+
+  dictionary Dictionary @relation(fields: [dictionaryId], references: [id], onDelete: Cascade)
+  employees  Employee[]
+  persons    Person[]
+
+  @@unique([dictionaryId, code])
+  @@map("dictionary_items")
+}
+
+/// Verifix «Исключения по документам при приеме»
+model HireDocumentException {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  divisionId String   @map("division_id") @db.Uuid
+  positionId String   @map("position_id") @db.Uuid
+  /// DictionaryItem ids from doc_types
+  documentTypeIds String[] @default([]) @map("document_type_ids") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, divisionId, positionId])
+  @@index([tenantId])
+  @@map("hire_document_exceptions")
+}
+
+/// Персональные документы физлица (паспорт, ID, диплом…) — импорт / журнал
+model PersonDocument {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  personId   String?   @map("person_id") @db.Uuid
+  employeeId String?   @map("employee_id") @db.Uuid
+  /// Код типа из справочника doc_types (PASSPORT, ID, DIPLOMA…)
+  docType    String    @map("doc_type")
+  docNumber  String    @map("doc_number")
+  issuedAt   DateTime? @map("issued_at") @db.Date
+  expiresAt  DateTime? @map("expires_at") @db.Date
+  issuer     String?
+  note       String?
+  payload    Json?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  person   Person?   @relation(fields: [personId], references: [id])
+  employee Employee? @relation(fields: [employeeId], references: [id])
+
+  @@index([tenantId, docType])
+  @@index([tenantId, personId])
+  @@index([tenantId, employeeId])
+  @@map("person_documents")
+}
+
+model ExternalIntegration {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  type        IntegrationType @default(webhook)
+  name        String
+  config      Json?
+  webhookUrl  String?         @map("webhook_url")
+  isActive    Boolean         @default(true) @map("is_active")
+  lastSyncAt  DateTime?       @map("last_sync_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("external_integrations")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String
+  entity    String?
+  entityId  String?  @map("entity_id")
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+/// Verifix: Шаблоны обходных листов
+model ClearanceTemplate {
+  id                       String   @id @default(uuid()) @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  code                     String
+  name                     String
+  divisionId               String?  @map("division_id") @db.Uuid
+  positionId               String?  @map("position_id") @db.Uuid
+  requireManagerSign       Boolean  @default(false) @map("require_manager_sign")
+  requireHigherManagerSign Boolean  @default(false) @map("require_higher_manager_sign")
+  isActive                 Boolean  @default(true) @map("is_active")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division  Division?                    @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  position  Position?                    @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  items     ClearanceTemplateItem[]
+  employees ClearanceTemplateEmployee[]
+  sheets    ClearanceSheet[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, divisionId])
+  @@index([tenantId, positionId])
+  @@map("clearance_templates")
+}
+
+model ClearanceTemplateItem {
+  id         String  @id @default(uuid()) @db.Uuid
+  templateId String  @map("template_id") @db.Uuid
+  title      String
+  department String?
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  template ClearanceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("clearance_template_items")
+}
+
+/// Employees who must sign on this template (Verifix nested table)
+model ClearanceTemplateEmployee {
+  id         String @id @default(uuid()) @db.Uuid
+  templateId String @map("template_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+  sortOrder  Int    @default(0) @map("sort_order")
+
+  template ClearanceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, employeeId])
+  @@index([templateId])
+  @@index([employeeId])
+  @@map("clearance_template_employees")
+}
+
+/// Verifix: Обходные листы (exit checklist)
+model ClearanceSheet {
+  id           String          @id @default(uuid()) @db.Uuid
+  tenantId     String          @map("tenant_id") @db.Uuid
+  employeeId   String          @map("employee_id") @db.Uuid
+  templateId   String?         @map("template_id") @db.Uuid
+  number       String?
+  documentDate DateTime        @default(now()) @map("document_date") @db.Date
+  title        String
+  status       ClearanceStatus @default(open)
+  note         String?
+  completedAt  DateTime?       @map("completed_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  template ClearanceTemplate?   @relation(fields: [templateId], references: [id])
+  items    ClearanceSheetItem[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, documentDate])
+  @@map("clearance_sheets")
+}
+
+model ClearanceSheetItem {
+  id         String              @id @default(uuid()) @db.Uuid
+  sheetId    String              @map("sheet_id") @db.Uuid
+  title      String
+  department String?
+  status     ClearanceItemStatus @default(pending)
+  sortOrder  Int                 @default(0) @map("sort_order")
+  doneAt     DateTime?           @map("done_at")
+  note       String?
+
+  sheet ClearanceSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+  @@map("clearance_sheet_items")
+}
+
+/// Verifix: Типы инцидента
+model IncidentType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  /// Начисление (label / payroll charge name)
+  accrualName String?  @map("accrual_name")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incidents Incident[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("incident_types")
+}
+
+/// Verifix: Инциденты
+model Incident {
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  employeeId       String?          @map("employee_id") @db.Uuid
+  managerId        String?          @map("manager_id") @db.Uuid
+  incidentTypeId   String           @map("incident_type_id") @db.Uuid
+  number           String?
+  title            String
+  description      String?
+  note             String?
+  severity         IncidentSeverity @default(medium)
+  status           IncidentStatus   @default(open)
+  action           IncidentAction   @default(verbal_warning)
+  damageAmount     Decimal?         @map("damage_amount") @db.Decimal(14, 2)
+  sendNotification Boolean          @default(false) @map("send_notification")
+  occurredAt       DateTime         @default(now()) @map("occurred_at")
+  resolvedAt       DateTime?        @map("resolved_at")
+  resolution       String?
+  /// [{ name, size, key? }]
+  attachments      Json?
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  manager      Employee?    @relation("IncidentManager", fields: [managerId], references: [id], onDelete: SetNull)
+  incidentType IncidentType @relation(fields: [incidentTypeId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, employeeId])
+  @@map("incidents")
+}
+
+/// In-app notifications (approvals, alerts)
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  kind      NotificationKind @default(info)
+  title     String
+  body      String?
+  entity    String?
+  entityId  String?          @map("entity_id")
+  href      String?
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, readAt])
+  @@index([tenantId, createdAt])
+  @@map("notifications")
+}
+
+enum StaffPositionStatus {
+  vacant
+  occupied
+  reserved
+  closed
+}
+
+enum LoanStatus {
+  draft
+  active
+  closed
+  defaulted
+}
+
+enum TripStatus {
+  planned
+  active
+  completed
+  cancelled
+}
+
+enum SettlementStatus {
+  open
+  matched
+  closed
+}
+
+enum VacancyStatus {
+  open
+  filled
+  cancelled
+}
+
+enum ApprovalStatus {
+  draft
+  pending
+  approved
+  rejected
+}
+
+/// Группы отделов
+model DivisionGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  divisions Division[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("division_groups")
+}
+
+/// Группа должностей
+model PositionGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  positions Position[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("position_groups")
+}
+
+/// Verifix «Шаблоны должностей» — шаблон позиции с графиком, разрядом и оплатой
+model PositionTemplate {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  code          String
+  divisionId    String?  @map("division_id") @db.Uuid
+  positionId    String?  @map("position_id") @db.Uuid
+  gradeId       String?  @map("grade_id") @db.Uuid
+  /// Основной график (первый из scheduleItems / для колонки списка)
+  scheduleId    String?  @map("schedule_id") @db.Uuid
+  tariffGroupId String?  @map("tariff_group_id") @db.Uuid
+  /// Доп. пункты графика: [{ scheduleId }]
+  scheduleItems Json?    @map("schedule_items")
+  /// Начисления [{ name, indicators }]
+  accruals      Json?
+  /// Удержания [{ name, indicators }]
+  deductions    Json?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division    Division?      @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  position    Position?      @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  grade       Grade?         @relation(fields: [gradeId], references: [id], onDelete: SetNull)
+  schedule    WorkSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  tariffGroup TariffGroup?   @relation(fields: [tariffGroupId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([divisionId])
+  @@index([positionId])
+  @@map("position_templates")
+}
+
+/// Разряды
+model Grade {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  level     Int      @default(1)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees      Employee[]
+  history        EmployeeGradeHistory[]
+  staffPositions StaffPosition[]
+  careerSteps    CareerPathStep[]
+  careerStepsFrom CareerPathStep[]      @relation("CareerStepFromGrade")
+  careerStepsTo   CareerPathStep[]      @relation("CareerStepToGrade")
+  tariffGroups   TariffGroup[]
+  promotionLinesFrom GradePromotionLine[] @relation("PromotionFromGrade")
+  promotionLinesTo   GradePromotionLine[] @relation("PromotionToGrade")
+  promotionRecommendations GradePromotionRecommendation[]
+  positionTemplates PositionTemplate[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("grades")
+}
+
+/// Повышение разрядов (журнал / аудит одной записи)
+model EmployeeGradeHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  gradeId    String   @map("grade_id") @db.Uuid
+  effectiveAt DateTime @map("effective_at") @db.Date
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  grade    Grade    @relation(fields: [gradeId], references: [id])
+
+  @@index([tenantId, employeeId])
+  @@map("employee_grade_history")
+}
+
+enum GradePromotionPeriodType {
+  grade_only
+  position_and_grade
+}
+
+/// Документ «Повышение разрядов» (Verifix)
+model GradePromotion {
+  id             String                   @id @default(uuid()) @db.Uuid
+  tenantId       String                   @map("tenant_id") @db.Uuid
+  divisionId     String?                  @map("division_id") @db.Uuid
+  documentDate   DateTime                 @map("document_date") @db.Date
+  documentNumber String?                  @map("document_number")
+  note           String?
+  periodType     GradePromotionPeriodType @default(grade_only) @map("period_type")
+  medicalExam    Boolean                  @default(false) @map("medical_exam")
+  useGphPeriod   Boolean                  @default(false) @map("use_gph_period")
+  /// assign_training after save
+  assignTraining Boolean                  @default(false) @map("assign_training")
+  status         DocumentLifecycle        @default(draft)
+  postedAt       DateTime?                @map("posted_at")
+  postedBy       String?                  @map("posted_by")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?            @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    GradePromotionLine[]
+
+  @@index([tenantId, documentDate])
+  @@index([tenantId, status])
+  @@map("grade_promotions")
+}
+
+model GradePromotionLine {
+  id              String    @id @default(uuid()) @db.Uuid
+  promotionId     String    @map("promotion_id") @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  staffPositionId String?   @map("staff_position_id") @db.Uuid
+  fromGradeId     String?   @map("from_grade_id") @db.Uuid
+  toGradeId       String?   @map("to_grade_id") @db.Uuid
+  changeDate      DateTime? @map("change_date") @db.Date
+  attemptStatus   String?   @map("attempt_status")
+  lineState       String?   @map("line_state")
+  note            String?
+  sortOrder       Int       @default(0) @map("sort_order")
+
+  promotion     GradePromotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  employee      Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  staffPosition StaffPosition? @relation(fields: [staffPositionId], references: [id], onDelete: SetNull)
+  fromGrade     Grade?         @relation("PromotionFromGrade", fields: [fromGradeId], references: [id], onDelete: SetNull)
+  toGrade       Grade?         @relation("PromotionToGrade", fields: [toGradeId], references: [id], onDelete: SetNull)
+
+  @@index([promotionId])
+  @@index([employeeId])
+  @@map("grade_promotion_lines")
+}
+
+/// Рекомендуемый список сотрудников (ожидающие рекомендации)
+model GradePromotionRecommendation {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  gradeId    String?   @map("grade_id") @db.Uuid
+  divisionId String?   @map("division_id") @db.Uuid
+  positionId String?   @map("position_id") @db.Uuid
+  recommendedAt DateTime @default(now()) @map("recommended_at") @db.Date
+  status     String    @default("pending")
+  note       String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  grade    Grade?    @relation(fields: [gradeId], references: [id], onDelete: SetNull)
+  division Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  position Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@map("grade_promotion_recommendations")
+}
+
+/// Карьерный путь
+model CareerPath {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  steps  CareerPathStep[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("career_paths")
+}
+
+model CareerPathStep {
+  id                 String  @id @default(uuid()) @db.Uuid
+  careerPathId       String  @map("career_path_id") @db.Uuid
+  positionId         String? @map("position_id") @db.Uuid
+  gradeId            String? @map("grade_id") @db.Uuid
+  fromGradeId        String? @map("from_grade_id") @db.Uuid
+  toGradeId          String? @map("to_grade_id") @db.Uuid
+  title              String  @default("")
+  sortOrder          Int     @default(0) @map("sort_order")
+  minMonths          Int?    @map("min_months")
+  /// Попытки
+  attempts           Int?    @default(1)
+  /// Период (месяцев)
+  periodMonths       Int?    @map("period_months")
+  /// Штрафной период (месяцев)
+  penaltyPeriodMonths Int?   @map("penalty_period_months")
+  /// Подробные условия (JSON)
+  conditions         Json?
+
+  careerPath CareerPath @relation(fields: [careerPathId], references: [id], onDelete: Cascade)
+  position   Position?  @relation(fields: [positionId], references: [id])
+  grade      Grade?     @relation(fields: [gradeId], references: [id])
+  fromGrade  Grade?     @relation("CareerStepFromGrade", fields: [fromGradeId], references: [id], onDelete: SetNull)
+  toGrade    Grade?     @relation("CareerStepToGrade", fields: [toGradeId], references: [id], onDelete: SetNull)
+
+  @@index([careerPathId])
+  @@map("career_path_steps")
+}
+
+/// Тарифные группы
+model TariffGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  gradeId   String?  @map("grade_id") @db.Uuid
+  code      String
+  name      String
+  /// Полное название (Verifix)
+  fullName  String?  @map("full_name")
+  baseRate  Decimal  @default(0) @map("base_rate") @db.Decimal(14, 2)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  grade          Grade?               @relation(fields: [gradeId], references: [id])
+  approvals      TariffGroupApproval[]
+  staffPositions StaffPosition[]
+  positionTemplates PositionTemplate[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("tariff_groups")
+}
+
+/// Утверждения тарифных групп
+model TariffGroupApproval {
+  id             String         @id @default(uuid()) @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  tariffGroupId  String         @map("tariff_group_id") @db.Uuid
+  /// Дата документа
+  documentDate   DateTime?      @map("document_date") @db.Date
+  /// Номер
+  documentNumber String?        @map("document_number")
+  /// Вступает в силу с
+  effectiveAt    DateTime?      @map("effective_at") @db.Date
+  /// Базовый тариф (снимок на момент утверждения)
+  baseRate       Decimal?       @map("base_rate") @db.Decimal(14, 2)
+  /// Размеры тарифов уст. в привязке к базовому тарифу
+  linkedToBase   Boolean        @default(true) @map("linked_to_base")
+  /// Показатели (произвольный JSON)
+  indicators     Json?
+  /// Строки: [{ gradeId, gradeName, coefficient, salary, note }]
+  lines          Json?
+  status         ApprovalStatus @default(draft)
+  note           String?
+  reviewedBy     String?        @map("reviewed_by")
+  reviewedAt     DateTime?      @map("reviewed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tariffGroup TariffGroup @relation(fields: [tariffGroupId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@map("tariff_group_approvals")
+}
+
+/// Штатные позиции (Позиции)
+model StaffPosition {
+  id                 String              @id @default(uuid()) @db.Uuid
+  tenantId           String              @map("tenant_id") @db.Uuid
+  divisionId         String?             @map("division_id") @db.Uuid
+  positionId         String?             @map("position_id") @db.Uuid
+  tariffGroupId      String?             @map("tariff_group_id") @db.Uuid
+  gradeId            String?             @map("grade_id") @db.Uuid
+  scheduleId         String?             @map("schedule_id") @db.Uuid
+  code               String
+  title              String
+  headcount          Int                 @default(1)
+  /// Дата открытия
+  openedAt           DateTime?           @map("opened_at") @db.Date
+  /// Дата закрытия
+  closedAt           DateTime?           @map("closed_at") @db.Date
+  /// Кол-во отпускных дней (в год)
+  vacationDays       Int?                @map("vacation_days")
+  /// Роли (текст / поиск)
+  roles              String?
+  /// Группа позиций (свободный текст / справочник)
+  groupName          String?             @map("group_name")
+  /// Доступ к подразделениям — массив id
+  accessDivisionIds  Json?               @map("access_division_ids")
+  /// Тип позиции: основной / не основной
+  isPrimary          Boolean             @default(true) @map("is_primary")
+  /// Договорная зарплата
+  contractualSalary  Boolean             @default(false) @map("contractual_salary")
+  /// Начисления [{ name, indicators }]
+  accruals           Json?
+  /// Удержания [{ name, indicators }]
+  deductions         Json?
+  /// Дополнительная информация
+  extraInfo          String?             @map("extra_info")
+  status             StaffPositionStatus @default(vacant)
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division    Division?     @relation(fields: [divisionId], references: [id])
+  position    Position?     @relation(fields: [positionId], references: [id])
+  tariffGroup TariffGroup?  @relation(fields: [tariffGroupId], references: [id])
+  grade       Grade?        @relation(fields: [gradeId], references: [id])
+  schedule    WorkSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  employees   Employee[]
+  vacancies   Vacancy[]
+  candidates  Candidate[]
+  hrChangeRequests HrChangeRequest[]
+  hrChangeRequestLines HrChangeRequestLine[]
+  gradePromotionLines GradePromotionLine[]
+  positionScheduleDocLines PositionScheduleDocLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([scheduleId])
+  @@map("staff_positions")
+}
+
+model DismissalReason {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  /// Группа причин увольнения (Verifix)
+  groupName String?  @map("group_name")
+  /// positive | negative
+  basisType String?  @map("basis_type")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees Employee[]
+  hrChangeRequests HrChangeRequest[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("dismissal_reasons")
+}
+
+/// Договор ГПХ
+model GphContract {
+  id              String            @id @default(uuid()) @db.Uuid
+  tenantId        String            @map("tenant_id") @db.Uuid
+  employeeId      String            @map("employee_id") @db.Uuid
+  divisionId      String?           @map("division_id") @db.Uuid
+  personId        String?           @map("person_id") @db.Uuid
+  number          String
+  title           String
+  startDate       DateTime          @map("start_date") @db.Date
+  endDate         DateTime?         @map("end_date") @db.Date
+  amount          Decimal?          @db.Decimal(14, 2)
+  allowAddService Boolean           @default(true) @map("allow_add_service")
+  status          DocumentLifecycle @default(draft)
+  isActive        Boolean           @default(true) @map("is_active")
+  note            String?
+  postedAt        DateTime?         @map("posted_at")
+  postedBy        String?           @map("posted_by")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  division Division?    @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  person   Person?      @relation(fields: [personId], references: [id], onDelete: SetNull)
+  services GphService[]
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("gph_contracts")
+}
+
+model GphService {
+  id         String             @id @default(uuid()) @db.Uuid
+  tenantId   String             @map("tenant_id") @db.Uuid
+  contractId String?            @map("contract_id") @db.Uuid
+  code       String
+  name       String
+  unitPrice  Decimal            @default(0) @map("unit_price") @db.Decimal(14, 2)
+  unit       String             @default("шт")
+  month      DateTime?          @db.Date
+  status     DocumentLifecycle  @default(draft)
+  isActive   Boolean            @default(true) @map("is_active")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contract GphContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, month])
+  @@map("gph_services")
+}
+
+/// Реестр изменения имени
+model EmployeeNameChange {
+  id         String            @id @default(uuid()) @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  employeeId String            @map("employee_id") @db.Uuid
+  status     DocumentLifecycle @default(draft)
+  oldLastName String  @map("old_last_name")
+  oldFirstName String @map("old_first_name")
+  oldMiddleName String? @map("old_middle_name")
+  newLastName String  @map("new_last_name")
+  newFirstName String @map("new_first_name")
+  newMiddleName String? @map("new_middle_name")
+  effectiveAt DateTime @map("effective_at") @db.Date
+  documentNumber String? @map("document_number")
+  note       String?
+  postedAt   DateTime? @map("posted_at")
+  postedBy   String?   @map("posted_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("employee_name_changes")
+}
+
+/// Все изменения в оплате труда
+model WageChange {
+  id         String            @id @default(uuid()) @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  employeeId String            @map("employee_id") @db.Uuid
+  status     DocumentLifecycle @default(draft)
+  oldAmount  Decimal? @map("old_amount") @db.Decimal(14, 2)
+  newAmount  Decimal  @map("new_amount") @db.Decimal(14, 2)
+  effectiveAt DateTime @map("effective_at") @db.Date
+  reason     String?
+  documentNumber String? @map("document_number")
+  postedAt   DateTime? @map("posted_at")
+  postedBy   String?   @map("posted_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("wage_changes")
+}
+
+/// Типы локаций
+model LocationType {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locations Location[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("location_types")
+}
+
+/// Корректировки табеля (audit trail — single day status)
+model TimesheetAdjustment {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  workDate   DateTime @map("work_date") @db.Date
+  oldStatus  DayStatus? @map("old_status")
+  newStatus  DayStatus  @map("new_status")
+  reason     String
+  createdBy  String?  @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workDate])
+  @@map("timesheet_adjustments")
+}
+
+/// Корректировка табеля (Verifix document)
+model TimesheetCorrection {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  status       DocumentLifecycle @default(draft)
+  documentDate DateTime          @map("document_date") @db.Date
+  number       String?
+  title        String            @default("Корректировка табеля")
+  divisionId   String?           @map("division_id") @db.Uuid
+  periodFrom   DateTime          @map("period_from") @db.Date
+  periodTo     DateTime          @map("period_to") @db.Date
+  /// Policy toggles + limits JSON
+  meta         Json?
+  postedAt     DateTime?         @map("posted_at")
+  postedBy     String?           @map("posted_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?                  @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    TimesheetCorrectionLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, documentDate])
+  @@map("timesheet_corrections")
+}
+
+model TimesheetCorrectionLine {
+  id            String   @id @default(uuid()) @db.Uuid
+  correctionId  String   @map("correction_id") @db.Uuid
+  employeeId    String   @map("employee_id") @db.Uuid
+  sortOrder     Int      @default(0) @map("sort_order")
+  plannedHours  Decimal? @map("planned_hours") @db.Decimal(8, 2)
+  onTimeHours   Decimal? @map("on_time_hours") @db.Decimal(8, 2)
+  outsideHours  Decimal? @map("outside_hours") @db.Decimal(8, 2)
+  workedHours   Decimal? @map("worked_hours") @db.Decimal(8, 2)
+  overtimeHours Decimal? @map("overtime_hours") @db.Decimal(8, 2)
+  beforeHours   Decimal? @map("before_hours") @db.Decimal(8, 2)
+  afterHours    Decimal? @map("after_hours") @db.Decimal(8, 2)
+  note          String?
+
+  correction TimesheetCorrection @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+  employee   Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([correctionId])
+  @@index([employeeId])
+  @@map("timesheet_correction_lines")
+}
+
+/// Табель (Verifix document — monthly timesheet)
+model TimesheetSheet {
+  id         String            @id @default(uuid()) @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  status     DocumentLifecycle @default(draft)
+  docDate    DateTime          @map("doc_date") @db.Date
+  number     String?
+  month      DateTime          @db.Date
+  divisionId String?           @map("division_id") @db.Uuid
+  /// full_month | ...
+  periodType String            @default("full_month") @map("period_type")
+  note       String?
+  postedAt   DateTime?         @map("posted_at")
+  postedBy   String?           @map("posted_by")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?           @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    TimesheetSheetLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, month])
+  @@index([tenantId, docDate])
+  @@map("timesheet_sheets")
+}
+
+model TimesheetSheetLine {
+  id           String   @id @default(uuid()) @db.Uuid
+  sheetId      String   @map("sheet_id") @db.Uuid
+  employeeId   String   @map("employee_id") @db.Uuid
+  sortOrder    Int      @default(0) @map("sort_order")
+  tabNumber    String?  @map("tab_number")
+  fullName     String?  @map("full_name")
+  positionName String?  @map("position_name")
+  divisionName String?  @map("division_name")
+  orgUnitName  String?  @map("org_unit_name")
+  scheduleName String?  @map("schedule_name")
+  plannedDays  Decimal? @map("planned_days") @db.Decimal(8, 2)
+  plannedHours Decimal? @map("planned_hours") @db.Decimal(8, 2)
+  workedDays   Decimal? @map("worked_days") @db.Decimal(8, 2)
+  workedHours  Decimal? @map("worked_hours") @db.Decimal(8, 2)
+  /// { presence, early, free, absence, late: { "1": 8, ... } }
+  days         Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sheet    TimesheetSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+  @@index([employeeId])
+  @@map("timesheet_sheet_lines")
+}
+
+/// Справочник типов смен (шаблон на графике)
+model ScheduleShift {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  scheduleId String   @map("schedule_id") @db.Uuid
+  code       String
+  name       String
+  startTime  String   @map("start_time")
+  endTime    String   @map("end_time")
+  weekday    Int?     // 0=Sun .. 6=Sat, null = any
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schedule WorkSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  assignments ScheduleShiftAssignment[]
+
+  @@unique([scheduleId, code])
+  @@index([tenantId])
+  @@map("schedule_shifts")
+}
+
+/// Verifix «Список смен расписания» — назначения смен сотрудникам (оперативный список)
+model ScheduleShiftAssignment {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  employeeId   String   @map("employee_id") @db.Uuid
+  workDate     DateTime @map("work_date") @db.Date
+  /// № смены (в пределах дня / документа)
+  number       Int?
+  shiftLabel   String   @map("shift_label")
+  shiftId      String?  @map("shift_id") @db.Uuid
+  /// planned | completed | cancelled | replaced
+  status       String   @default("planned")
+  /// Заменено
+  replaced     Boolean  @default(false)
+  replacedById String?  @map("replaced_by_id") @db.Uuid
+  /// roster | roster_change | individual | position | schedule | manual
+  source       String   @default("manual")
+  /// Always set for uniqueness (e.g. rosterId:employeeId:day)
+  sourceRef    String   @map("source_ref")
+  scheduleId   String?  @map("schedule_id") @db.Uuid
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  replacedBy Employee?       @relation("ShiftReplacedBy", fields: [replacedById], references: [id])
+  shift      ScheduleShift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  schedule   WorkSchedule?   @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, employeeId, workDate, source, sourceRef])
+  @@index([tenantId, workDate])
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
+  @@map("schedule_shift_assignments")
+}
+
+/// Назначение графика сотруднику (effect store; change-request / post side-effects)
+model EmployeeScheduleOverride {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  scheduleId String   @map("schedule_id") @db.Uuid
+  startDate  DateTime @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  schedule WorkSchedule @relation(fields: [scheduleId], references: [id])
+
+  @@index([tenantId, employeeId])
+  @@map("employee_schedule_overrides")
+}
+
+/// Verifix «Индивидуальные графики» — monthly plan document (header)
+model IndividualSchedule {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  status       DocumentLifecycle @default(draft)
+  kind         WorkScheduleKind  @default(ordinary)
+  documentDate DateTime          @map("document_date") @db.Date
+  number       String?
+  /// First day of the planned month
+  month        DateTime          @db.Date
+  divisionId   String?           @map("division_id") @db.Uuid
+  note         String?
+  /// Posted document is treated as verified (Проверен)
+  verified     Boolean           @default(false)
+  /// Checkboxes, interval type, display mode, late/early knobs, norms
+  settings     Json?
+  normDays     Decimal?          @map("norm_days") @db.Decimal(8, 2)
+  normHours    Decimal?          @map("norm_hours") @db.Decimal(8, 2)
+  postedAt     DateTime?         @map("posted_at")
+  postedBy     String?           @map("posted_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?                 @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    IndividualScheduleLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, documentDate])
+  @@index([tenantId, month])
+  @@index([tenantId, kind])
+  @@map("individual_schedules")
+}
+
+model IndividualScheduleLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  sortOrder  Int      @default(0) @map("sort_order")
+  /// Day-of-month map: { "1": "8", "2": "В", "3": "09:00-18:00", ... }
+  days       Json     @default("{}")
+  daysCount  Int?     @map("days_count")
+  hoursTotal Decimal? @map("hours_total") @db.Decimal(8, 2)
+  note       String?
+
+  document IndividualSchedule @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  employee Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([employeeId])
+  @@map("individual_schedule_lines")
+}
+
+/// Verifix «Расписание» — monthly roster document (assign template schedule to employees)
+model WorkRoster {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  status       DocumentLifecycle @default(draft)
+  name         String
+  documentDate DateTime          @map("document_date") @db.Date
+  number       String?
+  /// First day of planned month
+  month        DateTime          @db.Date
+  scheduleId   String            @map("schedule_id") @db.Uuid
+  note         String?
+  verified     Boolean           @default(false)
+  postedAt     DateTime?         @map("posted_at")
+  postedBy     String?           @map("posted_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  schedule WorkSchedule     @relation(fields: [scheduleId], references: [id])
+  lines    WorkRosterLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, documentDate])
+  @@index([tenantId, month])
+  @@index([scheduleId])
+  @@map("work_rosters")
+}
+
+model WorkRosterLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  rosterId   String   @map("roster_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  sortOrder  Int      @default(0) @map("sort_order")
+  /// Day-of-month map: { "1": "8", "2": "В", ... }
+  days       Json     @default("{}")
+  daysCount  Int?     @map("days_count")
+  hoursTotal Decimal? @map("hours_total") @db.Decimal(8, 2)
+  note       String?
+
+  roster   WorkRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  employee Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([rosterId])
+  @@index([employeeId])
+  @@map("work_roster_lines")
+}
+
+/// Индивидуальные графики для позиций (простой template-link; legacy)
+model PositionSchedule {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  positionId String   @map("position_id") @db.Uuid
+  scheduleId String   @map("schedule_id") @db.Uuid
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  position Position     @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  schedule WorkSchedule @relation(fields: [scheduleId], references: [id])
+
+  @@unique([positionId, scheduleId])
+  @@index([tenantId])
+  @@map("position_schedules")
+}
+
+/// Verifix «Индивидуальные графики для позиций» — monthly document
+model PositionScheduleDoc {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  status       DocumentLifecycle @default(draft)
+  kind         WorkScheduleKind  @default(ordinary)
+  documentDate DateTime          @map("document_date") @db.Date
+  number       String?
+  month        DateTime          @db.Date
+  divisionId   String?           @map("division_id") @db.Uuid
+  note         String?
+  verified     Boolean           @default(false)
+  /// fillOnlyWithEmployees, autoProdCalendar, template shifts[], displayMode, …
+  settings     Json?
+  normDays     Decimal?          @map("norm_days") @db.Decimal(8, 2)
+  normHours    Decimal?          @map("norm_hours") @db.Decimal(8, 2)
+  postedAt     DateTime?         @map("posted_at")
+  postedBy     String?           @map("posted_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?                 @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    PositionScheduleDocLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, documentDate])
+  @@index([tenantId, month])
+  @@index([tenantId, kind])
+  @@map("position_schedule_docs")
+}
+
+model PositionScheduleDocLine {
+  id              String   @id @default(uuid()) @db.Uuid
+  documentId      String   @map("document_id") @db.Uuid
+  positionId      String   @map("position_id") @db.Uuid
+  staffPositionId String?  @map("staff_position_id") @db.Uuid
+  employeeId      String?  @map("employee_id") @db.Uuid
+  sortOrder       Int      @default(0) @map("sort_order")
+  /// Day-of-month map or shift codes: { "1": "8", "2": "В", "3": "Смена 1" }
+  days            Json     @default("{}")
+  daysCount       Int?     @map("days_count")
+  hoursTotal      Decimal? @map("hours_total") @db.Decimal(8, 2)
+  /// Per-line month norms (Изменение нормы by position)
+  normDays        Decimal? @map("norm_days") @db.Decimal(8, 2)
+  normHours       Decimal? @map("norm_hours") @db.Decimal(8, 2)
+  note            String?
+
+  document      PositionScheduleDoc @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  position      Position            @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  staffPosition StaffPosition?      @relation(fields: [staffPositionId], references: [id], onDelete: SetNull)
+  employee      Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([positionId])
+  @@index([employeeId])
+  @@map("position_schedule_doc_lines")
+}
+
+/// Внутренняя командировка
+/// Verifix «Внутренняя командировка» — request + trip lifecycle
+model InternalTrip {
+  id                   String        @id @default(uuid()) @db.Uuid
+  tenantId             String        @map("tenant_id") @db.Uuid
+  employeeId           String        @map("employee_id") @db.Uuid
+  locationId           String?       @map("location_id") @db.Uuid
+  recipientDivisionId  String?       @map("recipient_division_id") @db.Uuid
+  senderDivisionId     String?       @map("sender_division_id") @db.Uuid
+  positionId           String?       @map("position_id") @db.Uuid
+  workScheduleId       String?       @map("work_schedule_id") @db.Uuid
+  /// personal | shared | inbox — Запросы мне / Мои / Общие
+  visibility           String        @default("personal")
+  createdByUserId      String?       @map("created_by_user_id") @db.Uuid
+  assigneeUserId       String?       @map("assignee_user_id") @db.Uuid
+  title                String
+  quantity             Int           @default(1)
+  requestDate          DateTime?     @map("request_date") @db.Date
+  startDate            DateTime      @map("start_date") @db.Date
+  endDate              DateTime      @map("end_date") @db.Date
+  earlyArrival         String        @default("00:00") @map("early_arrival")
+  lateDeparture        String        @default("00:00") @map("late_departure")
+  bySchedule           Boolean       @default(true) @map("by_schedule")
+  accrualName          String?       @map("accrual_name")
+  amount               Decimal?      @db.Decimal(14, 2)
+  /// Workflow (UI status column)
+  requestStatus        RequestStatus @default(pending) @map("request_status")
+  /// Trip lifecycle after approval
+  status               TripStatus    @default(planned)
+  note                 String?
+  reviewNote           String?       @map("review_note")
+  reviewedBy           String?       @map("reviewed_by")
+  /// organization, fundedBy, reason overrides, line items…
+  meta                 Json?
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee          Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location          Location?     @relation(fields: [locationId], references: [id])
+  recipientDivision Division?     @relation("TripRecipient", fields: [recipientDivisionId], references: [id])
+  senderDivision    Division?     @relation("TripSender", fields: [senderDivisionId], references: [id])
+  position          Position?     @relation(fields: [positionId], references: [id])
+  workSchedule      WorkSchedule? @relation(fields: [workScheduleId], references: [id])
+  travelReports     TravelExpenseReport[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, requestStatus])
+  @@index([tenantId, visibility])
+  @@map("internal_trips")
+}
+
+/// Отслеживание местоположения / GPS track
+model GpsTrackPoint {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  latitude   Float
+  longitude  Float
+  accuracyM  Float?   @map("accuracy_m")
+  recordedAt DateTime @map("recorded_at")
+  source     String   @default("mobile")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId, recordedAt])
+  @@map("gps_track_points")
+}
+
+/// Поручения
+model PaymentOrder {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  employeeId   String?   @map("employee_id") @db.Uuid
+  periodId     String?   @map("period_id") @db.Uuid
+  number       String    @default("")
+  title        String    @default("")
+  /// Начисление (название вида)
+  accrualName  String?   @map("accrual_name")
+  amount       Decimal   @db.Decimal(18, 6)
+  startDate    DateTime? @map("start_date") @db.Date
+  endDate      DateTime? @map("end_date") @db.Date
+  dueDate      DateTime? @map("due_date") @db.Date
+  /// new | sent | paid  (open = new)
+  status       String    @default("new")
+  note         String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, startDate])
+  @@map("payment_orders")
+}
+
+/// Парные счета (VERIFIX)
+model AccountPair {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  code          String
+  name          String
+  debitAccount  String   @map("debit_account")
+  creditAccount String   @map("credit_account")
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  settlements    Settlement[]
+  subcontos      AccountPairSubconto[]
+  selectedIn     SettlementSelectedPair[]
+  lines          SettlementLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("account_pairs")
+}
+
+model AccountPairSubconto {
+  id        String @id @default(uuid()) @db.Uuid
+  pairId    String @map("pair_id") @db.Uuid
+  name      String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  pair AccountPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+
+  @@index([pairId])
+  @@map("account_pair_subcontos")
+}
+
+/// Взаимозачет / Взаиморасчеты (VERIFIX)
+model Settlement {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @map("tenant_id") @db.Uuid
+  employeeId    String?          @map("employee_id") @db.Uuid
+  accountPairId String?          @map("account_pair_id") @db.Uuid
+  number        String?
+  title         String           @default("Взаимозачет")
+  amount        Decimal          @default(0) @db.Decimal(14, 2)
+  status        SettlementStatus @default(open)
+  docDate       DateTime         @default(now()) @map("doc_date")
+  settledAt     DateTime?        @map("settled_at")
+  createdByName String?          @map("created_by_name")
+  note          String?
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee      Employee?                @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  accountPair   AccountPair?             @relation(fields: [accountPairId], references: [id])
+  lines         SettlementLine[]
+  selectedPairs SettlementSelectedPair[]
+  audits        SettlementAudit[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("settlements")
+}
+
+model SettlementSelectedPair {
+  settlementId  String @map("settlement_id") @db.Uuid
+  accountPairId String @map("account_pair_id") @db.Uuid
+
+  settlement  Settlement  @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  accountPair AccountPair @relation(fields: [accountPairId], references: [id], onDelete: Cascade)
+
+  @@id([settlementId, accountPairId])
+  @@map("settlement_selected_pairs")
+}
+
+model SettlementLine {
+  id            String  @id @default(uuid()) @db.Uuid
+  settlementId  String  @map("settlement_id") @db.Uuid
+  accountPairId String? @map("account_pair_id") @db.Uuid
+  pairName      String  @map("pair_name")
+  currency      String  @default("UZS")
+  subconto      String  @default("")
+  firstAmount   Decimal @default(0) @db.Decimal(14, 2) @map("first_amount")
+  secondAmount  Decimal @default(0) @db.Decimal(14, 2) @map("second_amount")
+  amount        Decimal @default(0) @db.Decimal(14, 2)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  settlement  Settlement   @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  accountPair AccountPair? @relation(fields: [accountPairId], references: [id], onDelete: SetNull)
+
+  @@index([settlementId])
+  @@map("settlement_lines")
+}
+
+model SettlementAudit {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  settlementId String?  @map("settlement_id") @db.Uuid
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+  userName     String   @map("user_name")
+  eventType    String   @map("event_type")
+  organization String   @default("")
+  product      String   @default("HR HUB")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  settlement Settlement? @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@map("settlement_audits")
+}
+
+/// Настройка процентов продаж (по должности)
+model SalesCommissionPolicy {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  positionId       String?  @map("position_id") @db.Uuid
+  personalPercent  Decimal  @default(0) @map("personal_percent") @db.Decimal(8, 4)
+  divisionPercent  Decimal  @default(0) @map("division_percent") @db.Decimal(8, 4)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  position Position? @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, positionId])
+  @@index([tenantId])
+  @@map("sales_commission_policies")
+}
+
+/// Начисления процентов от продаж (документ)
+model SalesCommissionAccrual {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @map("tenant_id") @db.Uuid
+  number       String            @default("")
+  docDate      DateTime          @default(now()) @map("doc_date") @db.Date
+  periodFrom   DateTime          @default(now()) @map("period_from") @db.Date
+  periodTo     DateTime          @default(now()) @map("period_to") @db.Date
+  title        String?
+  /// cash | bank
+  paymentType  String            @default("cash") @map("payment_type")
+  /// personal | division — тип продаж
+  salesKind    String            @default("personal") @map("sales_kind")
+  divisionId   String?           @map("division_id") @db.Uuid
+  positionId   String?           @map("position_id") @db.Uuid
+  cashbox      String?
+  bankAccount  String?           @map("bank_account")
+  rounding     String            @default("####.000000")
+  note         String?
+  totalSales   Decimal           @default(0) @map("total_sales") @db.Decimal(14, 2)
+  totalAmount  Decimal           @default(0) @map("total_amount") @db.Decimal(14, 2)
+  status       DocumentLifecycle @default(draft)
+  postedAt     DateTime?         @map("posted_at")
+  createdByName String?          @map("created_by_name")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  position Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  lines    SalesCommissionLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, docDate])
+  @@index([tenantId, status])
+  @@map("sales_commission_accruals")
+}
+
+model SalesCommissionLine {
+  id          String  @id @default(uuid()) @db.Uuid
+  docId       String  @map("doc_id") @db.Uuid
+  employeeId  String  @map("employee_id") @db.Uuid
+  positionId  String? @map("position_id") @db.Uuid
+  salesKind   String  @default("personal") @map("sales_kind")
+  percent     Decimal @default(0) @db.Decimal(8, 4)
+  salesAmount Decimal @default(0) @map("sales_amount") @db.Decimal(14, 2)
+  amount      Decimal @default(0) @db.Decimal(14, 2)
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  doc      SalesCommissionAccrual @relation(fields: [docId], references: [id], onDelete: Cascade)
+  employee Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  position Position?              @relation(fields: [positionId], references: [id], onDelete: SetNull)
+
+  @@index([docId])
+  @@index([employeeId])
+  @@map("sales_commission_lines")
+}
+
+/// Verifix «Разовые начисления / удержания»
+model OneTimeAccrualDoc {
+  id            String            @id @default(uuid()) @db.Uuid
+  tenantId      String            @map("tenant_id") @db.Uuid
+  /// accrual | deduction
+  kind          String            @default("accrual")
+  number        String            @default("")
+  docDate       DateTime          @default(now()) @map("doc_date") @db.Date
+  month         DateTime          @default(now()) @db.Date
+  title         String?
+  divisionId    String?           @map("division_id") @db.Uuid
+  basis         String?
+  note          String?
+  currency      String            @default("UZS")
+  /// value | percent | formula
+  calcType      String            @default("value") @map("calc_type")
+  percent       Decimal           @default(0) @db.Decimal(8, 4)
+  formula       String?
+  useOneForAll  Boolean           @default(false) @map("use_one_for_all")
+  attachments   Json?
+  totalAmount   Decimal           @default(0) @map("total_amount") @db.Decimal(14, 2)
+  status        DocumentLifecycle @default(draft)
+  postedAt      DateTime?         @map("posted_at")
+  createdByName String?           @map("created_by_name")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division?            @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  lines    OneTimeAccrualLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, kind])
+  @@index([tenantId, docDate])
+  @@index([tenantId, status])
+  @@map("one_time_accrual_docs")
+}
+
+model OneTimeAccrualLine {
+  id         String    @id @default(uuid()) @db.Uuid
+  docId      String    @map("doc_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  typeId     String?   @map("type_id") @db.Uuid
+  typeName   String?   @map("type_name")
+  lineDate   DateTime? @map("line_date") @db.Date
+  amount     Decimal   @default(0) @db.Decimal(14, 2)
+  note       String?
+  sortOrder  Int       @default(0) @map("sort_order")
+
+  doc      OneTimeAccrualDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@index([employeeId])
+  @@map("one_time_accrual_lines")
+}
+
+/// Verifix «Бонусные начисления» — Факт / КПЭ
+model BonusAccrualDoc {
+  id              String            @id @default(uuid()) @db.Uuid
+  tenantId        String            @map("tenant_id") @db.Uuid
+  /// fact | kpi
+  kind            String            @default("fact")
+  number          String            @default("")
+  docDate         DateTime          @default(now()) @map("doc_date") @db.Date
+  startDate       DateTime          @default(now()) @map("start_date") @db.Date
+  endDate         DateTime          @default(now()) @map("end_date") @db.Date
+  divisionId      String?           @map("division_id") @db.Uuid
+  factTypeId      String?           @map("fact_type_id") @db.Uuid
+  factTypeName    String?           @map("fact_type_name")
+  considerPayroll Boolean           @default(false) @map("consider_payroll")
+  note            String?
+  totalAmount     Decimal           @default(0) @map("total_amount") @db.Decimal(14, 2)
+  status          DocumentLifecycle @default(draft)
+  postedAt        DateTime?         @map("posted_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  division Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  factType FactType? @relation(fields: [factTypeId], references: [id], onDelete: SetNull)
+  lines    BonusAccrualLine[]
+
+  @@index([tenantId, kind])
+  @@index([tenantId, docDate])
+  @@index([tenantId, status])
+  @@map("bonus_accrual_docs")
+}
+
+model BonusAccrualLine {
+  id          String    @id @default(uuid()) @db.Uuid
+  docId       String    @map("doc_id") @db.Uuid
+  employeeId  String    @map("employee_id") @db.Uuid
+  typeName    String?   @map("type_name")
+  accrualName String?   @map("accrual_name")
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  amount      Decimal   @default(0) @db.Decimal(14, 2)
+  sortOrder   Int       @default(0) @map("sort_order")
+
+  doc      BonusAccrualDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  employee Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@index([employeeId])
+  @@map("bonus_accrual_lines")
+}
+
+/// Verifix «Начисления» — виды начислений (справочник зарплаты)
+model AccrualType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  shortName   String?  @map("short_name")
+  description String?
+  /// Порядковый номер
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  /// Назначение начисления (текст / справочник)
+  purpose     String?
+
+  /// period | day | shift — тип расчета за период
+  periodCalc  String   @default("period") @map("period_calc")
+  /// formula | fixed — расчет и показатели
+  resultMode  String   @default("formula") @map("result_mode")
+  formula     String?
+
+  /// Налоги / взносы
+  taxNdfl     Boolean  @default(true) @map("tax_ndfl")
+  taxInps     Boolean  @default(false) @map("tax_inps")
+  taxOss      Boolean  @default(false) @map("tax_oss")
+  /// employee | operation — бухгалтерский учет
+  accountingMode String @default("employee") @map("accounting_mode")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("accrual_types")
+}
+
+/// Verifix «Удержания» — виды удержаний (справочник зарплаты)
+model DeductionType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  shortName   String?  @map("short_name")
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  /// Назначение (текст)
+  purpose     String?
+
+  /// period | day | shift
+  periodCalc  String   @default("period") @map("period_calc")
+  /// formula | fixed
+  resultMode  String   @default("formula") @map("result_mode")
+  formula     String?
+
+  /// employee | operation — бухгалтерский учет
+  accountingMode String @default("employee") @map("accounting_mode")
+  /// Счет (когда accountingMode = operation)
+  account     String?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("deduction_types")
+}
+
+/// Verifix «Типы фактов» (продажи Billz/iiko и др.)
+model FactType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  /// Единица измерения
+  unit        String   @default("Количество")
+  parentId    String?  @map("parent_id") @db.Uuid
+  accrualName String?  @map("accrual_name")
+  /// Реестр: [{ startDate, endDate, cycleTime, price }]
+  registry    Json?
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   FactType? @relation("FactTypeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children FactType[] @relation("FactTypeHierarchy")
+  facts     Fact[]
+  bonusDocs BonusAccrualDoc[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("fact_types")
+}
+
+/// Verifix «Факты» — факт по сотруднику (импорт Excel)
+model Fact {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  employeeId       String?  @map("employee_id") @db.Uuid
+  divisionId       String?  @map("division_id") @db.Uuid
+  factTypeId       String   @map("fact_type_id") @db.Uuid
+  value            String   @map("fact_value")
+  factDate         DateTime @map("fact_date") @db.Date
+  employmentSource String?  @map("employment_source")
+  status           String   @default("active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  division Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  factType FactType  @relation(fields: [factTypeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, factDate])
+  @@index([tenantId, employeeId])
+  @@index([factTypeId])
+  @@map("facts")
+}
+
+/// Займы — Verifix «Займы» / «Заем (создание)»
+model EmployeeLoan {
+  id             String     @id @default(uuid()) @db.Uuid
+  tenantId       String     @map("tenant_id") @db.Uuid
+  employeeId     String     @map("employee_id") @db.Uuid
+  /// Номер займа
+  number         String     @default("")
+  /// Дата займа
+  loanDate       DateTime   @default(now()) @map("loan_date") @db.Date
+  contractNumber String?    @map("contract_number")
+  contractDate   DateTime?  @map("contract_date") @db.Date
+  currency       String     @default("UZS")
+  principal      Decimal    @db.Decimal(14, 2)
+  remaining      Decimal    @db.Decimal(14, 2)
+  monthlyPayment Decimal?   @map("monthly_payment") @db.Decimal(14, 2)
+  /// С (период)
+  startDate      DateTime   @map("start_date") @db.Date
+  /// До (период)
+  endDate        DateTime?  @map("end_date") @db.Date
+  status         LoanStatus @default(draft)
+  note           String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payments LoanPayment[]
+
+  @@index([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, loanDate])
+  @@map("employee_loans")
+}
+
+model LoanPayment {
+  id        String   @id @default(uuid()) @db.Uuid
+  loanId    String   @map("loan_id") @db.Uuid
+  amount    Decimal  @db.Decimal(14, 2)
+  paidAt    DateTime @default(now()) @map("paid_at")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  loan EmployeeLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([loanId])
+  @@map("loan_payments")
+}
+
+/// Авансовый отчет по командировке
+model TravelExpenseReport {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @map("tenant_id") @db.Uuid
+  employeeId    String          @map("employee_id") @db.Uuid
+  tripId        String?         @map("trip_id") @db.Uuid
+  number        String          @default("")
+  title         String          @default("")
+  docDate       DateTime        @default(now()) @map("doc_date") @db.Date
+  currency      String          @default("UZS")
+  advance       Decimal         @default(0) @db.Decimal(14, 2)
+  amount        Decimal         @default(0) @db.Decimal(14, 2)
+  calcForSalary Boolean         @default(false) @map("calc_for_salary")
+  status        ApprovalStatus  @default(draft)
+  spentAt       DateTime?       @map("spent_at") @db.Date
+  note          String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  trip     InternalTrip?        @relation(fields: [tripId], references: [id])
+  lines    TravelExpenseLine[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, docDate])
+  @@map("travel_expense_reports")
+}
+
+model TravelExpenseLine {
+  id          String    @id @default(uuid()) @db.Uuid
+  reportId    String    @map("report_id") @db.Uuid
+  accrualName String?   @map("accrual_name")
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  amount      Decimal   @default(0) @db.Decimal(14, 2)
+  note        String?
+  sortOrder   Int       @default(0) @map("sort_order")
+
+  report TravelExpenseReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("travel_expense_lines")
+}
+
+model Candidate {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  staffPositionId String?  @map("staff_position_id") @db.Uuid
+  fullName        String   @map("full_name")
+  phone           String?
+  email           String?
+  status          String   @default("new")
+  note            String?
+  /// Verifix «Дата введения»
+  introducedAt    DateTime? @map("introduced_at") @db.Date
+  category        String?
+  education       String?
+  employmentSource String? @map("employment_source")
+  birthDate       DateTime? @map("birth_date") @db.Date
+  gender          String?
+  languages       String?
+  /// Display title in the report (TP, MERCHANDISER, …)
+  positionName    String?  @map("position_name")
+  /// Тип физического лица: A / B / C
+  personType      String?  @map("person_type")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffPosition StaffPosition? @relation(fields: [staffPositionId], references: [id])
+
+  @@index([tenantId])
+  @@map("candidates")
+}
+
+model Vacancy {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  staffPositionId String        @map("staff_position_id") @db.Uuid
+  title           String
+  status          VacancyStatus @default(open)
+  openedAt        DateTime      @default(now()) @map("opened_at")
+  closedAt        DateTime?     @map("closed_at")
+  note            String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffPosition StaffPosition @relation(fields: [staffPositionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@map("vacancies")
+}
+
+model EmployeeRelative {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  fullName   String   @map("full_name")
+  relation   String
+  birthDate  DateTime? @map("birth_date") @db.Date
+  phone      String?
+  /// Мужской / Женский (Verifix «Пол»)
+  gender     String?
+  /// Рабочее место родственника
+  workplace  String?
+  /// Зависимость
+  dependent  Boolean  @default(false)
+  /// Скрытый родственник (фильтр «Показать скрытые»)
+  isHidden   Boolean  @default(false) @map("is_hidden")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_relatives")
+}
+
+/// Verifix employee «Справки»
+model EmployeeCertificate {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  /// Код/название из справочника certificates
+  certType   String    @map("cert_type")
+  certNumber String    @map("cert_number")
+  certDate   DateTime? @map("cert_date") @db.Date
+  validFrom  DateTime? @map("valid_from") @db.Date
+  validUntil DateTime? @map("valid_until") @db.Date
+  title      String    @default("")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_certificates")
+}
+
+/// Verifix employee «Стаж»
+model EmployeeTenure {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  employeeId   String    @map("employee_id") @db.Uuid
+  tenureType   String    @map("tenure_type")
+  stillWorking Boolean   @default(false) @map("still_working")
+  countedFrom  DateTime? @map("counted_from") @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_tenures")
+}
+
+/// Verifix employee «Места работы»
+model EmployeeWorkplace {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  employeeId   String    @map("employee_id") @db.Uuid
+  organization String
+  position     String
+  orgAddress   String?   @map("org_address")
+  startDate    DateTime? @map("start_date") @db.Date
+  endDate      DateTime? @map("end_date") @db.Date
+  description  String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_workplaces")
+}
+
+/// Verifix employee «Награды»
+model EmployeeAward {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  awardType  String    @map("award_type")
+  docTitle   String?   @map("doc_title")
+  docNumber  String?   @map("doc_number")
+  awardDate  DateTime? @map("award_date") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_awards")
+}
+
+/// Verifix employee «Файлы»
+model EmployeeFile {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  name        String
+  note        String?
+  fileName    String   @map("file_name")
+  fileKey     String?  @map("file_key")
+  fileUrl     String?  @map("file_url")
+  contentType String?  @map("content_type")
+  fileSize    Int?     @map("file_size")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_files")
+}
+
+/// Verifix employee «Инвентарь»
+model EmployeeInventory {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  inventoryType   String    @map("inventory_type")
+  inventoryNumber String    @default("") @map("inventory_number")
+  model           String    @default("")
+  manufacturer    String    @default("")
+  operationAt     DateTime? @map("operation_at")
+  purchaseDate    DateTime? @map("purchase_date") @db.Date
+  locationName    String?   @map("location_name")
+  userName        String?   @map("user_name")
+  responsibleName String?   @map("responsible_name")
+  status          String    @default("Получен")
+  note            String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_inventory")
+}
+
+/// Verifix employee «Список машин»
+model EmployeeCar {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  name        String
+  plateNumber String   @map("plate_number")
+  code        String   @default("")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_cars")
+}
+
+/// Verifix «Периоды блокировки отметок»
+model EmployeeMarkBlock {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  startDate  DateTime  @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  note       String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_mark_blocks")
+}
+
+/// Verifix employee «Расчетные счета»
+model EmployeeBankAccount {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  employeeId    String   @map("employee_id") @db.Uuid
+  /// Банк (название)
+  bankName      String   @default("") @map("bank_name")
+  /// Название счёта
+  name          String   @default("")
+  /// Расчетный счет
+  accountNumber String   @map("account_number")
+  /// МФО / код банка
+  mfo           String   @default("")
+  /// Номер карты (опционально на счёте)
+  cardNumber    String?  @map("card_number")
+  isPrimary     Boolean  @default(false) @map("is_primary")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  cards    EmployeeBankCard[]
+
+  @@index([tenantId, employeeId])
+  @@map("employee_bank_accounts")
+}
+
+/// Verifix employee «Банковские карты»
+model EmployeeBankCard {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  accountId       String?   @map("account_id") @db.Uuid
+  cardNumber      String    @map("card_number")
+  /// Расчетный счет (текст или с привязанного счёта)
+  accountNumber   String    @default("") @map("account_number")
+  /// Код банка / МФО
+  bankCode        String    @default("") @map("bank_code")
+  expiresAt       DateTime? @map("expires_at") @db.Date
+  /// Состояние: active | blocked | expired
+  state           String    @default("active")
+  /// Статус: active | inactive
+  status          String    @default("active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  account  EmployeeBankAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_bank_cards")
+}
+
+model EmployeeAccessGrant {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  accessType String   @map("access_type")
+  resource   String
+  grantedAt  DateTime @default(now()) @map("granted_at")
+  expiresAt  DateTime? @map("expires_at")
+  isActive   Boolean  @default(true) @map("is_active")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("employee_access_grants")
+}
+
+/// Виды рабочего времени (Verifix)
+model TimeType {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  /// Буквенный код (short); code remains unique key
+  letterCode  String?  @map("letter_code")
+  digitalCode String?  @map("digital_code")
+  /// full | partial | unplanned — Нагрузка на план
+  planLoad    String   @default("partial") @map("plan_load")
+  /// Calendar color hex
+  color       String?
+  parentId    String?  @map("parent_id") @db.Uuid
+  isPaid      Boolean  @default(true) @map("is_paid")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent       TimeType?  @relation("TimeTypeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     TimeType[] @relation("TimeTypeHierarchy")
+  absenceTypes AbsenceType[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([parentId])
+  @@map("time_types")
+}
+
+/// Шаблоны отчётов / документов (Verifix «Шаблоны отчетов»)
+model ReportTemplate {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  code             String
+  name             String
+  /// Внутренний/старый вид отчёта (t13, contract, …)
+  kind             String   @default("document")
+  /// Источник (документ-основание)
+  source           String?
+  sourceType       String?  @map("source_type")
+  fileName         String?  @map("file_name")
+  fileUrl          String?  @map("file_url")
+  /// Группа шаблонов
+  templateGroup    String?  @map("template_group")
+  /// excel | word
+  templateType     String   @default("excel") @map("template_type")
+  sortOrder        Int      @default(0) @map("sort_order")
+  useNameInReport Boolean @default(true) @map("use_name_in_report")
+  /// Отображаемое «Создал» (System / user)
+  createdBy        String?  @map("created_by")
+  /// { variables: string[] }
+  definition       Json?
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("report_templates")
+}

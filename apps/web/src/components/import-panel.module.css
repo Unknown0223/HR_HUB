@@ -1,0 +1,87 @@
+.panel {
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.drop {
+  border: 1px dashed #d2ddec;
+  border-radius: var(--radius);
+  padding: 1.15rem;
+  text-align: center;
+  color: #95aac9;
+  cursor: pointer;
+  transition: border-color var(--motion), background var(--motion), color var(--motion);
+  background: var(--surface);
+}
+
+.drop:hover,
+.dropActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-active);
+}
+
+.fileInput {
+  display: none;
+}
+
+.preview {
+  margin-top: 0.85rem;
+  overflow: auto;
+  max-height: 280px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+
+.meta {
+  margin-top: 0.55rem;
+  font-size: var(--font-size-sm);
+  color: var(--ink-muted);
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.templateBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.result {
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}
+
+.resultOk {
+  composes: result;
+  background: var(--ok-soft);
+  color: #0d8a84;
+}
+
+.resultErr {
+  composes: result;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.xlsxHint {
+  margin-top: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  background: var(--warn-soft);
+  color: #b67800;
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}

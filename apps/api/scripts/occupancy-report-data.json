@@ -1,0 +1,873 @@
+{
+  "columns": [
+    "DIELUX",
+    "SOF",
+    "HR",
+    "SKLAD",
+    "LOGISTIKA SIRDARYO",
+    "LOGISTIKA ANDIJON",
+    "LOGISTIKA BUXORO",
+    "SKLAD FARGONA",
+    "LALAKU MD",
+    "IT",
+    "PHARMA",
+    "SKLAD NAVOI",
+    "SKLAD XORAZM",
+    "SKLAD SAMARQAND",
+    "SKLAD JIZZAX",
+    "SKLAD BUXORO",
+    "ADMIN",
+    "AXO",
+    "LOGISTIKA QASHQADARYO",
+    "SKLAD QASHQADARYO",
+    "SOF/MD",
+    "LALAKU PANTS",
+    "GIGA",
+    "DEPARTAMENT PRODAJ",
+    "FINANSOVIY OTDEL",
+    "LOGISTIKA FARGONA",
+    "SKLAD SIRDARYO",
+    "SKLAD QOQON",
+    "BUXGALTERIA",
+    "MARKETING",
+    "KASSA",
+    "LOGISTIKA SAMARQAND",
+    "LOGISTIKA NUKUS",
+    "LOGISTIKA SERGELI",
+    "LOGISTIKA QOQON",
+    "LOGISTIKA NAMANGAN",
+    "LOGISTIKA NAVOI",
+    "LOGISTIKA SURXANDARYO",
+    "LOGISTIKA  JIZZAX",
+    "SKLAD ANDIJON",
+    "SKLAD SURXANDARYO",
+    "SKLAD NAMANGAN",
+    "SKLAD NUKUS",
+    "YOYOKI",
+    "КА",
+    "OTDEL SVYAZI I KACHESTVA",
+    "SKLAD SERGELI",
+    "LOGISTIKA XORAZM",
+    "OPTOM MIX",
+    "OPTOM ORIKZOR",
+    "MERCHEN",
+    "OPTOM LLK PANTS",
+    "OPTOM GIGA",
+    "OPTOM DIELUX",
+    "KA PHARMA",
+    "LOGISTIKA OLMALIQ",
+    "SKLAD OLMALIQ",
+    "TOP",
+    "BOZOR GIGA",
+    "REVEREM WATER",
+    "OSDO",
+    "ECOARZONI",
+    "AUDIT",
+    "XORECA REVEREM",
+    "LALAKU MAMA",
+    "OSDO REVEREM",
+    "SKLAD YUNUSOBOD",
+    "OPTOM LALAKU MAMA",
+    "LOGISTIKA YUNUSOBOD",
+    "SKLAD SHIMKENT",
+    "LOGISTIKA SHIMKENT",
+    "MONNO",
+    "OPTOM MONNO",
+    "OSDO MONNO",
+    "MIX PRODAJA",
+    "TOP MAMA",
+    "TOP MONNO"
+  ],
+  "cells": [
+    {
+      "position": "HR MANAGER",
+      "division": "HR",
+      "count": 1
+    },
+    {
+      "position": "HRD",
+      "division": "HR",
+      "count": 1
+    },
+    {
+      "position": "KASSIR",
+      "division": "KASSA",
+      "count": 23
+    },
+    {
+      "position": "FILIAL DIREKTOR",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 17
+    },
+    {
+      "position": "MERCHANDISER",
+      "division": "КА",
+      "count": 3
+    },
+    {
+      "position": "MERCHANDISER",
+      "division": "KA PHARMA",
+      "count": 1
+    },
+    {
+      "position": "MERCHANDISER",
+      "division": "TOP",
+      "count": 2
+    },
+    {
+      "position": "GRAFIK DIZAYNER",
+      "division": "MARKETING",
+      "count": 3
+    },
+    {
+      "position": "RUKOVODITEL OTDELA SVYAZI",
+      "division": "OTDEL SVYAZI I KACHESTVA",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA SIRDARYO",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA ANDIJON",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA BUXORO",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA QASHQADARYO",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA FARGONA",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA SAMARQAND",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA SERGELI",
+      "count": 2
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA QOQON",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA NAMANGAN",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA NAVOI",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA XORAZM",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA OLMALIQ",
+      "count": 1
+    },
+    {
+      "position": "SVR LOGISTIKA",
+      "division": "LOGISTIKA YUNUSOBOD",
+      "count": 1
+    },
+    {
+      "position": "SMM",
+      "division": "MARKETING",
+      "count": 1
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA SIRDARYO",
+      "count": 9
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA ANDIJON",
+      "count": 19
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA BUXORO",
+      "count": 10
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA QASHQADARYO",
+      "count": 17
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA FARGONA",
+      "count": 17
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA SAMARQAND",
+      "count": 27
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA NUKUS",
+      "count": 8
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA SERGELI",
+      "count": 23
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA QOQON",
+      "count": 18
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA NAMANGAN",
+      "count": 18
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA NAVOI",
+      "count": 13
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA SURXANDARYO",
+      "count": 11
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA  JIZZAX",
+      "count": 7
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA XORAZM",
+      "count": 12
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA OLMALIQ",
+      "count": 6
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA YUNUSOBOD",
+      "count": 14
+    },
+    {
+      "position": "DOSTAVSHIK",
+      "division": "LOGISTIKA SHIMKENT",
+      "count": 2
+    },
+    {
+      "position": "ANALITIK",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 1
+    },
+    {
+      "position": "RM",
+      "division": "GIGA",
+      "count": 1
+    },
+    {
+      "position": "RM",
+      "division": "MONNO",
+      "count": 1
+    },
+    {
+      "position": "IT  MANAGER",
+      "division": "IT",
+      "count": 10
+    },
+    {
+      "position": "SVR",
+      "division": "DIELUX",
+      "count": 22
+    },
+    {
+      "position": "SVR",
+      "division": "SOF",
+      "count": 11
+    },
+    {
+      "position": "SVR",
+      "division": "SOF/MD",
+      "count": 6
+    },
+    {
+      "position": "SVR",
+      "division": "LALAKU PANTS",
+      "count": 24
+    },
+    {
+      "position": "SVR",
+      "division": "GIGA",
+      "count": 21
+    },
+    {
+      "position": "SVR",
+      "division": "YOYOKI",
+      "count": 2
+    },
+    {
+      "position": "SVR",
+      "division": "TOP",
+      "count": 1
+    },
+    {
+      "position": "SVR",
+      "division": "OSDO",
+      "count": 1
+    },
+    {
+      "position": "SVR",
+      "division": "LALAKU MAMA",
+      "count": 21
+    },
+    {
+      "position": "SVR",
+      "division": "MONNO",
+      "count": 19
+    },
+    {
+      "position": "SVR",
+      "division": "OSDO MONNO",
+      "count": 1
+    },
+    {
+      "position": "BUXGALTER",
+      "division": "BUXGALTERIA",
+      "count": 10
+    },
+    {
+      "position": "MANAGER",
+      "division": "PHARMA",
+      "count": 1
+    },
+    {
+      "position": "MANAGER",
+      "division": "MARKETING",
+      "count": 1
+    },
+    {
+      "position": "MANAGER",
+      "division": "КА",
+      "count": 1
+    },
+    {
+      "position": "MANAGER",
+      "division": "KA PHARMA",
+      "count": 2
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "DIELUX",
+      "count": 1
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "SOF",
+      "count": 1
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "LALAKU PANTS",
+      "count": 1
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "GIGA",
+      "count": 1
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "YOYOKI",
+      "count": 1
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "LALAKU MAMA",
+      "count": 1
+    },
+    {
+      "position": "BRAND MANAGER",
+      "division": "MONNO",
+      "count": 1
+    },
+    {
+      "position": "GLAVNIY BUXGALTER",
+      "division": "BUXGALTERIA",
+      "count": 1
+    },
+    {
+      "position": "OPERATOR",
+      "division": "OTDEL SVYAZI I KACHESTVA",
+      "count": 6
+    },
+    {
+      "position": "RECRUITER",
+      "division": "HR",
+      "count": 1
+    },
+    {
+      "position": "COMMERCIAL DIRECTOR",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 2
+    },
+    {
+      "position": "FARROSH",
+      "division": "AXO",
+      "count": 8
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD FARGONA",
+      "count": 3
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD NAVOI",
+      "count": 4
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD XORAZM",
+      "count": 2
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD SAMARQAND",
+      "count": 6
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD JIZZAX",
+      "count": 2
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD BUXORO",
+      "count": 3
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD QASHQADARYO",
+      "count": 5
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD SIRDARYO",
+      "count": 3
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD QOQON",
+      "count": 5
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD ANDIJON",
+      "count": 4
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD SURXANDARYO",
+      "count": 3
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD NAMANGAN",
+      "count": 4
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD NUKUS",
+      "count": 1
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD SERGELI",
+      "count": 7
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD OLMALIQ",
+      "count": 2
+    },
+    {
+      "position": "KLADOVSHIK",
+      "division": "SKLAD YUNUSOBOD",
+      "count": 6
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD FARGONA",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD NAVOI",
+      "count": 2
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD XORAZM",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD SAMARQAND",
+      "count": 2
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD JIZZAX",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD BUXORO",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD QASHQADARYO",
+      "count": 2
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD SIRDARYO",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD QOQON",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD ANDIJON",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD SURXANDARYO",
+      "count": 2
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD NAMANGAN",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD NUKUS",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD SERGELI",
+      "count": 2
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD OLMALIQ",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD YUNUSOBOD",
+      "count": 1
+    },
+    {
+      "position": "ZAVSKLAD",
+      "division": "SKLAD SHIMKENT",
+      "count": 1
+    },
+    {
+      "position": "MARKETOLOG",
+      "division": "MARKETING",
+      "count": 2
+    },
+    {
+      "position": "REKLAMA MONTAJ",
+      "division": "MARKETING",
+      "count": 2
+    },
+    {
+      "position": "TP",
+      "division": "DIELUX",
+      "count": 108
+    },
+    {
+      "position": "TP",
+      "division": "SOF",
+      "count": 67
+    },
+    {
+      "position": "TP",
+      "division": "SOF/MD",
+      "count": 10
+    },
+    {
+      "position": "TP",
+      "division": "LALAKU PANTS",
+      "count": 127
+    },
+    {
+      "position": "TP",
+      "division": "GIGA",
+      "count": 107
+    },
+    {
+      "position": "TP",
+      "division": "YOYOKI",
+      "count": 3
+    },
+    {
+      "position": "TP",
+      "division": "OPTOM MIX",
+      "count": 1
+    },
+    {
+      "position": "TP",
+      "division": "OPTOM LLK PANTS",
+      "count": 1
+    },
+    {
+      "position": "TP",
+      "division": "OPTOM GIGA",
+      "count": 4
+    },
+    {
+      "position": "TP",
+      "division": "OPTOM DIELUX",
+      "count": 2
+    },
+    {
+      "position": "TP",
+      "division": "TOP",
+      "count": 3
+    },
+    {
+      "position": "TP",
+      "division": "OSDO",
+      "count": 3
+    },
+    {
+      "position": "TP",
+      "division": "ECOARZONI",
+      "count": 20
+    },
+    {
+      "position": "TP",
+      "division": "LALAKU MAMA",
+      "count": 101
+    },
+    {
+      "position": "TP",
+      "division": "OPTOM LALAKU MAMA",
+      "count": 2
+    },
+    {
+      "position": "TP",
+      "division": "MONNO",
+      "count": 113
+    },
+    {
+      "position": "TP",
+      "division": "OPTOM MONNO",
+      "count": 2
+    },
+    {
+      "position": "TP",
+      "division": "OSDO MONNO",
+      "count": 4
+    },
+    {
+      "position": "TP",
+      "division": "TOP MONNO",
+      "count": 1
+    },
+    {
+      "position": "OFFICE MANAGER",
+      "division": "AXO",
+      "count": 1
+    },
+    {
+      "position": "STARSHIY KASSIR",
+      "division": "KASSA",
+      "count": 1
+    },
+    {
+      "position": "SVR OPTOM",
+      "division": "OPTOM MIX",
+      "count": 1
+    },
+    {
+      "position": "OPERATIONS DIRECTOR",
+      "division": "ADMIN",
+      "count": 1
+    },
+    {
+      "position": "BIZNES ANALITIK",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 1
+    },
+    {
+      "position": "STARSHIY DOSTAVSHIK",
+      "division": "LOGISTIKA SIRDARYO",
+      "count": 1
+    },
+    {
+      "position": "STARSHIY DOSTAVSHIK",
+      "division": "LOGISTIKA  JIZZAX",
+      "count": 1
+    },
+    {
+      "position": "STARSHIY DOSTAVSHIK",
+      "division": "LOGISTIKA XORAZM",
+      "count": 1
+    },
+    {
+      "position": "BIZNES TRENER",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 1
+    },
+    {
+      "position": "FINANSOVIY ANALITIK",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 1
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA SIRDARYO",
+      "count": 3
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA ANDIJON",
+      "count": 5
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA BUXORO",
+      "count": 5
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA QASHQADARYO",
+      "count": 5
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA SERGELI",
+      "count": 6
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA NAVOI",
+      "count": 1
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA  JIZZAX",
+      "count": 2
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA XORAZM",
+      "count": 3
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA OLMALIQ",
+      "count": 2
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA YUNUSOBOD",
+      "count": 7
+    },
+    {
+      "position": "EKSPEDITOR",
+      "division": "LOGISTIKA SHIMKENT",
+      "count": 1
+    },
+    {
+      "position": "INKASATOR",
+      "division": "KASSA",
+      "count": 27
+    },
+    {
+      "position": "PRODAVEC",
+      "division": "OPTOM ORIKZOR",
+      "count": 5
+    },
+    {
+      "position": "PRODAVEC",
+      "division": "MIX PRODAJA",
+      "count": 1
+    },
+    {
+      "position": "CEO",
+      "division": "ADMIN",
+      "count": 3
+    },
+    {
+      "position": "OPERATION MANAGER",
+      "division": "ADMIN",
+      "count": 1
+    },
+    {
+      "position": "AUDITOR",
+      "division": "AUDIT",
+      "count": 20
+    },
+    {
+      "position": "GLAVNIY KASSIR",
+      "division": "KASSA",
+      "count": 1
+    },
+    {
+      "position": "KASSIR YORDAMSHISI",
+      "division": "KASSA",
+      "count": 1
+    },
+    {
+      "position": "TM",
+      "division": "DEPARTAMENT PRODAJ",
+      "count": 4
+    },
+    {
+      "position": "TM",
+      "division": "MONNO",
+      "count": 1
+    },
+    {
+      "position": "AUDIT OPERATOR",
+      "division": "AUDIT",
+      "count": 1
+    }
+  ]
+}

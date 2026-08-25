@@ -1,0 +1,279 @@
+.card {
+  max-width: 720px;
+}
+
+.periodBtn {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  padding: 0 0.65rem;
+  cursor: pointer;
+}
+
+.treeTall {
+  max-height: 220px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.labelRow label {
+  margin: 0;
+}
+
+.switchBtn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  background: transparent;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #e4e6ef;
+  flex-shrink: 0;
+}
+
+.switchOn {
+  background: #3699ff;
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: left 0.15s ease;
+}
+
+.switchOn .knob {
+  left: 18px;
+}
+
+.pickWrap {
+  position: relative;
+}
+
+.pickInput {
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+  color: #3f4254;
+}
+
+.pickInput:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.pickMenu {
+  position: absolute;
+  z-index: 25;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: 280px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.pickMenuWide {
+  min-width: min(640px, 80vw);
+  right: auto;
+}
+
+.pickSearch {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  border: none;
+  border-bottom: 1px solid #e4e6ef;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.pickSearch:focus {
+  outline: none;
+}
+
+.pickEmpty {
+  padding: 0.7rem 0.55rem;
+  color: #a1a5b7;
+  font-size: 0.82rem;
+}
+
+.pickOpt {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  padding: 0.35rem 0.55rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #181c32;
+  cursor: pointer;
+}
+
+.pickOpt:hover,
+.pickOptOn {
+  background: #f3f6f9;
+}
+
+.pickOpt input {
+  accent-color: #3699ff;
+}
+
+.pickAll {
+  appearance: none;
+  width: 100%;
+  border: none;
+  border-top: 1px solid #e4e6ef;
+  background: #fff;
+  color: #3699ff;
+  padding: 0.4rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.empHead,
+.empRow {
+  display: grid;
+  grid-template-columns: 22px 110px 1fr 180px;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.empHead {
+  background: #f5f8fa;
+  color: #5e6278;
+  font-weight: 600;
+  position: sticky;
+  top: 32px;
+}
+
+.empRow {
+  appearance: none;
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  color: #181c32;
+}
+
+.empRow:hover,
+.empOn {
+  background: #f3f6f9;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+
+.chip {
+  appearance: none;
+  border: 1px solid #e4e6ef;
+  background: #f5f8fa;
+  color: #3f4254;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+}
+
+.periodLine {
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+}
+
+.tableWrap {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  max-height: calc(100vh - 220px);
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  background: #fff;
+  min-width: 980px;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border: 1px solid #d8dbe0;
+  padding: 0.35rem 0.5rem;
+  color: #181c32;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.table th {
+  background: #eef0f4;
+  font-weight: 600;
+}
+
+.rowName {
+  text-align: left;
+}
+
+.zebra td {
+  background: #f9fafb;
+}
+
+.empty {
+  text-align: center;
+  color: #a1a5b7;
+  padding: 1.5rem;
+}

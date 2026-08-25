@@ -1,0 +1,158 @@
+.card {
+  max-width: none;
+}
+
+.req {
+  color: #f64e60;
+}
+
+.meta {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+  text-align: center;
+}
+
+.monthWrap {
+  position: relative;
+  max-width: 280px;
+}
+
+.monthBtn {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid #e4e6ef;
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  color: #181c32;
+  cursor: pointer;
+}
+
+.monthBtn i {
+  color: #a1a5b7;
+}
+
+.monthPopup {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 6px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  padding: 0.55rem;
+}
+
+.monthYear {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+  font-weight: 600;
+  color: #181c32;
+}
+
+.monthYear button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #3699ff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+}
+
+.monthCell {
+  appearance: none;
+  border: none;
+  background: #fff;
+  color: #3f4254;
+  border-radius: 4px;
+  padding: 0.45rem 0.2rem;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.monthCell:hover {
+  background: #f3f6f9;
+}
+
+.monthOn {
+  background: #3699ff;
+  color: #fff;
+}
+
+.monthOn:hover {
+  background: #187de4;
+  color: #fff;
+}
+
+.tableWrap {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  margin-top: 0.55rem;
+  max-height: calc(100vh - 220px);
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  background: #fff;
+  width: 100%;
+  min-width: 980px;
+}
+
+.table th,
+.table td {
+  border: 1px solid #d8dbe0;
+  padding: 0.32rem 0.45rem;
+  color: #181c32;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.table th {
+  background: #eef0f4;
+  font-weight: 600;
+}
+
+.table thead tr:first-child th {
+  vertical-align: middle;
+}
+
+.name {
+  text-align: left;
+  white-space: normal;
+  min-width: 160px;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow td {
+  font-weight: 700;
+  background: #f5f6f8;
+}
+
+.empty {
+  text-align: center;
+  color: #7e8299;
+}

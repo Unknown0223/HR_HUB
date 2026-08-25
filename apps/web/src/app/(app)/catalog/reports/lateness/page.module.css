@@ -1,0 +1,300 @@
+.card {
+  max-width: none;
+}
+
+.filterGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 1rem 1.5rem;
+  align-items: start;
+}
+
+.meta {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+  text-align: center;
+}
+
+.tableWrap {
+  overflow: visible;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 0.74rem;
+  background: #fff;
+  width: max-content;
+  min-width: 100%;
+}
+
+.table th,
+.table td {
+  border: 1px solid #d8dbe0;
+  padding: 0.28rem 0.42rem;
+  color: #181c32;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.table th {
+  background: #eef0f4;
+  font-weight: 600;
+}
+
+.table tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.name {
+  text-align: left;
+  white-space: normal;
+  min-width: 220px;
+  max-width: 360px;
+}
+
+.num {
+  text-align: right;
+}
+
+.radioGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.15rem;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  color: #3f4254;
+  cursor: pointer;
+  user-select: none;
+}
+
+.radio input {
+  accent-color: #3699ff;
+}
+
+.tplBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tplLabel {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.tplBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.84rem;
+  height: 36px;
+  border-radius: 4px;
+  padding: 0 0.75rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tplBtn:hover {
+  border-color: #3699ff;
+}
+
+.tplMenu {
+  position: relative;
+}
+
+.tplDrop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(24, 28, 50, 0.12);
+  padding: 0.25rem;
+}
+
+.tplItem {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #181c32;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.tplItem:hover {
+  background: #f1f3f8;
+}
+
+.tplPopover {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 240px;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(24, 28, 50, 0.14);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.tplTitle {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #181c32;
+}
+
+.tplInput {
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.tplActions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.tplSave {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tplCancel {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #c27d00;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.settings {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.settingsHead {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sectionTitle {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #181c32;
+}
+
+.ruleRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 0.55rem;
+  align-items: end;
+  margin-bottom: 0.45rem;
+}
+
+.ruleField label {
+  display: block;
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+
+.ruleInput {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.86rem;
+  color: #3f4254;
+  background: #fff;
+}
+
+.ruleInput:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.addBtn {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.delBtn {
+  appearance: none;
+  border: 1px solid #e4e6ef;
+  background: #fff;
+  color: #f64e60;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.fieldErr {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #f64e60;
+}
+
+@media (max-width: 860px) {
+  .filterGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ruleRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}

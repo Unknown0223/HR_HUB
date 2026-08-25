@@ -1,0 +1,80 @@
+.meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 1.1rem;
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+}
+
+.tableWrap {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  max-height: calc(100vh - 220px);
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 0.72rem;
+  background: #fff;
+}
+
+.table th,
+.table td {
+  border: 1px solid #d8dbe0;
+  padding: 0.2rem 0.35rem;
+  color: #181c32;
+  white-space: nowrap;
+}
+
+.table th {
+  background: #f5f8fa;
+  font-weight: 600;
+}
+
+.corner,
+.pos {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 200px;
+  max-width: 260px;
+  text-align: left;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.corner {
+  z-index: 3;
+  background: #f5f8fa;
+  text-align: center;
+}
+
+.rot {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 140px;
+  min-width: 26px;
+  max-width: 36px;
+  padding: 0.45rem 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.num {
+  text-align: center;
+  min-width: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  background: #f5f8fa;
+  font-weight: 700;
+}
+
+.total .pos {
+  background: #f5f8fa;
+}

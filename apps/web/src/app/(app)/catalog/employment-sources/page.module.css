@@ -1,0 +1,74 @@
+.groupHeader td {
+  background: #f4f6f9;
+  color: #5e6278;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.42rem 0.7rem !important;
+}
+
+.groupHeader input {
+  vertical-align: middle;
+  margin-right: 0.45rem;
+}
+
+.filter {
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.5rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #3f4254;
+  background: #fff;
+  max-width: 220px;
+}
+
+.btnGhost {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.btnGhostOn {
+  border-color: #0d9488;
+  background: #ecfdf5;
+  color: #0f766e;
+}
+
+.btnDanger {
+  appearance: none;
+  border: none;
+  border-radius: 4px;
+  background: #f1416c;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.btnDanger:disabled,
+.btnGhost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.typeChip {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: #3f4254;
+}

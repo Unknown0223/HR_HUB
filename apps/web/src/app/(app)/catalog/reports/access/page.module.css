@@ -1,0 +1,166 @@
+.yes {
+  background: #e3f2fd;
+  color: #1565c0;
+  text-align: center;
+}
+
+.no {
+  background: #fccdd2;
+  color: #c62828;
+  text-align: center;
+}
+
+.box {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 16px;
+  accent-color: #3699ff;
+  cursor: pointer;
+}
+
+.treeMenu {
+  min-width: min(560px, 90vw);
+}
+
+.treeInner {
+  max-height: none;
+  overflow: visible;
+  padding: 0.2rem 0.3rem 0.45rem;
+}
+
+.treeOn {
+  background: #e8f4ff;
+  border-radius: 3px;
+}
+
+.treeName {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 0.86rem;
+  color: #3f4254;
+  cursor: pointer;
+  text-align: left;
+}
+
+.treeNameOn {
+  color: #181c32;
+  font-weight: 600;
+}
+
+.listMenu {
+  max-height: none;
+}
+
+.listRow {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #f1f3f6;
+  background: #fff;
+  text-align: left;
+  padding: 0.42rem 0.65rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #181c32;
+  cursor: pointer;
+}
+
+.listRow:hover {
+  background: #f4f7fb;
+}
+
+.listOn {
+  background: #e1f0ff;
+  color: #181c32;
+  font-weight: 600;
+}
+
+.listOn:hover {
+  background: #d4e9ff;
+}
+
+.empMenu {
+  min-width: min(640px, 92vw);
+  max-height: none;
+}
+
+.empTable {
+  display: flex;
+  flex-direction: column;
+}
+
+.empHead,
+.empRow {
+  display: grid;
+  grid-template-columns: 28px 150px 1fr;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.38rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.empHead {
+  background: #eef3f7;
+  color: #5e6278;
+  font-weight: 700;
+  position: sticky;
+  top: 32px;
+  z-index: 1;
+  border-bottom: 1px solid #d8dee6;
+}
+
+.empRow {
+  appearance: none;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #eef0f4;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  color: #181c32;
+}
+
+.empRow:nth-child(even) {
+  background: #fafbfc;
+}
+
+.empRow:hover {
+  background: #f1f7fd;
+}
+
+.empOn,
+.empOn:nth-child(even) {
+  background: #dceeff;
+  font-weight: 600;
+}
+
+.empOn:hover {
+  background: #cce5ff;
+}
+
+.empTab {
+  font-variant-numeric: tabular-nums;
+  color: #5e6278;
+}
+
+.empOn .empTab,
+.empOn .empName {
+  color: #181c32;
+}
+
+.empName {
+  letter-spacing: 0.01em;
+}
+
+.chipCount {
+  font-size: 11px;
+  color: #3699ff;
+  font-weight: 600;
+}

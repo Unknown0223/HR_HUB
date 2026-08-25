@@ -1,0 +1,168 @@
+.searchWrap {
+  position: relative;
+}
+
+.searchInput {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+  color: #3f4254;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: 220px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.opt,
+.optOn,
+.optEmpty {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.86rem;
+  color: #3f4254;
+  padding: 0.42rem 0.6rem;
+  cursor: pointer;
+}
+
+.opt:hover,
+.optOn {
+  background: #eef6ff;
+  color: #3699ff;
+}
+
+.optEmpty {
+  color: #9aa0a6;
+  cursor: default;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #eef6ff;
+  color: #3699ff;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem 0.1rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.chip button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.statusWrap {
+  position: relative;
+}
+
+.btnStatus {
+  appearance: none;
+  border: none;
+  border-radius: 4px;
+  background: #5d78ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.btnStatus:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.statusMenu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+  padding: 0.2rem 0;
+}
+
+.statusMenu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #3f4254;
+  padding: 0.42rem 0.75rem;
+  cursor: pointer;
+}
+
+.statusMenu button:hover {
+  background: #eef6ff;
+  color: #3699ff;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #d1f7ea;
+  color: #0d9488;
+}
+
+.badgeOff {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.cardWide {
+  max-width: none;
+  min-height: 0;
+}

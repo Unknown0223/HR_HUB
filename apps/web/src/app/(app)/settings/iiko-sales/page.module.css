@@ -1,0 +1,22 @@
+.dates {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dates input[type='date'] {
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.4rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #3f4254;
+  background: #fff;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

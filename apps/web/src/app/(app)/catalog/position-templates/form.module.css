@@ -1,0 +1,294 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.topBar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btnSave {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnSave:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btnClose {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+
+.ok {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  color: #0d9488;
+  background: #ecfdf5;
+  border-radius: 4px;
+}
+
+.muted {
+  margin: 0;
+  color: #95a5a6;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 6px;
+  padding: 1rem 1.15rem 1.2rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1.5rem;
+}
+
+@media (max-width: 800px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.72rem;
+  color: #95a5a6;
+  margin-bottom: 0.22rem;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+  color: #3f4254;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.addLink {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  align-self: flex-start;
+}
+
+.addLink:hover {
+  text-decoration: underline;
+}
+
+.schedList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.schedRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.schedRow select {
+  flex: 1;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.schedRow button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #f64e60;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.section {
+  margin-top: 1rem;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #3f4254;
+}
+
+.sectionTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.sectionTools select {
+  min-width: 200px;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.addBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: #f3f9ff;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b7280;
+  background: #fafafa;
+  border-bottom: 1px solid #eef0f4;
+  padding: 0.5rem 0.55rem;
+}
+
+.table td {
+  border-bottom: 1px solid #eef0f4;
+  padding: 0.4rem 0.55rem;
+  vertical-align: middle;
+  color: #3f4254;
+}
+
+.table input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.empty {
+  text-align: center;
+  color: #a1a5b7;
+  padding: 1.25rem !important;
+}
+
+.rowAction {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #f64e60;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}

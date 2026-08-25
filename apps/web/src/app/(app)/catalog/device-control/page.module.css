@@ -1,0 +1,173 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search {
+  min-width: 280px;
+  flex: 1;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.65rem;
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.refresh {
+  appearance: none;
+  border: 1px solid #e4e6ef;
+  background: #fff;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.refresh:hover {
+  background: #f5f8fa;
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  min-width: 920px;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid #eef0f4;
+  padding: 0.65rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  background: #f5f8fa;
+  color: #5e6278;
+  font-weight: 700;
+}
+
+.name {
+  color: #3699ff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.name:hover {
+  text-decoration: underline;
+}
+
+.meta {
+  margin-top: 0.15rem;
+  color: #7e8299;
+  font-size: 0.75rem;
+}
+
+.noteOk,
+.noteErr {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.noteOk {
+  color: #0f766e;
+}
+
+.noteErr {
+  color: #b91c1c;
+}
+
+.online,
+.offline {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.online {
+  background: #e6fff3;
+  color: #0f766e;
+}
+
+.offline {
+  background: #f3f6f9;
+  color: #7e8299;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.btn,
+.btnDanger {
+  appearance: none;
+  border: 1px solid #d8dee6;
+  background: #fff;
+  color: #181c32;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.32rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #e8f4ff;
+  border-color: #3699ff;
+  color: #3699ff;
+}
+
+.btnDanger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.btnDanger:hover {
+  background: #fef2f2;
+}
+
+.btn:disabled,
+.btnDanger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.empty {
+  text-align: center;
+  color: #a1a5b7;
+  padding: 1.6rem;
+}

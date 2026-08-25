@@ -1,0 +1,500 @@
+.page {
+  animation: fadeUp 0.2s ease both;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 1.5rem;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 8px;
+}
+
+.tabBtn,
+.tabBtnPrimary {
+  border: 1px solid #e4e6ef;
+  background: #f5f8fa;
+  color: #3f4254;
+  border-radius: 6px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.tabBtn:hover {
+  background: #eef3f7;
+}
+
+.tabBtnActive {
+  background: #3699ff;
+  border-color: #3699ff;
+  color: #fff;
+}
+
+.tabBtnPrimary {
+  background: #3699ff;
+  border-color: #3699ff;
+  color: #fff;
+}
+
+.tabBtnPrimary:disabled,
+.tabBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.filterPanel,
+.metaCard,
+.panel {
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.filterPanel {
+  padding: 1rem;
+}
+
+.panelTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.85rem;
+}
+
+.filterRow label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: #7e8299;
+}
+
+.filterRow input {
+  border: 1px solid #e4e6ef;
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+}
+
+.checkGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: #3f4254;
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.settingsPage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.settingsTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settingsH1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #181c32;
+}
+
+.settingsGear {
+  color: #7e8299;
+  font-size: 1rem;
+}
+
+.settingsColumns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.settingsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.settingsCard {
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.settingsHead {
+  background: #f5f8fa;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #3f4254;
+  border-bottom: 1px solid #e4e6ef;
+}
+
+.settingsBody {
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toggle {
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: #e4e6ef;
+  position: relative;
+  flex-shrink: 0;
+  display: inline-block;
+  margin-top: 0.1rem;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.toggleOn {
+  background: #50cd89;
+}
+
+.toggleOn::after {
+  left: 18px;
+}
+
+.toggleLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.toggleLabel em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: #a1a5b7;
+  font-weight: 600;
+}
+
+/* —— Verifix print/report sheet —— */
+.reportSheet {
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 8px;
+  padding: 1rem 1.15rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.reportTop {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  border-bottom: 1px solid #eef0f2;
+  padding-bottom: 0.75rem;
+}
+
+.reportBrand {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #1b2a4a;
+}
+
+.reportTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #181c32;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.reportActions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.printBtn {
+  border: 1px solid #cfd3df;
+  background: #fff;
+  color: #3f4254;
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.printBtn:hover {
+  background: #f5f8fa;
+}
+
+.reportMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  font-size: 0.84rem;
+  color: #3f4254;
+}
+
+.reportMeta span {
+  color: #7e8299;
+}
+
+.attWrap {
+  overflow: auto;
+  border: 1px solid #d0d4dc;
+}
+
+.attTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  min-width: 980px;
+}
+
+.attTable th,
+.attTable td {
+  border: 1px solid #d0d4dc;
+  padding: 0.35rem 0.4rem;
+  text-align: center;
+  white-space: nowrap;
+  color: #181c32;
+}
+
+.attTable th {
+  background: #f7f8fa;
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #3f4254;
+}
+
+.factHead,
+.factCell {
+  background: #fff2cc !important;
+}
+
+.weekendRow td {
+  background: #e7f3ff;
+}
+
+.dayOffCell {
+  text-align: center !important;
+  font-weight: 600;
+  color: #3f4254;
+}
+
+.noShowCell {
+  background: #fce4ec !important;
+  font-weight: 600;
+  color: #c62828;
+}
+
+.dateLink {
+  color: #3699ff !important;
+  font-weight: 600;
+  text-align: left !important;
+}
+
+.totalRow td {
+  background: #fafbfc;
+  font-weight: 600;
+}
+
+.panelHead {
+  padding: 0.55rem 0.75rem;
+  background: #f5f8fa;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-bottom: 1px solid #e4e6ef;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.table th,
+.table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid #eff2f5;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  background: #fafbfc;
+  color: #7e8299;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.empty {
+  text-align: center;
+  color: #a1a5b7;
+  padding: 1.25rem !important;
+}
+
+.legend {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #7e8299;
+}
+
+.summaryStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.summaryStrip > div {
+  background: #f5f8fa;
+  border: 1px solid #e4e6ef;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  min-width: 110px;
+}
+
+.summaryStrip strong {
+  display: block;
+  font-size: 1.05rem;
+  color: #181c32;
+}
+
+.summaryStrip span {
+  font-size: 0.72rem;
+  color: #7e8299;
+}
+
+.muted {
+  color: #a1a5b7;
+  font-size: 0.82rem;
+}
+
+.error {
+  color: #f1416c;
+  margin: 0;
+}
+
+.ok {
+  color: #50cd89;
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 1200px) {
+  .settingsColumns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .actionBar {
+    gap: 0.25rem;
+  }
+
+  .tabBtn,
+  .tabBtnPrimary {
+    padding: 0.4rem 0.55rem;
+    font-size: 0.7rem;
+  }
+
+  .settingsColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .reportTop {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .reportTitle {
+    text-align: left;
+  }
+}
+
+@media print {
+  .page {
+    padding: 0;
+  }
+
+  .actionBar,
+  .noPrint {
+    display: none !important;
+  }
+
+  .reportSheet {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .attWrap {
+    overflow: visible;
+    border: none;
+  }
+
+  .attTable {
+    min-width: 0;
+  }
+}

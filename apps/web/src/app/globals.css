@@ -1,0 +1,319 @@
+:root {
+  /* Verifix-captured tokens → HR HUB (brand name only differs) */
+  --bg: #eeeeef;
+  --bg-deep: #e8e8e9;
+  --bg-elevated: #f7f7f7;
+  --bg-hover: #f3f3f4;
+  --bg-soft: #f3f6f9;
+  --surface: #ffffff;
+  --surface-muted: #f9f9fa;
+  --ink: #464e5f;
+  --ink-strong: rgba(0, 0, 0, 0.9);
+  --ink-muted: rgba(0, 0, 0, 0.71);
+  --ink-faint: rgba(0, 0, 0, 0.51);
+  --line: #ced4da;
+  --line-soft: #eaeaea;
+  --line-table: rgba(0, 0, 0, 0.1);
+  --line-header: rgba(255, 255, 255, 0.24);
+
+  /* Metronic primary from style.bundle --primary */
+  --accent: #6993ff;
+  --accent-hover: #4377ff;
+  --accent-active: #366eff;
+  --accent-soft: #e1e9ff;
+  --accent-focus: rgba(128, 163, 255, 0.5);
+  --link: #257ab1;
+  --link-soft: #6993ff;
+
+  --ok: #1bc5bd;
+  --ok-soft: #c9f7f5;
+  --warn: #ffa800;
+  --warn-soft: #fff4de;
+  --danger: #f64e60;
+  --danger-soft: #ffe2e5;
+  --info: #8950fc;
+  --info-soft: #eee5ff;
+
+  /* Header / mega-menu (kt_header) */
+  --header: #072030;
+  --header-elev: #384161;
+  --header-ink: rgba(255, 255, 255, 0.9);
+  --header-muted: #c6cad7;
+  --header-faint: rgba(255, 255, 255, 0.71);
+  --header-height: 52px;
+
+  /* Aliases kept for existing component usage */
+  --sidebar: var(--header);
+  --sidebar-elev: var(--header-elev);
+  --sidebar-ink: var(--header-ink);
+  --sidebar-muted: var(--header-muted);
+  --accent-2: var(--accent);
+
+  --radius: 4px;
+  --radius-sm: 4px;
+  --radius-lg: 4px;
+  --control-height: 38px;
+  --table-row-pad-y: 8px;
+  --table-row-pad-x: 12px;
+  --table-head-pad-y: 10px;
+  --font-size: 15px;
+  --font-size-sm: 14px;
+  --font-size-xs: 13px;
+  --line-height: 1.45;
+
+  --shadow: 0 0 1px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 0 1px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 0 50px 0 rgba(82, 63, 105, 0.15);
+  --shadow-mega: 0 0 1px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.2);
+
+  --font-display: "Open Sans", sans-serif;
+  --font-body: "Open Sans", sans-serif;
+  --motion: 150ms ease;
+  --subheader-btn: #e1e3ea;
+
+  /* Dashboard attendance pie (Verifix amCharts palette) */
+  --dash-ontime: #06d6a0;
+  --dash-late: #ffd166;
+  --dash-absent: #ef476f;
+  --dash-dayoff: #a3c4f3;
+  --dash-center: #a0b1ba;
+
+  /* Mobile client (/m) — dark skin captured from the Verifix HR phone app */
+  --m-bg: #0d1017;
+  --m-nav: #0a0d13;
+  --m-card: #1c212c;
+  --m-card-elev: #242a37;
+  --m-field: #222836;
+  --m-ink: #e7eaf1;
+  --m-ink-muted: #9aa3b4;
+  --m-ink-faint: #6d7688;
+  --m-accent: #2563d9;
+  --m-accent-hover: #1e56c0;
+  --m-accent-link: #4a8cff;
+  --m-accent-soft: #1f2c47;
+  --m-line: rgba(255, 255, 255, 0.07);
+  --m-ok: #06d6a0;
+  --m-late: #ffd166;
+  --m-absent: #ef476f;
+  --m-dayoff: #a3c4f3;
+  --m-radius: 16px;
+}
+
+/* The /m shell paints its own dark plane; the desktop tokens stay untouched. */
+body[data-app='mobile'] {
+  background: var(--m-bg);
+  color: var(--m-ink);
+  overscroll-behavior-y: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--font-size);
+  font-weight: 400;
+  line-height: var(--line-height);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  transition: background var(--motion), color var(--motion), border-color var(--motion);
+}
+
+button:active:not(:disabled) {
+  transform: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+th,
+td {
+  text-align: left;
+  padding: var(--table-row-pad-y) var(--table-row-pad-x) var(--table-row-pad-y) 10px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+th {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-table);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--line-table);
+  padding: var(--table-head-pad-y) var(--table-row-pad-x) var(--table-head-pad-y) 10px;
+}
+
+tbody tr:nth-child(odd) {
+  background: var(--surface);
+}
+
+tbody tr:nth-child(even) {
+  background: var(--bg-elevated);
+}
+
+tbody tr {
+  transition: background var(--motion);
+}
+
+tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+tbody tr:hover td {
+  background: var(--bg-hover);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.pageEnter {
+  animation: fadeUp 0.25s var(--motion) both;
+}
+
+.noPrint {
+  /* screen default */
+}
+
+.printOnly {
+  display: none !important;
+}
+
+.printArea {
+  background: var(--surface);
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+
+  .noPrint,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  .printOnly {
+    display: block !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .printArea {
+    box-shadow: none !important;
+    border: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  [data-print='report'] {
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  [data-print='report'] table {
+    font-size: 8.5pt;
+  }
+
+  [data-print='report'] th,
+  [data-print='report'] td {
+    padding: 0.2rem 0.25rem;
+    border: 1px solid #ccc;
+  }
+
+  [data-print='report'] thead {
+    display: table-header-group;
+  }
+
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+}
+
+/* Form modal open: blur page content behind portal overlay */
+html.form-modal-open .topNav {
+  padding-right: var(--form-modal-scrollbar, 0px);
+}
+
+/* Ensure any in-tree modal backdrops are viewport-centered */
+[class*='modalBackdrop'],
+[class*='confirmBackdrop'] {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  padding: 1rem !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+}

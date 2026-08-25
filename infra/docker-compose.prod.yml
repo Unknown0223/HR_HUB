@@ -1,0 +1,48 @@
+# Production-oriented infra overlay for HR HUB.
+# Prefer this over K8s for single-node / small HA deployments.
+#
+# Usage (from repo root):
+#   cp .env.example .env.prod   # fill secrets — never commit
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Apps (api / web / device-gw) typically run on the host or behind a reverse proxy;
+# this file hardens data-plane services. See docs/DEPLOY.md.
+
+name: hr-hub-prod
+
+services:
+  postgres:
+    restart: always
+    ports:
+      # Bind to loopback only — expose via VPN/SSH tunnel or app network
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-hrhub}
+    # Optional: pin resources
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 1G
+
+  redis:
+    restart: always
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+
+  nats:
+    restart: always
+    ports:
+      - "127.0.0.1:${NATS_PORT:-4222}:4222"
+      - "127.0.0.1:8222:8222"
+
+  minio:
+    restart: always
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}

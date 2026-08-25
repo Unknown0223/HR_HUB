@@ -1,0 +1,37 @@
+.fieldBlock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  background: #f3f6f9;
+  border-radius: 4px;
+  padding: 0.55rem 0.75rem;
+  color: #3f4254;
+  font-size: 0.9rem;
+  cursor: grab;
+}
+
+.fieldBlock:active {
+  cursor: grabbing;
+}
+
+.handle {
+  color: #a1a5b7;
+  font-size: 1rem;
+  letter-spacing: -1px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-size: 0.88rem;
+  color: #5e6278;
+}
+
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #3f4254;
+}

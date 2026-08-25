@@ -1,0 +1,126 @@
+.btnOutline {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.btnOutline:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  appearance: none;
+  border: none;
+  border-radius: 4px;
+  background: #f1416c;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.btnDanger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.viewLayout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .viewLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.side {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.sideTitle {
+  font-weight: 650;
+  color: #3f4254;
+  font-size: 0.92rem;
+}
+
+.sideNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+}
+
+.sideNav button,
+.sideNavOn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 4px;
+  color: #5e6278;
+  cursor: pointer;
+}
+
+.sideNavOn {
+  background: #eef6ff;
+  color: #3699ff;
+  font-weight: 600;
+}
+
+.section {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #3f4254;
+}
+
+.viewGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .viewGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.readonly {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.65rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #f9fafb;
+  color: #3f4254;
+  font-size: 0.9rem;
+}

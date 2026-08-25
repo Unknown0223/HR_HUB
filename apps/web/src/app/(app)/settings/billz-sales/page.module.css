@@ -1,0 +1,8 @@
+.modalWide {
+  width: min(560px, 100%) !important;
+}
+
+.secret {
+  min-height: 120px;
+  resize: vertical;
+}

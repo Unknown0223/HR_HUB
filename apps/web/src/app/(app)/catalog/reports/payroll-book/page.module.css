@@ -1,0 +1,163 @@
+.card {
+  max-width: 640px;
+}
+
+.req {
+  color: #f64e60;
+}
+
+.monthWrap {
+  position: relative;
+}
+
+.monthBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  padding: 0 0.65rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.monthBtn:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.monthBtn i {
+  color: #a1a5b7;
+}
+
+.monthPopup {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  border-radius: 6px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  padding: 0.55rem;
+}
+
+.monthYear {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+  font-weight: 600;
+  color: #181c32;
+}
+
+.monthYear button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #3699ff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+}
+
+.monthCell {
+  appearance: none;
+  border: none;
+  background: #fff;
+  color: #3f4254;
+  border-radius: 4px;
+  padding: 0.45rem 0.2rem;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.monthCell:hover {
+  background: #f3f6f9;
+}
+
+.monthOn {
+  background: #3699ff;
+  color: #fff;
+}
+
+.monthOn:hover {
+  background: #187de4;
+  color: #fff;
+}
+
+.periodLine {
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+}
+
+.tableWrap {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+  max-height: calc(100vh - 220px);
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 0.68rem;
+  background: #fff;
+  min-width: 2200px;
+}
+
+.table th,
+.table td {
+  border: 1px solid #cfd3da;
+  padding: 0.2rem 0.28rem;
+  color: #181c32;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table thead th {
+  background: #5e6278;
+  color: #fff;
+  font-weight: 600;
+}
+
+.table tbody tr:nth-child(even) td {
+  background: #f9fafb;
+}
+
+.name {
+  text-align: left !important;
+  min-width: 200px;
+  max-width: 260px;
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  text-align: center;
+  color: #a1a5b7;
+  padding: 1.5rem;
+}

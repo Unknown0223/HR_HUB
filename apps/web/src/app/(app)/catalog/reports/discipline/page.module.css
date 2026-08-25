@@ -1,0 +1,309 @@
+.card {
+  max-width: none;
+}
+
+.box {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 16px;
+  accent-color: #3699ff;
+  cursor: pointer;
+}
+
+.treeOn {
+  background: #e8f4ff;
+  border-radius: 3px;
+}
+
+.treeName {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 0.86rem;
+  color: #3f4254;
+  cursor: pointer;
+  text-align: left;
+  white-space: normal;
+}
+
+.treeNameOn {
+  color: #181c32;
+  font-weight: 600;
+}
+
+.listRow {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #f1f3f6;
+  background: #fff;
+  text-align: left;
+  padding: 0.42rem 0.65rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #181c32;
+  cursor: pointer;
+  white-space: normal;
+}
+
+.listRow:hover {
+  background: #f4f7fb;
+}
+
+.listOn {
+  background: #e1f0ff;
+  font-weight: 600;
+}
+
+.dropWrap {
+  position: relative;
+}
+
+.dropField {
+  appearance: none;
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  padding: 0 0.55rem;
+  cursor: pointer;
+}
+
+.dropEmpty {
+  color: #a1a5b7;
+}
+
+.dropField:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+}
+
+.dropPanel {
+  display: none;
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+}
+
+.dropOpen .dropPanel {
+  display: block;
+}
+
+.dropSearch {
+  width: 100%;
+  box-sizing: border-box;
+  height: 34px;
+  border: none;
+  border-bottom: 1px solid #e4e6ef;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.dropSearch:focus {
+  outline: none;
+}
+
+.empWide {
+  min-width: min(680px, 92vw);
+  right: auto;
+}
+
+.empHead,
+.empRow {
+  display: grid;
+  grid-template-columns: 28px 140px 1fr 180px;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.38rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.empHead {
+  background: #eef3f7;
+  color: #5e6278;
+  font-weight: 700;
+}
+
+.empRow {
+  appearance: none;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #eef0f4;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  color: #181c32;
+}
+
+.empOn {
+  background: #dceeff;
+  font-weight: 600;
+}
+
+.showAll {
+  appearance: none;
+  display: block;
+  width: 100%;
+  border: none;
+  border-top: 1px solid #e4e6ef;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: right;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+.periodLine {
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin: 0 0 0.7rem;
+  font-size: 0.88rem;
+  color: #3f4254;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 1px solid #eff2f5;
+  background: #fff;
+  margin: 0 0 0.75rem;
+}
+
+.tab,
+.tabOn {
+  border: 0;
+  background: transparent;
+  color: #5e6278;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: #009ef7;
+}
+
+.tabOn {
+  color: #009ef7;
+  font-weight: 600;
+  border-bottom-color: #009ef7;
+  background: #f1faff;
+}
+
+.back {
+  appearance: none;
+  border: none;
+  background: none;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+  padding: 0 0 0.55rem;
+}
+
+.tableWrap {
+  overflow: visible;
+  background: #fff;
+  border: 1px solid #e4e6ef;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  background: #fff;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border: 1px solid #d8dbe0;
+  padding: 0.4rem 0.5rem;
+  color: #181c32;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table th {
+  background: #eef0f4;
+  font-weight: 600;
+}
+
+.table td.name {
+  text-align: left;
+  white-space: normal;
+  min-width: 220px;
+}
+
+.table td.left {
+  text-align: left;
+  white-space: normal;
+}
+
+.nameLink {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #3699ff;
+  cursor: pointer;
+  text-align: left;
+  white-space: normal;
+}
+
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+.late {
+  background: #fff2cc;
+}
+
+.off {
+  background: #e7f3ff;
+}
+
+.foot {
+  font-weight: 700;
+  background: #f5f8fa;
+}
+
+.empty {
+  text-align: center;
+  color: #a1a5b7;
+  padding: 1.25rem !important;
+}

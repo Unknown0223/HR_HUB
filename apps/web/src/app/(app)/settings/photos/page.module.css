@@ -1,0 +1,125 @@
+.fields {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
+  gap: 1rem 1.5rem;
+  max-width: 720px;
+  margin-bottom: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #5e6278;
+}
+
+.req {
+  color: #f64e60;
+  margin-left: 2px;
+}
+
+.invalid input {
+  border-color: #f64e60 !important;
+}
+
+.folderBtn {
+  appearance: none;
+  width: 100%;
+  height: 34px;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+  color: #3f4254;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folderBtn:hover {
+  border-color: #3699ff;
+}
+
+.folderBtnEmpty {
+  color: #a1a5b7;
+}
+
+.hidden {
+  display: none;
+}
+
+.uploadRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.uploadBtn {
+  appearance: none;
+  border: none;
+  background: #1bc5bd;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.15rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.uploadBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.hint {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #b5b5c3;
+  color: #7e8299;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+.tabs {
+  display: flex;
+  gap: 1.4rem;
+  border-bottom: 1px solid #eef0f4;
+  margin-bottom: 0.65rem;
+}
+
+.tab,
+.tabOn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 0 0.55rem;
+  cursor: pointer;
+  color: #7e8299;
+}
+
+.tabOn {
+  color: #3699ff;
+  box-shadow: inset 0 -2px 0 #3699ff;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.4rem;
+}

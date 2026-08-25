@@ -1,0 +1,181 @@
+uid,section,name,first_url,phase_hint,status
+1,Asosiy sahifa,Статистика посещений сотрудников,https://app2.verifix.com/#/!1iil5zr2/vhr/intro/dashboard,phase-1-attendance,todo
+3,Кадры,Сотрудники,https://app2.verifix.com/#/!1iil5zr2/vhr/href/employee/employee_list,phase-1-hr,todo
+4,Кадры,Все кадровые документы,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/journal_list,phase-1-hr,todo
+5,Кадры,Все кадровые документы / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/journal_list,phase-1-hr,optional
+6,Кадры,Организационная структура,https://app2.verifix.com/#/!1isie2pq/vhr/rep/href/organizational_structure,phase-1-hr,todo
+7,Кадры,Физические лица,https://app2.verifix.com/#/!1iutqrem/vhr/href/person/person_list,phase-1-hr,todo
+8,Кадры,Физические лица / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iwbbrum/vhr/href/person/person_add,phase-1-hr,optional
+9,Кадры,Уволенные сотрудники,https://app2.verifix.com/#/!1iymogji/vhr/href/employee/dismissed_employee_list,phase-1-hr,todo
+10,Кадры,Сотрудники по договору ГПХ,https://app2.verifix.com/#/!1j0y158e/vhr/href/employee/civil_employee_list,phase-1-hr,todo
+12,Кадры,Сотрудники / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1j9jmjsu/vhr/href/employee/employee_add,phase-1-hr,optional
+13,Кадры,Договор ГПХ,https://app2.verifix.com/#/!1jc6vwla/vhr/hpd/cv_contract_list,phase-1-hr,todo
+14,Кадры,Договор ГПХ / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1jc6vwla/vhr/hpd/cv_contract_list,phase-1-hr,optional
+15,Кадры,Реестр изменения имени сотрудника,https://app2.verifix.com/#/!1jftv9oe/vhr/hpd/person_name_document_list,phase-1-hr,todo
+16,Кадры,Реестр изменения имени сотрудника / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1jhhem66/vhr/hpd/person_name_document+add,phase-1-hr,optional
+17,Кадры,Обходные листы,https://app2.verifix.com/#/!1jjsrav2/vhr/hpd/clearance_sheet_list,phase-1-hr,todo
+18,Кадры,Все изменения в оплате труда,https://app2.verifix.com/#/!1jmg0nni/vhr/hpd/wage_change_list,phase-1-hr,todo
+19,Кадры,Все изменения в оплате труда / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1jmg0nni/vhr/hpd/wage_change_list,phase-1-hr,optional
+21,Кадры,Все отсутствия сотрудников,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/timeoff_list,phase-1-hr,todo
+22,Кадры,Типы отпуска,https://app2.verifix.com/#/!1jzceri6/vhr/hpd/vacation_type_list,phase-1-hr,todo
+23,Кадры,Типы отпуска / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1k0tzry6/vhr/hpd/vacation_type+add,phase-1-hr,optional
+26,Кадры,Все отсутствия сотрудников / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/timeoff_list,phase-1-hr,optional
+27,Кадры,Корректировки табеля,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/timebook_adjustment_list,phase-1-hr,todo
+28,Кадры,Заявки на кадровые изменения,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/application/application_list,phase-1-hr,todo
+29,Кадры,Заявки на кадровые изменения / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/hpd/application/application_list,phase-1-hr,optional
+30,Кадры,Шаблоны обходных листов,https://app2.verifix.com/#/!1kwx0pj2/vhr/hpd/clearance_sheet_template_list,phase-1-hr,todo
+31,Кадры,Шаблоны обходных листов / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1kykk20u/vhr/hpd/clearance_sheet_template+add,phase-1-hr,optional
+32,Кадры,Инциденты,https://app2.verifix.com/#/!1iil5zr2/vhr/hbeh/event_list,phase-1-hr,todo
+33,Кадры,Типы инцидента,https://app2.verifix.com/#/!1l95lh6m/vhr/hbeh/event_type_list,phase-1-hr,todo
+34,Кадры,Типы инцидента / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1lat4toe/vhr/hbeh/event_type+add,phase-1-hr,optional
+35,Кадры,Инциденты / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1lgfk7cu/vhr/hbeh/event+add,phase-1-hr,optional
+36,Кадры,Подразделения,https://app2.verifix.com/#/!1iil5zr2/vhr/hrm/division_list,phase-1-hr,todo
+37,Кадры,Группы отделов,https://app2.verifix.com/#/!1lnpixj2/anor/mhr/division_group_list,phase-1-hr,todo
+38,Кадры,Группы отделов / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1lpj0m2m/anor/mhr/division_group+add,phase-1-hr,optional
+41,Кадры,Должности,https://app2.verifix.com/#/!1iil5zr2/vhr/hrm/job_list,phase-1-hr,todo
+42,Кадры,Группа должностей,https://app2.verifix.com/#/!1m1xjpry/vhr/hrm/job_group_list,phase-1-hr,todo
+43,Кадры,Группа должностей / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1m3f4q7y/vhr/hrm/job_group+add,phase-1-hr,optional
+46,Кадры,Должности / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1m91k3we/vhr/hrm/job+add,phase-1-hr,optional
+47,Кадры,Разряды,https://app2.verifix.com/#/!1iil5zr2/anor/mhr/rank_list,phase-1-hr,todo
+48,Кадры,Разряды / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1mghh64e/anor/mhr/rank+add,phase-1-hr,optional
+49,Кадры,Позиции,https://app2.verifix.com/#/!1iil5zr2/vhr/hrm/robot_list,phase-1-hr,todo
+50,Кадры,Организационная структура по позициям,https://app2.verifix.com/#/!1mpkxku6/vhr/rep/hrm/robot_structure,phase-1-hr,todo
+52,Кадры,Тарифные группы,https://app2.verifix.com/#/!1iil5zr2/vhr/hrm/wage_scale_list,phase-1-hr,todo
+53,Кадры,Утверждения тарифных групп,https://app2.verifix.com/#/!1n0zqo8u/vhr/hrm/wage_scale_register_list,phase-1-hr,todo
+54,Кадры,Утверждения тарифных групп / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1n2hboou/vhr/hrm/wage_scale_register+add,phase-1-hr,optional
+55,Кадры,Тарифные группы / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1n83r2da/vhr/hrm/wage_scale+add,phase-1-hr,optional
+56,Кадры,Повышение разрядов,https://app2.verifix.com/#/!1iil5zr2/vhr/htm/recommended_rank_document_list,phase-1-hr,todo
+57,Кадры,Карьерный путь,https://app2.verifix.com/#/!1ngje4vy/vhr/htm/experience_list,phase-1-hr,todo
+58,Кадры,Карьерный путь / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1ni0z5by/vhr/htm/experience+add,phase-1-hr,optional
+59,Кадры,Повышение разрядов / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1nnnej0e/vhr/htm/recommended_rank_document+add,phase-1-hr,optional
+60,Кадры,820,https://app2.verifix.com/#/!1iil5zr2/vhr/intro/dismissal_reasons,phase-1-hr,todo
+61,Кадры,1274 чел.,https://app2.verifix.com/#/!1iil5zr2/vhr/intro/staff_changes,phase-1-hr,todo
+62,Кадры,1274,https://app2.verifix.com/#/!1iil5zr2/vhr/intro/transfers,phase-1-hr,todo
+63,Кадры,Статистика работы подразделений,https://app2.verifix.com/#/!1iil5zr2/vhr/intro/division_dashboard,phase-3-reporting,todo
+65,Кадры,Итоги года,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/year_summary_dashboard,phase-3-reporting,todo
+67,Посещения,Запросы на отсутствие,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/request_list,phase-1-attendance,todo
+68,Посещения,Мои,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/request_list,phase-1-attendance,todo
+69,Посещения,Мои / Создать :: Создать,https://app2.verifix.com/#/!1p1lflxa/vhr/htt/request+add_personal,phase-1-attendance,optional
+70,Посещения,Доступные,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/request_list,phase-1-attendance,todo
+71,Посещения,Доступные / Создать :: Создать,https://app2.verifix.com/#/!1p4qjyv2/vhr/htt/request+add,phase-1-attendance,optional
+72,Посещения,Виды отсутствий,https://app2.verifix.com/#/!1p6e3bcu/vhr/htt/request_kind_list,phase-1-attendance,todo
+73,Посещения,Виды отсутствий / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1p7vobsu/vhr/htt/request_kind+add,phase-1-attendance,optional
+74,Посещения,Запросы на отсутствие / Создать :: Создать,https://app2.verifix.com/#/!1pa710hq/vhr/htt/request+add,phase-1-attendance,optional
+75,Посещения,Запросы на изменение графика,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/change_list,phase-1-attendance,todo
+76,Посещения,Запросы на изменение графика / Создать :: Создать,https://app2.verifix.com/#/!1pkm43lq/vhr/htt/change+add,phase-1-attendance,optional
+77,Посещения,Внутренняя командировка,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/internal_business_trip_list,phase-1-attendance,todo
+78,Посещения,Запросы мне,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/internal_business_trip_list,phase-1-attendance,todo
+79,Посещения,Мои запросы,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/internal_business_trip_list,phase-1-attendance,todo
+80,Посещения,Мои запросы / Создать :: Создать,https://app2.verifix.com/#/!1prw2try/vhr/htt/internal_business_trip+add,phase-1-attendance,optional
+81,Посещения,Общие запросы,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/internal_business_trip_list,phase-1-attendance,todo
+82,Посещения,Запросы на локацию,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/location_request_list,phase-1-attendance,todo
+83,Посещения,Запросы на локацию / Создать :: Создать,https://app2.verifix.com/#/!1q3yp9dq/vhr/htt/location_request+add,phase-1-attendance,optional
+84,Посещения,Запросы на сверхурочные,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/overtime_request_list,phase-1-attendance,todo
+87,Посещения,Запросы на сверхурочные / Создать :: Создать,https://app2.verifix.com/#/!1qhiwpfi/vhr/htt/overtime_request+add,phase-1-attendance,optional
+88,Посещения,Локации,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/location_list,phase-1-attendance,todo
+89,Посещения,Графики работы,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/schedule_list,phase-1-attendance,todo
+90,Посещения,Графики работы / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/schedule_list,phase-1-attendance,optional
+91,Посещения,Типы локаций,https://app2.verifix.com/#/!1qpgorsu/vhr/htt/location_type_list,phase-1-attendance,todo
+92,Посещения,Типы локаций / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1qr484am/vhr/htt/location_type+add,phase-1-attendance,optional
+93,Посещения,Устройства,https://app2.verifix.com/#/!1qt9mgxq/vhr/htt/device_list,phase-1-attendance,todo
+94,Посещения,Устройства / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1qux5tfi/vhr/htt/device+add,phase-1-attendance,optional
+95,Посещения,Сгенерированные QR-коды,https://app2.verifix.com/#/!1qx8ii4e/vhr/htt/qr_code_list,phase-1-attendance,todo
+96,Посещения,Новые устройства,https://app2.verifix.com/#/!1qzdwuri/vhr/htt/new_devices_list,phase-1-attendance,todo
+97,Посещения,Локация,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/location_list,phase-1-attendance,todo
+98,Посещения,Локация / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1r36ujwe/vhr/htt/location+add,phase-1-attendance,optional
+101,Посещения,Локации / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1r7zi9by/vhr/htt/location+add,phase-1-attendance,optional
+104,Посещения,Отметки,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/track_list,phase-1-attendance,todo
+105,Посещения,Отслеживание местоположения,https://app2.verifix.com/#/!1rvazgam/vhr/htt/tracking,phase-1-attendance,todo
+106,Посещения,GPS отслеживание,https://app2.verifix.com/#/!1ry4754u/vhr/htt/gps_tracking,phase-1-attendance,todo
+107,Посещения,Список проблемных отметок,https://app2.verifix.com/#/!1shmqmym/vhr/hac/problem_tracks_list,phase-1-attendance,todo
+108,Посещения,Отображение последних отметок,https://app2.verifix.com/#/!1skfybsu/vhr/htt/latest_track_list,phase-1-attendance,todo
+109,Посещения,Отметки / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/track_list,phase-1-attendance,optional
+110,Посещения,Индивидуальные графики,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/schedule_registry_list+staff,phase-1-attendance,todo
+111,Посещения,Индивидуальные графики / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/schedule_registry_list+staff,phase-1-attendance,optional
+112,Посещения,Индивидуальные графики для позиций,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/schedule_registry_list+robot,phase-1-attendance,todo
+113,Посещения,Индивидуальные графики для позиций / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/schedule_registry_list+robot,phase-1-attendance,optional
+114,Посещения,Расписания,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/time_table_list,phase-1-attendance,todo
+115,Посещения,Запросы на изменение расписания,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/time_table_request_list,phase-1-attendance,todo
+116,Посещения,Список смен расписания,https://app2.verifix.com/#/!1iil5zr2/vhr/htt/shift_plan_list,phase-1-attendance,todo
+118,Зарплата,Табель,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/timebook_list,phase-2-payroll,todo
+119,Зарплата,Политики штрафов,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/penalty_list,phase-2-payroll,todo
+120,Зарплата,Политики штрафов / Создать :: Создать,https://app2.verifix.com/#/!1uaani9q/vhr/hpr/penalty+add?form_type=S,phase-2-payroll,optional
+121,Зарплата,Корректировки табеля / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1ue9jjge/vhr/hpd/timebook_adjustment+add?journal_type_id=3278,phase-2-payroll,optional
+122,Зарплата,месяц,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/timebook_list,phase-2-payroll,todo
+123,Зарплата,месяц / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1ui8fkn2/vhr/hpr/timebook+add,phase-2-payroll,optional
+124,Зарплата,Все начисления,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/book_list,phase-2-payroll,todo
+125,Зарплата,Поручения,https://app2.verifix.com/#/!1umd9xvi/vhr/hpr/charge_list,phase-2-payroll,todo
+126,Зарплата,Все начисления / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/book_list,phase-2-payroll,optional
+127,Зарплата,Взаиморасчеты,https://app2.verifix.com/#/!1iil5zr2/anor/mku/offset/offset_list,phase-2-payroll,todo
+128,Зарплата,Парные счета,https://app2.verifix.com/#/!1v3kgr0e/anor/mku/coa_twin_list,phase-2-payroll,todo
+129,Зарплата,Парные счета / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1v521rge/anor/mku/coa_twin+add,phase-2-payroll,optional
+130,Зарплата,Ведомость,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/payment_list,phase-2-payroll,todo
+131,Зарплата,ДОБАВИТЬ АВАНС,https://app2.verifix.com/#/!1vhamj3y/vhr/hpr/payment_advance+add,phase-2-payroll,todo
+132,Зарплата,ДОБАВИТЬ АВАНС / Добавить :: Добавить,https://app2.verifix.com/#/!1vhamj3y/vhr/hpr/payment_advance+add,phase-2-payroll,todo
+134,Зарплата,Ручные операции,https://app2.verifix.com/#/!1iil5zr2/anor/mku/operation/operation_list,phase-2-payroll,todo
+135,Зарплата,Ручные операции / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1vxzyc3i/anor/mku/operation/operation+add,phase-2-payroll,optional
+136,Зарплата,Список услуг договора ГПХ,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/cv_fact_list,phase-2-payroll,todo
+137,Зарплата,Начисления процентов от продаж,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/sales_bonus_payment_list,phase-2-payroll,todo
+138,Зарплата,Настройка процентов продаж,https://app2.verifix.com/#/!1we7f4xq/vhr/hrm/job_bonus_type_settings,phase-2-payroll,todo
+139,Зарплата,Начисления процентов от продаж / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1wjnw6ke/vhr/hpr/sales_bonus_payment+add,phase-2-payroll,optional
+140,Зарплата,Разовые начисления,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/charge_document_list,phase-2-payroll,todo
+141,Зарплата,Начисление,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/charge_document_list,phase-2-payroll,todo
+142,Зарплата,Начисление / Создать :: Создать,https://app2.verifix.com/#/!1wpm88ce/vhr/hpr/charge_document+add?document_kind=A,phase-2-payroll,optional
+143,Зарплата,Удержание,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/charge_document_list,phase-2-payroll,todo
+144,Зарплата,Удержание / Создать :: Создать,https://app2.verifix.com/#/!1wsrcla6/vhr/hpr/charge_document+add?document_kind=D,phase-2-payroll,optional
+145,Зарплата,Разовые начисления / Создать :: Создать,https://app2.verifix.com/#/!1wxk0apq/vhr/hpr/charge_document+add?document_kind=D,phase-2-payroll,optional
+146,Зарплата,Займы,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/credit_list,phase-2-payroll,todo
+147,Зарплата,Займы / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1x8yte4e/vhr/hpr/credit+add,phase-2-payroll,optional
+149,Зарплата,Авансовый отчет по командировке,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/business_trip_cost_list,phase-2-payroll,todo
+150,Зарплата,Бонусные начисления,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/bonus_calculation_list,phase-2-payroll,todo
+151,Зарплата,Бонусные начисления / СОЗДАТЬ :: СОЗДАТЬ,https://app2.verifix.com/#/!1iil5zr2/vhr/hpr/bonus_calculation_list,phase-2-payroll,optional
+153,Отчетность,Отчет по штатному расписанию,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/staffing,phase-3-reporting,todo
+154,Отчетность,Отчет по гендерному разделению сотрудников,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/href/employee_by_gender,phase-3-reporting,todo
+155,Отчетность,Отчет по движению сотрудников (подразделения),https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/division_docflow,phase-3-reporting,todo
+156,Отчетность,Отчет увольнений по подразделениям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/dismiss_by_division,phase-3-reporting,todo
+157,Отчетность,Отчет по причинам увольнения,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/dismissal_reason,phase-3-reporting,todo
+158,Отчетность,Отчёт по позициям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hrm/robot,phase-3-reporting,todo
+159,Отчетность,Отчет по изменению разрядов,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/rank_changes,phase-3-reporting,todo
+160,Отчетность,Отчет по корректировкe табеля,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/timebook_adjustment,phase-3-reporting,todo
+161,Отчетность,Отчет по движению сотрудников (штаты),https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/division_movement,phase-3-reporting,todo
+162,Отчетность,Отчет по кандидатам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/href/candidate,phase-3-reporting,todo
+163,Отчетность,Отчет по вакантным позициям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hrm/vacancy_report,phase-3-reporting,todo
+164,Отчетность,Отчет по плану графиков,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hrm/robot_plan,phase-1-attendance,todo
+165,Отчетность,Отчет по занятости,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hrm/division_employment,phase-3-reporting,todo
+166,Отчетность,Отчет по сотрудникам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/href/staff,phase-3-reporting,todo
+167,Отчетность,Отчет по стажам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htm/premium_experience,phase-3-reporting,todo
+168,Отчетность,Отчет по разрядам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpd/ranks,phase-3-reporting,todo
+169,Отчетность,Сотрудники и их родственники,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/href/employee_relatives,phase-3-reporting,todo
+170,Отчетность,Отчет по доступам сотрудников,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/href/employees_access_report,phase-3-reporting,todo
+171,Отчетность,Отчет по посещениям сотрудников,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/timesheet,phase-1-attendance,todo
+172,Отчетность,Создать шаблон,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/timesheet,phase-3-reporting,optional
+174,Отчетность,Отчет по посещениям сотрудников / Создать шаблон :: Создать шаблон,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/timesheet,phase-1-attendance,optional
+175,Отчетность,Отчет по дисциплине посещений,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/href/employee_attendance_analysis,phase-1-attendance,todo
+176,Отчетность,Отчет по режиму работы подразделения (период),https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/division_attendance,phase-3-reporting,todo
+177,Отчетность,Отчет по режиму работы подразделений,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hrm/division_timesheet,phase-3-reporting,todo
+178,Отчетность,Отчет по посещениям сотрудников (T-13),https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/timesheet_with_transfer,phase-1-attendance,todo
+179,Отчетность,Отчет по посещениям сотрудников (T-13) / Создать шаблон :: Создать шаблон,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/timesheet_with_transfer,phase-1-attendance,optional
+180,Отчетность,Детальный отчет по отметкам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/mark_details,phase-1-attendance,todo
+181,Отчетность,Отчет по пройденному расстоянию,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/user_travel_distance,phase-3-reporting,todo
+182,Отчетность,Почасовой отчет по посещениям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/hourly_timesheet,phase-1-attendance,todo
+183,Отчетность,Отчет посещений сотрудников по сменам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/shift_report,phase-1-attendance,todo
+184,Отчетность,Отчет по сменам (второй вариант),https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/custom_shift_report,phase-3-reporting,todo
+185,Отчетность,Отчет посещений по многосменным графикам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/multishift_report,phase-1-attendance,todo
+186,Отчетность,Отчет по видам времени,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/time_type_report,phase-3-reporting,todo
+187,Отчетность,Отчет по опозданиям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/lateness_report,phase-3-reporting,todo
+188,Отчетность,Отчет по опозданиям / Создать шаблон :: Создать шаблон,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/lateness_report,phase-3-reporting,optional
+189,Отчетность,Отчет по расписании,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/htt/time_table_report,phase-3-reporting,todo
+190,Отчетность,Книга начисления заработной платы,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/payroll_book,phase-2-payroll,todo
+191,Отчетность,Итоговый отчет по начислениям с группировками,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/book_report_by_groups,phase-2-payroll,todo
+192,Отчетность,Отчет по оплатам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/payment,phase-3-reporting,todo
+193,Отчетность,Расходы по подразделениям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/expenses_by_division,phase-3-reporting,todo
+194,Отчетность,ПРОСМОТР,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/expenses_by_division,phase-3-reporting,todo
+195,Отчетность,ФОТ отчет,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/expenses_by_location,phase-3-reporting,todo
+196,Отчетность,ФОТ отчет / Создать шаблон :: Создать шаблон,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/expenses_by_location,phase-3-reporting,optional
+197,Отчетность,Отчет по разовым начислениям,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/one_time_accruals_report,phase-2-payroll,todo
+198,Отчетность,Отчет по предварительному окладу,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/employee_salary,phase-3-reporting,todo
+199,Отчетность,Отчет по штрафам,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/fines_report,phase-3-reporting,todo
+201,Настройки,Главное,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/fines_report,phase-4-settings,todo
+202,Настройки,Справочники,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/fines_report,phase-4-settings,todo
+203,Настройки,Дополнительные справочники,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/fines_report,phase-4-settings,todo
+204,Настройки,Организация,https://app2.verifix.com/#/!1iil5zr2/vhr/rep/hpr/fines_report,phase-4-settings,todo

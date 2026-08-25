@@ -1,0 +1,107 @@
+.card {
+  background: #fff;
+  border: 1px solid #e8eaef;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.headBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+  color: #3f4254;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 220px;
+}
+
+.bar {
+  flex: 1;
+  height: 6px;
+  background: #e8edf5;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: #3699ff;
+  border-radius: 999px;
+}
+
+.progressText {
+  font-size: 0.82rem;
+  color: #5e6278;
+  white-space: nowrap;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 22px 1.5rem minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.72rem 0.9rem;
+  border-bottom: 1px solid #eef0f4;
+  font-size: 0.9rem;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3699ff;
+  cursor: pointer;
+}
+
+.num {
+  color: #7e8299;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  color: #3f4254;
+}
+
+.link {
+  color: #3699ff;
+  text-decoration: none;
+  margin-left: 0.35rem;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.ext {
+  color: #a1a5b7;
+  text-decoration: none;
+  font-size: 0.85rem;
+  justify-self: end;
+}
+
+.ext:hover {
+  color: #3699ff;
+}

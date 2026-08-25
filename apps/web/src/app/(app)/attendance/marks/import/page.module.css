@@ -1,0 +1,209 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.topBar h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.btnPrimary,
+.btnBlue,
+.btnGhost {
+  appearance: none;
+  border: none;
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  background: #1bc5bd;
+  color: #fff;
+}
+
+.btnBlue {
+  background: #3699ff;
+  color: #fff;
+}
+
+.btnGhost {
+  background: #fff;
+  border: 1px solid #e2e5ec;
+  color: #3f4254;
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .topGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cardHead input {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.drop {
+  appearance: none;
+  border: 2px dashed #cbd5e1;
+  background: #f8fafc;
+  border-radius: 8px;
+  min-height: 140px;
+  padding: 1rem;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.tableScroll {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.table th,
+.table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.thumb,
+.thumbEmpty {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #e5e7eb;
+  display: inline-block;
+}
+
+.empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 1.25rem !important;
+}
+
+.error {
+  color: #b91c1c;
+  margin: 0;
+}
+
+.info {
+  color: #0f766e;
+  margin: 0;
+}
+
+.search {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.85rem;
+  max-width: 240px;
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 1rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+@media (max-width: 800px) {
+  .settings {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mapList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mapRow {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.mapRow input,
+.startRow input {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+
+.startRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}

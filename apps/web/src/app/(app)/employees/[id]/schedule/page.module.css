@@ -1,0 +1,362 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: fade 0.18s ease both;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  display: none;
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btnSave {
+  appearance: none;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  height: var(--control-height);
+  line-height: 1;
+}
+
+.btnSave:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btnSave:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnClose {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  height: var(--control-height);
+  line-height: 1;
+}
+
+.btnClose:hover {
+  background: var(--bg-elevated);
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}
+
+.ok {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  color: #0d9488;
+  background: var(--ok-soft);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}
+
+.muted {
+  color: var(--ink-muted);
+  font-size: var(--font-size);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.3fr);
+  gap: 1.25rem 2rem;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+@media (max-width: 960px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.field label {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--ink-faint);
+  margin-bottom: 0.2rem;
+  font-weight: 500;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--font-size);
+  background: #fff;
+  color: var(--ink-strong);
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.12rem var(--accent-focus);
+}
+
+.field input[readonly] {
+  background: var(--surface-muted);
+  color: var(--ink-muted);
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.check input[type='checkbox'],
+.check input[type='radio'] {
+  accent-color: var(--accent);
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: var(--font-size-sm);
+  color: var(--ink);
+  min-height: var(--control-height);
+}
+
+.toggle {
+  appearance: none;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #e1e3ea;
+  position: relative;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--motion);
+}
+
+.toggleOn {
+  background: var(--accent);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform var(--motion);
+}
+
+.toggleOn::after {
+  transform: translateX(18px);
+}
+
+.gridCard {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem 0.85rem;
+}
+
+.gridTools {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+
+.toolBtn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--subheader-btn);
+  color: var(--ink);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+  height: 30px;
+}
+
+.toolBtn:hover:not(:disabled) {
+  background: #d7dae3;
+}
+
+.toolBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tableScroll {
+  overflow: auto;
+  max-width: 100%;
+  border: 1px solid var(--line-soft);
+}
+
+.grid {
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 1100px;
+  width: 100%;
+}
+
+.grid th,
+.grid td {
+  border: 1px solid var(--line-table);
+  padding: 3px 2px;
+  text-align: center;
+  white-space: nowrap;
+  min-width: 26px;
+  height: 26px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.grid th {
+  background: var(--bg-elevated);
+  color: var(--ink-muted);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.grid tbody tr:nth-child(even) td:not(.offCell) {
+  background: #fafbfc;
+}
+
+.monthCell {
+  text-align: left !important;
+  padding-left: 0.5rem !important;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 88px !important;
+  background: var(--bg-elevated) !important;
+}
+
+.req {
+  color: var(--danger);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+.workCell {
+  cursor: pointer;
+  background: #f3f6f9 !important;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.workCell:hover {
+  background: var(--accent-soft) !important;
+}
+
+.offCell {
+  background: var(--danger-soft) !important;
+  color: var(--danger);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.offCell:hover {
+  filter: brightness(0.97);
+}

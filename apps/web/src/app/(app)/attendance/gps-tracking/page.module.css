@@ -1,0 +1,232 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 70vh;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.btnBlue,
+.btnGhost {
+  appearance: none;
+  border: none;
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnBlue {
+  background: #3699ff;
+  color: #fff;
+}
+
+.btnGhost {
+  background: #fff;
+  border: 1px solid #e2e5ec;
+  color: #3f4254;
+}
+
+.board {
+  display: grid;
+  gap: 0;
+  min-height: 620px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.left,
+.right {
+  background: #fff;
+  border-right: 1px solid #eef0f4;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.right {
+  border-right: none;
+  border-left: 1px solid #eef0f4;
+}
+
+.searchRow {
+  padding: 0.65rem;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.searchRow input {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.list {
+  overflow: auto;
+  flex: 1;
+}
+
+.card,
+.cardActive {
+  appearance: none;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fff;
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cardActive {
+  background: #ecfdf5;
+  box-shadow: inset 3px 0 0 #1bc5bd;
+}
+
+.avatar,
+.avatarEmpty {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.cardBody strong {
+  font-size: 0.78rem;
+  color: #111827;
+}
+
+.cardBody span {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.mapPane {
+  position: relative;
+  background: #eef2f7;
+  min-height: 620px;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  border: 0;
+}
+
+.collapse {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+}
+
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.dateField input {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.timeline {
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: auto;
+}
+
+.tlItem {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.tlIn,
+.tlOut,
+.tlMark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tlIn {
+  background: #d7f1ff;
+  box-shadow: inset 0 0 0 6px #3699ff;
+}
+
+.tlOut {
+  background: #ffe2e5;
+  box-shadow: inset 0 0 0 6px #f1416c;
+}
+
+.tlMark {
+  background: #fff4de;
+  box-shadow: inset 0 0 0 6px #ffc700;
+}
+
+.tlItem strong {
+  font-size: 0.9rem;
+}
+
+.tlItem div {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.empty {
+  color: #9ca3af;
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.error {
+  color: #b91c1c;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .board {
+    grid-template-columns: 1fr !important;
+  }
+}

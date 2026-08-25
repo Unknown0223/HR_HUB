@@ -1,0 +1,377 @@
+.wrap {
+  --sky: #8ecae6;
+  --ink: #2c3e50;
+  --muted: #95a5a6;
+  --panel: #ffffff;
+  --page: #eef1f5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: -0.75rem -1rem -1.25rem;
+  padding: 0.65rem 1rem 1.25rem;
+  background: var(--page);
+  min-height: calc(100vh - 7rem);
+  animation: fadeUp 0.2s ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--panel);
+  border-radius: 0;
+  margin: -0.65rem -1rem 0;
+  padding: 0.15rem 1rem 0.15rem 1rem;
+  border-bottom: 1px solid #e4e6ef;
+  min-height: 44px;
+}
+
+.head :global([data-no-print]) {
+  margin: 0;
+  border: none;
+  background: transparent;
+  flex: 1;
+}
+
+.filterIcon {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.35rem;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.filterIcon:hover {
+  background: #f8f9fa;
+}
+
+.filterPanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--panel);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.filterPanel label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.filterPanel input {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid #e4e6ef;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  background: #fff;
+}
+
+.applyBtn {
+  appearance: none;
+  border: none;
+  border-radius: 4px;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+.resetBtn {
+  appearance: none;
+  border: 1px solid #e4e6ef;
+  border-radius: 4px;
+  background: #f3f6f9;
+  color: #3f4254;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+.error {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 0.85rem;
+}
+
+.loading {
+  margin: 1rem 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .kpiRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kpi {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 1rem 1.15rem 0.9rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.kpiValue {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.kpiLabel {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #7f8c8d;
+}
+
+.gridTop {
+  display: grid;
+  grid-template-columns: 1.05fr 0.7fr 1.45fr;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.gridBottom {
+  display: grid;
+  grid-template-columns: 1.25fr 0.7fr 0.85fr 1.05fr;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+@media (max-width: 1280px) {
+  .gridTop {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cardFlow {
+    grid-column: 1 / -1;
+  }
+  .gridBottom {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .gridTop,
+  .gridBottom,
+  .kpiRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem 0.85rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardFlow {
+  min-height: 280px;
+  padding: 0.55rem 0.65rem 0.7rem;
+}
+
+.card h2 {
+  margin: 0 0 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7f8c8d;
+}
+
+.chartEmpty {
+  flex: 1;
+  min-height: 120px;
+}
+
+/* —— Horizontal bars (Verifix) —— */
+.hBars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.hRow {
+  display: grid;
+  grid-template-columns: minmax(64px, 30%) 1fr;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 16px;
+}
+
+.hLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #5d6d7e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.hTrack {
+  position: relative;
+  height: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.hFill {
+  height: 100%;
+  background: var(--sky);
+  border-radius: 1px;
+  min-width: 2px;
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hCount {
+  position: absolute;
+  left: 100%;
+  margin-left: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* —— Vertical bars —— */
+.vBars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-evenly;
+  gap: 0.35rem;
+  flex: 1;
+  min-height: 180px;
+  padding: 0.35rem 0.15rem 0;
+  border-bottom: 1px solid #e8ecf0;
+}
+
+.vCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 88px;
+  height: 100%;
+}
+
+.vCount {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink);
+  min-height: 1rem;
+}
+
+.vTrack {
+  flex: 1;
+  width: 100%;
+  max-width: 42px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.vFill {
+  width: 100%;
+  background: var(--sky);
+  border-radius: 1px 1px 0 0;
+  min-height: 3px;
+  transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.vZero {
+  width: 100%;
+  height: 2px;
+  background: #d5dbe3;
+}
+
+.vLabel {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: #7f8c8d;
+  text-align: center;
+  line-height: 1.15;
+  max-width: 100%;
+}
+
+/* —— Sankey —— */
+.sankey {
+  width: 100%;
+  height: auto;
+  flex: 1;
+  min-height: 240px;
+  overflow: visible;
+}
+
+.sankeyHead {
+  fill: #7f8c8d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: inherit;
+}
+
+.sankeyLabel {
+  fill: #5d6d7e;
+  font-size: 9.5px;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.sankeyDest {
+  fill: #2c3e50;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+}

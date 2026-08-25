@@ -1,0 +1,445 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: fade 0.18s ease both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.btnSave,
+.btnStatus {
+  appearance: none;
+  border: none;
+  background: #3699ff;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnSave:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btnStatus {
+  background: #0d9488;
+}
+
+.btnClose {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #3699ff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.05rem;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.statusMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.statusMenu button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.statusMenu button:hover {
+  background: #f3f4f6;
+}
+
+.error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 4px;
+  max-width: 560px;
+}
+
+.ok {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  color: #0d9488;
+  background: #ecfdf5;
+  border-radius: 4px;
+  max-width: 560px;
+}
+
+.formShell {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 6px;
+  padding: 1.25rem 1.4rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field > span {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.req {
+  color: #e8534a;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.field input:not([type='radio']),
+.field select,
+.field textarea,
+.searchLike {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #1f2937;
+  background: #fff;
+}
+
+.field input:not([type='radio']):not([type='date']),
+.field select,
+.searchLike {
+  height: 36px;
+}
+
+.field input:not([type='radio']):focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
+}
+
+.field textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.45;
+  padding: 0.55rem 0.65rem;
+}
+
+.fieldValue {
+  font-size: 0.9rem;
+  color: #2c3e50;
+  min-height: 1.4em;
+}
+
+.combo {
+  position: relative;
+}
+
+.comboInput {
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0.4rem 0.65rem;
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.comboInput:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
+}
+
+.comboList {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 240px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.comboItem,
+.comboItemActive {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #1f2937;
+}
+
+.comboItem:hover,
+.comboItemActive {
+  background: #eef6ff;
+  color: #3699ff;
+}
+
+.comboMeta {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.comboEmpty {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.selectedHint {
+  font-size: 0.78rem;
+  color: #0d9488;
+}
+
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.5rem;
+  padding-top: 0.15rem;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #1f2937;
+  cursor: pointer;
+  margin: 0;
+}
+
+.radio input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3699ff;
+}
+
+.swapList {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.swapRow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.dateInput {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0.35rem 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #374151;
+  background: #fff;
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: #3699ff;
+  box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
+}
+
+.swapArrow {
+  font-size: 1.15rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+}
+
+.periodRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.addBtn,
+.ghostBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 4px;
+  width: 2.1rem;
+  height: 2.1rem;
+  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #3699ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ghostBtn {
+  color: #dc2626;
+  font-size: 1.05rem;
+}
+
+.addBtn:hover,
+.ghostBtn:hover {
+  background: #f8fafc;
+  border-color: #bfdbfe;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1.5rem;
+}
+
+.dayChangeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  width: 100%;
+}
+
+.dayChangeRow .dateInput {
+  flex: 0 1 12rem;
+  max-width: 14rem;
+}
+
+.dayTypeRadios {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+
+@media (max-width: 700px) {
+  .grid2,
+  .periodRow {
+    grid-template-columns: 1fr;
+  }
+
+  .swapRow,
+  .dayChangeRow {
+    flex-wrap: wrap;
+  }
+
+  .dayChangeRow .dateInput {
+    max-width: none;
+    flex: 1 1 100%;
+  }
+}
+
+.muted {
+  color: #95a5a6;
+}
+
+.historyEmpty {
+  color: #95a5a6;
+  font-size: 0.88rem;
+  padding: 1rem 0;
+}

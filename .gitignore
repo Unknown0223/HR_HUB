@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build
+dist/
+build/
+.next/
+.next-build/
+out/
+*.tsbuildinfo
+
+# Flutter / mobile
+.dart_tool/
+**/android/.gradle/
+**/android/.kotlin/
+apps/mobile/**/app/build/
+*.apk
+*.aab
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Prisma
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+**/query_engine*.tmp*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / coverage
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# Local debug dumps (screenshots / UI dumps)
+apps/mobile/emu*.png
+apps/mobile/emulator*.png
+apps/mobile/ui*.xml
+apps/mobile/build-log*.txt
+
+# Docker volumes (local)
+infra/data/
+
+# Misc
+*.pem
+.turbo/
+.cache/
+
+# Accidental nested project copy (do not publish)
+/hr-hub/
