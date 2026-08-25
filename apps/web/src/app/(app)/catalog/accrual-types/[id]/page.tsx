@@ -1,7 +1,7 @@
 'use client';
 
 import { use } from 'react';
-import { AccrualTypeForm } from '../../AccrualTypeForm';
+import { AccrualTypeForm } from '../AccrualTypeForm';
 
 export default function ViewAccrualTypePage({
   params,

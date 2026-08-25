@@ -6,7 +6,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { EmployeePickModal } from '@/components/EmployeePickModal';
 import { toPickItems } from '@/components/employee-pick';
 import { apiFetch } from '@/lib/api';
-import styles from '../marks/page.module.css';
+import styles from '../page.module.css';
 
 type EmpRow = {
   id: string;

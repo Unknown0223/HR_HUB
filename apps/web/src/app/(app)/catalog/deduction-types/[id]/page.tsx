@@ -1,7 +1,7 @@
 'use client';
 
 import { use } from 'react';
-import { DeductionTypeForm } from '../../DeductionTypeForm';
+import { DeductionTypeForm } from '../DeductionTypeForm';
 
 export default function ViewDeductionTypePage({
   params,

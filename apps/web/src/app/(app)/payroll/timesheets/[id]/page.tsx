@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { TimesheetForm } from '../../TimesheetForm';
+import { TimesheetForm } from '../TimesheetForm';
 
 export default function ViewTimesheetPage() {
   const { id } = useParams<{ id: string }>();
