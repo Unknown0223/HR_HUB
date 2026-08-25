@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     device_gw_port: int = 8000
     device_gw_nats_url: str = "nats://localhost:4222"
     device_gw_nats_subject: str = "hrhub.punch.raw"
+    # Nest API base (local or Railway public URL) for HTTP punch ingest fallback
+    device_gw_api_url: str = "http://localhost:3001"
+    # Must match API PUNCH_INGEST_API_KEY when set
+    device_gw_punch_key: str = ""
     default_adapter: str = "mock"
 
 
@@ -44,6 +48,8 @@ app = FastAPI(
 publisher = PunchPublisher(
     url=settings.device_gw_nats_url,
     subject=settings.device_gw_nats_subject,
+    api_url=settings.device_gw_api_url,
+    punch_key=settings.device_gw_punch_key,
 )
 
 
@@ -188,8 +194,11 @@ async def maybe_unlock_after_sync(
         if adapter.punch_locked:
             logger.info("punch unlock deferred — %s", reason)
         return
-    if publisher.status != "connected":
-        logger.info("punch unlock deferred — server NATS not connected")
+    if not publisher.server_ready:
+        logger.info(
+            "punch unlock deferred — server not ready (status=%s)",
+            publisher.status,
+        )
         return
     await adapter.unlock_punching()
 

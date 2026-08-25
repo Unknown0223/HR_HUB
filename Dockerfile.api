@@ -1,0 +1,31 @@
+# HR HUB API — build from monorepo root (shared npm workspaces)
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN npm ci
+
+FROM node:20-bookworm-slim AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY apps/api ./apps/api
+COPY packages/shared ./packages/shared
+RUN npm run db:generate && npm run build:api
+
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY --from=build /app/apps/api/dist apps/api/dist
+COPY --from=build /app/apps/api/prisma apps/api/prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+
+EXPOSE 3001
+# Railway sets PORT; prisma push on boot for first deploy (replace with migrate deploy later)
+CMD ["sh", "-c", "cd apps/api && npx prisma db push --skip-generate && node dist/main.js"]

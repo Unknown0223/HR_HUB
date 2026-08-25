@@ -74,9 +74,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = Number(process.env.API_PORT ?? 3001);
-  await app.listen(port);
-  logger.log(`HR HUB API listening on http://localhost:${port}`);
+  // Railway / PaaS inject PORT; local/dev still use API_PORT.
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`HR HUB API listening on http://0.0.0.0:${port}`);
   logger.log(`Swagger: http://localhost:${port}/docs`);
   logger.log(`CORS origins: ${corsOrigins.join(', ')}`);
 }

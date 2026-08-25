@@ -1,0 +1,19 @@
+# Dependencies / build context for API & Web images
+node_modules
+**/node_modules
+.git
+.next
+**/.next
+dist
+**/dist
+.venv
+**/.venv
+hr-hub
+infra/data
+*.md
+apps/mobile
+apps/device-gw
+tools
+.env
+.env.*
+!**/.env.example

@@ -67,3 +67,6 @@ infra/data/
 
 # Accidental nested project copy (do not publish)
 /hr-hub/
+
+# Local CLI binaries / scratch
+/tools/
