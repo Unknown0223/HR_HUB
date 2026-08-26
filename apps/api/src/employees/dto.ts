@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EmploymentStatus, EmploymentType } from '@prisma/client';
@@ -115,6 +116,11 @@ export class UpdateEmployeeDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  tabNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   divisionId?: string;
 
   @ApiPropertyOptional()
@@ -139,8 +145,20 @@ export class UpdateEmployeeDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @ValidateIf((_, v) => v !== '' && v != null)
+  @IsDateString()
+  hiredAt?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== '' && v != null)
   @IsDateString()
   dismissedAt?: string;
+
+  @ApiPropertyOptional({ description: 'Base monthly salary' })
+  @IsOptional()
+  @IsString()
+  baseSalary?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

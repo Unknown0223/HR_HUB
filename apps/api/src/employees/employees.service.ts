@@ -1813,16 +1813,44 @@ export class EmployeesService {
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {
     await this.findOne(tenantId, id);
-    const { dismissedAt, ...rest } = dto;
+    const {
+      dismissedAt,
+      hiredAt,
+      baseSalary,
+      divisionId,
+      positionId,
+      scheduleId,
+      regionId,
+      gradeId,
+      personId,
+      ...rest
+    } = dto;
+    const nullIfEmpty = (v: string | undefined) =>
+      v === undefined ? undefined : v === '' || v === 'null' ? null : v;
+    let salary: Prisma.Decimal | null | undefined = undefined;
+    if (baseSalary !== undefined) {
+      const raw = String(baseSalary).trim();
+      salary = raw === '' ? null : new Prisma.Decimal(raw);
+    }
     return this.prisma.employee.update({
       where: { id },
       data: {
         ...rest,
+        divisionId: nullIfEmpty(divisionId),
+        positionId: nullIfEmpty(positionId),
+        scheduleId: nullIfEmpty(scheduleId),
+        regionId: nullIfEmpty(regionId),
+        gradeId: nullIfEmpty(gradeId),
+        personId: nullIfEmpty(personId),
+        hiredAt: hiredAt !== undefined ? (hiredAt ? new Date(hiredAt) : null) : undefined,
+        baseSalary: salary,
         dismissedAt: dismissedAt
           ? new Date(dismissedAt)
           : dto.status === EmploymentStatus.dismissed
             ? new Date()
-            : undefined,
+            : dto.status === EmploymentStatus.active
+              ? null
+              : undefined,
       },
       include: {
         division: { select: { id: true, name: true, code: true } },
@@ -1830,6 +1858,7 @@ export class EmployeesService {
         region: { select: { id: true, name: true, code: true } },
         grade: { select: { id: true, name: true, code: true } },
         person: true,
+        schedule: { select: { id: true, name: true, code: true, startTime: true, endTime: true } },
       },
     });
   }

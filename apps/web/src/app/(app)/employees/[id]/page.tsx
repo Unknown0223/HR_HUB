@@ -47,10 +47,10 @@ type Detail = {
   hiredAt?: string | null;
   dismissedAt?: string | null;
   baseSalary?: string | number | null;
-  division?: { name: string; code?: string } | null;
-  position?: { name: string; code?: string } | null;
+  division?: { id?: string; name: string; code?: string } | null;
+  position?: { id?: string; name: string; code?: string } | null;
   region?: { id?: string; name: string; code?: string } | null;
-  grade?: { name: string; code?: string } | null;
+  grade?: { id?: string; name: string; code?: string } | null;
   person?: {
     pinfl?: string | null;
     passport?: string | null;
@@ -525,7 +525,13 @@ function genderRu(g?: string | null) {
 function statusRu(status: string) {
   if (status === 'active') return 'Работает';
   if (status === 'dismissed') return 'Уволен';
+  if (status === 'leave') return 'В отпуске';
   return status;
+}
+function employmentTypeRu(t: string) {
+  if (t === 'staff') return 'Штат';
+  if (t === 'gph') return 'ГПХ';
+  return t;
 }
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -948,6 +954,7 @@ export default function EmployeeDetailPage() {
   const photos = usePhotoLightbox();
   const [personalOpen, setPersonalOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [orgOpen, setOrgOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState<'personal' | 'contacts' | null>(
     null,
   );
@@ -997,6 +1004,27 @@ export default function EmployeeDetailPage() {
   const [regions, setRegions] = useState<{ id: string; name: string; code: string }[]>(
     [],
   );
+  const [nationalityOpts, setNationalityOpts] = useState<
+    { code: string; name: string }[]
+  >([]);
+  const [orgForm, setOrgForm] = useState({
+    tabNumber: '',
+    divisionId: '',
+    positionId: '',
+    scheduleId: '',
+    gradeId: '',
+    regionId: '',
+    employmentType: 'staff',
+    status: 'active',
+    hiredAt: '',
+    baseSalary: '',
+  });
+  const [orgLookups, setOrgLookups] = useState<{
+    divisions: { id: string; name: string }[];
+    positions: { id: string; name: string }[];
+    schedules: { id: string; name: string }[];
+    grades: { id: string; name: string }[];
+  }>({ divisions: [], positions: [], schedules: [], grades: [] });
   const [markForm, setMarkForm] = useState({
     locationId: '',
     occurredAt: '',
@@ -1350,7 +1378,7 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  function openPersonalEdit() {
+  async function openPersonalEdit() {
     if (!row) return;
     const bd = row.person?.birthDate
       ? new Date(row.person.birthDate).toISOString().slice(0, 10)
@@ -1367,7 +1395,124 @@ export default function EmployeeDetailPage() {
       inn: row.profileExtras?.inn || '',
       note: row.profileExtras?.note || '',
     });
+    try {
+      const dicts = await apiFetch<
+        Array<{
+          code: string;
+          items?: Array<{ code: string; name: string; isActive?: boolean }>;
+        }>
+      >('/api/settings/dictionaries?kind=extra');
+      const dict = dicts.find((d) => d.code === 'nationality');
+      const opts = (dict?.items || [])
+        .filter((i) => i.isActive !== false)
+        .map((i) => ({ code: i.code, name: i.name }));
+      setNationalityOpts(
+        opts.length
+          ? opts
+          : [
+              { code: 'UZB', name: 'Узбек' },
+              { code: 'KAZ', name: 'казах' },
+              { code: 'TJK', name: 'таджик' },
+              { code: 'RUS', name: 'русский' },
+            ],
+      );
+    } catch {
+      setNationalityOpts([
+        { code: 'UZB', name: 'Узбек' },
+        { code: 'KAZ', name: 'казах' },
+        { code: 'TJK', name: 'таджик' },
+        { code: 'RUS', name: 'русский' },
+      ]);
+    }
     setPersonalOpen(true);
+  }
+
+  async function openOrgEdit() {
+    if (!row) return;
+    setOrgForm({
+      tabNumber: row.tabNumber || '',
+      divisionId: row.division?.id || '',
+      positionId: row.position?.id || '',
+      scheduleId: row.schedule?.id || '',
+      gradeId: row.grade?.id || '',
+      regionId: row.region?.id || '',
+      employmentType: row.employmentType === 'gph' ? 'gph' : 'staff',
+      status: row.status || 'active',
+      hiredAt: row.hiredAt ? new Date(row.hiredAt).toISOString().slice(0, 10) : '',
+      baseSalary:
+        row.baseSalary != null && row.baseSalary !== ''
+          ? String(row.baseSalary)
+          : '',
+    });
+    try {
+      const [lookups, dicts] = await Promise.all([
+        apiFetch<{
+          divisions?: { id: string; name: string }[];
+          positions?: { id: string; name: string }[];
+          schedules?: { id: string; name: string }[];
+          grades?: { id: string; name: string }[];
+        }>('/api/catalog/lookups'),
+        apiFetch<
+          {
+            id: string;
+            code: string;
+            items?: { id: string; name: string; code: string }[];
+          }[]
+        >('/api/settings/dictionaries?kind=admin'),
+      ]);
+      setOrgLookups({
+        divisions: lookups.divisions || [],
+        positions: lookups.positions || [],
+        schedules: lookups.schedules || [],
+        grades: lookups.grades || [],
+      });
+      const regionDict =
+        dicts.find((d) => d.code === 'regions' || d.code === 'region') || null;
+      setRegions(regionDict?.items || []);
+    } catch {
+      setOrgLookups({
+        divisions: row.division?.id
+          ? [{ id: row.division.id, name: row.division.name }]
+          : [],
+        positions: row.position?.id
+          ? [{ id: row.position.id, name: row.position.name }]
+          : [],
+        schedules: row.schedule?.id
+          ? [{ id: row.schedule.id, name: row.schedule.name }]
+          : [],
+        grades: row.grade?.id ? [{ id: row.grade.id, name: row.grade.name }] : [],
+      });
+    }
+    setOrgOpen(true);
+  }
+
+  async function saveOrg() {
+    if (!id) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/employees/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          tabNumber: orgForm.tabNumber.trim() || undefined,
+          divisionId: orgForm.divisionId || '',
+          positionId: orgForm.positionId || '',
+          scheduleId: orgForm.scheduleId || '',
+          gradeId: orgForm.gradeId || '',
+          regionId: orgForm.regionId || '',
+          employmentType: orgForm.employmentType,
+          status: orgForm.status,
+          hiredAt: orgForm.hiredAt || '',
+          baseSalary: orgForm.baseSalary.trim(),
+        }),
+      });
+      await load();
+      setOrgOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function openContactsEdit() {
@@ -3208,8 +3353,8 @@ export default function EmployeeDetailPage() {
     try {
       const dicts = await apiFetch<
         Array<{ code: string; items?: Array<{ code: string; name: string; isActive?: boolean }> }>
-      >('/api/settings/dictionaries?kind=extra');
-      const dict = dicts.find((d) => d.code === 'nationality');
+      >('/api/settings/dictionaries?kind=admin');
+      const dict = dicts.find((d) => d.code === 'countries');
       const opts = (dict?.items || [])
         .filter((i) => i.isActive !== false)
         .map((i) => ({ code: i.code, name: i.name }));
@@ -3834,6 +3979,17 @@ export default function EmployeeDetailPage() {
                     type="button"
                     className={styles.menuItem}
                     disabled={busy}
+                    onClick={() => {
+                      setActionMenuOpen(false);
+                      void openOrgEdit();
+                    }}
+                  >
+                    Изменить организацию
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    disabled={busy}
                     onClick={() => photoInputRef.current?.click()}
                   >
                     Изменить фото
@@ -4208,6 +4364,78 @@ export default function EmployeeDetailPage() {
             <div className={styles.panelBody}>
               {tab === 'main' ? (
                 <>
+                  <div className={styles.section}>
+                    <div className={styles.sectionHead}>
+                      <h3 className={styles.sectionTitle}>Организация и занятость</h3>
+                      <div className={styles.sectionActions}>
+                        <button
+                          type="button"
+                          className={styles.btnGhost}
+                          onClick={() => void openOrgEdit()}
+                        >
+                          Изменить
+                        </button>
+                      </div>
+                    </div>
+                    <div className={styles.fieldGrid}>
+                      <div className={styles.field}>
+                        <label>Табельный номер</label>
+                        <div className={styles.fieldValue}>{row.tabNumber || '—'}</div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Подразделение</label>
+                        <div className={styles.fieldValue}>
+                          {row.division?.name || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Должность</label>
+                        <div className={styles.fieldValue}>
+                          {row.position?.name || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Грейд</label>
+                        <div className={styles.fieldValue}>
+                          {row.grade?.name || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>График работы</label>
+                        <div className={styles.fieldValue}>
+                          {scheduleLabel(row) || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Регион</label>
+                        <div className={styles.fieldValue}>
+                          {row.region?.name || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Тип занятости</label>
+                        <div className={styles.fieldValue}>
+                          {employmentTypeRu(row.employmentType)}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Статус</label>
+                        <div className={styles.fieldValue}>
+                          {statusRu(row.status)}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Дата приёма</label>
+                        <div className={styles.fieldValue}>{fmtDate(row.hiredAt)}</div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Оклад</label>
+                        <div className={styles.fieldValue}>
+                          {salaryVisible ? fmtMoney(row.baseSalary) : '********'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div className={styles.section}>
                     <div className={styles.sectionHead}>
                       <h3 className={styles.sectionTitle}>Персональные данные</h3>
@@ -11838,7 +12066,7 @@ export default function EmployeeDetailPage() {
                 </div>
                 <div className={styles.modalField}>
                   <label>Национальность</label>
-                  <input
+                  <select
                     value={personalForm.nationality}
                     onChange={(e) =>
                       setPersonalForm((f) => ({
@@ -11846,7 +12074,19 @@ export default function EmployeeDetailPage() {
                         nationality: e.target.value,
                       }))
                     }
-                  />
+                  >
+                    {!nationalityOpts.some((o) => o.name === personalForm.nationality) &&
+                    personalForm.nationality ? (
+                      <option value={personalForm.nationality}>
+                        {personalForm.nationality}
+                      </option>
+                    ) : null}
+                    {nationalityOpts.map((o) => (
+                      <option key={o.code} value={o.name}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className={styles.modalRow2}>
@@ -12098,6 +12338,198 @@ export default function EmployeeDetailPage() {
                 className={styles.btn}
                 disabled={busy}
                 onClick={() => void saveContacts()}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {orgOpen && row ? (
+        <div
+          className={styles.modalBackdrop}
+          onClick={() => setOrgOpen(false)}
+          role="presentation"
+        >
+          <div
+            className={`${styles.modal} ${styles.profileEditModal}`}
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHead}>
+              <h2 className={styles.modalTitle}>Организация и занятость</h2>
+              <button
+                type="button"
+                className={styles.modalClose}
+                onClick={() => setOrgOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.modalRow2}>
+                <div className={styles.modalField}>
+                  <label>Табельный номер</label>
+                  <input
+                    value={orgForm.tabNumber}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, tabNumber: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className={styles.modalField}>
+                  <label>Дата приёма</label>
+                  <input
+                    type="date"
+                    value={orgForm.hiredAt}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, hiredAt: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className={styles.modalRow2}>
+                <div className={styles.modalField}>
+                  <label>Подразделение</label>
+                  <select
+                    value={orgForm.divisionId}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, divisionId: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {orgLookups.divisions.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.modalField}>
+                  <label>Должность</label>
+                  <select
+                    value={orgForm.positionId}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, positionId: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {orgLookups.positions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className={styles.modalRow2}>
+                <div className={styles.modalField}>
+                  <label>Грейд</label>
+                  <select
+                    value={orgForm.gradeId}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, gradeId: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {orgLookups.grades.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.modalField}>
+                  <label>График работы</label>
+                  <select
+                    value={orgForm.scheduleId}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, scheduleId: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {orgLookups.schedules.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className={styles.modalRow2}>
+                <div className={styles.modalField}>
+                  <label>Регион</label>
+                  <select
+                    value={orgForm.regionId}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, regionId: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {regions.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.modalField}>
+                  <label>Оклад</label>
+                  <input
+                    value={orgForm.baseSalary}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, baseSalary: e.target.value }))
+                    }
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className={styles.modalRow2}>
+                <div className={styles.modalField}>
+                  <label>Тип занятости</label>
+                  <select
+                    value={orgForm.employmentType}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({
+                        ...f,
+                        employmentType: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="staff">Штат</option>
+                    <option value="gph">ГПХ</option>
+                  </select>
+                </div>
+                <div className={styles.modalField}>
+                  <label>Статус</label>
+                  <select
+                    value={orgForm.status}
+                    onChange={(e) =>
+                      setOrgForm((f) => ({ ...f, status: e.target.value }))
+                    }
+                  >
+                    <option value="active">Работает</option>
+                    <option value="leave">В отпуске</option>
+                    <option value="dismissed">Уволен</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() => setOrgOpen(false)}
+              >
+                Закрыть
+              </button>
+              <button
+                type="button"
+                className={styles.btn}
+                disabled={busy}
+                onClick={() => void saveOrg()}
               >
                 Сохранить
               </button>
