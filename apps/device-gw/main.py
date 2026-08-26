@@ -209,6 +209,12 @@ async def poll_hikvision_events() -> None:
         for device_id, rec in list(devices.items()):
             if rec.info.adapter != AdapterType.hikvision_isapi:
                 continue
+            # Verifix imports without LAN host cannot be polled — skip so the
+            # 8s online heartbeat stays responsive for real terminals.
+            if isinstance(rec.adapter, HikvisionIsapiAdapter) and not (
+                getattr(rec.adapter, "host", None) or ""
+            ).strip():
+                continue
             try:
                 locked_this_cycle = await apply_admin_login_guard(rec)
                 n = await publish_adapter_events(device_id, rec)

@@ -153,14 +153,58 @@ class PunchPublisher:
                 self._safe_log(payload),
             )
 
+    async def _publish_heartbeat_http(self, payload: dict[str, Any]) -> bool:
+        if not self.api_url:
+            return False
+        body = {
+            "tenantId": payload.get("tenantId") or payload.get("tenant_id"),
+            "deviceId": payload.get("deviceId") or payload.get("device_id"),
+            "deviceNow": payload.get("deviceNow") or payload.get("device_now"),
+            "clockDriftSeconds": payload.get("clockDriftSeconds")
+            if payload.get("clockDriftSeconds") is not None
+            else payload.get("clock_drift_seconds"),
+            "punchLocked": payload.get("punchLocked")
+            if payload.get("punchLocked") is not None
+            else payload.get("punch_locked"),
+            "adminLoginDetected": payload.get("adminLoginDetected")
+            if payload.get("adminLoginDetected") is not None
+            else payload.get("admin_login_detected"),
+            "adminLoginAt": payload.get("adminLoginAt") or payload.get("admin_login_at"),
+            "adminLoginSerial": payload.get("adminLoginSerial")
+            if payload.get("adminLoginSerial") is not None
+            else payload.get("admin_login_serial"),
+            "authFailed": payload.get("authFailed")
+            if payload.get("authFailed") is not None
+            else payload.get("auth_failed"),
+        }
+        headers = {"Content-Type": "application/json"}
+        if self.punch_key:
+            headers["X-Punch-Key"] = self.punch_key
+        url = f"{self.api_url}/api/attendance/heartbeats/ingest"
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.post(url, json=body, headers=headers)
+                if res.status_code >= 400:
+                    logger.warning(
+                        "HTTP heartbeat ingest failed %s: %s %s",
+                        res.status_code,
+                        url,
+                        res.text[:300],
+                    )
+                    return False
+                return True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("HTTP heartbeat ingest error: %s", exc)
+            return False
+
     async def publish_heartbeat(self, payload: dict[str, Any]) -> None:
         data = json.dumps(payload).encode("utf-8")
-        if self._nc is None:
-            return
-        try:
-            await self._nc.publish(self.subject, data)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("NATS heartbeat failed: %s", exc)
+        if self._nc is not None:
+            try:
+                await self._nc.publish(self.subject, data)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("NATS heartbeat failed: %s", exc)
+        await self._publish_heartbeat_http(payload)
 
     async def close(self) -> None:
         if self._nc is not None:

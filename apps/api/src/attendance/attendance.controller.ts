@@ -35,6 +35,7 @@ import {
   CreateScheduleDto,
   DeviceIgnoreDto,
   GpsPunchDto,
+  IngestHeartbeatDto,
   IngestPunchDto,
   QrPunchDto,
   UpdateDeviceDto,
@@ -1000,5 +1001,19 @@ export class AttendanceController {
   @Post('punches/ingest')
   ingest(@Body() dto: IngestPunchDto) {
     return this.attendance.ingestPunch(dto);
+  }
+
+  /** Device-gw online pulse (~8s). Auth same as punches/ingest. */
+  @Public()
+  @SkipTenant()
+  @UseGuards(PunchIngestGuard, PunchRateLimitGuard)
+  @ApiHeader({
+    name: 'X-Punch-Key',
+    required: false,
+    description: 'Required when PUNCH_INGEST_API_KEY is set',
+  })
+  @Post('heartbeats/ingest')
+  ingestHeartbeat(@Body() dto: IngestHeartbeatDto) {
+    return this.attendance.recordDeviceHeartbeat(dto);
   }
 }

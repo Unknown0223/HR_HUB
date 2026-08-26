@@ -203,6 +203,19 @@ export class IngestPunchDto {
   @ApiPropertyOptional() @IsOptional() @IsString() photoBase64?: string;
 }
 
+/** Device-gw → cloud online pulse (every ~8s). Same punch-key auth as punches/ingest. */
+export class IngestHeartbeatDto {
+  @ApiProperty() @IsString() tenantId!: string;
+  @ApiProperty() @IsString() deviceId!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() deviceNow?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() clockDriftSeconds?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() punchLocked?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() adminLoginDetected?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() adminLoginAt?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() adminLoginSerial?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() authFailed?: boolean;
+}
+
 export class AssignScheduleDto {
   @ApiProperty() @IsString() employeeId!: string;
 }
@@ -310,4 +323,20 @@ export class UpdateLocationDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() locationTypeId?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
   @ApiPropertyOptional() @IsOptional() meta?: Record<string, unknown>;
+}
+
+export class OfficeLinkAnnounceDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
+  @ApiProperty() @IsString() tunnelUrl!: string;
+}
+
+export class OfficeLinkDeviceDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
+  @ApiProperty() @IsString() host!: string;
+  @ApiProperty() @IsString() password!: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() port?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() username?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() serialNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
 }
