@@ -204,13 +204,14 @@ async def maybe_unlock_after_sync(
 
 
 async def poll_hikvision_events() -> None:
-    await asyncio.sleep(4)
+    await asyncio.sleep(2)
     while True:
+        cycle_had_punch = False
         for device_id, rec in list(devices.items()):
             if rec.info.adapter != AdapterType.hikvision_isapi:
                 continue
             # Verifix catalog rows often register without LAN host → would poll 127.0.0.1
-            # and block the ~8s heartbeat loop for real terminals.
+            # and block the heartbeat loop for real terminals.
             if isinstance(rec.adapter, HikvisionIsapiAdapter):
                 host = (rec.adapter.host or "").strip().lower()
                 if not host or host in ("127.0.0.1", "localhost", "::1"):
@@ -218,6 +219,8 @@ async def poll_hikvision_events() -> None:
             try:
                 locked_this_cycle = await apply_admin_login_guard(rec)
                 n = await publish_adapter_events(device_id, rec)
+                if n:
+                    cycle_had_punch = True
                 drift = 0.0
                 device_now = None
                 punch_locked = False
@@ -285,7 +288,8 @@ async def poll_hikvision_events() -> None:
                     except Exception:  # noqa: BLE001
                         pass
                 logger.warning("event poll %s failed: %s", device_id, exc)
-        await asyncio.sleep(8)
+        # Faster loop when punches are flowing; otherwise ~2s online pulse.
+        await asyncio.sleep(0.5 if cycle_had_punch else 2)
 
 
 @app.get("/health")

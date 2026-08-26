@@ -27,6 +27,7 @@ class PunchPublisher:
         self.api_url = (api_url or "").rstrip("/") or None
         self.punch_key = (punch_key or "").strip()
         self._nc: Any = None
+        self._http: Optional[httpx.AsyncClient] = None
         # connected | http | unavailable | disconnected
         self.status: str = "disconnected"
 
@@ -52,6 +53,7 @@ class PunchPublisher:
         if self.api_url:
             if self.status != "connected":
                 self.status = "http"
+            self._http = httpx.AsyncClient(timeout=20.0)
             logger.info(
                 "HTTP punch ingest enabled: %s/api/attendance/punches/ingest",
                 self.api_url,
@@ -113,18 +115,20 @@ class PunchPublisher:
             headers["X-Punch-Key"] = self.punch_key
         url = f"{self.api_url}/api/attendance/punches/ingest"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                res = await client.post(url, json=body, headers=headers)
-                if res.status_code >= 400:
-                    logger.warning(
-                        "HTTP punch ingest failed %s: %s %s",
-                        res.status_code,
-                        url,
-                        res.text[:300],
-                    )
-                    return False
-                logger.info("HTTP punch ingest OK → %s", url)
-                return True
+            client = self._http or httpx.AsyncClient(timeout=20.0)
+            res = await client.post(url, json=body, headers=headers)
+            if self._http is None:
+                await client.aclose()
+            if res.status_code >= 400:
+                logger.warning(
+                    "HTTP punch ingest failed %s: %s %s",
+                    res.status_code,
+                    url,
+                    res.text[:300],
+                )
+                return False
+            logger.info("HTTP punch ingest OK → %s", url)
+            return True
         except Exception as exc:  # noqa: BLE001
             logger.warning("HTTP punch ingest error: %s", exc)
             return False
@@ -180,17 +184,19 @@ class PunchPublisher:
             headers["X-Punch-Key"] = self.punch_key
         url = f"{self.api_url}/api/attendance/heartbeats/ingest"
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                res = await client.post(url, json=body, headers=headers)
-                if res.status_code >= 400:
-                    logger.warning(
-                        "HTTP heartbeat ingest failed %s: %s %s",
-                        res.status_code,
-                        url,
-                        res.text[:200],
-                    )
-                    return False
-                return True
+            client = self._http or httpx.AsyncClient(timeout=15.0)
+            res = await client.post(url, json=body, headers=headers)
+            if self._http is None:
+                await client.aclose()
+            if res.status_code >= 400:
+                logger.warning(
+                    "HTTP heartbeat ingest failed %s: %s %s",
+                    res.status_code,
+                    url,
+                    res.text[:200],
+                )
+                return False
+            return True
         except Exception as exc:  # noqa: BLE001
             logger.warning("HTTP heartbeat ingest error: %s", exc)
             return False
@@ -207,6 +213,9 @@ class PunchPublisher:
             logger.warning("NATS heartbeat failed: %s", exc)
 
     async def close(self) -> None:
+        if self._http is not None:
+            await self._http.aclose()
+            self._http = None
         if self._nc is not None:
             await self._nc.drain()
             self._nc = None

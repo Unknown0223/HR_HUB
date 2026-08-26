@@ -69,9 +69,9 @@ export class FaceService {
       include: { faceProfile: true },
     });
     if (!emp) throw new NotFoundException('Employee not found');
-    if (!emp.externalId) {
+    if (!emp.tabNumber && !emp.externalId) {
       throw new BadRequestException(
-        'Employee externalId (Face ID / employeeNo) required',
+        'Employee tabNumber or externalId (Face ID / employeeNo) required',
       );
     }
     if (!emp.faceProfile?.photoUrl && !emp.faceProfile?.photoKey) {
@@ -93,7 +93,9 @@ export class FaceService {
     });
     const hasReal = allDevices.some((d) => (d.adapterType || 'mock') !== 'mock');
     const devices = hasReal
-      ? allDevices.filter((d) => (d.adapterType || 'mock') !== 'mock')
+      ? allDevices.filter(
+          (d) => (d.adapterType || 'mock') !== 'mock' && Boolean(d.host?.trim()),
+        )
       : allDevices;
 
     if (devices.length === 0) {
@@ -154,7 +156,7 @@ export class FaceService {
 
       try {
         const res = await this.gw.syncFace(gatewayRef!, {
-          employee_external_id: emp.externalId,
+          employee_external_id: this.employeeNoForDevice(emp),
           employee_name: name,
           face_image_base64: faceB64,
         });
@@ -181,7 +183,7 @@ export class FaceService {
           if (okReg && gatewayRef) {
             try {
               const res = await this.gw.syncFace(gatewayRef, {
-                employee_external_id: emp.externalId,
+                employee_external_id: this.employeeNoForDevice(emp),
                 employee_name: name,
                 face_image_base64: faceB64,
               });
@@ -389,6 +391,17 @@ export class FaceService {
     }
 
     return { candidates: profiles.length, purged, errors, days };
+  }
+
+  private employeeNoForDevice(emp: {
+    tabNumber?: string | null;
+    externalId?: string | null;
+    id: string;
+  }): string {
+    const raw = emp.tabNumber || emp.externalId || emp.id;
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return String(raw).slice(0, 32);
+    return String(BigInt(digits));
   }
 
   private async resolveFaceBase64(profile: {

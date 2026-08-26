@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { BadRequestException, BadGatewayException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import {
   DayStatus,
+  FaceSyncStatus,
   ProdCalendarDayType,
   PunchDirection,
   Prisma,
@@ -747,58 +748,112 @@ export class AttendanceService {
 
   async syncDevice(tenantId: string, id: string) {
     const device = await this.getDevice(tenantId, id);
+    await this.ensureGwRegistered(device);
     await this.heartbeat(tenantId, id);
+    const refreshed = await this.getDevice(tenantId, id);
+    const gatewayRef = refreshed.gatewayRef;
+    if (!gatewayRef) {
+      throw new BadGatewayException('Device gateway not registered — check DEVICE_GW_URL / tunnel');
+    }
 
     const faceSyncs = await this.prisma.deviceFaceSync.findMany({
-      where: { tenantId, deviceId: id },
+      where: {
+        tenantId,
+        deviceId: id,
+        OR: [
+          { syncStatus: FaceSyncStatus.pending },
+          { syncStatus: FaceSyncStatus.failed },
+          { syncStatus: FaceSyncStatus.syncing },
+        ],
+      },
       include: {
         faceProfile: {
           include: {
             employee: {
-              select: { id: true, firstName: true, lastName: true, tabNumber: true },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                tabNumber: true,
+                externalId: true,
+              },
             },
           },
         },
       },
-      take: 50,
+      take: 500,
+      orderBy: { updatedAt: 'asc' },
     });
 
     let synced = 0;
-    for (const fs of faceSyncs) {
-      const emp = fs.faceProfile.employee;
-      const name = [emp.lastName, emp.firstName].filter(Boolean).join(' ');
-      if (device.gatewayRef) {
-        try {
-          await this.gw.syncFace(device.gatewayRef, {
-            employee_external_id: emp.tabNumber || emp.id,
-            employee_name: name,
-          });
-          await this.prisma.deviceFaceSync.update({
-            where: { id: fs.id },
-            data: { syncStatus: 'synced', lastSyncedAt: new Date(), lastError: null },
-          });
-          synced += 1;
-        } catch (e) {
-          await this.prisma.deviceFaceSync.update({
-            where: { id: fs.id },
-            data: {
-              syncStatus: 'failed',
-              lastError: e instanceof Error ? e.message : String(e),
-            },
-          });
-        }
-      } else {
-        await this.prisma.deviceFaceSync.update({
-          where: { id: fs.id },
-          data: { syncStatus: 'synced', lastSyncedAt: new Date() },
-        });
-        synced += 1;
+    let failed = 0;
+    const concurrency = 3;
+    for (let i = 0; i < faceSyncs.length; i += concurrency) {
+      const batch = faceSyncs.slice(i, i + concurrency);
+      const results = await Promise.all(
+        batch.map(async (fs) => {
+          const emp = fs.faceProfile.employee;
+          const name = [emp.lastName, emp.firstName].filter(Boolean).join(' ');
+          const empNo = this.deviceEmployeeNo(emp);
+          try {
+            const faceB64 = await this.resolveFaceBase64(fs.faceProfile);
+            if (!faceB64) {
+              await this.prisma.deviceFaceSync.update({
+                where: { id: fs.id },
+                data: {
+                  syncStatus: FaceSyncStatus.failed,
+                  lastError: 'No face photo on employee',
+                },
+              });
+              return { ok: false as const, name };
+            }
+            const res = await this.gw.syncFace(gatewayRef, {
+              employee_external_id: empNo,
+              employee_name: name,
+              face_image_base64: faceB64,
+            });
+            const ok = Boolean(res.synced && res.face_enrolled);
+            await this.prisma.deviceFaceSync.update({
+              where: { id: fs.id },
+              data: {
+                syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
+                lastSyncedAt: ok ? new Date() : undefined,
+                lastError: ok ? null : 'Device rejected face enroll',
+              },
+            });
+            await this.prisma.faceProfile.update({
+              where: { id: fs.faceProfileId },
+              data: {
+                syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
+                lastSyncedAt: ok ? new Date() : undefined,
+                lastError: ok ? null : 'Device rejected face enroll',
+              },
+            });
+            await this.appendCommand(tenantId, id, {
+              type: 'Person Edit',
+              employeeName: name,
+              status: ok ? 'completed' : 'failed',
+            });
+            return { ok, name };
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await this.prisma.deviceFaceSync.update({
+              where: { id: fs.id },
+              data: { syncStatus: FaceSyncStatus.failed, lastError: msg },
+            });
+            await this.appendCommand(tenantId, id, {
+              type: 'Person Edit',
+              employeeName: name,
+              status: 'failed',
+            });
+            return { ok: false as const, name };
+          }
+        }),
+      );
+      for (const r of results) {
+        if (r.ok) synced += 1;
+        else failed += 1;
       }
-      await this.appendCommand(tenantId, id, {
-        type: 'Person Edit',
-        employeeName: name,
-        status: 'completed',
-      });
     }
 
     if (!faceSyncs.length) {
@@ -811,8 +866,47 @@ export class AttendanceService {
     return this.getDevice(tenantId, id).then((d) => ({
       ok: true,
       synced,
+      failed,
+      pending: faceSyncs.length,
       device: d,
     }));
+  }
+
+  private deviceEmployeeNo(emp: {
+    tabNumber?: string | null;
+    externalId?: string | null;
+    id: string;
+  }): string {
+    const raw = emp.tabNumber || emp.externalId || emp.id;
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return String(raw).slice(0, 32);
+    // Strip leading zeros the same way Hikvision / device-gw do.
+    return String(BigInt(digits));
+  }
+
+  private async resolveFaceBase64(profile: {
+    photoKey?: string | null;
+    photoUrl?: string | null;
+  }): Promise<string | null> {
+    if (profile.photoUrl?.startsWith('data:')) {
+      const idx = profile.photoUrl.indexOf('base64,');
+      return idx >= 0 ? profile.photoUrl.slice(idx + 7) : null;
+    }
+    if (profile.photoKey) {
+      const buf = await this.storage.getObjectBuffer(profile.photoKey);
+      if (buf?.length) return buf.toString('base64');
+    }
+    if (profile.photoUrl?.startsWith('http')) {
+      try {
+        const res = await fetch(profile.photoUrl);
+        if (!res.ok) return null;
+        const ab = await res.arrayBuffer();
+        return Buffer.from(ab).toString('base64');
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   private remoteActionMessage(
@@ -1117,28 +1211,31 @@ export class AttendanceService {
   }
 
   async syncDevicePersons(tenantId: string, deviceId: string) {
-    const device = await this.getDevice(tenantId, deviceId);
+    await this.getDevice(tenantId, deviceId);
     const employees = await this.prisma.employee.findMany({
-      where: { tenantId, status: 'active' },
-      take: 100,
+      where: {
+        tenantId,
+        status: 'active',
+        faceProfile: {
+          OR: [{ photoUrl: { not: null } }, { photoKey: { not: null } }],
+        },
+      },
       orderBy: { lastName: 'asc' },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         tabNumber: true,
+        externalId: true,
         faceProfile: true,
       },
     });
 
     let created = 0;
+    let queued = 0;
     for (const emp of employees) {
-      let profile = emp.faceProfile;
-      if (!profile) {
-        profile = await this.prisma.faceProfile.create({
-          data: { tenantId, employeeId: emp.id, syncStatus: 'pending' },
-        });
-      }
+      const profile = emp.faceProfile;
+      if (!profile) continue;
       const existing = await this.prisma.deviceFaceSync.findUnique({
         where: {
           deviceId_faceProfileId: { deviceId, faceProfileId: profile.id },
@@ -1151,7 +1248,7 @@ export class AttendanceService {
             deviceId,
             faceProfileId: profile.id,
             employeeId: emp.id,
-            syncStatus: 'pending',
+            syncStatus: FaceSyncStatus.pending,
           },
         });
         created += 1;
@@ -1159,14 +1256,34 @@ export class AttendanceService {
           type: 'Person Add',
           employeeName: [emp.lastName, emp.firstName].filter(Boolean).join(' '),
         });
+      } else if (existing.syncStatus !== FaceSyncStatus.synced) {
+        await this.prisma.deviceFaceSync.update({
+          where: { id: existing.id },
+          data: { syncStatus: FaceSyncStatus.pending, lastError: null },
+        });
+        queued += 1;
       }
     }
 
-    if (device.gatewayRef || created > 0) {
-      await this.syncDevice(tenantId, deviceId);
+    // Push faces in waves until pending queue is empty (max 20 waves × 500).
+    let totalSynced = 0;
+    let totalFailed = 0;
+    for (let wave = 0; wave < 20; wave += 1) {
+      const result = await this.syncDevice(tenantId, deviceId);
+      totalSynced += result.synced;
+      totalFailed += result.failed ?? 0;
+      if (!result.pending) break;
     }
 
-    return { ok: true, created, persons: await this.listDevicePersons(tenantId, deviceId) };
+    return {
+      ok: true,
+      created,
+      requeued: queued,
+      withPhoto: employees.length,
+      synced: totalSynced,
+      failed: totalFailed,
+      persons: await this.listDevicePersons(tenantId, deviceId),
+    };
   }
 
   async listDeviceMarks(
@@ -1434,6 +1551,116 @@ export class AttendanceService {
       }
     }
     return { registered: results.filter((r) => r.ok).length, results };
+  }
+
+  async resolveTenantByCode(code: string) {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { code: (code || 'demo').trim() || 'demo' },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return tenant;
+  }
+
+  async officeLinkPing(tenantCode: string) {
+    const tenant = await this.resolveTenantByCode(tenantCode);
+    return { ok: true, tenantCode: tenant.code, tenantId: tenant.id };
+  }
+
+  async officeLinkAnnounce(tenantCode: string, tunnelUrl: string) {
+    const tenant = await this.resolveTenantByCode(tenantCode);
+    const url = (tunnelUrl || '').trim();
+    if (!/^https:\/\/[a-z0-9.-]+/i.test(url)) {
+      throw new BadRequestException('Tunnel URL https bo‘lishi kerak');
+    }
+    await this.gw.announceUrl(tenant.id, url);
+    return { ok: true, gwUrl: url.replace(/\/$/, '') };
+  }
+
+  async officeLinkDevice(
+    tenantCode: string,
+    dto: {
+      host: string;
+      password: string;
+      port?: number;
+      username?: string;
+      serialNumber?: string;
+      name?: string;
+      model?: string;
+    },
+  ) {
+    const tenant = await this.resolveTenantByCode(tenantCode);
+    const host = dto.host.trim();
+    const password = dto.password;
+    const port = dto.port ?? 80;
+    const username = (dto.username || 'admin').trim() || 'admin';
+    const serial =
+      (dto.serialNumber || '').trim() || `lan-${host.replace(/\./g, '-')}`;
+    const name = (dto.name || '').trim() || serial;
+
+    let device = await this.prisma.device.findFirst({
+      where: { tenantId: tenant.id, serialNumber: serial },
+    });
+    if (!device) {
+      device = await this.prisma.device.findFirst({
+        where: { tenantId: tenant.id, host },
+      });
+    }
+    if (!device) {
+      device = await this.prisma.device.create({
+        data: {
+          tenantId: tenant.id,
+          name,
+          serialNumber: serial,
+          model: dto.model || 'Hikvision',
+          adapterType: 'hikvision',
+          host,
+          port,
+          username,
+          passwordEnc: password,
+          isActive: true,
+          status: 'registered',
+        },
+      });
+    } else {
+      device = await this.prisma.device.update({
+        where: { id: device.id },
+        data: {
+          name: dto.name?.trim() || device.name,
+          serialNumber: serial,
+          model: dto.model || device.model,
+          adapterType: 'hikvision',
+          host,
+          port,
+          username,
+          passwordEnc: password,
+          isActive: true,
+        },
+      });
+    }
+
+    const reg = await this.gw.registerFromDevice(device);
+    if (reg?.id) {
+      device = await this.prisma.device.update({
+        where: { id: device.id },
+        data: {
+          gatewayRef: reg.id,
+          status: reg.status || 'online',
+          lastSeenAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      ok: true,
+      device: {
+        id: device.id,
+        name: device.name,
+        serialNumber: device.serialNumber,
+        host: device.host,
+        status: device.status,
+        gatewayRef: device.gatewayRef,
+      },
+    };
   }
 
   // --- Schedules ---
