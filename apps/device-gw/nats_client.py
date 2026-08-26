@@ -161,20 +161,18 @@ class PunchPublisher:
             "deviceId": payload.get("deviceId") or payload.get("device_id"),
             "deviceNow": payload.get("deviceNow") or payload.get("device_now"),
             "clockDriftSeconds": payload.get("clockDriftSeconds")
-            if payload.get("clockDriftSeconds") is not None
-            else payload.get("clock_drift_seconds"),
+            or payload.get("clock_drift_seconds"),
             "punchLocked": payload.get("punchLocked")
-            if payload.get("punchLocked") is not None
+            if "punchLocked" in payload
             else payload.get("punch_locked"),
             "adminLoginDetected": payload.get("adminLoginDetected")
-            if payload.get("adminLoginDetected") is not None
+            if "adminLoginDetected" in payload
             else payload.get("admin_login_detected"),
             "adminLoginAt": payload.get("adminLoginAt") or payload.get("admin_login_at"),
             "adminLoginSerial": payload.get("adminLoginSerial")
-            if payload.get("adminLoginSerial") is not None
-            else payload.get("admin_login_serial"),
+            or payload.get("admin_login_serial"),
             "authFailed": payload.get("authFailed")
-            if payload.get("authFailed") is not None
+            if "authFailed" in payload
             else payload.get("auth_failed"),
         }
         headers = {"Content-Type": "application/json"}
@@ -189,7 +187,7 @@ class PunchPublisher:
                         "HTTP heartbeat ingest failed %s: %s %s",
                         res.status_code,
                         url,
-                        res.text[:300],
+                        res.text[:200],
                     )
                     return False
                 return True
@@ -198,13 +196,15 @@ class PunchPublisher:
             return False
 
     async def publish_heartbeat(self, payload: dict[str, Any]) -> None:
-        data = json.dumps(payload).encode("utf-8")
-        if self._nc is not None:
-            try:
-                await self._nc.publish(self.subject, data)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("NATS heartbeat failed: %s", exc)
+        # Always try HTTP when configured (Railway has no shared NATS with LAN GW).
         await self._publish_heartbeat_http(payload)
+        if self._nc is None:
+            return
+        data = json.dumps(payload).encode("utf-8")
+        try:
+            await self._nc.publish(self.subject, data)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("NATS heartbeat failed: %s", exc)
 
     async def close(self) -> None:
         if self._nc is not None:

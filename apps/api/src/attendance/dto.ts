@@ -203,15 +203,15 @@ export class IngestPunchDto {
   @ApiPropertyOptional() @IsOptional() @IsString() photoBase64?: string;
 }
 
-/** Device-gw → cloud online pulse (every ~8s). Same punch-key auth as punches/ingest. */
+/** Device-gw online pulse (~8s). Same auth as punches/ingest. */
 export class IngestHeartbeatDto {
   @ApiProperty() @IsString() tenantId!: string;
   @ApiProperty() @IsString() deviceId!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() deviceNow?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsString() deviceNow?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() clockDriftSeconds?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() punchLocked?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() adminLoginDetected?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsString() adminLoginAt?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsString() adminLoginAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() adminLoginSerial?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() authFailed?: boolean;
 }
