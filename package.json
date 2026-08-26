@@ -12,6 +12,7 @@
     "dev:api": "npm run start:dev -w @hr-hub/api",
     "dev:web": "npm run dev -w @hr-hub/web",
     "dev:gw": "node scripts/run-device-gw.js",
+    "devices:up": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/link-devices.ps1",
     "dev:apps": "node scripts/dev-apps.js",
     "build:api": "npm run build -w @hr-hub/api",
     "build:web": "npm run build -w @hr-hub/web",
@@ -86,7 +87,10 @@
     "infra:prod": "docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env.prod up -d",
     "load:punch": "node scripts/load-punch-test.js",
     "load:punch:medium": "node scripts/load-punch-test.js --profile medium",
-    "load:punch:heavy": "node scripts/load-punch-test.js --profile heavy --write-results"
+    "load:punch:heavy": "node scripts/load-punch-test.js --profile heavy --write-results",
+    "verifix:gather": "python scripts/verifix-gather.py",
+    "verifix:import": "node apps/api/scripts/import-verifix-dump.js",
+    "verifix:import-live": "node apps/api/scripts/import-verifix-live.js"
   },
   "engines": {
     "node": ">=20"
