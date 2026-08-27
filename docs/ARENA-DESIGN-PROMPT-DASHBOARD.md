@@ -1,5 +1,17 @@
 # Arena AI — HR HUB design prompt: Главная / Dashboard
 
+**Главная** ichidagi 1/3-sahifa. Login visual language bilan.
+
+## Qayerga qo‘yiladi (Arena natijasini almashtirish)
+
+| Arena fayl | Loyihada overwrite |
+|------------|-------------------|
+| `page.tsx` | `apps/web/src/app/(app)/dashboard/page.tsx` |
+| `page.module.css` | `apps/web/src/app/(app)/dashboard/page.module.css` |
+
+Tekshiruv: `/dashboard` · **Главная → Статистика посещений сотрудников**  
+Barcha 3 sahifa: [ARENA-HOME-REPLACE-GUIDE.md](./ARENA-HOME-REPLACE-GUIDE.md)
+
 **Use this after login.** User approved the login visual language only (dark atmosphere + cyan biometric accent). Do **not** invent a new IA.
 
 Copy the block below into Arena.
