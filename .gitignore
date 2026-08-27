@@ -82,3 +82,7 @@ data/verifix-dump/
 /tools/office-link/build/
 /tools/office-link/**/__pycache__/
 /tools/office-link/*.log
+
+# Arena zip extract previews
+_arena-redesign-preview/
+

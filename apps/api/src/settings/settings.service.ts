@@ -831,14 +831,15 @@ export class SettingsService {
         continue;
       }
       const prev = byCode.get(code);
+      const prevMeta = prev ? asMeta(prev.meta) : {};
       const meta = {
-        ...(prev ? asMeta(prev.meta) : {}),
+        ...prevMeta,
         ...asMeta(it.meta),
-        createdAt: prev ? asMeta(prev.meta).createdAt || now : now,
-        createdBy: prev ? asMeta(prev.meta).createdBy || who : who,
+        createdAt: typeof prevMeta.createdAt === 'string' ? prevMeta.createdAt : now,
+        createdBy: typeof prevMeta.createdBy === 'string' ? prevMeta.createdBy : who,
         updatedAt: now,
         updatedBy: who,
-      };
+      } as Prisma.JsonObject;
       try {
         if (prev) {
           await this.prisma.dictionaryItem.update({
@@ -862,7 +863,12 @@ export class SettingsService {
               meta: meta as Prisma.InputJsonValue,
             },
           });
-          byCode.set(code, { id: row.id, code, meta, sortOrder: row.sortOrder });
+          byCode.set(code, {
+            id: row.id,
+            code,
+            meta: meta as Prisma.JsonValue,
+            sortOrder: row.sortOrder,
+          });
           created += 1;
         }
       } catch (e) {

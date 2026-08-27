@@ -2846,7 +2846,10 @@ export class CatalogService {
             row.penaltyPeriodMonths != null && row.penaltyPeriodMonths !== ''
               ? Number(row.penaltyPeriodMonths)
               : null,
-          conditions: row.conditions ?? undefined,
+          conditions:
+            row.conditions == null
+              ? undefined
+              : (row.conditions as Prisma.InputJsonValue),
         };
       })
       .filter((s) => s.fromGradeId || s.toGradeId || s.positionId || s.title);
@@ -3920,7 +3923,10 @@ export class CatalogService {
         occurredAt,
         status: (body.status as any) || 'open',
         severity: (body.severity as any) || 'medium',
-        attachments: body.attachments ?? undefined,
+        attachments:
+          body.attachments == null
+            ? undefined
+            : (body.attachments as Prisma.InputJsonValue),
       },
       include: this.incidentInclude(),
     });
