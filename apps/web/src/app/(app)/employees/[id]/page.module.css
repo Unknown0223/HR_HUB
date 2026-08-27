@@ -1318,7 +1318,7 @@ button.calCell {
 .modal {
   width: min(520px, 100%);
   max-height: min(92vh, 760px);
-  overflow: auto;
+  overflow: hidden;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 0 50px 0 rgba(82, 63, 105, 0.15);
@@ -1364,6 +1364,9 @@ button.calCell {
   display: flex;
   flex-direction: column;
   gap: 0.95rem;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modalFooter {
@@ -1620,6 +1623,11 @@ button.calCell {
   font: inherit;
   font-size: 0.84rem;
   transition: border-color 0.15s ease;
+}
+
+.modalField select option {
+  color: #181c32;
+  background: #fff;
 }
 
 .modalField input:focus,

@@ -8,6 +8,7 @@ import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
 import { FormModal } from '@/components/FormModal';
+import { ModalPortal } from '@/components/ModalPortal';
 import fmStyles from '@/components/form-modal.module.css';
 import styles from './page.module.css';
 import { UserSettingsPanel } from './UserSettingsPanel';
@@ -1447,10 +1448,10 @@ export default function EmployeeDetailPage() {
     try {
       const [lookups, dicts] = await Promise.all([
         apiFetch<{
-          divisions?: { id: string; name: string }[];
-          positions?: { id: string; name: string }[];
-          schedules?: { id: string; name: string }[];
-          grades?: { id: string; name: string }[];
+          divisions?: { id: string; name?: string; label?: string }[];
+          positions?: { id: string; name?: string; label?: string }[];
+          schedules?: { id: string; name?: string; label?: string }[];
+          grades?: { id: string; name?: string; label?: string }[];
         }>('/api/catalog/lookups'),
         apiFetch<
           {
@@ -1460,11 +1461,18 @@ export default function EmployeeDetailPage() {
           }[]
         >('/api/settings/dictionaries?kind=admin'),
       ]);
+      const asNamed = (
+        rows?: { id: string; name?: string; label?: string }[],
+      ) =>
+        (rows || []).map((r) => ({
+          id: r.id,
+          name: (r.name || r.label || '').trim() || r.id,
+        }));
       setOrgLookups({
-        divisions: lookups.divisions || [],
-        positions: lookups.positions || [],
-        schedules: lookups.schedules || [],
-        grades: lookups.grades || [],
+        divisions: asNamed(lookups.divisions),
+        positions: asNamed(lookups.positions),
+        schedules: asNamed(lookups.schedules),
+        grades: asNamed(lookups.grades),
       });
       const regionDict =
         dicts.find((d) => d.code === 'regions' || d.code === 'region') || null;
@@ -12346,6 +12354,7 @@ export default function EmployeeDetailPage() {
         </div>
       ) : null}
       {orgOpen && row ? (
+        <ModalPortal>
         <div
           className={styles.modalBackdrop}
           onClick={() => setOrgOpen(false)}
@@ -12536,6 +12545,7 @@ export default function EmployeeDetailPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
       {historyOpen && historyData ? (
         <div

@@ -15169,13 +15169,17 @@ ORDER BY pp.month;`,
         employmentType: e.employmentType,
         phone: e.phone ?? undefined,
       })),
-      persons: persons.map((p) => ({
-        id: p.id,
-        label: [p.lastName, p.firstName, p.middleName].filter(Boolean).join(' '),
-      })),
-      grades: grades.map((g) => ({ id: g.id, label: `${g.code} ${g.name}` })),
-      divisions: divisions.map((d) => ({ id: d.id, label: d.name })),
-      positions: positions.map((p) => ({ id: p.id, label: p.name })),
+      persons: persons.map((p) => {
+        const text = [p.lastName, p.firstName, p.middleName].filter(Boolean).join(' ');
+        return { id: p.id, label: text, name: text };
+      }),
+      // Both `label` and `name` — UI forms historically used either key for <option> text.
+      grades: grades.map((g) => {
+        const text = `${g.code} ${g.name}`.trim();
+        return { id: g.id, label: text, name: text };
+      }),
+      divisions: divisions.map((d) => ({ id: d.id, label: d.name, name: d.name })),
+      positions: positions.map((p) => ({ id: p.id, label: p.name, name: p.name })),
       schedules: schedules.map((s) => ({
         id: s.id,
         label: s.name,
@@ -15186,20 +15190,43 @@ ORDER BY pp.month;`,
       educationTypes: (eduDict?.items || []).map((it) => ({
         id: it.id,
         label: it.name,
+        name: it.name,
         code: it.code,
       })),
-      accrualTypes: accrualTypesList.map((a) => ({ id: a.id, label: a.name, code: a.code })),
-      deductionTypes: deductionTypesList.map((d) => ({ id: d.id, label: d.name, code: d.code })),
-      locations: locations.map((l) => ({ id: l.id, label: l.name })),
+      accrualTypes: accrualTypesList.map((a) => ({
+        id: a.id,
+        label: a.name,
+        name: a.name,
+        code: a.code,
+      })),
+      deductionTypes: deductionTypesList.map((d) => ({
+        id: d.id,
+        label: d.name,
+        name: d.name,
+        code: d.code,
+      })),
+      locations: locations.map((l) => ({ id: l.id, label: l.name, name: l.name })),
       timeTypes: timeTypesList.map((t) => ({
         id: t.id,
         label: t.name,
+        name: t.name,
         code: t.code,
         letterCode: t.letterCode,
       })),
-      incidentTypes: incidentTypes.map((i) => ({ id: i.id, label: i.name })),
-      tariffGroups: tariffGroups.map((t) => ({ id: t.id, label: t.name })),
-      staffPositions: staffPositions.map((s) => ({ id: s.id, label: `${s.code} ${s.title}` })),
+      incidentTypes: incidentTypes.map((i) => ({
+        id: i.id,
+        label: i.name,
+        name: i.name,
+      })),
+      tariffGroups: tariffGroups.map((t) => ({
+        id: t.id,
+        label: t.name,
+        name: t.name,
+      })),
+      staffPositions: staffPositions.map((s) => {
+        const text = `${s.code} ${s.title}`.trim();
+        return { id: s.id, label: text, name: text };
+      }),
       staffGroups: [
         ...new Set(
           staffPositions
@@ -15208,17 +15235,41 @@ ORDER BY pp.month;`,
         ),
       ]
         .sort((a, b) => a.localeCompare(b, 'ru'))
-        .map((name) => ({ id: name, label: name })),
-      divisionGroups: divisionGroups.map((g) => ({ id: g.id, label: g.name })),
-      positionGroups: positionGroups.map((g) => ({ id: g.id, label: g.name })),
-      salesPolicies: policies.map((p) => ({
-        id: p.id,
-        label: p.position?.name || p.positionId,
+        .map((name) => ({ id: name, label: name, name })),
+      divisionGroups: divisionGroups.map((g) => ({
+        id: g.id,
+        label: g.name,
+        name: g.name,
       })),
-      accountPairs: accountPairs.map((a) => ({ id: a.id, label: a.name })),
-      clearanceTemplates: templates.map((t) => ({ id: t.id, label: t.name })),
-      careerPaths: careerPaths.map((c) => ({ id: c.id, label: c.name })),
-      dismissalReasons: dismissalReasons.map((r) => ({ id: r.id, label: r.name })),
+      positionGroups: positionGroups.map((g) => ({
+        id: g.id,
+        label: g.name,
+        name: g.name,
+      })),
+      salesPolicies: policies.map((p) => {
+        const text = p.position?.name || p.positionId;
+        return { id: p.id, label: text, name: text };
+      }),
+      accountPairs: accountPairs.map((a) => ({
+        id: a.id,
+        label: a.name,
+        name: a.name,
+      })),
+      clearanceTemplates: templates.map((t) => ({
+        id: t.id,
+        label: t.name,
+        name: t.name,
+      })),
+      careerPaths: careerPaths.map((c) => ({
+        id: c.id,
+        label: c.name,
+        name: c.name,
+      })),
+      dismissalReasons: dismissalReasons.map((r) => ({
+        id: r.id,
+        label: r.name,
+        name: r.name,
+      })),
       employmentSources: (employmentSourceDict?.items || []).map((it) => {
         const meta =
           it.meta && typeof it.meta === 'object' && !Array.isArray(it.meta)
@@ -15227,6 +15278,7 @@ ORDER BY pp.month;`,
         return {
           id: it.id,
           label: it.name,
+          name: it.name,
           code: it.code,
           sourceType: meta.sourceType || 'hire_and_dismissal',
         };
@@ -15246,6 +15298,7 @@ ORDER BY pp.month;`,
         return {
           id: it.id,
           label: meta.positionName || it.name,
+          name: meta.positionName || it.name,
           code: it.code,
           positionId: meta.positionId,
           positionName: meta.positionName || it.name,
