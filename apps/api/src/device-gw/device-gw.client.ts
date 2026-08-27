@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { safeJsonForLog } from '../common/redact';
 
 export type GwDeviceRegister = {
@@ -68,14 +70,72 @@ export type GwSyncFace = {
 };
 
 @Injectable()
-export class DeviceGwClient {
+export class DeviceGwClient implements OnModuleInit {
   private readonly logger = new Logger(DeviceGwClient.name);
-  private readonly baseUrl: string;
+  private announcedUrl: string | null = null;
 
-  constructor(private readonly config: ConfigService) {
-    this.baseUrl = (
-      this.config.get<string>('DEVICE_GW_URL') || 'http://127.0.0.1:8000'
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private get baseUrl(): string {
+    return (
+      this.announcedUrl ||
+      this.config.get<string>('DEVICE_GW_URL') ||
+      'http://127.0.0.1:8000'
     ).replace(/\/$/, '');
+  }
+
+  async onModuleInit() {
+    try {
+      const rows = await this.prisma.tenantSetting.findMany({ take: 30 });
+      for (const row of rows) {
+        const extras =
+          row.extras && typeof row.extras === 'object' && !Array.isArray(row.extras)
+            ? (row.extras as Record<string, unknown>)
+            : {};
+        const link =
+          extras.deviceLink &&
+          typeof extras.deviceLink === 'object' &&
+          !Array.isArray(extras.deviceLink)
+            ? (extras.deviceLink as Record<string, unknown>)
+            : null;
+        if (typeof link?.gwUrl === 'string' && /^https?:\/\//i.test(link.gwUrl)) {
+          this.announcedUrl = link.gwUrl.replace(/\/$/, '');
+          this.logger.log(`Device GW URL from office-link: ${this.announcedUrl}`);
+          break;
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`Device GW URL load skipped: ${e}`);
+    }
+  }
+
+  async announceUrl(tenantId: string, url: string) {
+    const clean = url.replace(/\/$/, '');
+    if (!/^https?:\/\//i.test(clean)) {
+      throw new Error('Invalid gateway URL');
+    }
+    this.announcedUrl = clean;
+    const existing = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId },
+    });
+    const extras =
+      existing?.extras &&
+      typeof existing.extras === 'object' &&
+      !Array.isArray(existing.extras)
+        ? { ...(existing.extras as Record<string, unknown>) }
+        : {};
+    extras.deviceLink = {
+      gwUrl: clean,
+      at: new Date().toISOString(),
+    };
+    await this.prisma.tenantSetting.upsert({
+      where: { tenantId },
+      create: { tenantId, extras: extras as Prisma.InputJsonValue },
+      update: { extras: extras as Prisma.InputJsonValue },
+    });
   }
 
   mapAdapter(adapterType?: string | null): 'mock' | 'hikvision_isapi' | 'zkteco_push' {

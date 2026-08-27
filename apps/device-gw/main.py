@@ -166,6 +166,35 @@ async def publish_adapter_events(device_id: str, rec: DeviceRecord) -> int:
     return count
 
 
+def bind_realtime_publisher(device_id: str, rec: DeviceRecord) -> None:
+    """Publish alertStream punches immediately (do not wait for AcsEvent poll)."""
+    if not isinstance(rec.adapter, HikvisionIsapiAdapter):
+        return
+
+    async def _on_realtime(ev: dict[str, Any]) -> None:
+        punch = punch_from_adapter_event(device_id, rec, ev)
+        await publisher.publish(punch)
+        rec.info.last_seen = datetime.now(timezone.utc).isoformat()
+        rec.info.status = "online"
+        logger.info(
+            "realtime published device=%s emp=%s",
+            device_id,
+            ev.get("employee_external_id"),
+        )
+
+    rec.adapter._on_realtime_event = _on_realtime
+
+
+async def start_realtime(device_id: str, rec: DeviceRecord) -> None:
+    if not isinstance(rec.adapter, HikvisionIsapiAdapter):
+        return
+    bind_realtime_publisher(device_id, rec)
+    try:
+        await rec.adapter.subscribe_events()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("subscribe_events skipped device=%s: %s", device_id, exc)
+
+
 async def apply_admin_login_guard(rec: DeviceRecord) -> bool:
     """Lock punching after local admin password; unlock only after a later sync cycle."""
     if not isinstance(rec.adapter, HikvisionIsapiAdapter):
@@ -215,6 +244,9 @@ async def poll_hikvision_events() -> None:
             if isinstance(rec.adapter, HikvisionIsapiAdapter):
                 host = (rec.adapter.host or "").strip().lower()
                 if not host or host in ("127.0.0.1", "localhost", "::1"):
+                    continue
+                # Avoid hammering ISAPI while the terminal login lock is active.
+                if rec.adapter.auth_locked():
                     continue
             try:
                 locked_this_cycle = await apply_admin_login_guard(rec)
@@ -268,7 +300,10 @@ async def poll_hikvision_events() -> None:
                 await maybe_unlock_after_sync(rec, locked_this_cycle, hb_ok)
             except Exception as exc:  # noqa: BLE001
                 rec.info.status = "offline"
-                auth_failed = isinstance(rec.adapter, HikvisionIsapiAdapter) and rec.adapter.auth_failed
+                auth_failed = (
+                    isinstance(rec.adapter, HikvisionIsapiAdapter)
+                    and rec.adapter.auth_failed
+                )
                 if auth_failed:
                     rec.info.status = "auth_failed"
                     try:
@@ -282,7 +317,9 @@ async def poll_hikvision_events() -> None:
                                 "device_id": device_id,
                                 "authFailed": True,
                                 "punchLocked": bool(rec.adapter.punch_locked),
-                                "adminLoginSerial": int(rec.adapter.last_admin_login_serial or 0),
+                                "adminLoginSerial": int(
+                                    rec.adapter.last_admin_login_serial or 0
+                                ),
                             }
                         )
                     except Exception:  # noqa: BLE001
@@ -294,11 +331,24 @@ async def poll_hikvision_events() -> None:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    realtime = []
+    for did, rec in devices.items():
+        if isinstance(rec.adapter, HikvisionIsapiAdapter):
+            realtime.append(
+                {
+                    "deviceId": did,
+                    "connected": bool(rec.adapter.realtime_connected),
+                    "lastAt": rec.adapter.last_realtime_at.isoformat()
+                    if rec.adapter.last_realtime_at
+                    else None,
+                }
+            )
     return {
         "status": "ok",
         "service": "hr-hub-device-gw",
         "nats": publisher.status,
         "devices": len(devices),
+        "realtime": realtime,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -352,10 +402,6 @@ async def register_device(body: DeviceRegister) -> DeviceInfo:
                 await adapter.sync_clock()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("sync_clock skipped: %s", exc)
-        try:
-            await adapter.subscribe_events()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("subscribe_events skipped: %s", exc)
 
     ok = await adapter.heartbeat()
     info = DeviceInfo(
@@ -369,6 +415,8 @@ async def register_device(body: DeviceRegister) -> DeviceInfo:
         model=body.model,
     )
     devices[device_id] = DeviceRecord(info, adapter)
+    if kind == AdapterType.hikvision_isapi:
+        await start_realtime(device_id, devices[device_id])
     logger.info("Registered device %s (%s) tenant=%s", device_id, kind, body.tenant_id)
     return info
 
@@ -395,7 +443,7 @@ async def change_password(device_id: str, body: ChangePasswordRequest) -> dict[s
     if not ok:
         raise HTTPException(502, err or "Terminal rejected password change")
     try:
-        await rec.adapter.subscribe_events()
+        await start_realtime(device_id, rec)
     except Exception as exc:  # noqa: BLE001
         logger.warning("resubscribe after password change: %s", exc)
     rec.info.status = "online"
@@ -435,6 +483,7 @@ async def verify_password(device_id: str, body: VerifyPasswordRequest) -> dict[s
         await adapter.connect()
     except Exception as exc:  # noqa: BLE001
         logger.warning("reconnect after verify-password: %s", exc)
+    await start_realtime(device_id, rec)
     rec.info.status = "online"
     rec.info.last_seen = datetime.now(timezone.utc).isoformat()
     return {"ok": True, "device_id": device_id}
@@ -449,6 +498,34 @@ async def heartbeat(device_id: str) -> DeviceInfo:
     rec.info.status = "online" if ok else "offline"
     rec.info.last_seen = datetime.now(timezone.utc).isoformat()
     return rec.info
+
+
+@app.post("/devices/{device_id}/unlock-punching")
+async def unlock_punching(device_id: str) -> dict[str, Any]:
+    """Force re-enable face/card auth after local admin login lock."""
+    rec = devices.get(device_id)
+    if not rec:
+        raise HTTPException(404, "Device not found")
+    if not isinstance(rec.adapter, HikvisionIsapiAdapter):
+        raise HTTPException(400, "Only Hikvision ISAPI devices support unlock")
+    # Ensure client is connected with stored credentials
+    try:
+        await rec.adapter.connect()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"Device connect failed: {exc}") from exc
+    ok = await rec.adapter.unlock_punching()
+    if not ok:
+        # Still try enable flags even if adapter thought it wasn't locked
+        ok = await rec.adapter.set_punching_enabled(True)
+        rec.adapter.punch_locked = False
+        rec.adapter.awaiting_sync_unlock = False
+    rec.info.status = "online" if ok else rec.info.status
+    return {
+        "ok": bool(ok),
+        "device_id": device_id,
+        "punch_locked": bool(rec.adapter.punch_locked),
+        "lock_method": rec.adapter.lock_method,
+    }
 
 
 @app.post("/devices/{device_id}/sync-face")

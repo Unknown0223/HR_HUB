@@ -122,8 +122,13 @@ function DynamicFieldsPageInner() {
     setBusy(true);
     setError('');
     try {
-      for (const id of ids) {
-        await apiFetch(`/api/catalog/dynamic-fields/${id}`, { method: 'DELETE' });
+      const chunk = 8;
+      for (let i = 0; i < ids.length; i += chunk) {
+        await Promise.all(
+          ids.slice(i, i + chunk).map((id) =>
+            apiFetch(`/api/catalog/dynamic-fields/${id}`, { method: 'DELETE' }),
+          ),
+        );
       }
       setSelected(new Set());
       setFocusId(null);

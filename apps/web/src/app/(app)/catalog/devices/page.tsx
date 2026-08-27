@@ -159,7 +159,11 @@ function DevicesInner() {
     setChecked(new Set(filtered.map((d) => d.id)));
   }
 
-  async function save(values: DeviceFormValues, sync: boolean) {
+  async function save(
+    values: DeviceFormValues,
+    sync: boolean,
+    meta?: { locationChanged: boolean },
+  ) {
     setBusy(true);
     try {
       const body: Record<string, unknown> = {
@@ -176,6 +180,9 @@ function DevicesInner() {
       };
       if (values.password.trim()) body.password = values.password;
       let id = editing?.id;
+      const locationChanged =
+        meta?.locationChanged === true ||
+        (!!editing && (editing.location?.id || '') !== values.locationId);
       if (editing) {
         await apiFetch(`/api/attendance/devices/${editing.id}`, {
           method: 'PATCH',
@@ -188,13 +195,24 @@ function DevicesInner() {
         });
         id = created.id;
       }
-      if (sync && id) {
-        await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
+      // Create + location change already schedule backend sync — only POST when sync
+      // requested without a location change on an existing device.
+      if (sync && id && editing && !locationChanged) {
+        void apiFetch(`/api/attendance/devices/${id}/persons/sync`, { method: 'POST' }).catch(
+          () => undefined,
+        );
       }
-      setModalOpen(false);
-      setEditing(null);
       await load();
-      if (id) router.push(`/catalog/devices/${id}`);
+      if (id) {
+        window.setTimeout(() => {
+          setModalOpen(false);
+          setEditing(null);
+          router.push(`/catalog/devices/${id}`);
+        }, 900);
+      } else {
+        setModalOpen(false);
+        setEditing(null);
+      }
     } finally {
       setBusy(false);
     }
@@ -217,11 +235,10 @@ function DevicesInner() {
     if (!(await confirm(`Удалить устройства (${selectedIds.length})?`))) return;
     setBusy(true);
     try {
-      await Promise.all(
-        selectedIds.map((id) =>
-          apiFetch(`/api/attendance/devices/${id}`, { method: 'DELETE' }),
-        ),
-      );
+      await apiFetch('/api/attendance/devices/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ ids: selectedIds }),
+      });
       setChecked(new Set());
       setFocusId(null);
       await load();
@@ -316,7 +333,7 @@ function DevicesInner() {
         <div className={styles.rightTools}>
           <input
             className={styles.search}
-            placeholder="Поиск..."
+            placeholder="Поиск: название, серийный, локация..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

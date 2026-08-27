@@ -15,6 +15,7 @@ export type LocationFormValues = {
   geoRadiusM: string;
   locationTypeId: string;
   isActive: boolean;
+  isGlobal: boolean;
   region: string;
   bssid: string;
   restrictMarks: boolean;
@@ -34,6 +35,7 @@ export function blankLocationForm(): LocationFormValues {
     geoRadiusM: '150',
     locationTypeId: '',
     isActive: true,
+    isGlobal: false,
     region: '',
     bssid: '',
     restrictMarks: false,
@@ -188,6 +190,19 @@ export function LocationFormModal({ open, title, initial, busy, onClose, onSave 
               type="checkbox"
               checked={values.restrictMarks}
               onChange={(e) => setValues((v) => ({ ...v, restrictMarks: e.target.checked }))}
+            />
+          </div>
+          <div className={`${styles.toggleRow} ${styles.full}`}>
+            <span>
+              Глобальная локация
+              <small style={{ display: 'block', color: '#6b7280', fontWeight: 400, marginTop: 2 }}>
+                Сотрудники этой локации загружаются на все устройства республики
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              checked={values.isGlobal}
+              onChange={(e) => setValues((v) => ({ ...v, isGlobal: e.target.checked }))}
             />
           </div>
           <div className={styles.toggleRow}>

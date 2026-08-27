@@ -1,0 +1,5 @@
+{
+  "apiUrl": "https://hr-hubapi-production.up.railway.app",
+  "webUrl": "https://hr-hubweb-production.up.railway.app",
+  "tenantCode": "demo"
+}

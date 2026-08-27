@@ -23,6 +23,7 @@ type Location = {
   longitude?: number | null;
   geoRadiusM?: number;
   isActive: boolean;
+  isGlobal?: boolean;
   locationTypeId?: string | null;
   locationType?: { id: string; code: string; name: string } | null;
   deviceCount?: number;
@@ -45,6 +46,7 @@ function toForm(row: Location): LocationFormValues {
     geoRadiusM: row.geoRadiusM != null ? String(row.geoRadiusM) : '150',
     locationTypeId: row.locationTypeId || row.locationType?.id || '',
     isActive: row.isActive,
+    isGlobal: row.isGlobal === true || meta.global === true,
     region: typeof meta.region === 'string' ? meta.region : '',
     bssid: typeof meta.bssid === 'string' ? meta.bssid : '',
     restrictMarks: meta.restrictMarks === true,
@@ -63,11 +65,13 @@ function bodyFromForm(values: LocationFormValues) {
     geoRadiusM: values.geoRadiusM.trim() ? Number(values.geoRadiusM) : 150,
     locationTypeId: values.locationTypeId || null,
     isActive: values.isActive,
+    isGlobal: values.isGlobal,
     meta: {
       region: values.region.trim() || null,
       bssid: values.bssid.trim() || null,
       restrictMarks: values.restrictMarks,
       polygonalAnalysis: values.polygonalAnalysis.trim() || null,
+      global: values.isGlobal,
       updatedByLabel: 'Admin',
     },
   };
@@ -350,7 +354,14 @@ function LocationsInner() {
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td>{r.name}</td>
+                    <td>
+                      {r.name}
+                      {r.isGlobal ? (
+                        <span className={styles.badgeOk} style={{ marginLeft: 6 }}>
+                          Глобальная
+                        </span>
+                      ) : null}
+                    </td>
                     <td>{r.address || '—'}</td>
                     <td>{r.locationType?.name || '—'}</td>
                     <td>{r.deviceCount ?? r._count?.devices ?? 0}</td>

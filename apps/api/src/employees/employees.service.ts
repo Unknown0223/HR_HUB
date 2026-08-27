@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { EmploymentStatus, EmploymentType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { FaceService } from './face.service';
 import { buildCsvBuffer, buildExcelBuffer } from '../common/excel';
 import type { ImportResult } from '../common/import.dto';
 import { CreateEmployeeDto, UpdateEmployeeDto, UpdateEmployeeContactsDto, UpdateEmployeePersonalDto, CreateEmployeeBankAccountDto, UpdateEmployeeBankAccountDto, CreateEmployeeBankCardDto, UpdateEmployeeBankCardDto, CreateEmployeePersonDocDto, UpdateEmployeePersonDocDto, CreateEmployeeRelativeDto, UpdateEmployeeRelativeDto, UpdateEmployeeMaritalStatusDto, CreateEmployeeCertificateDto, UpdateEmployeeCertificateDto, CreateEmployeeTenureDto, UpdateEmployeeTenureDto, CreateEmployeeWorkplaceDto, UpdateEmployeeWorkplaceDto, CreateEmployeeAwardDto, UpdateEmployeeAwardDto, UpdateEmployeeFileDto, CreateEmployeeInventoryDto, UpdateEmployeeInventoryDto, CreateEmployeeCarDto, UpdateEmployeeCarDto, UpdateEmployeeIdentificationDto, UpdateEmployeeExtraInfoDto, UpdateEmployeeUserSettingsDto, CreateEmployeeMarkBlockDto, UpdateEmployeeMarkBlockDto } from './dto';
@@ -29,10 +30,24 @@ function assertEnum<T extends Record<string, string>>(
 
 @Injectable()
 export class EmployeesService {
+  private readonly logger = new Logger(EmployeesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly face: FaceService,
   ) {}
+
+  /** Push face to devices of employee's locations (non-blocking). */
+  private scheduleEmployeeDeviceSync(tenantId: string, employeeId: string) {
+    void this.face.syncToDevices(tenantId, employeeId).catch((e) => {
+      this.logger.warn(
+        `Auto face sync after location change employee=${employeeId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    });
+  }
 
   requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
@@ -1812,7 +1827,11 @@ export class EmployeesService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {
-    await this.findOne(tenantId, id);
+    const prev = await this.prisma.employee.findFirst({
+      where: { id, tenantId },
+      select: { id: true, divisionId: true },
+    });
+    if (!prev) throw new NotFoundException('Employee not found');
     const {
       dismissedAt,
       hiredAt,
@@ -1832,11 +1851,16 @@ export class EmployeesService {
       const raw = String(baseSalary).trim();
       salary = raw === '' ? null : new Prisma.Decimal(raw);
     }
-    return this.prisma.employee.update({
+    const nextDivisionId =
+      divisionId !== undefined ? nullIfEmpty(divisionId) : undefined;
+    const divisionChanged =
+      nextDivisionId !== undefined && nextDivisionId !== prev.divisionId;
+
+    const updated = await this.prisma.employee.update({
       where: { id },
       data: {
         ...rest,
-        divisionId: nullIfEmpty(divisionId),
+        divisionId: nextDivisionId,
         positionId: nullIfEmpty(positionId),
         scheduleId: nullIfEmpty(scheduleId),
         regionId: nullIfEmpty(regionId),
@@ -1861,6 +1885,11 @@ export class EmployeesService {
         schedule: { select: { id: true, name: true, code: true, startTime: true, endTime: true } },
       },
     });
+
+    if (divisionChanged) {
+      this.scheduleEmployeeDeviceSync(tenantId, id);
+    }
+    return updated;
   }
 
   private async setProfileFlag(
@@ -1993,6 +2022,10 @@ export class EmployeesService {
           },
         });
       }
+    }
+
+    if ((dto.attach?.length ?? 0) > 0) {
+      this.scheduleEmployeeDeviceSync(tenantId, employeeId);
     }
 
     return this.findOne(tenantId, employeeId);

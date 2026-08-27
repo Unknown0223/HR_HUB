@@ -78,26 +78,32 @@ if (-not (Test-Path $cf)) {
 
 Write-Step "1/3" "Device Gateway ($gwPort)"
 $gwProc = $null
-if (Test-Gw) {
-  Write-Host "  Allaqachon ishlayapti."
-} else {
-  $gwProc = Start-Process -FilePath "powershell" -ArgumentList @(
-    "-NoProfile", "-WindowStyle", "Minimized", "-Command",
-    "Set-Location `"$root`"; npm run dev:gw"
-  ) -PassThru
-  $ok = $false
-  for ($i = 0; $i -lt 30; $i++) {
-    Start-Sleep -Seconds 1
-    if (Test-Gw) {
-      $ok = $true
-      break
-    }
-  }
-  if (-not $ok) {
-    throw "Gateway 8800 da ochilmadi. apps/device-gw/.venv ni tekshiring."
-  }
-  Write-Host "  Gateway tayyor."
+# Always restart GW so latest unlock/heartbeat code is loaded (stale process was a common failure mode).
+Get-NetTCPConnection -LocalPort $gwPort -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
+  try { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } catch {}
 }
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -and ($_.CommandLine -match 'uvicorn.*main:app|run-device-gw|dev:gw') } |
+  ForEach-Object {
+    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+  }
+Start-Sleep -Seconds 1
+$gwProc = Start-Process -FilePath "powershell" -ArgumentList @(
+  "-NoProfile", "-WindowStyle", "Minimized", "-Command",
+  "Set-Location `"$root`"; npm run dev:gw"
+) -PassThru
+$ok = $false
+for ($i = 0; $i -lt 30; $i++) {
+  Start-Sleep -Seconds 1
+  if (Test-Gw) {
+    $ok = $true
+    break
+  }
+}
+if (-not $ok) {
+  throw "Gateway 8800 da ochilmadi. apps/device-gw/.venv ni tekshiring."
+}
+Write-Host "  Gateway qayta ishga tushdi."
 
 Write-Step "2/3" "Internet tunnel (Cloudflare)"
 

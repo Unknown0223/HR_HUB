@@ -10,6 +10,7 @@ import asyncio
 import base64
 import json
 import logging
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -139,6 +140,9 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self._subscribe_task: Optional[asyncio.Task] = None
         self._event_queue: list[dict[str, Any]] = []
         self._seen_event_keys: set[str] = set()
+        self._on_realtime_event: Optional[Any] = None  # async (punch: dict) -> None
+        self.realtime_connected: bool = False
+        self.last_realtime_at: Optional[datetime] = None
         self.last_drift_seconds: float = 0.0
         self.last_device_now_iso: Optional[str] = None
         self.last_clock_sync_at: Optional[datetime] = None
@@ -155,6 +159,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self._acs_skip_minors: set[int] = set()
         self.auth_failed: bool = False
         self.clock_read_ok: bool = False
+        self.auth_lock_until: Optional[datetime] = None
 
     @property
     def base_url(self) -> str:
@@ -192,24 +197,55 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             await self._client.aclose()
             self._client = None
 
+    def auth_locked(self) -> bool:
+        if not self.auth_lock_until:
+            return False
+        if datetime.now(timezone.utc) >= self.auth_lock_until:
+            self.auth_lock_until = None
+            return False
+        return True
+
+    def _note_auth_response(self, resp: httpx.Response) -> None:
+        """Parse Hikvision 401 lockStatus/unlockTime to avoid hammering lockouts."""
+        if resp.status_code != 401:
+            return
+        self.auth_failed = True
+        text = resp.text or ""
+        if "<lockStatus>lock</lockStatus>" not in text and "lockStatus>lock" not in text:
+            return
+        # unlockTime is seconds remaining
+        m = re.search(r"<unlockTime>\s*(\d+)\s*</unlockTime>", text)
+        secs = int(m.group(1)) if m else 120
+        secs = max(30, min(secs + 5, 3600))
+        self.auth_lock_until = datetime.now(timezone.utc) + timedelta(seconds=secs)
+        logger.warning(
+            "device ISAPI locked — backoff %ss until %s",
+            secs,
+            self.auth_lock_until.isoformat(),
+        )
+
     async def heartbeat(self) -> bool:
         if not self._client:
+            return False
+        if self.auth_locked():
             return False
         try:
             resp = await self._client.get("/ISAPI/System/deviceInfo")
             if resp.status_code == 401:
-                self.auth_failed = True
+                self._note_auth_response(resp)
                 return False
             if resp.status_code < 400:
                 self.auth_failed = False
+                self.auth_lock_until = None
                 return True
             resp2 = await self._client.get("/ISAPI/System/deviceInfo?format=json")
             if resp2.status_code == 401:
-                self.auth_failed = True
+                self._note_auth_response(resp2)
                 return False
             ok = resp2.status_code < 400
             if ok:
                 self.auth_failed = False
+                self.auth_lock_until = None
             return ok
         except Exception as exc:  # noqa: BLE001
             logger.warning("heartbeat failed: %s", exc)
@@ -1136,8 +1172,10 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             logger.warning("AcsEvent pull failed: %s", exc)
             return punches
 
-    async def subscribe_events(self) -> None:
-        """Start background alertStream consumer (best-effort)."""
+    async def subscribe_events(self, on_event: Any = None) -> None:
+        """Start background alertStream consumer (realtime punches)."""
+        if on_event is not None:
+            self._on_realtime_event = on_event
         if not self._client:
             return
         if self._subscribe_task and not self._subscribe_task.done():
@@ -1145,87 +1183,217 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self._subscribe_task = asyncio.create_task(self._alert_stream_loop())
 
     async def _alert_stream_loop(self) -> None:
+        """Long-lived multipart alertStream → queue + optional realtime callback."""
         assert self._client is not None
-        urls = (
-            "/ISAPI/Event/notification/alertStream",
-            "/ISAPI/Event/notification/alertStream?format=json",
+        # Dedicated client so poll/heartbeat timeouts cannot cancel the stream.
+        stream_client = httpx.AsyncClient(
+            base_url=self.base_url,
+            auth=httpx.DigestAuth(self.username, self.password),
+            timeout=httpx.Timeout(None, connect=5.0),
+            verify=False,
         )
-        url_index = 0
+        url = "/ISAPI/Event/notification/alertStream"
         logger.info("Starting alertStream subscribe on %s", self.base_url)
-        while True:
+        try:
+            while True:
+                if self.auth_locked():
+                    wait = max(
+                        5.0,
+                        (self.auth_lock_until - datetime.now(timezone.utc)).total_seconds()
+                        if self.auth_lock_until
+                        else 5.0,
+                    )
+                    await asyncio.sleep(min(wait, 600))
+                    continue
+                try:
+                    async with stream_client.stream("GET", url) as resp:
+                        if resp.status_code >= 400:
+                            self.realtime_connected = False
+                            self._note_auth_response(resp)
+                            logger.warning(
+                                "alertStream %s status %s", url, resp.status_code
+                            )
+                            wait = 5.0
+                            if self.auth_lock_until:
+                                wait = max(
+                                    5.0,
+                                    (
+                                        self.auth_lock_until
+                                        - datetime.now(timezone.utc)
+                                    ).total_seconds(),
+                                )
+                            await asyncio.sleep(min(wait, 600))
+                            continue
+                        self.realtime_connected = True
+                        logger.info("alertStream connected %s", self.base_url)
+                        boundary = b"--MIME_boundary"
+                        buffer = b""
+                        async for chunk in resp.aiter_bytes():
+                            buffer += chunk
+                            if len(buffer) > 4_000_000:
+                                buffer = buffer[-500_000:]
+                            while True:
+                                start = buffer.find(boundary)
+                                if start < 0:
+                                    break
+                                nxt = buffer.find(boundary, start + len(boundary))
+                                if nxt < 0:
+                                    buffer = buffer[start:]
+                                    break
+                                part = buffer[start:nxt]
+                                buffer = buffer[nxt:]
+                                await self._handle_alert_mime_part(part)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    self.realtime_connected = False
+                    logger.warning("alertStream disconnected: %s — retry in 5s", exc)
+                    await asyncio.sleep(5)
+        finally:
+            self.realtime_connected = False
+            await stream_client.aclose()
+
+    async def _handle_alert_mime_part(self, part: bytes) -> None:
+        text = part.decode("utf-8", errors="ignore")
+        # Skip pure binary image parts without JSON
+        if "{" not in text:
+            return
+        for data in self._extract_json_objects(text):
+            punch = self._punch_from_alert_payload(data)
+            if not punch:
+                continue
+            self.last_realtime_at = datetime.now(timezone.utc)
+            logger.info(
+                "realtime punch emp=%s at=%s",
+                punch.get("employee_external_id"),
+                punch.get("occurred_at"),
+            )
+            cb = self._on_realtime_event
+            if cb is not None:
+                try:
+                    result = cb(punch)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("realtime callback failed: %s", exc)
+                    # Fallback: keep for poll publisher
+                    self._event_queue.append(punch)
+            else:
+                self._event_queue.append(punch)
+
+    @staticmethod
+    def _extract_json_objects(text: str) -> list[dict[str, Any]]:
+        """Extract top-level JSON objects with brace counting (nested-safe)."""
+        objs: list[dict[str, Any]] = []
+        i = 0
+        n = len(text)
+        while i < n:
+            start = text.find("{", i)
+            if start < 0:
+                break
+            depth = 0
+            in_str = False
+            esc = False
+            end: Optional[int] = None
+            for j in range(start, n):
+                ch = text[j]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == "\\":
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                    continue
+                if ch == '"':
+                    in_str = True
+                elif ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = j + 1
+                        break
+            if end is None:
+                break
             try:
-                url = urls[url_index % len(urls)]
-                async with self._client.stream("GET", url, timeout=None) as resp:
-                    if resp.status_code >= 400:
-                        logger.warning("alertStream %s status %s", url, resp.status_code)
-                        if resp.status_code == 404:
-                            url_index += 1
-                        await asyncio.sleep(5)
-                        continue
-                    url_index = 0
-                    buffer = b""
-                    async for chunk in resp.aiter_bytes():
-                        buffer += chunk
-                        # Parse simple JSON event chunks when present
-                        while b"{" in buffer and b"}" in buffer:
-                            start = buffer.find(b"{")
-                            end = buffer.find(b"}", start)
-                            if end < 0:
-                                break
-                            piece = buffer[start : end + 1]
-                            buffer = buffer[end + 1 :]
-                            self._try_parse_event_chunk(piece)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("alertStream disconnected: %s — retry in 5s", exc)
-                await asyncio.sleep(5)
+                data = json.loads(text[start:end])
+                if isinstance(data, dict):
+                    objs.append(data)
+            except Exception:  # noqa: BLE001
+                pass
+            i = end
+        return objs
+
+    # Face / card / fingerprint success minors on DS-K1T (major=5 access events).
+    _AUTH_OK_MINORS = frozenset({1, 38, 39, 75, 76})
+
+    def _punch_from_alert_payload(self, data: dict[str, Any]) -> dict[str, Any] | None:
+        event = data.get("AccessControllerEvent")
+        if not isinstance(event, dict):
+            event = data.get("EventNotificationAlert")
+        if not isinstance(event, dict):
+            # Some firmwares nest under EventNotificationAlert.AccessControllerEvent
+            if isinstance(data.get("EventNotificationAlert"), dict):
+                nested = data["EventNotificationAlert"].get("AccessControllerEvent")
+                event = nested if isinstance(nested, dict) else None
+        if not isinstance(event, dict):
+            return None
+
+        minor = int(event.get("subEventType") or event.get("minor") or 0)
+        major = int(event.get("majorEventType") or event.get("major") or 0)
+        eid = (
+            event.get("employeeNoString")
+            or event.get("employeeNo")
+            or event.get("cardNo")
+        )
+        if not eid:
+            return None
+        # Prefer known auth-success minors; still accept if major=5 and name present.
+        if major in (0, 5) and minor and minor not in self._AUTH_OK_MINORS:
+            if not (event.get("name") or event.get("attendanceStatus")):
+                return None
+
+        item = dict(event)
+        if not item.get("time"):
+            item["time"] = data.get("dateTime") or event.get("dateTime")
+        if item.get("minor") is None and minor:
+            item["minor"] = minor
+        if item.get("major") is None and major:
+            item["major"] = major
+        punch = self._punch_from_acs_item(item)
+        if punch:
+            punch["source"] = "hikvision_isapi_realtime"
+            raw = punch.get("raw") if isinstance(punch.get("raw"), dict) else {}
+            punch["raw"] = {**raw, "realtime": True, "alert": data}
+        return punch
 
     def _try_parse_event_chunk(self, piece: bytes) -> None:
+        """Legacy single-chunk parser (kept for tests); prefer MIME path."""
+        for data in self._extract_json_objects(piece.decode("utf-8", errors="ignore")):
+            punch = self._punch_from_alert_payload(data)
+            if punch:
+                self._event_queue.append(punch)
+        # XML fallback
         try:
-            import json
-
-            data = json.loads(piece.decode("utf-8", errors="ignore"))
-        except Exception:
-            # Try XML AccessControllerEvent
-            try:
-                root = ET.fromstring(piece.decode("utf-8", errors="ignore"))
-                eid = root.findtext(".//employeeNoString") or root.findtext(
-                    ".//employeeNo"
-                )
-                if not eid:
-                    return
-                self._event_queue.append(
-                    {
-                        "employee_external_id": eid,
-                        "direction": "AUTO",
-                        "occurred_at": datetime.now(timezone.utc).isoformat(),
-                        "source": "hikvision_isapi",
-                        "raw": {"xml": piece.decode("utf-8", errors="ignore")[:500]},
-                    }
-                )
-            except Exception:
+            root = ET.fromstring(piece.decode("utf-8", errors="ignore"))
+            eid = root.findtext(".//employeeNoString") or root.findtext(".//employeeNo")
+            if not eid:
                 return
-            return
-
-        event = data.get("AccessControllerEvent") or data.get("EventNotificationAlert") or data
-        if isinstance(event, dict):
-            eid = (
-                event.get("employeeNoString")
-                or event.get("employeeNo")
-                or data.get("employeeNoString")
+            punch = self._punch_from_acs_item(
+                {
+                    "employeeNoString": eid,
+                    "time": root.findtext(".//dateTime")
+                    or datetime.now(timezone.utc).isoformat(),
+                    "minor": 75,
+                    "major": 5,
+                }
             )
-            if eid:
-                self._event_queue.append(
-                    {
-                        "employee_external_id": str(eid),
-                        "direction": self._map_direction(event),
-                        "occurred_at": event.get("time")
-                        or datetime.now(timezone.utc).isoformat(),
-                        "source": "hikvision_isapi",
-                        "raw": data,
-                    }
-                )
+            if punch:
+                punch["source"] = "hikvision_isapi_realtime"
+                self._event_queue.append(punch)
+        except Exception:
+            return
 
     @staticmethod
     def _map_direction(item: dict[str, Any]) -> str:

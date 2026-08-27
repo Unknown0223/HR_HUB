@@ -25,6 +25,12 @@ export class CreateLocationDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() geoRadiusM?: number;
   @ApiPropertyOptional() @IsOptional() @IsUUID() locationTypeId?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({
+    description: 'Global location — employees sync to all devices in the tenant',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isGlobal?: boolean;
   @ApiPropertyOptional({ description: 'Verifix location extras JSON' })
   @IsOptional()
   meta?: Record<string, unknown>;
@@ -118,7 +124,7 @@ export class UpdateQrCodeDto {
 export class CreateDeviceDto {
   @ApiProperty() @IsString() name!: string;
   @ApiProperty() @IsString() serialNumber!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() locationId?: string;
+  @ApiProperty() @IsString() locationId!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
   @ApiPropertyOptional({ default: 'mock' }) @IsOptional() @IsString() adapterType?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() host?: string;
@@ -135,7 +141,7 @@ export class CreateDeviceDto {
 export class UpdateDeviceDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() serialNumber?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() locationId?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsString() locationId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() model?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsString() adapterType?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() host?: string | null;
@@ -148,6 +154,13 @@ export class UpdateDeviceDto {
 }
 
 export class DeviceIgnoreDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  ids!: string[];
+}
+
+export class BulkDeviceIdsDto {
   @ApiProperty({ type: [String] })
   @IsArray()
   @IsUUID('4', { each: true })
@@ -322,6 +335,12 @@ export class UpdateLocationDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() geoRadiusM?: number;
   @ApiPropertyOptional() @IsOptional() @IsUUID() locationTypeId?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({
+    description: 'Global location — employees sync to all devices in the tenant',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isGlobal?: boolean;
   @ApiPropertyOptional() @IsOptional() meta?: Record<string, unknown>;
 }
 

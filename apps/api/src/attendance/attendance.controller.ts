@@ -24,6 +24,7 @@ import { AttendanceService } from './attendance.service';
 import {
   AssignScheduleDto,
   ApplyMarkSettingsDto,
+  BulkDeviceIdsDto,
   BulkMarksDto,
   CopyMarksDto,
   CopyMarksPreviewDto,
@@ -166,6 +167,20 @@ export class AttendanceController {
   registerGw(@CurrentTenant() tenantId: string | null) {
     return this.attendance.registerTenantDevices(
       this.attendance.requireTenant(tenantId),
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Post('devices/bulk-delete')
+  bulkDeleteDevices(
+    @CurrentTenant() tenantId: string | null,
+    @Body() dto: BulkDeviceIdsDto,
+  ) {
+    return this.attendance.bulkDeleteDevices(
+      this.attendance.requireTenant(tenantId),
+      dto.ids,
     );
   }
 

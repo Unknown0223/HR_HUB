@@ -124,21 +124,17 @@ export class StorageService implements OnModuleInit {
 
   /** Stable URL for <img src> — avoids expired MinIO signatures. */
   mediaUrl(photoKey?: string | null, photoUrl?: string | null): string | null {
-    // Prefer embedded data URLs (MinIO-less deploys store captures this way).
+    // Always prefer the proxy when we have a key so list APIs do not ship base64.
+    // /api/storage/file falls back to FaceProfile.photoUrl if MinIO is down.
+    if (photoKey && this.isSafeKey(photoKey)) {
+      return this.proxyUrl(photoKey);
+    }
     if (photoUrl?.startsWith('data:') || photoUrl?.startsWith('blob:')) {
       return photoUrl;
     }
-    // Only proxy by key when object storage is actually available.
-    if (this.ready && photoKey && this.isSafeKey(photoKey)) {
-      return this.proxyUrl(photoKey);
-    }
     if (!photoUrl) return null;
     const fromSigned = this.extractKeyFromUrl(photoUrl);
-    if (fromSigned && this.ready) return this.proxyUrl(fromSigned);
-    // Rewrite broken localhost proxy URLs when we still have a key but no MinIO.
-    if (photoKey && this.isSafeKey(photoKey) && photoUrl.includes('/api/storage/file')) {
-      return null;
-    }
+    if (fromSigned) return this.proxyUrl(fromSigned);
     return photoUrl;
   }
 

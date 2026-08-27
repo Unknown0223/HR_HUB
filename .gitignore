@@ -60,6 +60,9 @@ apps/mobile/build-log*.txt
 # Docker volumes (local)
 infra/data/
 
+# Verifix live dump (credentials, employee photos, large JSON)
+data/verifix-dump/
+
 # Misc
 *.pem
 .turbo/
@@ -68,5 +71,14 @@ infra/data/
 # Accidental nested project copy (do not publish)
 /hr-hub/
 
-# Local CLI binaries / scratch
-/tools/
+# Local CLI binaries / scratch (office-link skriptlari gitda qoladi)
+/tools/*
+!/tools/office-link/
+!/tools/office-link/**
+/tools/office-link/runtime/
+/tools/office-link/data/
+/tools/office-link/gw/
+/tools/office-link/dist/
+/tools/office-link/build/
+/tools/office-link/**/__pycache__/
+/tools/office-link/*.log

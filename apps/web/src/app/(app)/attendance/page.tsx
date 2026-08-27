@@ -243,13 +243,18 @@ export default function AttendancePage() {
   async function createDevice(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const locationId = String(fd.get('locationId') || '').trim();
+    if (!locationId) {
+      alert('Выберите локацию — по ней загружаются сотрудники на терминал');
+      return;
+    }
     await apiFetch('/api/attendance/devices', {
       method: 'POST',
       body: JSON.stringify({
         name: fd.get('name'),
         serialNumber: fd.get('serialNumber'),
         adapterType: fd.get('adapterType') || 'mock',
-        locationId: fd.get('locationId') || undefined,
+        locationId,
         model: fd.get('model') || undefined,
         host: fd.get('host') || undefined,
         username: fd.get('username') || undefined,
@@ -718,9 +723,9 @@ export default function AttendancePage() {
               <input name="password" type="password" placeholder="••••••" />
             </label>
             <label>
-              Локация
-              <select name="locationId">
-                <option value="">—</option>
+              Локация *
+              <select name="locationId" required>
+                <option value="">Выберите локацию</option>
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}

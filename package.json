@@ -13,6 +13,8 @@
     "dev:web": "npm run dev -w @hr-hub/web",
     "dev:gw": "node scripts/run-device-gw.js",
     "devices:up": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/link-devices.ps1",
+    "office-link:admin": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/office-link/link.ps1 -Mode admin",
+    "office-link": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/office-link/link.ps1 -Mode field",
     "dev:apps": "node scripts/dev-apps.js",
     "build:api": "npm run build -w @hr-hub/api",
     "build:web": "npm run build -w @hr-hub/web",
@@ -89,8 +91,15 @@
     "load:punch:medium": "node scripts/load-punch-test.js --profile medium",
     "load:punch:heavy": "node scripts/load-punch-test.js --profile heavy --write-results",
     "verifix:gather": "python scripts/verifix-gather.py",
+    "verifix:dump-live": "python scripts/_vf_live_dump.py",
     "verifix:import": "node apps/api/scripts/import-verifix-dump.js",
-    "verifix:import-live": "node apps/api/scripts/import-verifix-live.js"
+    "verifix:import-live": "node apps/api/scripts/import-verifix-live.js",
+    "verifix:import-live-extra": "node apps/api/scripts/import-verifix-live-extra.js",
+    "attendance:purge": "node apps/api/scripts/purge-attendance.js",
+    "verifix:bootstrap": "python scripts/verifix-bootstrap.py",
+    "verifix:pack": "python scripts/verifix-pack-transfer.py",
+    "verifix:restore": "python scripts/verifix-pack-transfer.py --restore",
+    "verifix:photos": "python scripts/_vf_live_photos.py && node apps/api/scripts/import-verifix-photos.js"
   },
   "engines": {
     "node": ">=20"

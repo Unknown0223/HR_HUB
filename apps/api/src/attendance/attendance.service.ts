@@ -18,6 +18,7 @@ import {
   CreateQrCodeDto,
   CreateScheduleDto,
   ApplyMarkSettingsDto,
+  BulkDeviceIdsDto,
   DeviceIgnoreDto,
   GpsPunchDto,
   IngestPunchDto,
@@ -48,6 +49,8 @@ import {
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
+  /** Per-device in-flight persons sync — prevents double wave pipelines. */
+  private readonly personsSyncInFlight = new Map<string, Promise<void>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -79,9 +82,39 @@ export class AttendanceService {
     _count: { select: { devices: true, qrCodes: true, divisions: true } },
   } as const;
 
+  private locationIsGlobal(meta: unknown): boolean {
+    return this.asLocationMeta(meta).global === true;
+  }
+
+  private async globalLocationIds(tenantId: string): Promise<string[]> {
+    const locs = await this.prisma.location.findMany({
+      where: { tenantId, isActive: true },
+      select: { id: true, meta: true },
+    });
+    return locs.filter((l) => this.locationIsGlobal(l.meta)).map((l) => l.id);
+  }
+
+  /** When a location is marked global, push its people onto every active device. */
+  private scheduleAllDevicesPersonsSync(tenantId: string) {
+    void (async () => {
+      const devices = await this.prisma.device.findMany({
+        where: { tenantId, isActive: true, locationId: { not: null } },
+        select: { id: true },
+      });
+      for (const d of devices) {
+        this.scheduleLocationPersonsSync(tenantId, d.id);
+      }
+    })().catch((e) => {
+      this.logger.warn(
+        `Global location sync schedule failed: ${e instanceof Error ? e.message : e}`,
+      );
+    });
+  }
+
   private enrichLocationRow<
     T extends {
       id: string;
+      meta?: unknown;
       devices?: Array<{ status: string; isActive: boolean }>;
       _count?: { devices?: number; qrCodes?: number; divisions?: number };
     },
@@ -94,6 +127,7 @@ export class AttendanceService {
     const { devices: _devices, ...rest } = row as T & { devices?: unknown };
     return {
       ...rest,
+      isGlobal: this.locationIsGlobal(row.meta),
       deviceCount: row._count?.devices ?? devices.length,
       devicesOffline,
       devicesOfflineLabel: devicesOffline ? 'Да' : 'Нет',
@@ -207,6 +241,7 @@ export class AttendanceService {
 
     return {
       ...loc,
+      isGlobal: this.locationIsGlobal(loc.meta),
       employeeCount: grants.length,
       persons: grants.map((g) => ({
         id: g.employee.id,
@@ -240,41 +275,44 @@ export class AttendanceService {
   }
 
   createLocation(tenantId: string, dto: CreateLocationDto) {
-    const meta = dto.meta
-      ? ({
-          ...dto.meta,
-          createdByLabel: (dto.meta.createdByLabel as string) || 'Admin',
-          updatedByLabel: (dto.meta.updatedByLabel as string) || 'Admin',
-          changeHistory: [
-            {
-              at: new Date().toISOString(),
-              by: 'Admin',
-              action: 'create',
-            },
-          ],
-        } as Prisma.InputJsonValue)
-      : ({
-          createdByLabel: 'Admin',
-          updatedByLabel: 'Admin',
-          changeHistory: [{ at: new Date().toISOString(), by: 'Admin', action: 'create' }],
-        } as Prisma.InputJsonValue);
+    const baseMeta = dto.meta ? { ...dto.meta } : {};
+    if (dto.isGlobal !== undefined) baseMeta.global = dto.isGlobal === true;
+    const meta = {
+      ...baseMeta,
+      createdByLabel: (baseMeta.createdByLabel as string) || 'Admin',
+      updatedByLabel: (baseMeta.updatedByLabel as string) || 'Admin',
+      changeHistory: [
+        {
+          at: new Date().toISOString(),
+          by: 'Admin',
+          action: 'create',
+        },
+      ],
+    } as Prisma.InputJsonValue;
 
-    return this.prisma.location.create({
-      data: {
-        tenantId,
-        code: dto.code,
-        name: dto.name,
-        address: dto.address,
-        timezone: dto.timezone ?? 'Asia/Tashkent',
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        geoRadiusM: dto.geoRadiusM ?? 150,
-        locationTypeId: dto.locationTypeId,
-        isActive: dto.isActive ?? true,
-        meta,
-      },
-      include: this.locationInclude,
-    });
+    return this.prisma.location
+      .create({
+        data: {
+          tenantId,
+          code: dto.code,
+          name: dto.name,
+          address: dto.address,
+          timezone: dto.timezone ?? 'Asia/Tashkent',
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          geoRadiusM: dto.geoRadiusM ?? 150,
+          locationTypeId: dto.locationTypeId,
+          isActive: dto.isActive ?? true,
+          meta,
+        },
+        include: this.locationInclude,
+      })
+      .then((loc) => {
+        if (this.locationIsGlobal(loc.meta)) {
+          this.scheduleAllDevicesPersonsSync(tenantId);
+        }
+        return loc;
+      });
   }
 
   async updateLocation(tenantId: string, id: string, dto: UpdateLocationDto) {
@@ -297,7 +335,9 @@ export class AttendanceService {
     }
 
     const prevMeta = this.asLocationMeta(loc.meta);
+    const wasGlobal = this.locationIsGlobal(prevMeta);
     const nextMeta = dto.meta ? { ...prevMeta, ...dto.meta } : { ...prevMeta };
+    if (dto.isGlobal !== undefined) nextMeta.global = dto.isGlobal === true;
     const history = Array.isArray(nextMeta.changeHistory)
       ? [...(nextMeta.changeHistory as unknown[])]
       : [];
@@ -311,11 +351,17 @@ export class AttendanceService {
     if (!nextMeta.createdByLabel) nextMeta.createdByLabel = 'Admin';
     data.meta = nextMeta as Prisma.InputJsonValue;
 
-    return this.prisma.location.update({
+    const updated = await this.prisma.location.update({
       where: { id },
       data,
       include: this.locationInclude,
     });
+
+    const nowGlobal = this.locationIsGlobal(updated.meta);
+    if (nowGlobal && !wasGlobal) {
+      this.scheduleAllDevicesPersonsSync(tenantId);
+    }
+    return updated;
   }
 
   async deleteLocation(tenantId: string, id: string) {
@@ -379,6 +425,9 @@ export class AttendanceService {
   }
 
   async createDevice(tenantId: string, dto: CreateDeviceDto) {
+    if (!dto.locationId?.trim()) {
+      throw new BadRequestException('Локация обязательна для устройства');
+    }
     const adapterType = dto.adapterType ?? 'mock';
     const meta = dto.meta ? (dto.meta as Prisma.InputJsonValue) : undefined;
     const device = await this.prisma.device.create({
@@ -403,8 +452,9 @@ export class AttendanceService {
 
     const reg = await this.gw.registerFromDevice(device);
 
+    let saved = device;
     if (reg?.id) {
-      return this.prisma.device.update({
+      saved = await this.prisma.device.update({
         where: { id: device.id },
         data: {
           gatewayRef: reg.id,
@@ -413,10 +463,14 @@ export class AttendanceService {
         },
         include: this.deviceInclude,
       });
+    } else {
+      this.logger.warn(`Device ${device.id} created but GW register skipped/failed`);
     }
 
-    this.logger.warn(`Device ${device.id} created but GW register skipped/failed`);
-    return device;
+    if (saved.locationId) {
+      this.scheduleLocationPersonsSync(tenantId, saved.id);
+    }
+    return saved;
   }
 
   async updateDevice(tenantId: string, id: string, dto: UpdateDeviceDto) {
@@ -435,9 +489,10 @@ export class AttendanceService {
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.locationId !== undefined) {
-      data.location = dto.locationId
-        ? { connect: { id: dto.locationId } }
-        : { disconnect: true };
+      if (!dto.locationId) {
+        throw new BadRequestException('Локация обязательна для устройства');
+      }
+      data.location = { connect: { id: dto.locationId } };
     }
     if (dto.meta !== undefined) {
       data.meta = {
@@ -446,11 +501,18 @@ export class AttendanceService {
       } as Prisma.InputJsonValue;
     }
 
-    return this.prisma.device.update({
+    const updated = await this.prisma.device.update({
       where: { id },
       data,
       include: this.deviceInclude,
     });
+
+    const locationChanged =
+      dto.locationId !== undefined && dto.locationId !== existing.locationId;
+    if (locationChanged && updated.locationId) {
+      this.scheduleLocationPersonsSync(tenantId, updated.id);
+    }
+    return updated;
   }
 
   async changeDevicePassword(tenantId: string, id: string, newPassword: string) {
@@ -715,6 +777,49 @@ export class AttendanceService {
     return { ok: true, id };
   }
 
+  async bulkDeleteDevices(tenantId: string, ids: string[]) {
+    const unique = [...new Set((ids || []).filter(Boolean))];
+    if (!unique.length) return { ok: true, deleted: 0 };
+    const result = await this.prisma.device.deleteMany({
+      where: { tenantId, id: { in: unique } },
+    });
+    return { ok: true, deleted: result.count };
+  }
+
+  private async appendCommands(
+    tenantId: string,
+    deviceId: string,
+    cmds: Array<{
+      type: string;
+      employeeName?: string | null;
+      status?: string;
+    }>,
+  ) {
+    if (!cmds.length) return;
+    const device = await this.prisma.device.findFirst({ where: { id: deviceId, tenantId } });
+    if (!device) return;
+    const meta = this.asMeta(device.meta);
+    const commands = Array.isArray(meta.commands) ? [...(meta.commands as unknown[])] : [];
+    const now = new Date().toISOString();
+    for (const cmd of cmds) {
+      const id = 3000000 + commands.length + Math.floor(Math.random() * 90000);
+      commands.unshift({
+        id,
+        type: cmd.type,
+        employeeName: cmd.employeeName ?? null,
+        createdAt: now,
+        startedAt: now,
+        finishedAt: now,
+        status: cmd.status ?? 'completed',
+      });
+    }
+    meta.commands = commands.slice(0, 200);
+    await this.prisma.device.update({
+      where: { id: deviceId },
+      data: { meta: meta as Prisma.InputJsonValue },
+    });
+  }
+
   private async appendCommand(
     tenantId: string,
     deviceId: string,
@@ -724,32 +829,19 @@ export class AttendanceService {
       status?: string;
     },
   ) {
-    const device = await this.prisma.device.findFirst({ where: { id: deviceId, tenantId } });
-    if (!device) return;
-    const meta = this.asMeta(device.meta);
-    const commands = Array.isArray(meta.commands) ? [...(meta.commands as unknown[])] : [];
-    const now = new Date().toISOString();
-    const id = 3000000 + commands.length + Math.floor(Math.random() * 90000);
-    commands.unshift({
-      id,
-      type: cmd.type,
-      employeeName: cmd.employeeName ?? null,
-      createdAt: now,
-      startedAt: now,
-      finishedAt: now,
-      status: cmd.status ?? 'completed',
-    });
-    meta.commands = commands.slice(0, 200);
-    await this.prisma.device.update({
-      where: { id: deviceId },
-      data: { meta: meta as Prisma.InputJsonValue },
-    });
+    await this.appendCommands(tenantId, deviceId, [cmd]);
   }
 
-  async syncDevice(tenantId: string, id: string) {
+  async syncDevice(
+    tenantId: string,
+    id: string,
+    opts: { skipHeartbeat?: boolean } = {},
+  ) {
     const device = await this.getDevice(tenantId, id);
     await this.ensureGwRegistered(device);
-    await this.heartbeat(tenantId, id);
+    if (!opts.skipHeartbeat) {
+      await this.heartbeat(tenantId, id);
+    }
     const refreshed = await this.getDevice(tenantId, id);
     const gatewayRef = refreshed.gatewayRef;
     if (!gatewayRef) {
@@ -787,6 +879,11 @@ export class AttendanceService {
 
     let synced = 0;
     let failed = 0;
+    const commandBatch: Array<{
+      type: string;
+      employeeName?: string | null;
+      status?: string;
+    }> = [];
     const concurrency = 3;
     for (let i = 0; i < faceSyncs.length; i += concurrency) {
       const batch = faceSyncs.slice(i, i + concurrency);
@@ -829,22 +926,12 @@ export class AttendanceService {
                 lastError: ok ? null : 'Device rejected face enroll',
               },
             });
-            await this.appendCommand(tenantId, id, {
-              type: 'Person Edit',
-              employeeName: name,
-              status: ok ? 'completed' : 'failed',
-            });
             return { ok, name };
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             await this.prisma.deviceFaceSync.update({
               where: { id: fs.id },
               data: { syncStatus: FaceSyncStatus.failed, lastError: msg },
-            });
-            await this.appendCommand(tenantId, id, {
-              type: 'Person Edit',
-              employeeName: name,
-              status: 'failed',
             });
             return { ok: false as const, name };
           }
@@ -853,10 +940,17 @@ export class AttendanceService {
       for (const r of results) {
         if (r.ok) synced += 1;
         else failed += 1;
+        commandBatch.push({
+          type: 'Person Edit',
+          employeeName: r.name,
+          status: r.ok ? 'completed' : 'failed',
+        });
       }
     }
 
-    if (!faceSyncs.length) {
+    if (commandBatch.length) {
+      await this.appendCommands(tenantId, id, commandBatch);
+    } else if (!faceSyncs.length) {
       await this.appendCommand(tenantId, id, {
         type: 'Device Sync',
         status: 'completed',
@@ -1210,8 +1304,60 @@ export class AttendanceService {
     });
   }
 
-  async syncDevicePersons(tenantId: string, deviceId: string) {
-    await this.getDevice(tenantId, deviceId);
+  private deviceIgnoreSets(meta: unknown): {
+    personIds: Set<string>;
+    divisionIds: Set<string>;
+  } {
+    const m = this.asMeta(meta);
+    const personRaw = m.ignoredPersonIds;
+    const divisionRaw = m.ignoredDivisionIds;
+    const personIds = new Set(
+      Array.isArray(personRaw)
+        ? personRaw.filter((x): x is string => typeof x === 'string' && !!x)
+        : [],
+    );
+    const divisionIds = new Set(
+      Array.isArray(divisionRaw)
+        ? divisionRaw.filter((x): x is string => typeof x === 'string' && !!x)
+        : [],
+    );
+    return { personIds, divisionIds };
+  }
+
+  /** Active employees with faces for a device location (grants + division + global locations). */
+  private async employeesForDeviceLocation(
+    tenantId: string,
+    device: { id: string; locationId: string | null; meta: unknown },
+  ) {
+    if (!device.locationId) {
+      throw new BadRequestException('Сначала назначьте локацию устройству');
+    }
+    const locationId = device.locationId;
+    const { personIds: ignoredPersons, divisionIds: ignoredDivisions } =
+      this.deviceIgnoreSets(device.meta);
+
+    const globalIds = await this.globalLocationIds(tenantId);
+    const locationScope = [...new Set([locationId, ...globalIds])];
+
+    const grantRows = await this.prisma.employeeAccessGrant.findMany({
+      where: {
+        tenantId,
+        accessType: 'location',
+        resource: { in: locationScope },
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { employeeId: true },
+    });
+    const grantIds = [...new Set(grantRows.map((g) => g.employeeId))];
+
+    const orFilters: Prisma.EmployeeWhereInput[] = [
+      { division: { locationId: { in: locationScope } } },
+    ];
+    if (grantIds.length) {
+      orFilters.unshift({ id: { in: grantIds } });
+    }
+
     const employees = await this.prisma.employee.findMany({
       where: {
         tenantId,
@@ -1219,6 +1365,7 @@ export class AttendanceService {
         faceProfile: {
           OR: [{ photoUrl: { not: null } }, { photoKey: { not: null } }],
         },
+        OR: orFilters,
       },
       orderBy: { lastName: 'asc' },
       select: {
@@ -1227,63 +1374,299 @@ export class AttendanceService {
         lastName: true,
         tabNumber: true,
         externalId: true,
+        divisionId: true,
         faceProfile: true,
       },
     });
 
-    let created = 0;
-    let queued = 0;
-    for (const emp of employees) {
-      const profile = emp.faceProfile;
-      if (!profile) continue;
-      const existing = await this.prisma.deviceFaceSync.findUnique({
-        where: {
-          deviceId_faceProfileId: { deviceId, faceProfileId: profile.id },
+    return employees.filter((emp) => {
+      if (ignoredPersons.has(emp.id)) return false;
+      if (emp.divisionId && ignoredDivisions.has(emp.divisionId)) return false;
+      return true;
+    });
+  }
+
+  async employeeBelongsToLocation(
+    tenantId: string,
+    employeeId: string,
+    locationId: string,
+  ): Promise<boolean> {
+    if (await this.employeeIsGlobalAccess(tenantId, employeeId)) return true;
+
+    const grant = await this.prisma.employeeAccessGrant.findFirst({
+      where: {
+        tenantId,
+        employeeId,
+        accessType: 'location',
+        resource: locationId,
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    });
+    if (grant) return true;
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, tenantId },
+      select: { division: { select: { locationId: true } } },
+    });
+    return emp?.division?.locationId === locationId;
+  }
+
+  /** Employee of a global location (division or grant) may pass any device. */
+  private async employeeIsGlobalAccess(
+    tenantId: string,
+    employeeId: string,
+  ): Promise<boolean> {
+    const globalIds = await this.globalLocationIds(tenantId);
+    if (!globalIds.length) return false;
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, tenantId },
+      select: { division: { select: { locationId: true } } },
+    });
+    if (emp?.division?.locationId && globalIds.includes(emp.division.locationId)) {
+      return true;
+    }
+    const grant = await this.prisma.employeeAccessGrant.findFirst({
+      where: {
+        tenantId,
+        employeeId,
+        accessType: 'location',
+        resource: { in: globalIds },
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    });
+    return Boolean(grant);
+  }
+
+  /** Enroll one employee face onto a device (visitor / on-demand). */
+  async ensureEmployeeOnDevice(
+    tenantId: string,
+    deviceId: string,
+    employeeId: string,
+  ): Promise<void> {
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, tenantId },
+      include: { faceProfile: true },
+    });
+    if (!emp?.faceProfile) return;
+    const profile = emp.faceProfile;
+    if (!profile.photoUrl && !profile.photoKey) return;
+
+    const existing = await this.prisma.deviceFaceSync.findUnique({
+      where: {
+        deviceId_faceProfileId: { deviceId, faceProfileId: profile.id },
+      },
+    });
+    if (!existing) {
+      await this.prisma.deviceFaceSync.create({
+        data: {
+          tenantId,
+          deviceId,
+          faceProfileId: profile.id,
+          employeeId: emp.id,
+          syncStatus: FaceSyncStatus.pending,
         },
       });
-      if (!existing) {
-        await this.prisma.deviceFaceSync.create({
-          data: {
+      await this.appendCommand(tenantId, deviceId, {
+        type: 'Person Add',
+        employeeName: [emp.lastName, emp.firstName].filter(Boolean).join(' '),
+      });
+    } else if (existing.syncStatus === FaceSyncStatus.synced) {
+      return;
+    } else {
+      await this.prisma.deviceFaceSync.update({
+        where: { id: existing.id },
+        data: { syncStatus: FaceSyncStatus.pending, lastError: null },
+      });
+    }
+
+    const device = await this.getDevice(tenantId, deviceId);
+    await this.ensureGwRegistered(device);
+    const refreshed = await this.getDevice(tenantId, deviceId);
+    const gatewayRef = refreshed.gatewayRef;
+    if (!gatewayRef) return;
+
+    const faceB64 = await this.resolveFaceBase64(profile);
+    if (!faceB64) return;
+    const name = [emp.lastName, emp.firstName].filter(Boolean).join(' ');
+    try {
+      const res = await this.gw.syncFace(gatewayRef, {
+        employee_external_id: this.deviceEmployeeNo(emp),
+        employee_name: name,
+        face_image_base64: faceB64,
+      });
+      const ok = Boolean(res.synced && res.face_enrolled);
+      await this.prisma.deviceFaceSync.updateMany({
+        where: { deviceId, faceProfileId: profile.id },
+        data: {
+          syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
+          lastSyncedAt: ok ? new Date() : undefined,
+          lastError: ok ? null : 'Device rejected face enroll',
+        },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await this.prisma.deviceFaceSync.updateMany({
+        where: { deviceId, faceProfileId: profile.id },
+        data: { syncStatus: FaceSyncStatus.failed, lastError: msg },
+      });
+      this.logger.warn(
+        `ensureEmployeeOnDevice failed device=${deviceId} emp=${employeeId}: ${msg}`,
+      );
+    }
+  }
+
+  private async ensureVisitLocationGrant(
+    tenantId: string,
+    employeeId: string,
+    locationId: string,
+  ) {
+    const existing = await this.prisma.employeeAccessGrant.findFirst({
+      where: {
+        tenantId,
+        employeeId,
+        accessType: 'location',
+        resource: locationId,
+        isActive: true,
+      },
+    });
+    if (existing) return;
+    await this.prisma.employeeAccessGrant.create({
+      data: {
+        tenantId,
+        employeeId,
+        accessType: 'location',
+        resource: locationId,
+        note: 'visit',
+        isActive: true,
+      },
+    });
+  }
+
+  private scheduleLocationPersonsSync(tenantId: string, deviceId: string) {
+    void this.syncDevicePersons(tenantId, deviceId).catch((e) => {
+      this.logger.warn(
+        `Background location persons sync failed device=${deviceId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    });
+  }
+
+  private async runPersonsSyncWaves(tenantId: string, deviceId: string) {
+    let totalSynced = 0;
+    let totalFailed = 0;
+    for (let wave = 0; wave < 20; wave += 1) {
+      const result = await this.syncDevice(tenantId, deviceId, {
+        skipHeartbeat: wave > 0,
+      });
+      totalSynced += result.synced;
+      totalFailed += result.failed ?? 0;
+      if (!result.pending) break;
+    }
+    await this.appendCommand(tenantId, deviceId, {
+      type: 'Person Sync',
+      employeeName: `synced=${totalSynced}; failed=${totalFailed}`,
+      status: totalFailed && !totalSynced ? 'failed' : 'completed',
+    });
+  }
+
+  async syncDevicePersons(tenantId: string, deviceId: string) {
+    const alreadyRunning = this.personsSyncInFlight.has(deviceId);
+    // Claim lock synchronously before any await so parallel requests cannot both start waves.
+    if (!alreadyRunning) {
+      this.personsSyncInFlight.set(deviceId, Promise.resolve());
+    }
+
+    try {
+      const device = await this.getDevice(tenantId, deviceId);
+      if (!device.locationId) {
+        throw new BadRequestException('Сначала назначьте локацию устройству');
+      }
+      const employees = await this.employeesForDeviceLocation(tenantId, device);
+      const withFace = employees.filter((emp) => emp.faceProfile);
+      const faceIds = withFace.map((e) => e.faceProfile!.id).filter(Boolean);
+
+      const existing = faceIds.length
+        ? await this.prisma.deviceFaceSync.findMany({
+            where: { deviceId, faceProfileId: { in: faceIds } },
+            select: { id: true, faceProfileId: true, syncStatus: true },
+          })
+        : [];
+      const existingByFace = new Map(existing.map((r) => [r.faceProfileId, r]));
+
+      const toCreate: Prisma.DeviceFaceSyncCreateManyInput[] = [];
+      const toRequeueIds: string[] = [];
+      for (const emp of withFace) {
+        const profile = emp.faceProfile!;
+        const row = existingByFace.get(profile.id);
+        if (!row) {
+          toCreate.push({
             tenantId,
             deviceId,
             faceProfileId: profile.id,
             employeeId: emp.id,
             syncStatus: FaceSyncStatus.pending,
-          },
+          });
+        } else if (row.syncStatus !== FaceSyncStatus.synced) {
+          toRequeueIds.push(row.id);
+        }
+      }
+
+      if (toCreate.length) {
+        await this.prisma.deviceFaceSync.createMany({
+          data: toCreate,
+          skipDuplicates: true,
         });
-        created += 1;
-        await this.appendCommand(tenantId, deviceId, {
-          type: 'Person Add',
-          employeeName: [emp.lastName, emp.firstName].filter(Boolean).join(' '),
-        });
-      } else if (existing.syncStatus !== FaceSyncStatus.synced) {
-        await this.prisma.deviceFaceSync.update({
-          where: { id: existing.id },
+      }
+      if (toRequeueIds.length) {
+        await this.prisma.deviceFaceSync.updateMany({
+          where: { id: { in: toRequeueIds } },
           data: { syncStatus: FaceSyncStatus.pending, lastError: null },
         });
-        queued += 1;
       }
-    }
 
-    // Push faces in waves until pending queue is empty (max 20 waves × 500).
-    let totalSynced = 0;
-    let totalFailed = 0;
-    for (let wave = 0; wave < 20; wave += 1) {
-      const result = await this.syncDevice(tenantId, deviceId);
-      totalSynced += result.synced;
-      totalFailed += result.failed ?? 0;
-      if (!result.pending) break;
-    }
+      const created = toCreate.length;
+      const requeued = toRequeueIds.length;
 
-    return {
-      ok: true,
-      created,
-      requeued: queued,
-      withPhoto: employees.length,
-      synced: totalSynced,
-      failed: totalFailed,
-      persons: await this.listDevicePersons(tenantId, deviceId),
-    };
+      await this.appendCommand(tenantId, deviceId, {
+        type: 'Person Sync',
+        employeeName: `queued +${created}/requeue ${requeued} (loc employees ${withFace.length})`,
+        status: 'completed',
+      });
+
+      if (!alreadyRunning) {
+        const run = this.runPersonsSyncWaves(tenantId, deviceId)
+          .catch((e) => {
+            this.logger.warn(
+              `Persons sync waves failed device=${deviceId}: ${
+                e instanceof Error ? e.message : e
+              }`,
+            );
+          })
+          .finally(() => {
+            this.personsSyncInFlight.delete(deviceId);
+          });
+        this.personsSyncInFlight.set(deviceId, run);
+      }
+
+      return {
+        ok: true,
+        queued: true,
+        alreadyRunning,
+        created,
+        requeued,
+        withPhoto: withFace.length,
+        locationId: device.locationId,
+      };
+    } catch (e) {
+      if (!alreadyRunning) {
+        this.personsSyncInFlight.delete(deviceId);
+      }
+      throw e;
+    }
   }
 
   async listDeviceMarks(
@@ -2532,35 +2915,95 @@ export class AttendanceService {
     if (!marks.length) return { ok: true, affected: 0 };
 
     const action = (dto.action || '').toLowerCase();
+    const recalcKeys = new Map<string, { employeeId: string; at: Date }>();
+    const rememberRecalc = (employeeId: string | null | undefined, at: Date) => {
+      if (!employeeId) return;
+      const key = `${employeeId}:${at.toISOString().slice(0, 10)}`;
+      if (!recalcKeys.has(key)) recalcKeys.set(key, { employeeId, at });
+    };
+
     if (action === 'delete') {
       await this.prisma.attendanceMark.deleteMany({
         where: { tenantId, id: { in: marks.map((m) => m.id) } },
       });
-      const seen = new Set<string>();
-      for (const m of marks) {
-        if (!m.employeeId) continue;
-        const key = `${m.employeeId}:${m.occurredAt.toISOString().slice(0, 10)}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        await this.recalcDay(tenantId, m.employeeId, m.occurredAt);
+      for (const m of marks) rememberRecalc(m.employeeId, m.occurredAt);
+      for (const row of recalcKeys.values()) {
+        await this.recalcDay(tenantId, row.employeeId, row.at);
       }
       return { ok: true, affected: marks.length };
     }
 
-    let affected = 0;
-    for (const mark of marks) {
-      if (action === 'set_valid') {
-        await this.updateMark(tenantId, mark.id, { isValid: true });
-        affected += 1;
-      } else if (action === 'set_invalid') {
-        await this.updateMark(tenantId, mark.id, { isValid: false });
-        affected += 1;
-      } else if (action === 'set_type' && dto.markType) {
-        await this.updateMark(tenantId, mark.id, { markType: dto.markType });
-        affected += 1;
-      }
+    if (
+      action !== 'set_valid' &&
+      action !== 'set_invalid' &&
+      !(action === 'set_type' && dto.markType)
+    ) {
+      return { ok: true, affected: 0 };
     }
-    return { ok: true, affected };
+
+    const nowIso = new Date().toISOString();
+    const chunkSize = 40;
+    for (let i = 0; i < marks.length; i += chunkSize) {
+      const chunk = marks.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(async (mark) => {
+          const prevPayload =
+            mark.rawPayload &&
+            typeof mark.rawPayload === 'object' &&
+            !Array.isArray(mark.rawPayload)
+              ? { ...(mark.rawPayload as Record<string, unknown>) }
+              : {};
+
+          let direction = mark.direction;
+          if (action === 'set_valid') prevPayload.isValid = true;
+          if (action === 'set_invalid') prevPayload.isValid = false;
+          if (action === 'set_type' && dto.markType) {
+            prevPayload.markType = dto.markType;
+            const mt = dto.markType.toLowerCase();
+            if (mt === 'in' || mt === 'break_in') direction = PunchDirection.IN;
+            else if (mt === 'out' || mt === 'break_out') direction = PunchDirection.OUT;
+            else direction = PunchDirection.AUTO;
+          }
+
+          const history = Array.isArray(prevPayload.changeHistory)
+            ? [...(prevPayload.changeHistory as unknown[])]
+            : [];
+          const mtLabel = this.normalizeMarkType(
+            String(dto.markType || prevPayload.markType || 'mark'),
+          ).label;
+          history.unshift({
+            at: nowIso,
+            by: 'Admin',
+            event:
+              action === 'set_invalid'
+                ? 'Сделана недействительной'
+                : action === 'set_valid'
+                  ? 'Сделана действительной'
+                  : 'Изменён тип',
+            occurredAt: mark.occurredAt.toISOString(),
+            markType: dto.markType || prevPayload.markType || 'mark',
+            markTypeLabel: mtLabel,
+            isValid: prevPayload.isValid !== false,
+          });
+          prevPayload.changeHistory = history.slice(0, 100);
+          prevPayload.updatedByLabel = 'Admin';
+
+          await this.prisma.attendanceMark.update({
+            where: { id: mark.id },
+            data: {
+              direction,
+              rawPayload: prevPayload as Prisma.InputJsonValue,
+            },
+          });
+          rememberRecalc(mark.employeeId, mark.occurredAt);
+        }),
+      );
+    }
+
+    for (const row of recalcKeys.values()) {
+      await this.recalcDay(tenantId, row.employeeId, row.at);
+    }
+    return { ok: true, affected: marks.length };
   }
 
   async copyMarksPreview(
@@ -3717,6 +4160,45 @@ export class AttendanceService {
       return { ok: false, reason: 'unknown_employee' };
     }
 
+    let visitor = false;
+    let visitorLocationId: string | null = null;
+    if (deviceId) {
+      const punchDevice = await this.prisma.device.findFirst({
+        where: { id: deviceId, tenantId },
+        select: { id: true, locationId: true, meta: true },
+      });
+      if (punchDevice?.locationId) {
+        const belongs = await this.employeeBelongsToLocation(
+          tenantId,
+          employeeId,
+          punchDevice.locationId,
+        );
+        if (!belongs) {
+          visitor = true;
+          visitorLocationId = punchDevice.locationId;
+          void this.ensureEmployeeOnDevice(tenantId, punchDevice.id, employeeId).catch(
+            (e) =>
+              this.logger.warn(
+                `visitor face sync failed device=${punchDevice.id} emp=${employeeId}: ${
+                  e instanceof Error ? e.message : e
+                }`,
+              ),
+          );
+          void this.ensureVisitLocationGrant(
+            tenantId,
+            employeeId,
+            punchDevice.locationId,
+          ).catch((e) =>
+            this.logger.warn(
+              `visitor grant failed emp=${employeeId} loc=${punchDevice.locationId}: ${
+                e instanceof Error ? e.message : e
+              }`,
+            ),
+          );
+        }
+      }
+    }
+
     let occurredAt = new Date(dto.occurredAt);
     const guardResult = await this.applyClockGuard({
       tenantId,
@@ -3761,6 +4243,16 @@ export class AttendanceService {
           photoKey: stored.key,
         } as Prisma.InputJsonValue;
       }
+    }
+
+    if (visitor) {
+      rawPayload = {
+        ...((rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
+          ? rawPayload
+          : {}) as Record<string, unknown>),
+        visitor: true,
+        visitorLocationId,
+      } as Prisma.InputJsonValue;
     }
 
     const tamper = this.clockTamperFromRaw(dto.raw);
@@ -3825,7 +4317,7 @@ export class AttendanceService {
     });
 
     await this.recalcDay(tenantId, employeeId, occurredAt);
-    return { ok: true, markId: mark.id, deviceId };
+    return { ok: true, markId: mark.id, deviceId, visitor };
   }
 
   async recalcDay(tenantId: string, employeeId: string, when: Date) {

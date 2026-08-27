@@ -1,0 +1,23 @@
+HR HUB — ofis qurilma ulash
+
+1) ADMIN (o‘z kompyuterida, qurilma oldida EMAS):
+   ADMIN-PAROL.bat
+   Chiqqan parolni Railway API Variables ga yozing:
+     DEVICE_LINK_KEY
+     PUNCH_INGEST_API_KEY
+   (ikkalasi ham bir xil)
+   Keyin SHU papkani USB yoki AnyDesk bilan ofis PCga to‘liq nusxalang.
+   Joyidagi odam bu parolni KO‘RMAYDI.
+
+2) OFIS PC (qurilma bilan bir tarmoq):
+   BOSHLASH.bat  (yoki dist\HRHUB-Qurilma\HRHUB-Qurilma.exe)
+   So‘raladigan narsa: faqat qurilma (Hikvision) paroli.
+   Oyna ochiq tursin.
+
+   Holat: Qidirilmoqda / Online / Parol noto‘g‘ri / Qulflangan / Ulandi
+   1-noto‘g‘ri parol: qayta kiriting (avtomatik qayta urinish yo‘q).
+   2-noto‘g‘ri parol: 30 daqiqa qulflanadi (Hikvision uslubi).
+   Tarmoq kutish vaqti parol xatosi EMAS.
+
+Qurilma internetdagi ochiq IP orqali ULANMAYDI.
+U lokal tarmoqda qoladi. Ofis PC gateway + tunnel orqali HR HUB (Railway) ga chiqadi.

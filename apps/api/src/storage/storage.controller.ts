@@ -47,7 +47,14 @@ export class StorageController {
     if (!this.storage.isSafeKey(key || '')) {
       throw new BadRequestException('Invalid file key');
     }
-    const buf = await this.storage.getObjectBuffer(key);
+    let buf = await this.storage.getObjectBuffer(key);
+    if (!buf?.length) {
+      const profile = await this.prisma.faceProfile.findFirst({
+        where: { photoKey: key },
+        select: { photoUrl: true },
+      });
+      buf = decodeDataUrl(profile?.photoUrl);
+    }
     if (!buf?.length) throw new NotFoundException('File not found');
     const lower = key.toLowerCase();
     const type = lower.endsWith('.png')
@@ -250,5 +257,17 @@ export class StorageController {
       not_found: items.filter((i) => i.status === 'not_found').length,
     };
     return { ok: true, storageReady: this.storage.isReady, counts, items };
+  }
+}
+
+function decodeDataUrl(photoUrl?: string | null): Buffer | null {
+  if (!photoUrl?.startsWith('data:')) return null;
+  const idx = photoUrl.indexOf('base64,');
+  if (idx < 0) return null;
+  try {
+    const buf = Buffer.from(photoUrl.slice(idx + 7), 'base64');
+    return buf.length ? buf : null;
+  } catch {
+    return null;
   }
 }

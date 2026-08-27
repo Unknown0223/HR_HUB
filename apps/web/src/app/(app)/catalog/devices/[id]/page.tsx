@@ -287,15 +287,22 @@ function DeviceDetailInner() {
     );
   }, [ignoredDivisions, search]);
 
-  async function save(values: DeviceFormValues, sync: boolean) {
+  async function save(
+    values: DeviceFormValues,
+    sync: boolean,
+    meta?: { locationChanged: boolean },
+  ) {
     setBusy(true);
     try {
+      const locationChanged =
+        meta?.locationChanged === true ||
+        (device?.location?.id || '') !== values.locationId;
       await apiFetch(`/api/attendance/devices/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           name: values.name.trim(),
           serialNumber: values.serialNumber.trim(),
-          locationId: values.locationId || null,
+          locationId: values.locationId,
           model: values.model || null,
           adapterType: values.adapterType,
           host: values.host || null,
@@ -306,12 +313,15 @@ function DeviceDetailInner() {
           meta: values.meta,
         }),
       });
-      if (sync) {
-        await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
+      // Location change already schedules backend sync — avoid double pipeline.
+      if (sync && !locationChanged) {
+        void apiFetch(`/api/attendance/devices/${id}/persons/sync`, { method: 'POST' }).catch(
+          () => undefined,
+        );
       }
-      setEditOpen(false);
       await loadDevice();
       await loadTabData();
+      window.setTimeout(() => setEditOpen(false), 900);
     } finally {
       setBusy(false);
     }
@@ -348,9 +358,20 @@ function DeviceDetailInner() {
 
   async function syncPersons() {
     setBusy(true);
+    setError('');
     try {
-      await apiFetch(`/api/attendance/devices/${id}/persons/sync`, { method: 'POST' });
+      const res = await apiFetch<{ queued?: boolean; alreadyRunning?: boolean; created?: number }>(
+        `/api/attendance/devices/${id}/persons/sync`,
+        { method: 'POST' },
+      );
+      setError(
+        res.alreadyRunning
+          ? 'Синхронизация уже выполняется'
+          : 'Синхронизация сотрудников запущена',
+      );
       await loadTabData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка синхронизации');
     } finally {
       setBusy(false);
     }
@@ -552,12 +573,12 @@ function DeviceDetailInner() {
                     disabled={busy}
                     onClick={() => void syncPersons()}
                   >
-                    Синхронизировать физические лица
+                    Синхронизировать сотрудников локации
                   </button>
                 </div>
                 <input
                   className={styles.search}
-                  placeholder="Поиск..."
+                  placeholder="Поиск по ФИО или ПИН..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -575,7 +596,9 @@ function DeviceDetailInner() {
                   {filteredPersons.length === 0 ? (
                     <tr>
                       <td colSpan={4} className={styles.empty}>
-                        Нет данных
+                        {search.trim()
+                          ? 'Ничего не найдено — проверьте поиск или нажмите «Синхронизировать»'
+                          : 'Нет данных — нажмите «Синхронизировать сотрудников локации»'}
                       </td>
                     </tr>
                   ) : (

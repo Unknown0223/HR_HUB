@@ -31,6 +31,7 @@ type Location = {
   longitude?: number | null;
   geoRadiusM?: number;
   isActive: boolean;
+  isGlobal?: boolean;
   createdAt?: string;
   updatedAt?: string;
   locationTypeId?: string | null;
@@ -114,6 +115,7 @@ function toForm(row: Location): LocationFormValues {
     geoRadiusM: row.geoRadiusM != null ? String(row.geoRadiusM) : '150',
     locationTypeId: row.locationTypeId || row.locationType?.id || '',
     isActive: row.isActive,
+    isGlobal: row.isGlobal === true || meta.global === true,
     region: row.region || (typeof meta.region === 'string' ? meta.region : '') || '',
     bssid: row.bssid || (typeof meta.bssid === 'string' ? meta.bssid : '') || '',
     restrictMarks: row.restrictMarks === true || meta.restrictMarks === true,
@@ -189,11 +191,13 @@ function LocationDetailInner() {
           geoRadiusM: values.geoRadiusM.trim() ? Number(values.geoRadiusM) : 150,
           locationTypeId: values.locationTypeId || null,
           isActive: values.isActive,
+          isGlobal: values.isGlobal,
           meta: {
             region: values.region.trim() || null,
             bssid: values.bssid.trim() || null,
             restrictMarks: values.restrictMarks,
             polygonalAnalysis: values.polygonalAnalysis.trim() || null,
+            global: values.isGlobal,
             updatedByLabel: 'Admin',
           },
         }),
@@ -269,6 +273,11 @@ function LocationDetailInner() {
             <span className={row.isActive ? styles.badgeActive : styles.badgeInactive}>
               {row.isActive ? 'Активный' : 'Неактивный'}
             </span>
+            {row.isGlobal || row.meta?.global === true ? (
+              <span className={styles.badgeOk} style={{ marginLeft: 6 }}>
+                Глобальная
+              </span>
+            ) : null}
           </div>
           <nav className={styles.nav}>
             {TABS.map((t) => (
@@ -301,6 +310,10 @@ function LocationDetailInner() {
                   <div className={styles.field}>
                     <label>Тип локации</label>
                     <div>{row.locationType?.name || '—'}</div>
+                  </div>
+                  <div className={styles.field}>
+                    <label>Глобальная</label>
+                    <div>{row.isGlobal || row.meta?.global === true ? 'Да' : 'Нет'}</div>
                   </div>
                   <div className={styles.field}>
                     <label>Регион</label>

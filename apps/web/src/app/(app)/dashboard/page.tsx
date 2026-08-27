@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
@@ -761,7 +762,7 @@ function GridFilterPop({
     return () => document.removeEventListener('pointerdown', closeMenus);
   }, [paramOpen, tplOpen]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
   function persist(next: GridTpl[]) {
     setTemplates(next);
@@ -785,7 +786,7 @@ function GridFilterPop({
     setTplOpen(false);
   }
 
-  return (
+  return createPortal(
     <div
       className={styles.gridFilterOverlay}
       onMouseDown={(event) => {
@@ -1049,7 +1050,8 @@ function GridFilterPop({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

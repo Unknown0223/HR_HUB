@@ -187,8 +187,13 @@ function FactsPageInner() {
     if (!(await confirm(`Удалить факты (${ids.length})?`))) return;
     setBusy(true);
     try {
-      for (const id of ids) {
-        await apiFetch(`/api/catalog/facts/${id}`, { method: 'DELETE' });
+      const chunk = 8;
+      for (let i = 0; i < ids.length; i += chunk) {
+        await Promise.all(
+          ids.slice(i, i + chunk).map((id) =>
+            apiFetch(`/api/catalog/facts/${id}`, { method: 'DELETE' }),
+          ),
+        );
       }
       setSelected(new Set());
       await load();

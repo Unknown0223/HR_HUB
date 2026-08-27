@@ -92,21 +92,36 @@ export class FaceService {
       where: { tenantId, isActive: true },
     });
     const hasReal = allDevices.some((d) => (d.adapterType || 'mock') !== 'mock');
-    const devices = hasReal
+    const realOrMock = hasReal
       ? allDevices.filter(
           (d) => (d.adapterType || 'mock') !== 'mock' && Boolean(d.host?.trim()),
         )
       : allDevices;
+
+    const locationIds = await this.employeeLocationIds(tenantId, employeeId);
+    const devices =
+      locationIds.size > 0
+        ? realOrMock.filter(
+            (d) => d.locationId && locationIds.has(d.locationId),
+          )
+        : realOrMock;
 
     if (devices.length === 0) {
       await this.prisma.faceProfile.update({
         where: { employeeId },
         data: {
           syncStatus: FaceSyncStatus.failed,
-          lastError: 'No active devices',
+          lastError:
+            locationIds.size > 0
+              ? 'No active devices for employee locations'
+              : 'No active devices',
         },
       });
-      throw new BadRequestException('No active devices to sync');
+      throw new BadRequestException(
+        locationIds.size > 0
+          ? 'Нет активных устройств для локаций сотрудника'
+          : 'No active devices to sync',
+      );
     }
 
     const name = `${emp.lastName} ${emp.firstName}`.trim();
@@ -391,6 +406,54 @@ export class FaceService {
     }
 
     return { candidates: profiles.length, purged, errors, days };
+  }
+
+  private async employeeLocationIds(
+    tenantId: string,
+    employeeId: string,
+  ): Promise<Set<string>> {
+    const ids = new Set<string>();
+    const grants = await this.prisma.employeeAccessGrant.findMany({
+      where: {
+        tenantId,
+        employeeId,
+        accessType: 'location',
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { resource: true },
+    });
+    for (const g of grants) {
+      if (g.resource) ids.add(g.resource);
+    }
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, tenantId },
+      select: { division: { select: { locationId: true } } },
+    });
+    if (emp?.division?.locationId) ids.add(emp.division.locationId);
+
+    // Global location membership → sync to every active location that has devices.
+    if (ids.size) {
+      const locs = await this.prisma.location.findMany({
+        where: { tenantId, id: { in: [...ids] }, isActive: true },
+        select: { id: true, meta: true },
+      });
+      const isGlobal = locs.some((l) => {
+        const m =
+          l.meta && typeof l.meta === 'object' && !Array.isArray(l.meta)
+            ? (l.meta as Record<string, unknown>)
+            : {};
+        return m.global === true;
+      });
+      if (isGlobal) {
+        const all = await this.prisma.location.findMany({
+          where: { tenantId, isActive: true },
+          select: { id: true },
+        });
+        for (const l of all) ids.add(l.id);
+      }
+    }
+    return ids;
   }
 
   private employeeNoForDevice(emp: {
