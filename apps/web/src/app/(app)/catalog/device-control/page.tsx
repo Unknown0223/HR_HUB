@@ -45,17 +45,45 @@ function statusLabel(status: string, isActive: boolean) {
   return status;
 }
 
+function statusClass(status: string, isActive: boolean) {
+  if (!isActive) return styles.stInactive;
+  const s = status.toLowerCase();
+  if (s === 'online') return styles.stOnline;
+  if (s === 'offline') return styles.stOffline;
+  if (s === 'new' || s === 'registered') return styles.stNew;
+  return styles.stOffline;
+}
+
+const I = {
+  search: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  ),
+  refresh: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </svg>
+  ),
+};
+
 export default function DeviceControlPage() {
   const [rows, setRows] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<Action | null>(null);
   const [notes, setNotes] = useState<Record<string, { ok: boolean; text: string }>>({});
 
-  async function load() {
-    setLoading(true);
+  async function load(silent = false) {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     setError('');
     try {
       const data = await apiFetch<Device[]>('/api/attendance/devices');
@@ -65,6 +93,7 @@ export default function DeviceControlPage() {
       setRows([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -81,6 +110,24 @@ export default function DeviceControlPage() {
         .some((x) => String(x).toLowerCase().includes(q)),
     );
   }, [rows, search]);
+
+  const summary = useMemo(() => {
+    let online = 0;
+    let offline = 0;
+    let inactive = 0;
+    let neu = 0;
+    for (const d of rows) {
+      if (!d.isActive) {
+        inactive += 1;
+        continue;
+      }
+      const s = d.status.toLowerCase();
+      if (s === 'online') online += 1;
+      else if (s === 'new' || s === 'registered') neu += 1;
+      else offline += 1;
+    }
+    return { total: rows.length, online, offline, inactive, neu };
+  }, [rows]);
 
   async function run(device: Device, action: Action) {
     const meta = ACTIONS.find((a) => a.id === action);
@@ -105,7 +152,7 @@ export default function DeviceControlPage() {
         ...prev,
         [device.id]: { ok: res.ok !== false, text: res.message || 'Готово' },
       }));
-      if (action === 'heartbeat' || action === 'sync') await load();
+      if (action === 'heartbeat' || action === 'sync') await load(true);
     } catch (e) {
       setNotes((prev) => ({
         ...prev,
@@ -118,20 +165,70 @@ export default function DeviceControlPage() {
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.page}>
       <PageSubnav groupKey="device-control" />
+
+      <header className={styles.head}>
+        <div className={styles.headInner}>
+          <div>
+            <span className={styles.kicker}>
+              <span className={styles.livePulse} aria-hidden="true" />
+              Главная · Удалённое управление устройствами
+            </span>
+            <h1 className={styles.h1}>Удалённое управление устройствами</h1>
+            <p className={styles.headSub}>
+              Терминалы Face ID и точки прохода: состояние и команды без выезда на объект.
+            </p>
+          </div>
+          <div className={styles.headMetrics}>
+            <div className={styles.headMetric}>
+              <span className={`${styles.headMetricVal} ${styles.mNeutral}`}>{summary.total}</span>
+              <span className={styles.headMetricLabel}>устройств</span>
+            </div>
+            <div className={styles.headMetric}>
+              <span className={`${styles.headMetricVal} ${styles.mOnline}`}>{summary.online}</span>
+              <span className={styles.headMetricLabel}>в сети</span>
+            </div>
+            <div className={styles.headMetric}>
+              <span className={`${styles.headMetricVal} ${styles.mOffline}`}>{summary.offline}</span>
+              <span className={styles.headMetricLabel}>не в сети</span>
+            </div>
+            <div className={styles.headMetric}>
+              <span className={`${styles.headMetricVal} ${styles.mNew}`}>{summary.neu}</span>
+              <span className={styles.headMetricLabel}>новые</span>
+            </div>
+            <div className={styles.headMetric}>
+              <span className={`${styles.headMetricVal} ${styles.mInactive}`}>{summary.inactive}</span>
+              <span className={styles.headMetricLabel}>неактивные</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
       <div className={styles.toolbar}>
-        <input
-          className={styles.search}
-          placeholder="Поиск по устройству, IP, локации..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <button type="button" className={styles.refresh} disabled={loading} onClick={() => void load()}>
+        <div className={styles.searchWrap}>
+          <span className={styles.searchIcon}>{I.search}</span>
+          <input
+            className={styles.searchInput}
+            placeholder="Поиск по устройству, IP, локации..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Поиск устройства"
+          />
+        </div>
+        <button
+          type="button"
+          className={`${styles.ghostBtn} ${refreshing ? styles.spin : ''}`}
+          disabled={loading || refreshing}
+          onClick={() => void load(true)}
+        >
+          {I.refresh}
           Обновить
         </button>
       </div>
-      {error ? <p className={styles.error}>{error}</p> : null}
+
+      {error ? <div className={styles.errorBanner}>{error}</div> : null}
+
       <div className={styles.panel}>
         <table className={styles.table}>
           <thead>
@@ -147,6 +244,7 @@ export default function DeviceControlPage() {
             {loading ? (
               <tr>
                 <td colSpan={5} className={styles.empty}>
+                  <div className={styles.spinner} aria-hidden="true" />
                   Загрузка…
                 </td>
               </tr>
@@ -158,10 +256,10 @@ export default function DeviceControlPage() {
               </tr>
             ) : (
               filtered.map((d) => {
-                const online = d.isActive && d.status.toLowerCase() === 'online';
                 const note = notes[d.id];
+                const isBusy = busyId === d.id;
                 return (
-                  <tr key={d.id}>
+                  <tr key={d.id} className={isBusy ? styles.rowBusy : undefined}>
                     <td>
                       <Link href={`/catalog/devices/${d.id}`} className={styles.name}>
                         {d.name}
@@ -176,11 +274,11 @@ export default function DeviceControlPage() {
                     </td>
                     <td>{d.location?.name || '—'}</td>
                     <td>
-                      <span className={online ? styles.online : styles.offline}>
+                      <span className={`${styles.statusChip} ${statusClass(d.status, d.isActive)}`}>
                         {statusLabel(d.status, d.isActive)}
                       </span>
                     </td>
-                    <td>{fmtDt(d.lastSeenAt)}</td>
+                    <td className={styles.mono}>{fmtDt(d.lastSeenAt)}</td>
                     <td>
                       <div className={styles.actions}>
                         {ACTIONS.map((a) => (
@@ -188,10 +286,10 @@ export default function DeviceControlPage() {
                             key={a.id}
                             type="button"
                             className={a.danger ? styles.btnDanger : styles.btn}
-                            disabled={busyId === d.id}
+                            disabled={isBusy}
                             onClick={() => void run(d, a.id)}
                           >
-                            {busyId === d.id && busyAction === a.id ? '…' : a.label}
+                            {isBusy && busyAction === a.id ? '…' : a.label}
                           </button>
                         ))}
                       </div>

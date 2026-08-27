@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
-import { PhotoThumb, usePhotoLightbox, type PhotoLightboxApi } from '@/components/PhotoLightbox';
-import styles from './page.module.css';
+import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
+import css from './page.module.css';
+
+/* ================= Real API contracts ================= */
 
 type AttRow = {
   employeeId: string;
@@ -22,6 +23,8 @@ type AttRow = {
   note?: string;
   email?: string | null;
   phone?: string | null;
+  position?: string | null;
+  division?: string | null;
 };
 
 type Birthday = {
@@ -74,10 +77,20 @@ type Stats = {
 };
 
 type Opt = { id: string; name: string };
-type PieKind = 'all' | 'on_time' | 'late' | 'absent' | 'not_started';
 
-type FilterSnapshot = {
-  period: string;
+type ViewMode = 'chart' | 'list';
+type QuickFilterId = 'all' | 'on_time' | 'late' | 'absent' | 'not_started';
+type ChipId =
+  | 'on_time'
+  | 'late'
+  | 'early_leave'
+  | 'absent'
+  | 'not_started'
+  | 'day_off'
+  | 'excused';
+
+type FilterState = {
+  date: string;
   divisionIds: string[];
   positionIds: string[];
   scheduleIds: string[];
@@ -85,40 +98,81 @@ type FilterSnapshot = {
   locationIds: string[];
 };
 
+/** Persisted sidebar templates (real app shape). */
 type FilterTemplate = {
   id: string;
   name: string;
-  filters: FilterSnapshot;
+  filters: {
+    period: string;
+    divisionIds: string[];
+    positionIds: string[];
+    scheduleIds: string[];
+    gradeIds: string[];
+    locationIds: string[];
+  };
   createdAt: string;
 };
 
-const FILTER_TEMPLATE_KEY = 'hrhub.dashboard.filter_templates.v1';
+type ExtraKey =
+  | 'login'
+  | 'telegram'
+  | 'fingerprints'
+  | 'code'
+  | 'distance'
+  | 'accessLevel'
+  | 'workStatus'
+  | 'arrivalLocation'
+  | 'tabNumber'
+  | 'email'
+  | 'firstName';
 
-function loadFilterTemplates(): FilterTemplate[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(FILTER_TEMPLATE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as FilterTemplate[];
-    return Array.isArray(parsed) ? parsed.filter((t) => t?.id && t?.name && t?.filters) : [];
-  } catch {
-    return [];
-  }
-}
+type GridState = {
+  fio: string;
+  statuses: string[];
+  params: Partial<Record<ExtraKey, string>>;
+  added: ExtraKey[];
+};
 
-function saveFilterTemplates(items: FilterTemplate[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(FILTER_TEMPLATE_KEY, JSON.stringify(items));
-}
+/** Persisted grid templates (real app shape). */
+type GridTplStored = {
+  id: string;
+  name: string;
+  nameQ: string;
+  statuses: string[];
+  extras: string[];
+  extraValues: Record<string, string>;
+};
 
-const PIE = [
-  { kind: 'on_time' as const, label: 'Вовремя', color: '#06d6a0' },
-  { kind: 'late' as const, label: 'Опоздали', color: '#ffd166' },
-  { kind: 'absent' as const, label: 'Не пришли', color: '#ef476f' },
-  { kind: 'not_started' as const, label: 'Рабочий день не начался', color: '#5e6278' },
+const FILTER_TPL_KEY = 'hrhub.dashboard.filter_templates.v1';
+const GRID_TPL_KEY = 'hrhub.dashboard.grid-filter-templates';
+
+const EMPTY_GRID: GridState = { fio: '', statuses: [], params: {}, added: [] };
+
+const BUCKET_LEGEND: { id: Exclude<QuickFilterId, 'all'>; label: string }[] = [
+  { id: 'on_time', label: 'Вовремя' },
+  { id: 'late', label: 'Опоздали' },
+  { id: 'absent', label: 'Не пришли' },
+  { id: 'not_started', label: 'Рабочий день не начался' },
 ];
 
-const TABLE_STATUSES: { id: string; label: string }[] = [
+const STATUS_LABELS: Record<string, string> = {
+  on_time: 'Вовремя',
+  late: 'Опоздал',
+  early_leave: 'Раньше ушел',
+  absent: 'Не пришел',
+  not_started: 'Рабочий день не начался',
+  day_off: 'Выходной',
+  excused: 'Отсутствие по причине',
+  leave: 'Отсутствие по причине',
+  holiday: 'Праздник',
+  extra_off: 'Доп. выходной',
+  non_working: 'Нерабочий день',
+  no_pass: 'Нет подписки',
+  no_schedule: 'График не задан',
+  absent_request: 'Не пришел с запросом',
+};
+
+const STATUS_CHECKLIST = [
   { id: 'not_started', label: 'Рабочий день не начался' },
   { id: 'leave', label: 'Отсутствие по причине' },
   { id: 'late', label: 'Опоздание' },
@@ -133,23 +187,124 @@ const TABLE_STATUSES: { id: string; label: string }[] = [
   { id: 'absent_request', label: 'Не пришел с запросом' },
 ];
 
-const EXTRA_PARAMS: { id: string; label: string }[] = [
-  { id: 'login', label: 'Логин' },
-  { id: 'telegram', label: 'Телеграм' },
-  { id: 'fingerprints', label: 'Отпечатки' },
-  { id: 'code', label: 'Код' },
-  { id: 'distance', label: 'Общее расстояние (км)' },
-  { id: 'accessLevel', label: 'Уровень доступа' },
-  { id: 'workStatus', label: 'Статус на работе' },
-  { id: 'arrivalLocation', label: 'Локация прихода' },
-  { id: 'tabNumber', label: 'Табельный номер' },
-  { id: 'email', label: 'E-mail' },
-  { id: 'firstName', label: 'Имя' },
+const EXTRA_PARAMS: {
+  key: ExtraKey;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'location';
+  options?: { v: string; l: string }[];
+}[] = [
+  { key: 'login', label: 'Логин', type: 'text' },
+  { key: 'telegram', label: 'Telegram', type: 'text' },
+  { key: 'fingerprints', label: 'Отпечатки пальцев', type: 'select', options: [{ v: 'yes', l: 'Есть' }, { v: 'no', l: 'Нет' }] },
+  { key: 'code', label: 'Код', type: 'text' },
+  { key: 'distance', label: 'Расстояние, км (не более)', type: 'number' },
+  { key: 'accessLevel', label: 'Уровень доступа', type: 'select', options: [{ v: 'Полный', l: 'Полный' }, { v: 'Стандарт', l: 'Стандарт' }, { v: 'Гость', l: 'Гость' }] },
+  { key: 'workStatus', label: 'Статус работы', type: 'select', options: [{ v: 'Штатный', l: 'Штатный' }, { v: 'Удаленный', l: 'Удаленный' }, { v: 'Стажер', l: 'Стажер' }] },
+  { key: 'arrivalLocation', label: 'Локация прихода', type: 'location' },
+  { key: 'tabNumber', label: 'Табельный номер', type: 'text' },
+  { key: 'email', label: 'E-mail', type: 'text' },
+  { key: 'firstName', label: 'Имя', type: 'text' },
 ];
 
-const ALL_STATUS_IDS = () => new Set(TABLE_STATUSES.map((s) => s.id));
+const chipClass: Record<ChipId, string> = {
+  on_time: css.chipOnTime,
+  late: css.chipLate,
+  early_leave: css.chipEarlyLeave,
+  absent: css.chipAbsent,
+  not_started: css.chipNotStarted,
+  day_off: css.chipDayOff,
+  excused: css.chipExcused,
+};
 
-function extraField(r: AttRow, id: string) {
+/* ================= Helpers ================= */
+
+function loadJSON<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveJSON(key: string, value: unknown) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function todayLocalISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function pluralize(n: number, one: string, few: string, many: string) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last > 1 && last < 5) return few;
+  if (last === 1) return one;
+  return many;
+}
+
+function formatRuDate(iso: string, opts?: Intl.DateTimeFormatOptions) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat(
+    'ru-RU',
+    opts ?? { day: 'numeric', month: 'long', year: 'numeric', weekday: 'short' },
+  ).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+function initialsOf(fullName: string) {
+  return fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
+function hueFromId(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360} 42% 42%)`;
+}
+
+function rowChips(r: AttRow): ChipId[] {
+  const chips: ChipId[] = [];
+  if (r.status === 'on_time' && !r.note) chips.push('on_time');
+  else if (r.status === 'late' || (r.status === 'on_time' && r.note)) {
+    if (r.note?.includes('Ertaroq')) chips.push('early_leave');
+    else chips.push('late');
+  } else if (r.status === 'absent') chips.push('absent');
+  else if (r.status === 'not_started') chips.push('not_started');
+  else if (r.status === 'day_off') chips.push('day_off');
+  else if (r.status === 'leave') chips.push('excused');
+  else if (r.status === 'on_time') chips.push('on_time');
+  else if (r.status === 'late') chips.push('late');
+  return chips.length ? chips : [];
+}
+
+function rowBucket(r: AttRow): Exclude<QuickFilterId, 'all'> | 'other' {
+  if (r.status === 'on_time' && !r.note) return 'on_time';
+  if (r.status === 'late' || (r.status === 'on_time' && r.note)) return 'late';
+  if (r.status === 'absent') return 'absent';
+  if (r.status === 'not_started') return 'not_started';
+  return 'other';
+}
+
+function filterStatusId(r: AttRow) {
+  if (r.status === 'on_time' && r.note) return 'late';
+  return r.status;
+}
+
+function extraField(r: AttRow, id: ExtraKey) {
   switch (id) {
     case 'login':
     case 'email':
@@ -159,489 +314,37 @@ function extraField(r: AttRow, id: string) {
     case 'code':
     case 'tabNumber':
       return r.tabNumber || '';
-    case 'id':
-      return r.employeeId;
     case 'firstName':
       return r.firstName || '';
     case 'workStatus':
-      return statusMeta(r.status, r.note).label;
+      return STATUS_LABELS[filterStatusId(r)] || r.status;
     default:
       return '';
   }
 }
 
-function initials(name: string) {
-  const p = name.trim().split(/\s+/).filter(Boolean);
-  if (!p.length) return '?';
-  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
-  return (p[0][0] + p[1][0]).toUpperCase();
-}
-
-function pct(n: number, total: number) {
-  if (!total) return 0;
-  return Math.round((n / total) * 1000) / 10;
-}
-
-function statusMeta(status: string, note?: string) {
-  if (status === 'on_time' && !note) {
-    return { label: 'Вовремя', color: '#06d6a0' };
-  }
-  if (status === 'late' || (status === 'on_time' && note)) {
-    return { label: note?.includes('Ertaroq') ? 'Раньше ушел' : 'Опоздал', color: '#ffd166' };
-  }
-  if (status === 'absent') {
-    return { label: 'Не пришел', color: '#ef476f' };
-  }
-  if (status === 'not_started') {
-    return { label: 'Рабочий день не начался', color: '#5e6278' };
-  }
-  if (status === 'day_off') {
-    return { label: 'Выходной', color: '#a3c4f3' };
-  }
-  if (status === 'leave') {
-    return { label: 'Отсутствие по причине', color: '#ff9999' };
-  }
-  return { label: status, color: '#778da9' };
-}
-
-function nameParts(r: AttRow) {
-  const last = (r.lastName || r.fullName.trim().split(/\s+/)[0] || '').toLocaleUpperCase('ru');
-  const rest = (
-    [r.firstName, r.middleName].filter(Boolean).join(' ') ||
-    r.fullName.trim().split(/\s+/).slice(1).join(' ')
-  ).toLocaleUpperCase('ru');
-  return { last, rest };
-}
-
-const VIEW_MODES = [
-  { id: 'chart' as const, label: 'Круговая диаграмма' },
-  { id: 'list' as const, label: 'Список' },
-];
-type ViewMode = (typeof VIEW_MODES)[number]['id'];
-
-function PersonCell({
-  r,
-  rows,
-  lightbox,
-}: {
-  r: AttRow;
-  rows: AttRow[];
-  lightbox: PhotoLightboxApi;
-}) {
-  const parts = nameParts(r);
-  const src = mediaSrc(r.photoUrl);
-  const slides = rows
-    .map((x) => ({ src: mediaSrc(x.photoUrl) || '', caption: x.fullName }))
-    .filter((s) => s.src);
-  const idx = src ? slides.findIndex((s) => s.src === src) : -1;
+function isGridActive(g: GridState) {
   return (
-    <Link href={`/employees/${r.employeeId}`} className={styles.person}>
-      {src ? (
-        <PhotoThumb
-          className={styles.avatarImg}
-          src={src}
-          alt=""
-          lightbox={lightbox}
-          slides={slides}
-          index={idx < 0 ? 0 : idx}
-        />
-      ) : (
-        <span className={styles.avatar} aria-hidden>
-          {initials(r.fullName)}
-        </span>
-      )}
-      <span className={styles.nameBlock}>
-        <span className={styles.nameLast}>{parts.last}</span>
-        {parts.rest ? <span className={styles.nameRest}>{parts.rest}</span> : null}
-      </span>
-    </Link>
+    g.fio.trim().length > 0 ||
+    g.statuses.length > 0 ||
+    Object.values(g.params).some((v) => String(v ?? '').trim().length > 0)
   );
 }
 
-function AttendanceTable({
-  rows,
-  emptyDate,
-  showStatus,
-  lightbox,
-}: {
-  rows: AttRow[];
-  emptyDate: string;
-  showStatus: boolean;
-  lightbox: PhotoLightboxApi;
-}) {
-  return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>ФИО</th>
-            <th className={styles.thCenter}>Приход</th>
-            <th className={styles.thCenter}>Уход</th>
-            {showStatus ? <th>Состояние</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={showStatus ? 4 : 3} className={styles.empty}>
-                Нет данных за {emptyDate}
-              </td>
-            </tr>
-          ) : (
-            rows.map((r) => {
-              const meta = statusMeta(r.status, r.note);
-              return (
-                <tr key={r.employeeId}>
-                  <td>
-                    <PersonCell r={r} rows={rows} lightbox={lightbox} />
-                  </td>
-                  <td className={styles.time}>{r.firstIn ?? '—'}</td>
-                  <td className={styles.time}>{r.lastOut ?? '—'}</td>
-                  {showStatus ? (
-                    <td>
-                      <span className={styles.state}>
-                        <i className="fa fa-circle" style={{ color: meta.color }} aria-hidden />
-                        <span style={{ color: meta.color }}>{meta.label}</span>
-                      </span>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ViewPicker({
-  value,
-  onChange,
-}: {
-  value: ViewMode;
-  onChange: (v: ViewMode) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState('');
-  const rootRef = useRef<HTMLDivElement>(null);
-  const current = VIEW_MODES.find((m) => m.id === value)?.label ?? '';
-  const filtered = VIEW_MODES.filter((m) => m.label.toLowerCase().includes(q.trim().toLowerCase()));
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setQ('');
-      }
+function matchesGrid(r: AttRow, g: GridState) {
+  if (g.fio.trim() && !r.fullName.toLowerCase().includes(g.fio.trim().toLowerCase())) return false;
+  if (g.statuses.length && !g.statuses.includes(filterStatusId(r))) return false;
+  for (const [key, raw] of Object.entries(g.params)) {
+    const v = String(raw ?? '').trim().toLowerCase();
+    if (!v) continue;
+    const k = key as ExtraKey;
+    const field = extraField(r, k).toLowerCase();
+    if (k === 'fingerprints' || k === 'distance' || k === 'accessLevel' || k === 'arrivalLocation') {
+      continue;
     }
-    document.addEventListener('pointerdown', closeOnOutside);
-    return () => document.removeEventListener('pointerdown', closeOnOutside);
-  }, [open]);
-
-  return (
-    <div className={styles.typeSearch} ref={rootRef}>
-      <input
-        className={styles.typeInput}
-        placeholder="Поиск..."
-        value={open ? q : current}
-        onChange={(e) => {
-          setQ(e.target.value);
-          if (!open) setOpen(true);
-        }}
-        onFocus={() => {
-          setOpen(true);
-          setQ('');
-        }}
-        aria-label="Вид"
-        aria-expanded={open}
-      />
-      <button
-        type="button"
-        className={styles.typeClear}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Открыть вид"
-      >
-        <i className={`fas fa-chevron-${open ? 'up' : 'down'}`} aria-hidden />
-      </button>
-      {open ? (
-        <div className={styles.typeMenu}>
-          {filtered.length === 0 ? (
-            <div className={styles.typeEmpty}>Нет совпадений</div>
-          ) : (
-            filtered.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                className={m.id === value ? styles.typeItemOn : styles.typeItem}
-                onClick={() => {
-                  onChange(m.id);
-                  setOpen(false);
-                  setQ('');
-                }}
-              >
-                {m.label}
-              </button>
-            ))
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function polar(cx: number, cy: number, r: number, angleDeg: number) {
-  const a = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-}
-
-function donutSlice(
-  cx: number,
-  cy: number,
-  rOuter: number,
-  rInner: number,
-  startAngle: number,
-  endAngle: number,
-) {
-  const large = endAngle - startAngle > 180 ? 1 : 0;
-  const p1 = polar(cx, cy, rOuter, startAngle);
-  const p2 = polar(cx, cy, rOuter, endAngle);
-  const p3 = polar(cx, cy, rInner, endAngle);
-  const p4 = polar(cx, cy, rInner, startAngle);
-  return [
-    `M ${p1.x} ${p1.y}`,
-    `A ${rOuter} ${rOuter} 0 ${large} 1 ${p2.x} ${p2.y}`,
-    `L ${p3.x} ${p3.y}`,
-    `A ${rInner} ${rInner} 0 ${large} 0 ${p4.x} ${p4.y}`,
-    'Z',
-  ].join(' ');
-}
-
-function DonutChart({
-  segments,
-  total,
-}: {
-  segments: { value: number; color: string; label: string }[];
-  total: number;
-}) {
-  const cx = 160;
-  const cy = 150;
-  const rOuter = 118;
-  const rInner = 72;
-  const sum = segments.reduce((s, x) => s + x.value, 0) || 1;
-  let angle = 0;
-  const paths = segments
-    .filter((s) => s.value > 0)
-    .map((s) => {
-      const sweep = (s.value / sum) * 360;
-      const start = angle;
-      const end = angle + sweep;
-      angle = end;
-      const mid = start + sweep / 2;
-      const labelPos = polar(cx, cy, (rOuter + rInner) / 2 + 28, mid);
-      return { ...s, d: donutSlice(cx, cy, rOuter, rInner, start, end - 0.01), labelPos, mid };
-    });
-
-  return (
-    <svg className={styles.donutSvg} viewBox="0 0 320 300" role="img" aria-label="Статистика посещений">
-      {paths.length === 0 ? (
-        <circle cx={cx} cy={cy} r={(rOuter + rInner) / 2} fill="none" stroke="#ced4da" strokeWidth={rOuter - rInner} />
-      ) : (
-        paths.map((p) => (
-          <g key={p.label} className={styles.donutSeg}>
-            <title>
-              {p.label}: {p.value}
-            </title>
-            <path d={p.d} fill={p.color} stroke="#fff" strokeWidth={2} />
-            <text
-              x={p.labelPos.x}
-              y={p.labelPos.y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className={styles.donutSliceLabel}
-            >
-              {p.value}
-            </text>
-          </g>
-        ))
-      )}
-      <circle cx={cx} cy={cy} r={rInner - 2} fill="#fff" />
-      <text x={cx} y={cy - 8} textAnchor="middle" className={styles.donutCenterNum}>
-        {total}
-      </text>
-      <text x={cx} y={cy + 16} textAnchor="middle" className={styles.donutCenterCap}>
-        сотрудник(ов)
-      </text>
-    </svg>
-  );
-}
-
-function formatPeriodButton(dateIso?: string) {
-  if (!dateIso) return 'Выбрать дату';
-  const d = new Date(dateIso + 'T12:00:00');
-  const month = d.toLocaleDateString('ru-RU', { month: 'long' });
-  const text = `${month} ${d.getDate()}, ${d.getFullYear()}`;
-  return `${text} - ${text}`;
-}
-
-function toYmd(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function PeriodPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (iso: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = useMemo(() => {
-    const d = value ? new Date(value + 'T12:00:00') : new Date();
-    return Number.isNaN(d.getTime()) ? new Date() : d;
-  }, [value]);
-  const [view, setView] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1));
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setView(new Date(selected.getFullYear(), selected.getMonth(), 1));
-  }, [open, selected]);
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener('pointerdown', closeOnOutside);
-    return () => document.removeEventListener('pointerdown', closeOnOutside);
-  }, [open]);
-
-  const monthLabel = view.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-  const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-
-  const cells = useMemo(() => {
-    const year = view.getFullYear();
-    const month = view.getMonth();
-    const first = new Date(year, month, 1);
-    // Monday-first
-    const startOffset = (first.getDay() + 6) % 7;
-    const start = new Date(year, month, 1 - startOffset);
-    const out: { date: Date; inMonth: boolean; ymd: string }[] = [];
-    for (let i = 0; i < 42; i += 1) {
-      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-      out.push({
-        date: d,
-        inMonth: d.getMonth() === month,
-        ymd: toYmd(d),
-      });
-    }
-    return out;
-  }, [view]);
-
-  const todayYmd = toYmd(new Date());
-
-  return (
-    <div className={styles.periodWrap} ref={rootRef}>
-      <button
-        type="button"
-        className={styles.periodBtn}
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <span className={styles.periodBtnLeft}>
-          <i className="fa fa-calendar" aria-hidden />
-          <span>{formatPeriodButton(value)}</span>
-        </span>
-        <i className="fa fa-angle-down" aria-hidden />
-      </button>
-
-      {open ? (
-        <div className={styles.calPopup} role="dialog" aria-label="Выбор периода">
-          <div className={styles.calHeader}>
-            <button
-              type="button"
-              className={styles.calNav}
-              onClick={() => setView((v) => new Date(v.getFullYear(), v.getMonth() - 1, 1))}
-              aria-label="Предыдущий месяц"
-            >
-              <i className="fas fa-chevron-up" aria-hidden />
-            </button>
-            <div className={styles.calMonth}>{monthLabel}</div>
-            <button
-              type="button"
-              className={styles.calNav}
-              onClick={() => setView((v) => new Date(v.getFullYear(), v.getMonth() + 1, 1))}
-              aria-label="Следующий месяц"
-            >
-              <i className="fas fa-chevron-down" aria-hidden />
-            </button>
-          </div>
-
-          <div className={styles.calWeekdays}>
-            {weekdays.map((w) => (
-              <span key={w}>{w}</span>
-            ))}
-          </div>
-
-          <div className={styles.calGrid}>
-            {cells.map((cell) => {
-              const isSelected = cell.ymd === value;
-              const isToday = cell.ymd === todayYmd;
-              return (
-                <button
-                  key={cell.ymd}
-                  type="button"
-                  className={[
-                    styles.calDay,
-                    cell.inMonth ? '' : styles.calDayMuted,
-                    isSelected ? styles.calDaySelected : '',
-                    isToday && !isSelected ? styles.calDayToday : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => {
-                    onChange(cell.ymd);
-                    setOpen(false);
-                  }}
-                >
-                  {cell.date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={styles.calFooter}>
-            <button
-              type="button"
-              className={styles.calLink}
-              onClick={() => {
-                onChange('');
-                setOpen(false);
-              }}
-            >
-              Очистить
-            </button>
-            <button
-              type="button"
-              className={styles.calLink}
-              onClick={() => {
-                onChange(todayYmd);
-                setOpen(false);
-              }}
-            >
-              Сегодня
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+    if (!field.includes(v)) return false;
+  }
+  return true;
 }
 
 function formatBirthday(b: Birthday) {
@@ -650,888 +353,589 @@ function formatBirthday(b: Birthday) {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
-const GRID_TPL_KEY = 'hrhub.dashboard.grid-filter-templates';
+function gridToStored(name: string, g: GridState): GridTplStored {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    nameQ: g.fio,
+    statuses: [...g.statuses],
+    extras: [...g.added],
+    extraValues: { ...g.params } as Record<string, string>,
+  };
+}
 
-type GridTpl = {
-  id: string;
-  name: string;
-  nameQ: string;
-  statuses: string[];
-  extras: string[];
-  extraValues: Record<string, string>;
+function storedToGrid(tpl: GridTplStored): GridState {
+  return {
+    fio: tpl.nameQ || '',
+    statuses: Array.isArray(tpl.statuses) ? [...tpl.statuses] : [],
+    added: (tpl.extras || []).filter((k): k is ExtraKey =>
+      EXTRA_PARAMS.some((p) => p.key === k),
+    ),
+    params: { ...(tpl.extraValues || {}) } as Partial<Record<ExtraKey, string>>,
+  };
+}
+
+function filterToStored(name: string, f: FilterState): FilterTemplate {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    filters: {
+      period: f.date,
+      divisionIds: [...f.divisionIds],
+      positionIds: [...f.positionIds],
+      scheduleIds: [...f.scheduleIds],
+      gradeIds: [...f.gradeIds],
+      locationIds: [...f.locationIds],
+    },
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function storedToFilter(tpl: FilterTemplate): FilterState {
+  const f = tpl.filters;
+  return {
+    date: f.period || todayLocalISO(),
+    divisionIds: f.divisionIds ?? [],
+    positionIds: f.positionIds ?? [],
+    scheduleIds: f.scheduleIds ?? [],
+    gradeIds: f.gradeIds ?? [],
+    locationIds: f.locationIds ?? [],
+  };
+}
+
+/* ================= Icons ================= */
+
+const I = {
+  chart: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+      <path d="M22 12A10 10 0 0 0 12 2v10z" />
+    </svg>
+  ),
+  list: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="8" x2="21" y1="6" y2="6" />
+      <line x1="8" x2="21" y1="12" y2="12" />
+      <line x1="8" x2="21" y1="18" y2="18" />
+      <line x1="3" x2="3.01" y1="6" y2="6" />
+      <line x1="3" x2="3.01" y1="12" y2="12" />
+      <line x1="3" x2="3.01" y1="18" y2="18" />
+    </svg>
+  ),
+  search: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  ),
+  sliders: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="4" x2="4" y1="21" y2="14" />
+      <line x1="4" x2="4" y1="10" y2="3" />
+      <line x1="12" x2="12" y1="21" y2="12" />
+      <line x1="12" x2="12" y1="8" y2="3" />
+      <line x1="20" x2="20" y1="21" y2="16" />
+      <line x1="20" x2="20" y1="12" y2="3" />
+      <line x1="2" x2="6" y1="14" y2="14" />
+      <line x1="10" x2="14" y1="8" y2="8" />
+      <line x1="18" x2="22" y1="16" y2="16" />
+    </svg>
+  ),
+  pin: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
+    </svg>
+  ),
+  refresh: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </svg>
+  ),
+  dots: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </svg>
+  ),
+  chevron: (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  ),
+  chevronL: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  ),
+  chevronR: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  ),
+  check: (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  ),
+  x: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  ),
+  cake: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" />
+      <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" />
+      <path d="M2 21h20" />
+      <path d="M7 8v3" />
+      <path d="M12 8v3" />
+      <path d="M17 8v3" />
+      <path d="M7 4h.01" />
+      <path d="M12 4h.01" />
+      <path d="M17 4h.01" />
+    </svg>
+  ),
+  inbox: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  ),
+  download: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" x2="12" y1="15" y2="3" />
+    </svg>
+  ),
 };
 
-function loadGridTpls(): GridTpl[] {
-  try {
-    const raw = localStorage.getItem(GRID_TPL_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+/* ================= Donut ================= */
 
-function saveGridTpls(items: GridTpl[]) {
-  localStorage.setItem(GRID_TPL_KEY, JSON.stringify(items));
-}
-
-function GridFilterPop({
-  open,
-  nameQ,
-  statuses,
-  extras,
-  extraValues,
-  onNameQ,
-  onToggleStatus,
-  onToggleExtra,
-  onExtraValue,
-  onRemoveExtra,
-  onApply,
-  onShowAll,
-  onDefault,
-  onResetStatuses,
-  onLoadTpl,
-  onClose,
+function DonutChart({
+  working,
+  counts,
 }: {
-  open: boolean;
-  nameQ: string;
-  statuses: Set<string>;
-  extras: Set<string>;
-  extraValues: Record<string, string>;
-  onNameQ: (v: string) => void;
-  onToggleStatus: (id: string) => void;
-  onToggleExtra: (id: string) => void;
-  onExtraValue: (id: string, v: string) => void;
-  onRemoveExtra: (id: string) => void;
-  onApply: () => void;
-  onShowAll: () => void;
-  onDefault: () => void;
-  onResetStatuses: () => void;
-  onLoadTpl: (tpl: GridTpl) => void;
-  onClose: () => void;
+  working: number;
+  counts: { on_time: number; late: number; absent: number; not_started: number };
 }) {
-  const [paramOpen, setParamOpen] = useState(false);
-  const [tplOpen, setTplOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [templates, setTemplates] = useState<GridTpl[]>([]);
-  const paramRef = useRef<HTMLDivElement>(null);
-  const tplRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) {
-      setParamOpen(false);
-      setTplOpen(false);
-      setCreating(false);
-      return;
-    }
-    setTemplates(loadGridTpls());
-    function onKey(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      if (paramOpen) {
-        setParamOpen(false);
-        return;
-      }
-      if (tplOpen) {
-        setTplOpen(false);
-        setCreating(false);
-        return;
-      }
-      onClose();
-    }
-    document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+  const R = 84;
+  const SWc = 2 * Math.PI * R;
+  const segClass: Record<string, string> = {
+    on_time: css.segOnTime,
+    late: css.segLate,
+    absent: css.segAbsent,
+    not_started: css.segNotStarted,
+  };
+  let acc = 0;
+  const segments = BUCKET_LEGEND.map((b) => {
+    const ratio = working > 0 ? counts[b.id] / working : 0;
+    const len = ratio * SWc;
+    const seg = {
+      key: b.id,
+      dash: `${Math.max(len - 2, 0)} ${SWc - Math.max(len - 2, 0)}`,
+      offset: -acc * SWc,
+      cls: segClass[b.id],
     };
-  }, [open, paramOpen, tplOpen, onClose]);
+    acc += ratio;
+    return seg;
+  });
 
-  useEffect(() => {
-    if (!paramOpen && !tplOpen) return;
-    function closeMenus(event: PointerEvent) {
-      const target = event.target as Node;
-      if (paramOpen && !paramRef.current?.contains(target)) setParamOpen(false);
-      if (tplOpen && !tplRef.current?.contains(target)) {
-        setTplOpen(false);
-        setCreating(false);
-      }
-    }
-    document.addEventListener('pointerdown', closeMenus);
-    return () => document.removeEventListener('pointerdown', closeMenus);
-  }, [paramOpen, tplOpen]);
-
-  if (!open || typeof document === 'undefined') return null;
-
-  function persist(next: GridTpl[]) {
-    setTemplates(next);
-    saveGridTpls(next);
-  }
-
-  function saveTpl() {
-    const name = newName.trim();
-    if (!name) return;
-    const item: GridTpl = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name,
-      nameQ,
-      statuses: [...statuses],
-      extras: [...extras],
-      extraValues: { ...extraValues },
-    };
-    persist([item, ...templates.filter((t) => t.name.toLowerCase() !== name.toLowerCase())]);
-    setCreating(false);
-    setNewName('');
-    setTplOpen(false);
-  }
-
-  return createPortal(
+  return (
     <div
-      className={styles.gridFilterOverlay}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      className={css.donutWrap}
+      role="img"
+      aria-label={`Всего по графику: ${working} ${pluralize(working, 'сотрудник', 'сотрудника', 'сотрудников')}`}
     >
-      <div
-        className={styles.gridFilterModal}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Фильтр"
-      >
-        <div className={styles.gridFilterHead}>
-          <span>Фильтр</span>
-          <button
-            type="button"
-            className={styles.gridFilterClose}
-            title="Закрыть"
-            aria-label="Закрыть"
-            onClick={onClose}
-          >
-            <i className="fas fa-times" aria-hidden />
-          </button>
-        </div>
-
-        <div className={styles.gridFilterTools}>
-          <div className={styles.tplWrap} ref={tplRef}>
-            <button
-              type="button"
-              className={styles.tplBtn}
-              onClick={() => {
-                setTplOpen((v) => !v);
-                setParamOpen(false);
-              }}
-              aria-expanded={tplOpen}
-            >
-              Шаблон <i className="fa fa-angle-down" aria-hidden />
-            </button>
-            {tplOpen ? (
-              <div className={styles.tplMenu} role="menu">
-                {!creating ? (
-                  <button
-                    type="button"
-                    className={styles.tplMenuItem}
-                    onClick={() => {
-                      setCreating(true);
-                      setNewName('');
-                    }}
-                  >
-                    <i className="fas fa-save" aria-hidden />
-                    <span>Новый шаблон</span>
-                  </button>
-                ) : (
-                  <div className={styles.tplCreateBox}>
-                    <input
-                      type="text"
-                      className={styles.tplNameInput}
-                      placeholder="Название шаблона"
-                      value={newName}
-                      maxLength={100}
-                      autoFocus
-                      onChange={(e) => setNewName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveTpl();
-                        if (e.key === 'Escape') {
-                          setCreating(false);
-                          setNewName('');
-                        }
-                      }}
-                    />
-                    <div className={styles.tplCreateActions}>
-                      <button
-                        type="button"
-                        className={styles.tplSaveBtn}
-                        onClick={saveTpl}
-                        disabled={!newName.trim()}
-                      >
-                        Сохранить
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.tplCancelBtn}
-                        onClick={() => {
-                          setCreating(false);
-                          setNewName('');
-                        }}
-                      >
-                        Отменить
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {templates.length > 0 ? <div className={styles.tplDivider} /> : null}
-                {templates.length === 0 && !creating ? (
-                  <div className={styles.tplEmpty}>Нет сохранённых шаблонов</div>
-                ) : null}
-                {templates.map((item) => (
-                  <div key={item.id} className={styles.tplMenuRow}>
-                    <button
-                      type="button"
-                      className={styles.tplMenuItem}
-                      onClick={() => {
-                        onLoadTpl(item);
-                        setTplOpen(false);
-                      }}
-                    >
-                      <i className="fas fa-filter" aria-hidden />
-                      <span>{item.name}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.tplDeleteBtn}
-                      title="Удалить"
-                      aria-label={`Удалить ${item.name}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        persist(templates.filter((t) => t.id !== item.id));
-                      }}
-                    >
-                      <i className="fas fa-times" aria-hidden />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <div className={styles.gridFilterToolsRight}>
-            <button type="button" className={styles.defaultBtn} onClick={onDefault}>
-              <i className="fas fa-undo" aria-hidden /> По умолчанию
-            </button>
-            <div className={styles.paramWrap} ref={paramRef}>
-              <button
-                type="button"
-                className={styles.paramBtn}
-                onClick={() => {
-                  setParamOpen((v) => !v);
-                  setTplOpen(false);
-                }}
-              >
-                Добавить параметры +
-              </button>
-              {paramOpen ? (
-                <div className={styles.paramMenu}>
-                  {EXTRA_PARAMS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={extras.has(p.id) ? styles.paramItemOn : styles.paramItem}
-                      onClick={() => onToggleExtra(p.id)}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.gridFilterBody}>
-          <div className={styles.filterRow}>
-            <span className={styles.filterRowGrip} aria-hidden>
-              <i className="fas fa-grip-vertical" />
-            </span>
-            <div className={styles.filterRowMain}>
-              <div className={styles.filterRowLabel}>ФИО</div>
-              <label className={styles.fioBox}>
-                <i className="fa fa-search" aria-hidden />
-                <input
-                  value={nameQ}
-                  onChange={(e) => onNameQ(e.target.value)}
-                  placeholder="Поиск..."
-                />
-              </label>
-            </div>
-            <button
-              type="button"
-              className={styles.filterRowRemove}
-              title="Очистить"
-              aria-label="Очистить ФИО"
-              onClick={() => onNameQ('')}
-            >
-              <i className="fas fa-times" aria-hidden />
-            </button>
-          </div>
-
-          <div className={styles.filterRow}>
-            <span className={styles.filterRowGrip} aria-hidden>
-              <i className="fas fa-grip-vertical" />
-            </span>
-            <div className={styles.filterRowMain}>
-              <div className={styles.filterRowLabel}>Состояние</div>
-              <div className={styles.statusChecks}>
-                {TABLE_STATUSES.map((s) => (
-                  <label key={s.id} className={styles.statusCheck}>
-                    <input
-                      type="checkbox"
-                      checked={statuses.has(s.id)}
-                      onChange={() => onToggleStatus(s.id)}
-                    />
-                    {s.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <button
-              type="button"
-              className={styles.filterRowRemove}
-              title="Сбросить"
-              aria-label="Сбросить состояние"
-              onClick={onResetStatuses}
-            >
-              <i className="fas fa-times" aria-hidden />
-            </button>
-          </div>
-
-          {[...extras].map((id) => {
-            const meta = EXTRA_PARAMS.find((p) => p.id === id);
-            if (!meta) return null;
-            return (
-              <div key={id} className={styles.filterRow}>
-                <span className={styles.filterRowGrip} aria-hidden>
-                  <i className="fas fa-grip-vertical" />
-                </span>
-                <div className={styles.filterRowMain}>
-                  <div className={styles.filterRowLabel}>{meta.label}</div>
-                  <label className={styles.fioBox}>
-                    <i className="fa fa-search" aria-hidden />
-                    <input
-                      value={extraValues[id] || ''}
-                      onChange={(e) => onExtraValue(id, e.target.value)}
-                      placeholder="Поиск..."
-                    />
-                  </label>
-                </div>
-                <button
-                  type="button"
-                  className={styles.filterRowRemove}
-                  title="Удалить"
-                  aria-label={`Удалить ${meta.label}`}
-                  onClick={() => onRemoveExtra(id)}
-                >
-                  <i className="fas fa-times" aria-hidden />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className={styles.gridFilterFoot}>
-          <button type="button" className={styles.filterApply} onClick={onApply}>
-            Применить
-          </button>
-          <button type="button" className={styles.filterGhost} onClick={onShowAll}>
-            Показать все
-          </button>
-          <button type="button" className={styles.filterGhost} onClick={onClose}>
-            Закрыть
-          </button>
-        </div>
+      <svg className={css.donutSvg} width="216" height="216" viewBox="0 0 216 216">
+        <circle className={css.donutTrack} cx="108" cy="108" r={R} />
+        {segments.map((s) => (
+          <circle
+            key={s.key}
+            className={`${css.donutSeg} ${s.cls}`}
+            cx="108"
+            cy="108"
+            r={R}
+            strokeDasharray={s.dash}
+            strokeDashoffset={s.offset}
+          />
+        ))}
+      </svg>
+      <div className={css.donutCenter}>
+        <span className={css.donutTotal}>{working}</span>
+        <span className={css.donutUnit}>
+          {pluralize(working, 'сотрудник', 'сотрудника', 'сотрудников')}
+        </span>
+        <span className={css.donutCaption}>по графику</span>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
 
-function MultiFilter({
+/* ================= Calendar ================= */
+
+const RU_MONTHS = [
+  'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',
+];
+const RU_WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+function Calendar({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
+  const [vy, vm] = value.split('-').map(Number);
+  const [view, setView] = useState<{ y: number; m: number }>({ y: vy, m: vm });
+
+  useEffect(() => {
+    const [y2, m2] = value.split('-').map(Number);
+    setView({ y: y2, m: m2 });
+  }, [value]);
+
+  const today = todayLocalISO();
+  const [ty, tm] = today.split('-').map(Number);
+
+  const first = new Date(Date.UTC(view.y, view.m - 1, 1));
+  const lead = (first.getUTCDay() + 6) % 7;
+  const daysInMonth = new Date(Date.UTC(view.y, view.m, 0)).getUTCDate();
+
+  const cells: { iso: string; day: number; out: boolean }[] = [];
+  const prevMonthDays = new Date(Date.UTC(view.y, view.m - 1, 0)).getUTCDate();
+  for (let i = lead - 1; i >= 0; i -= 1) {
+    const dNum = prevMonthDays - i;
+    const pm = view.m === 1 ? 12 : view.m - 1;
+    const py = view.m === 1 ? view.y - 1 : view.y;
+    cells.push({
+      iso: `${py}-${String(pm).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`,
+      day: dNum,
+      out: true,
+    });
+  }
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    cells.push({
+      iso: `${view.y}-${String(view.m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+      day: d,
+      out: false,
+    });
+  }
+  while (cells.length % 7 !== 0) {
+    const dNum = cells.length - lead - daysInMonth + 1;
+    const nm = view.m === 12 ? 1 : view.m + 1;
+    const ny = view.m === 12 ? view.y + 1 : view.y;
+    cells.push({
+      iso: `${ny}-${String(nm).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`,
+      day: dNum,
+      out: true,
+    });
+  }
+
+  return (
+    <div className={css.calendar} role="group" aria-label="Период">
+      <div className={css.calHead}>
+        <span className={css.calMonth}>
+          {RU_MONTHS[view.m - 1]} {view.y}
+        </span>
+        <div className={css.calNav}>
+          <button
+            type="button"
+            className={css.calNavBtn}
+            aria-label="Предыдущий месяц"
+            onClick={() => setView((v) => (v.m === 1 ? { y: v.y - 1, m: 12 } : { y: v.y, m: v.m - 1 }))}
+          >
+            {I.chevronL}
+          </button>
+          <button
+            type="button"
+            className={css.calNavBtn}
+            aria-label="Следующий месяц"
+            onClick={() => setView((v) => (v.m === 12 ? { y: v.y + 1, m: 1 } : { y: v.y, m: v.m + 1 }))}
+          >
+            {I.chevronR}
+          </button>
+        </div>
+      </div>
+      <div className={css.calQuick}>
+        <button type="button" className={css.calQuickBtn} onClick={() => onChange(today)}>
+          Очистить
+        </button>
+        <button type="button" className={css.calQuickBtn} onClick={() => onChange(today)}>
+          Сегодня
+        </button>
+      </div>
+      <div className={css.calGrid}>
+        {RU_WD.map((d) => (
+          <span key={d} className={css.calWd}>
+            {d}
+          </span>
+        ))}
+        {cells.map((c) => {
+          const isToday = c.iso === today && !c.out && view.y === ty && view.m === tm;
+          const isTodayCell = c.iso === today;
+          const selected = c.iso === value;
+          return (
+            <button
+              key={c.iso}
+              type="button"
+              disabled={c.out}
+              className={`${css.calDay} ${c.out ? css.calDayOut : ''} ${isToday || isTodayCell ? css.calDayToday : ''} ${
+                selected ? css.calDaySelected : ''
+              }`}
+              onClick={() => onChange(c.iso)}
+              aria-pressed={selected}
+            >
+              {c.day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ================= Multiselect ================= */
+
+function MultiSelect({
+  idKey,
   label,
   options,
   selected,
   onChange,
+  openId,
+  setOpenId,
 }: {
+  idKey: string;
   label: string;
   options: Opt[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  openId: string | null;
+  setOpenId: (id: string | null) => void;
 }) {
   const [q, setQ] = useState('');
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return options;
-    return options.filter((o) => o.name.toLowerCase().includes(needle));
-  }, [options, q]);
+  const open = openId === idKey;
+  const filtered = options.filter((o) => o.name.toLowerCase().includes(q.trim().toLowerCase()));
 
-  function toggle(id: string) {
-    onChange(
-      selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id],
-    );
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('pointerdown', closeOnOutside);
-    return () => document.removeEventListener('pointerdown', closeOnOutside);
-  }, [open]);
+  const toggle = (id: string) => {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  };
 
   return (
-    <div className={styles.formGroup} ref={rootRef}>
-      <label>{label}</label>
-      <div className={open ? styles.multiBoxOpen : styles.multiBox}>
-        <input
-          type="text"
-          placeholder={selected.length ? `Выбрано: ${selected.length}` : 'Поиск...'}
-          className={styles.multiInput}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setOpen(false);
-              e.currentTarget.blur();
-            }
-          }}
-          aria-label={`Поиск: ${label}`}
-          aria-expanded={open}
-        />
-        <button
-          type="button"
-          className={styles.multiToggle}
-          onClick={() => setOpen((value) => !value)}
-          aria-label={`${open ? 'Закрыть' : 'Открыть'}: ${label}`}
-          aria-expanded={open}
-        >
-          <i className={`fas fa-chevron-${open ? 'up' : 'down'}`} aria-hidden />
-        </button>
-      </div>
-      {selected.length > 0 && !open ? (
-        <div className={styles.chipRow}>
-          {selected.map((id) => {
-            const opt = options.find((o) => o.id === id);
-            return (
-              <button
-                key={id}
-                type="button"
-                className={styles.chip}
-                onClick={() => toggle(id)}
-                title="Убрать"
-              >
-                {opt?.name ?? id} <span aria-hidden>×</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-      <div className={open ? styles.optionSlideOpen : styles.optionSlide}>
-        <div className={styles.optionSlideInner}>
-          <div className={styles.optList}>
-            {filtered.map((o) => (
-              <label key={o.id} className={styles.optItem}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(o.id)}
-                  onChange={() => toggle(o.id)}
-                />
-                <span>{o.name}</span>
-              </label>
-            ))}
-            {filtered.length === 0 ? (
-              <span className={styles.optEmpty}>Нет вариантов</span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FilterTemplateMenu({
-  snapshot,
-  activeName,
-  onApply,
-  onActiveNameChange,
-}: {
-  snapshot: FilterSnapshot;
-  activeName: string;
-  onApply: (filters: FilterSnapshot) => void;
-  onActiveNameChange: (name: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [templates, setTemplates] = useState<FilterTemplate[]>([]);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setTemplates(loadFilterTemplates());
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setCreating(false);
-        setNewName('');
-      }
-    }
-    document.addEventListener('pointerdown', closeOnOutside);
-    return () => document.removeEventListener('pointerdown', closeOnOutside);
-  }, [open]);
-
-  function persist(next: FilterTemplate[]) {
-    setTemplates(next);
-    saveFilterTemplates(next);
-  }
-
-  function startCreate(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    setCreating(true);
-    setNewName('');
-  }
-
-  function cancelCreate() {
-    setCreating(false);
-    setNewName('');
-  }
-
-  function saveNew() {
-    const name = newName.trim();
-    if (!name) return;
-    if (templates.some((t) => t.name.toLowerCase() === name.toLowerCase())) {
-      return;
-    }
-    const item: FilterTemplate = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name,
-      filters: {
-        period: snapshot.period,
-        divisionIds: [...snapshot.divisionIds],
-        positionIds: [...snapshot.positionIds],
-        scheduleIds: [...snapshot.scheduleIds],
-        gradeIds: [...snapshot.gradeIds],
-        locationIds: [...snapshot.locationIds],
-      },
-      createdAt: new Date().toISOString(),
-    };
-    persist([item, ...templates]);
-    onActiveNameChange(name);
-    setCreating(false);
-    setNewName('');
-    setOpen(false);
-  }
-
-  function selectTemplate(item: FilterTemplate) {
-    onApply({ ...item.filters });
-    onActiveNameChange(item.name);
-    setOpen(false);
-    setCreating(false);
-  }
-
-  function removeTemplate(id: string, event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    const target = templates.find((t) => t.id === id);
-    const next = templates.filter((t) => t.id !== id);
-    persist(next);
-    if (target && activeName === target.name) {
-      onActiveNameChange('');
-    }
-  }
-
-  return (
-    <div className={styles.tplWrap} ref={rootRef}>
+    <div className={css.msWrap} data-multiselect>
+      <span className={css.tplLabel}>{label}</span>
       <button
         type="button"
-        className={styles.tplBtn}
-        onClick={() => setOpen((v) => !v)}
+        className={`${css.msTrigger} ${open ? css.msTriggerOpen : ''}`}
+        onClick={() => setOpenId(open ? null : idKey)}
         aria-expanded={open}
-        aria-haspopup="menu"
       >
-        {activeName || 'Шаблон'} <i className="fa fa-angle-down" aria-hidden />
+        <span className={css.msTriggerLabel}>{label}</span>
+        <span className={css.msRight}>
+          {selected.length > 0 && <span className={css.msCount}>Выбрано: {selected.length}</span>}
+          {I.chevron}
+        </span>
       </button>
-      {open ? (
-        <div className={styles.tplMenu} role="menu">
-          {!creating ? (
-            <button type="button" className={styles.tplMenuItem} onClick={startCreate}>
-              <i className="fas fa-save" aria-hidden />
-              <span>Новый шаблон</span>
-            </button>
-          ) : (
-            <div className={styles.tplCreateBox}>
-              <input
-                type="text"
-                className={styles.tplNameInput}
-                placeholder="Название шаблона"
-                value={newName}
-                maxLength={100}
-                autoFocus
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveNew();
-                  if (e.key === 'Escape') cancelCreate();
-                }}
-              />
-              <div className={styles.tplCreateActions}>
-                <button
-                  type="button"
-                  className={styles.tplSaveBtn}
-                  onClick={saveNew}
-                  disabled={!newName.trim()}
-                >
-                  Сохранить
-                </button>
-                <button type="button" className={styles.tplCancelBtn} onClick={cancelCreate}>
-                  Отменить
-                </button>
-              </div>
-            </div>
-          )}
-
-          {templates.length > 0 ? <div className={styles.tplDivider} /> : null}
-
-          {templates.length === 0 && !creating ? (
-            <div className={styles.tplEmpty}>Нет сохранённых шаблонов</div>
-          ) : null}
-
-          {templates.map((item) => (
-            <div
-              key={item.id}
-              className={
-                activeName === item.name ? styles.tplMenuRowActive : styles.tplMenuRow
-              }
-            >
-              <button
-                type="button"
-                className={styles.tplMenuItem}
-                onClick={() => selectTemplate(item)}
-              >
-                <i className="fas fa-filter" aria-hidden />
-                <span>{item.name}</span>
-              </button>
-              <button
-                type="button"
-                className={styles.tplDeleteBtn}
-                title="Удалить"
-                aria-label={`Удалить ${item.name}`}
-                onClick={(e) => removeTemplate(item.id, e)}
-              >
-                <i className="fas fa-times" aria-hidden />
-              </button>
-            </div>
-          ))}
+      {open && (
+        <div className={css.msPanel}>
+          <div className={css.msSearch}>
+            <input
+              autoFocus
+              className={css.msSearchInput}
+              placeholder="Поиск..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label={`Поиск: ${label}`}
+            />
+          </div>
+          <div className={css.msList}>
+            {filtered.length === 0 ? (
+              <div className={css.msEmpty}>Нет вариантов</div>
+            ) : (
+              filtered.map((o) => {
+                const on = selected.includes(o.id);
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`${css.msItem} ${on ? css.msItemSelected : ''}`}
+                    onClick={() => toggle(o.id)}
+                  >
+                    <span className={`${css.msCheckbox} ${on ? css.msCheckboxOn : ''}`}>
+                      {on && I.check}
+                    </span>
+                    {o.name}
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className={css.msFoot}>Выбрано: {selected.length}</div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
+
+function StatusChips({ chips }: { chips: ChipId[] }) {
+  if (!chips.length) return <span className={css.timeEmpty}>—</span>;
+  return (
+    <div className={css.chips}>
+      {chips.map((s) => (
+        <span key={s} className={`${css.chip} ${chipClass[s]}`} data-status={s}>
+          {STATUS_LABELS[s] ?? s}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ================= Page ================= */
 
 export default function DashboardPage() {
   const photos = usePhotoLightbox();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [filterKind, setFilterKind] = useState<PieKind>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('chart');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
-  const [gridFilterOpen, setGridFilterOpen] = useState(false);
-  const [draftName, setDraftName] = useState('');
-  const [draftStatuses, setDraftStatuses] = useState<Set<string>>(() => new Set(TABLE_STATUSES.map((s) => s.id)));
-  const [appliedName, setAppliedName] = useState('');
-  const [appliedStatuses, setAppliedStatuses] = useState<Set<string>>(
-    () => new Set(TABLE_STATUSES.map((s) => s.id)),
-  );
-  const [draftExtras, setDraftExtras] = useState<Set<string>>(new Set());
-  const [draftExtraValues, setDraftExtraValues] = useState<Record<string, string>>({});
-  const [appliedExtras, setAppliedExtras] = useState<Set<string>>(new Set());
-  const [appliedExtraValues, setAppliedExtraValues] = useState<Record<string, string>>({});
-
-  const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 10));
-  const [divisionIds, setDivisionIds] = useState<string[]>([]);
-  const [positionIds, setPositionIds] = useState<string[]>([]);
-  const [scheduleIds, setScheduleIds] = useState<string[]>([]);
-  const [gradeIds, setGradeIds] = useState<string[]>([]);
-  const [locationIds, setLocationIds] = useState<string[]>([]);
-  const [activeTemplateName, setActiveTemplateName] = useState('');
-  const [pendingReload, setPendingReload] = useState(false);
-  const [sideOpen, setSideOpen] = useState(true);
-
-  const [divisions, setDivisions] = useState<Opt[]>([]);
-  const [positions, setPositions] = useState<Opt[]>([]);
-  const [schedules, setSchedules] = useState<Opt[]>([]);
-  const [grades, setGrades] = useState<Opt[]>([]);
-  const [locations, setLocations] = useState<Opt[]>([]);
-
-  const filterSnapshot = useMemo<FilterSnapshot>(
+  const today = todayLocalISO();
+  const DEFAULT_FILTERS: FilterState = useMemo(
     () => ({
-      period,
-      divisionIds,
-      positionIds,
-      scheduleIds,
-      gradeIds,
-      locationIds,
+      date: today,
+      divisionIds: [],
+      positionIds: [],
+      scheduleIds: [],
+      gradeIds: [],
+      locationIds: [],
     }),
-    [period, divisionIds, positionIds, scheduleIds, gradeIds, locationIds],
+    [today],
   );
 
-  function applyTemplateFilters(filters: FilterSnapshot) {
-    setPeriod(filters.period || new Date().toISOString().slice(0, 10));
-    setDivisionIds(filters.divisionIds ?? []);
-    setPositionIds(filters.positionIds ?? []);
-    setScheduleIds(filters.scheduleIds ?? []);
-    setGradeIds(filters.gradeIds ?? []);
-    setLocationIds(filters.locationIds ?? []);
-    setPendingReload(true);
-  }
+  const [applied, setApplied] = useState<FilterState>(DEFAULT_FILTERS);
+  const [pending, setPending] = useState<FilterState>(DEFAULT_FILTERS);
 
-  const closeGridFilter = useCallback(() => setGridFilterOpen(false), []);
+  const [options, setOptions] = useState<{
+    divisions: Opt[];
+    positions: Opt[];
+    schedules: Opt[];
+    grades: Opt[];
+    locations: Opt[];
+  }>({ divisions: [], positions: [], schedules: [], grades: [], locations: [] });
 
-  const gridFilterActive =
-    !!appliedName.trim() ||
-    appliedStatuses.size < TABLE_STATUSES.length ||
-    [...appliedExtras].some((id) => (appliedExtraValues[id] || '').trim());
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  function toggleGridFilter() {
-    setDraftName(appliedName);
-    setDraftStatuses(new Set(appliedStatuses));
-    setDraftExtras(new Set(appliedExtras));
-    setDraftExtraValues({ ...appliedExtraValues });
-    setGridFilterOpen((v) => !v);
-  }
+  const [viewMode, setViewMode] = useState<ViewMode>('chart');
+  const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all');
+  const [search, setSearch] = useState('');
+  const [pinned, setPinned] = useState(false);
+  const [pageSize, setPageSize] = useState(50);
+  const [page, setPage] = useState(1);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [openDrop, setOpenDrop] = useState<string | null>(null);
 
-  function applyGridFilter() {
-    setAppliedName(draftName);
-    setAppliedStatuses(new Set(draftStatuses));
-    setAppliedExtras(new Set(draftExtras));
-    setAppliedExtraValues({ ...draftExtraValues });
-    setSearch(draftName);
-    setGridFilterOpen(false);
-  }
+  const [templates, setTemplates] = useState<FilterTemplate[]>([]);
+  const [tplSelected, setTplSelected] = useState('');
 
-  function showAllGridFilter() {
-    const all = ALL_STATUS_IDS();
-    setDraftStatuses(all);
-    setDraftName('');
-    setDraftExtras(new Set());
-    setDraftExtraValues({});
-    setAppliedStatuses(all);
-    setAppliedName('');
-    setAppliedExtras(new Set());
-    setAppliedExtraValues({});
-    setSearch('');
-    setGridFilterOpen(false);
-  }
+  const [gridState, setGridState] = useState<GridState>(EMPTY_GRID);
+  const [gridApplied, setGridApplied] = useState<GridState>(EMPTY_GRID);
+  const [gridTemplates, setGridTemplates] = useState<GridTplStored[]>([]);
+  const [gridTplSelected, setGridTplSelected] = useState('');
+  const [paramsPickerOpen, setParamsPickerOpen] = useState(false);
 
-  function defaultGridFilter() {
-    setDraftName('');
-    setDraftStatuses(ALL_STATUS_IDS());
-    setDraftExtras(new Set());
-    setDraftExtraValues({});
-  }
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    apiFetch<Opt[]>('/api/organization/divisions')
-      .then((rows) => setDivisions(rows.map((r) => ({ id: r.id, name: r.name }))))
-      .catch(() => undefined);
-    apiFetch<Opt[]>('/api/organization/positions')
-      .then((rows) => setPositions(rows.map((r) => ({ id: r.id, name: r.name }))))
-      .catch(() => undefined);
-    apiFetch<Opt[]>('/api/attendance/schedules')
-      .then((rows) => setSchedules(rows.map((r) => ({ id: r.id, name: r.name }))))
-      .catch(() => undefined);
-    apiFetch<Opt[]>('/api/attendance/locations')
-      .then((rows) => setLocations(rows.map((r) => ({ id: r.id, name: r.name }))))
-      .catch(() => undefined);
-    apiFetch<{ id: string; name: string }[]>('/api/catalog/grades')
-      .then((rows) => setGrades((rows ?? []).map((r) => ({ id: r.id, name: r.name }))))
-      .catch(() => undefined);
-  }, []);
-
-  const buildQuery = useCallback(() => {
-    const p = new URLSearchParams();
-    if (period) p.set('date', period);
-    if (divisionIds.length) p.set('divisionIds', divisionIds.join(','));
-    if (positionIds.length) p.set('positionIds', positionIds.join(','));
-    if (scheduleIds.length) p.set('scheduleIds', scheduleIds.join(','));
-    if (gradeIds.length) p.set('gradeIds', gradeIds.join(','));
-    if (locationIds.length) p.set('locationIds', locationIds.join(','));
-    const qs = p.toString();
-    return qs ? `?${qs}` : '';
-  }, [period, divisionIds, positionIds, scheduleIds, gradeIds, locationIds]);
-
-  const load = useCallback(() => {
+  const fetchStats = useCallback(async (f: FilterState) => {
     setLoading(true);
-    setError('');
-    apiFetch<Stats>(`/api/dashboard/stats${buildQuery()}`)
-      .then((data) => {
-        setStats(data);
-        // Do NOT setPeriod(data.date) — UTC ISO dates caused an infinite
-        // backward date walk (period → API → period-1 → … → 2015…).
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Error'))
-      .finally(() => setLoading(false));
-  }, [buildQuery]);
-
-  // Initial load only — filter changes apply via ОБНОВИТЬ (Verifix UX).
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setError(null);
+    try {
+      const p = new URLSearchParams();
+      p.set('date', f.date);
+      if (f.divisionIds.length) p.set('divisionIds', f.divisionIds.join(','));
+      if (f.positionIds.length) p.set('positionIds', f.positionIds.join(','));
+      if (f.scheduleIds.length) p.set('scheduleIds', f.scheduleIds.join(','));
+      if (f.gradeIds.length) p.set('gradeIds', f.gradeIds.join(','));
+      if (f.locationIds.length) p.set('locationIds', f.locationIds.join(','));
+      const data = await apiFetch<Stats>(`/api/dashboard/stats?${p.toString()}`);
+      setStats(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки данных');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Template tanlanganda filtr state yangilangach avtomatik Обновить
+  const fetchOptions = useCallback(async () => {
+    try {
+      const asOpt = (rows: Array<{ id: string; name?: string; label?: string; code?: string }> | null | undefined) =>
+        (rows ?? []).map((r) => ({
+          id: r.id,
+          name: (r.name || r.label || r.code || '').trim() || r.id,
+        }));
+      const [divs, poss, schs, grds, locs] = await Promise.all([
+        apiFetch<Array<{ id: string; name?: string; label?: string }>>('/api/organization/divisions'),
+        apiFetch<Array<{ id: string; name?: string; label?: string }>>('/api/organization/positions'),
+        apiFetch<Array<{ id: string; name?: string; label?: string }>>('/api/attendance/schedules'),
+        apiFetch<Array<{ id: string; name?: string; label?: string; code?: string }>>('/api/catalog/grades'),
+        apiFetch<Array<{ id: string; name?: string; label?: string }>>('/api/attendance/locations'),
+      ]);
+      setOptions({
+        divisions: asOpt(divs),
+        positions: asOpt(poss),
+        schedules: asOpt(schs),
+        grades: asOpt(grds),
+        locations: asOpt(locs),
+      });
+    } catch {
+      /* keep previous */
+    }
+  }, []);
+
   useEffect(() => {
-    if (!pendingReload) return;
-    setPendingReload(false);
-    load();
-  }, [pendingReload, load]);
+    const rawTpl = loadJSON<FilterTemplate[]>(FILTER_TPL_KEY, []);
+    setTemplates(Array.isArray(rawTpl) ? rawTpl.filter((t) => t?.name && t?.filters) : []);
+    const rawGrid = loadJSON<GridTplStored[]>(GRID_TPL_KEY, []);
+    setGridTemplates(Array.isArray(rawGrid) ? rawGrid : []);
+    fetchOptions();
+  }, [fetchOptions]);
+
+  // Initial load + when applied filters change (only via «Обновить» / template)
+  useEffect(() => {
+    fetchStats(applied);
+  }, [applied, fetchStats]);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      const t = e.target as HTMLElement;
+      if (menuRef.current && !menuRef.current.contains(t)) setMenuOpen(false);
+      if (openDrop && !t.closest('[data-multiselect]')) setOpenDrop(null);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [openDrop]);
+
+  useEffect(() => {
+    document.body.style.overflow = modalOpen ? 'hidden' : '';
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setModalOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [modalOpen]);
 
   const a = stats?.attendance;
-  const headcount = stats?.headcount ?? 0;
-  const onTimeN = a?.on_time ?? 0;
-  const lateN = a?.late ?? 0;
-  const absentN = a?.absent ?? 0;
-  const notStartedN = a?.not_started ?? 0;
-
-  const pieSegments = useMemo(
-    () => [
-      { value: onTimeN, color: PIE[0].color, label: PIE[0].label },
-      { value: lateN, color: PIE[1].color, label: PIE[1].label },
-      { value: absentN, color: PIE[2].color, label: PIE[2].label },
-      { value: notStartedN, color: PIE[3].color, label: PIE[3].label },
-    ],
-    [onTimeN, lateN, absentN, notStartedN],
-  );
-
-  const pieTotal = onTimeN + lateN + absentN + notStartedN || headcount;
-
-  const legend = [
-    { ...PIE[0], count: onTimeN, pct: pct(onTimeN, pieTotal || headcount) },
-    { ...PIE[1], count: lateN, pct: pct(lateN, pieTotal || headcount) },
-    { ...PIE[2], count: absentN, pct: pct(absentN, pieTotal || headcount) },
-    { ...PIE[3], count: notStartedN, pct: pct(notStartedN, pieTotal || headcount) },
-  ];
+  const counts = {
+    on_time: a?.on_time ?? 0,
+    late: a?.late ?? 0,
+    absent: a?.absent ?? 0,
+    not_started: a?.not_started ?? 0,
+  };
+  const working =
+    counts.on_time + counts.late + counts.absent + counts.not_started || stats?.headcount || 0;
+  const totalHead = stats?.headcount ?? working;
 
   const allRows = useMemo(() => {
     const onTime = stats?.lists?.onTime ?? [];
@@ -1540,489 +944,928 @@ export default function DashboardPage() {
     const notStarted = stats?.lists?.notStarted ?? [];
     const dayOff = stats?.lists?.dayOff ?? [];
     const leave = stats?.lists?.leave ?? [];
-    return [...onTime, ...late, ...absent, ...notStarted, ...dayOff, ...leave].sort((a, b) =>
-      a.fullName.localeCompare(b.fullName, 'ru'),
+    return [...onTime, ...late, ...absent, ...notStarted, ...dayOff, ...leave].sort((x, y) =>
+      x.fullName.localeCompare(y.fullName, 'ru'),
     );
   }, [stats]);
 
-  const filteredRows = useMemo(() => {
-    let rows = allRows;
-    if (filterKind === 'on_time') {
-      rows = rows.filter((r) => r.status === 'on_time' && !r.note);
-    } else if (filterKind === 'late') {
-      rows = rows.filter((r) => r.status === 'late' || !!r.note);
-    } else if (filterKind === 'absent') {
-      rows = rows.filter((r) => r.status === 'absent');
-    } else if (filterKind === 'not_started') {
-      rows = rows.filter((r) => r.status === 'not_started');
-    }
-    if (appliedStatuses.size && appliedStatuses.size < TABLE_STATUSES.length) {
-      rows = rows.filter((r) => appliedStatuses.has(r.status === 'on_time' && r.note ? 'late' : r.status));
-    }
-    const q = (appliedName || search).trim().toLowerCase();
+  const filtered = useMemo(() => {
+    let arr = allRows;
+    if (quickFilter !== 'all') arr = arr.filter((r) => rowBucket(r) === quickFilter);
+    const q = search.trim().toLowerCase();
     if (q) {
-      rows = rows.filter(
+      arr = arr.filter(
         (r) =>
           r.fullName.toLowerCase().includes(q) ||
-          r.tabNumber.toLowerCase().includes(q),
+          (r.tabNumber ?? '').toLowerCase().includes(q) ||
+          (r.position ?? '').toLowerCase().includes(q),
       );
     }
-    for (const id of appliedExtras) {
-      const val = (appliedExtraValues[id] || '').trim().toLowerCase();
-      if (!val) continue;
-      const hasData = rows.some((r) => extraField(r, id).trim());
-      if (!hasData) continue;
-      rows = rows.filter((r) => extraField(r, id).toLowerCase().includes(val));
-    }
-    return rows;
-  }, [allRows, filterKind, search, appliedName, appliedStatuses, appliedExtras, appliedExtraValues]);
+    if (isGridActive(gridApplied)) arr = arr.filter((r) => matchesGrid(r, gridApplied));
+    return arr;
+  }, [allRows, quickFilter, search, gridApplied]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageSafe = Math.min(page, pageCount);
-  const pageRows = filteredRows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
-  const birthdays = stats?.birthdays ?? [];
-  const birthdaySlides = birthdays
-    .map((b) => ({ src: mediaSrc(b.photoUrl) || '', caption: b.fullName }))
-    .filter((s) => s.src);
+  const pageRows = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const rangeFrom = filtered.length === 0 ? 0 : (pageSafe - 1) * pageSize + 1;
+  const rangeTo = Math.min(filtered.length, pageSafe * pageSize);
 
-  useEffect(() => {
+  const pagerNumbers = useMemo(() => {
+    const maxBtns = 5;
+    let start = Math.max(1, pageSafe - Math.floor(maxBtns / 2));
+    const end = Math.min(pageCount, start + maxBtns - 1);
+    start = Math.max(1, end - maxBtns + 1);
+    const nums: number[] = [];
+    for (let i = start; i <= end; i += 1) nums.push(i);
+    return nums;
+  }, [pageSafe, pageCount]);
+
+  const birthdays = stats?.birthdays ?? [];
+  const photoSlides = useMemo(
+    () =>
+      filtered
+        .map((r) => ({ src: mediaSrc(r.photoUrl) || '', caption: r.fullName }))
+        .filter((s) => s.src),
+    [filtered],
+  );
+  const birthdaySlides = useMemo(
+    () =>
+      birthdays
+        .map((b) => ({ src: mediaSrc(b.photoUrl) || '', caption: b.fullName }))
+        .filter((s) => s.src),
+    [birthdays],
+  );
+
+  const setQuick = (id: QuickFilterId) => {
+    setQuickFilter((cur) => (cur === id ? 'all' : id));
     setPage(1);
-  }, [filterKind, search, appliedName, appliedStatuses, appliedExtras, appliedExtraValues]);
+  };
+
+  const applySidebar = () => {
+    setApplied({ ...pending });
+    setPage(1);
+  };
+
+  const resetTableFilters = () => {
+    setQuickFilter('all');
+    setSearch('');
+    setGridApplied(EMPTY_GRID);
+    setGridState(EMPTY_GRID);
+    setGridTplSelected('');
+    setPage(1);
+  };
+
+  const gridIsActive = isGridActive(gridApplied);
+
+  const exportCsv = () => {
+    const head = ['ФИО', 'Приход', 'Уход', 'Состояние'];
+    const lines = filtered.map((r) =>
+      [r.fullName, r.firstIn ?? '—', r.lastOut ?? '—', rowChips(r).map((c) => STATUS_LABELS[c]).join(' / ')]
+        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+        .join(';'),
+    );
+    const csv = `\uFEFF${[head.join(';'), ...lines].join('\r\n')}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const aEl = document.createElement('a');
+    aEl.href = url;
+    aEl.download = `hrhub_attendance_${applied.date}.csv`;
+    document.body.appendChild(aEl);
+    aEl.click();
+    aEl.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const saveSidebarTemplate = (mode: 'new' | 'overwrite') => {
+    if (mode === 'overwrite' && tplSelected) {
+      const idx = templates.findIndex((t) => t.name === tplSelected);
+      if (idx >= 0) {
+        const next = templates.slice();
+        next[idx] = { ...next[idx], filters: filterToStored(tplSelected, pending).filters };
+        setTemplates(next);
+        saveJSON(FILTER_TPL_KEY, next);
+      }
+      return;
+    }
+    const name = window.prompt('Название шаблона', 'Мой фильтр');
+    if (!name || !name.trim()) return;
+    const item = filterToStored(name.trim(), pending);
+    const next = [item, ...templates.filter((t) => t.name.toLowerCase() !== item.name.toLowerCase())];
+    setTemplates(next);
+    saveJSON(FILTER_TPL_KEY, next);
+    setTplSelected(item.name);
+  };
+
+  const saveGridTemplate = () => {
+    const name = window.prompt('Название шаблона фильтра', 'Мой фильтр');
+    if (!name || !name.trim()) return;
+    const item = gridToStored(name.trim(), gridState);
+    const next = [item, ...gridTemplates.filter((t) => t.name.toLowerCase() !== item.name.toLowerCase())];
+    setGridTemplates(next);
+    saveJSON(GRID_TPL_KEY, next);
+    setGridTplSelected(item.name);
+  };
+
+  const dateLabel = formatRuDate(applied.date);
 
   return (
-    <div className={styles.wrap}>
-      {error ? <p className={styles.error}>{error}</p> : null}
+    <div className={css.page}>
+      <div className={css.pageHead}>
+        <div>
+          <h1 className={css.h1}>Статистика посещений сотрудников</h1>
+          <p className={css.dateLine}>
+            Данные за <span className={css.dateLineStrong}>{dateLabel}</span>
+          </p>
+        </div>
+        <div className={css.viewSwitch} role="tablist" aria-label="Режим отображения">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'chart'}
+            className={`${css.viewBtn} ${viewMode === 'chart' ? css.viewBtnActive : ''}`}
+            onClick={() => setViewMode('chart')}
+          >
+            {I.chart}
+            Круговая диаграмма
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'list'}
+            className={`${css.viewBtn} ${viewMode === 'list' ? css.viewBtnActive : ''}`}
+            onClick={() => setViewMode('list')}
+          >
+            {I.list}
+            Список
+          </button>
+        </div>
+      </div>
 
-      <div className={sideOpen ? styles.layout : styles.layoutWide}>
-        <div className={styles.mainCol}>
-          {sideOpen ? null : (
-            <button
-              type="button"
-              className={styles.sideReopen}
-              title="Показать фильтр"
-              aria-label="Показать фильтр"
-              onClick={() => setSideOpen(true)}
-            >
-              <i className="fas fa-chevron-left" aria-hidden />
-            </button>
-          )}
-          <section className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h1 className={styles.cardTitle}>Статистика посещений сотрудников</h1>
-              <ViewPicker value={viewMode} onChange={setViewMode} />
-            </div>
-
-            <div className={styles.cardBody}>
-              {viewMode === 'list' ? (
-                <>
-                  <div className={styles.badges}>
-                    <button
-                      type="button"
-                      className={filterKind === 'all' ? styles.badgeOn : styles.badge}
-                      onClick={() => setFilterKind('all')}
-                    >
-                      Все
-                    </button>
-                    {legend.map((item) => (
-                      <button
-                        key={item.kind}
-                        type="button"
-                        className={filterKind === item.kind ? styles.badgeOn : styles.badge}
-                        onClick={() => setFilterKind((k) => (k === item.kind ? 'all' : item.kind))}
-                      >
-                        <span className={styles.badgeDot} style={{ background: item.color }} />
-                        {item.count} {item.kind === 'late' ? 'Опоздал' : item.kind === 'absent' ? 'Не пришел' : item.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className={styles.tableCol}>
-                      <div className={styles.gridController}>
-                        <input
-                          type="search"
-                          className={styles.gridSearch}
-                          placeholder="Поиск..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                        <div className={styles.gridAppend}>
+      <div className={css.layout}>
+        <div className={css.mainCol}>
+          <div className={css.viewArea} key={viewMode}>
+            {viewMode === 'chart' ? (
+              <section className={css.chartCard} aria-label="Круговая диаграмма посещений">
+                <div className={css.chartBody}>
+                  <DonutChart working={working} counts={counts} />
+                  <ul className={css.legend}>
+                    {BUCKET_LEGEND.map((b) => {
+                      const n = counts[b.id];
+                      const pct = working > 0 ? Math.round((n / working) * 100) : 0;
+                      const dotCls =
+                        b.id === 'on_time'
+                          ? css.dotOnTime
+                          : b.id === 'late'
+                            ? css.dotLate
+                            : b.id === 'absent'
+                              ? css.dotAbsent
+                              : css.dotNotStarted;
+                      return (
+                        <li key={b.id}>
                           <button
                             type="button"
-                            data-grid-filter-toggle
-                            className={
-                              gridFilterOpen || gridFilterActive
-                                ? styles.gridIconBtnOn
-                                : styles.gridIconBtn
-                            }
-                            title="Фильтр"
-                            aria-label="Фильтр"
-                            onClick={toggleGridFilter}
+                            className={`${css.legendItem} ${quickFilter === b.id ? css.legendItemActive : ''}`}
+                            onClick={() => setQuick(b.id)}
+                            aria-pressed={quickFilter === b.id}
                           >
-                            <i className="fa fa-filter" aria-hidden />
+                            <span className={`${css.legendDot} ${dotCls}`} aria-hidden="true" />
+                            <span className={css.legendLabel}>{b.label}</span>
+                            <span className={css.legendCount}>{n}</span>
+                            <span className={css.legendPct}>{pct}%</span>
                           </button>
-                          <button type="button" className={styles.gridIconBtn} title="Закрепить" aria-label="Закрепить">
-                            <i className="fa fa-thumbtack" aria-hidden />
-                          </button>
-                          <span className={styles.gridLimit}>
-                            <i className="fas fa-arrow-down" aria-hidden /> {pageSize} / {filteredRows.length}
-                          </span>
-                          <div className={styles.pageList}>
-                            <button
-                              type="button"
-                              className={styles.pageChev}
-                              disabled={pageSafe <= 1}
-                              onClick={() => setPage((p) => Math.max(1, p - 1))}
-                              aria-label="Предыдущая"
-                            >
-                              <i className="fas fa-chevron-left" aria-hidden />
-                            </button>
-                            {Array.from({ length: Math.min(5, pageCount) }, (_, i) => {
-                              const n = i + 1;
-                              return (
-                                <button
-                                  key={n}
-                                  type="button"
-                                  className={n === pageSafe ? styles.pageNumActive : styles.pageNum}
-                                  onClick={() => setPage(n)}
-                                >
-                                  {n}
-                                </button>
-                              );
-                            })}
-                            <button
-                              type="button"
-                              className={styles.pageChev}
-                              disabled={pageSafe >= pageCount}
-                              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                              aria-label="Следующая"
-                            >
-                              <i className="fas fa-chevron-right" aria-hidden />
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            className={styles.gridIconBtn}
-                            title="Обновить"
-                            aria-label="Обновить"
-                            onClick={load}
-                            disabled={loading}
-                          >
-                            <i className={`fas fa-redo${loading ? ` ${styles.spin}` : ''}`} aria-hidden />
-                          </button>
-                          <button type="button" className={styles.gridIconBtn} title="Меню" aria-label="Меню">
-                            <i className="fas fa-bars" aria-hidden />
-                          </button>
-                        </div>
-                      </div>
-                      <AttendanceTable
-                        rows={pageRows}
-                        emptyDate={stats?.date ?? 'сегодня'}
-                        showStatus={false}
-                        lightbox={photos}
-                      />
-                    </div>
-                </>
-              ) : (
-              <div className={styles.chartRow}>
-                <div className={styles.chartCol}>
-                  <div className={styles.donutWrap}>
-                    <DonutChart segments={pieSegments} total={headcount || pieTotal} />
-                  </div>
-                  <div className={styles.legend}>
-                    {legend.map((item) => (
-                      <button
-                        key={item.kind}
-                        type="button"
-                        className={
-                          filterKind === item.kind ? styles.legendItemActive : styles.legendItem
-                        }
-                        onClick={() =>
-                          setFilterKind((k) => (k === item.kind ? 'all' : item.kind))
-                        }
-                      >
-                        <span className={styles.legendDot} style={{ background: item.color }} />
-                        <span className={styles.legendText}>
-                          <strong>{item.pct}%</strong>
-                          <small>{item.label}</small>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
+                <p className={css.chartHint}>
+                  Нажмите на категорию, чтобы отфильтровать таблицу ниже. Повторное нажатие сбрасывает
+                  фильтр.
+                </p>
+              </section>
+            ) : (
+              <div className={css.badgeRow} aria-label="Фильтры по статусу">
+                <button
+                  type="button"
+                  className={`${css.badge} ${quickFilter === 'all' ? css.badgeAllActive : ''}`}
+                  onClick={() => {
+                    setQuickFilter('all');
+                    setPage(1);
+                  }}
+                  aria-pressed={quickFilter === 'all'}
+                >
+                  <span>Все</span>
+                  <span className={css.badgeCount}>{totalHead}</span>
+                </button>
+                {(
+                  [
+                    { id: 'on_time' as const, label: 'Вовремя', cls: css.badgeOnTimeActive, n: counts.on_time },
+                    { id: 'late' as const, label: 'Опоздал', cls: css.badgeLateActive, n: counts.late },
+                    { id: 'absent' as const, label: 'Не пришел', cls: css.badgeAbsentActive, n: counts.absent },
+                    {
+                      id: 'not_started' as const,
+                      label: 'Рабочий день не начался',
+                      cls: css.badgeNotStartedActive,
+                      n: counts.not_started,
+                    },
+                  ] as const
+                ).map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={`${css.badge} ${quickFilter === b.id ? b.cls : ''}`}
+                    onClick={() => setQuick(b.id)}
+                    aria-pressed={quickFilter === b.id}
+                  >
+                    <span>{b.label}</span>
+                    <span className={css.badgeCount}>{b.n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-                <div className={styles.tableCol}>
-                  <div className={styles.gridController}>
-                    <input
-                      type="search"
-                      className={styles.gridSearch}
-                      placeholder="Поиск..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                    <div className={styles.gridAppend}>
+          <section className={`${css.card} ${css.tableCard}`} aria-label="Таблица посещений">
+            <div className={css.toolbar}>
+              <div className={css.searchWrap}>
+                <span className={css.searchIcon}>{I.search}</span>
+                <input
+                  className={css.searchInput}
+                  placeholder="Поиск..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  aria-label="Поиск по таблице"
+                />
+              </div>
+              <div className={css.toolbarSpacer} />
+              <div className={css.toolCluster}>
+                <button type="button" className={css.toolBtn} onClick={() => setModalOpen(true)}>
+                  {I.sliders}
+                  Фильтр
+                  {gridIsActive && <span className={css.toolBtnDot} aria-hidden="true" />}
+                </button>
+                <button
+                  type="button"
+                  className={`${css.toolBtn} ${pinned ? css.toolBtnActive : ''}`}
+                  onClick={() => setPinned((v) => !v)}
+                  aria-pressed={pinned}
+                  title="Закрепить шапку таблицы"
+                >
+                  {I.pin}
+                  Закрепить
+                </button>
+                <select
+                  className={css.pageSizeSelect}
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  aria-label="Строк на странице"
+                >
+                  {[10, 20, 50, 100].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <div className={css.pager} aria-label="Пагинация">
+                  <button
+                    type="button"
+                    className={css.pagerBtn}
+                    disabled={pageSafe <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    aria-label="Предыдущая страница"
+                  >
+                    ‹
+                  </button>
+                  {pagerNumbers.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`${css.pagerBtn} ${n === pageSafe ? css.pagerBtnActive : ''}`}
+                      onClick={() => setPage(n)}
+                      aria-current={n === pageSafe ? 'page' : undefined}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={css.pagerBtn}
+                    disabled={pageSafe >= pageCount}
+                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                    aria-label="Следующая страница"
+                  >
+                    ›
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className={`${css.toolBtn} ${loading ? css.refreshSpin : ''}`}
+                  onClick={() => fetchStats(applied)}
+                  title="Обновить данные"
+                >
+                  {I.refresh}
+                  Обновить
+                </button>
+                <div className={css.menuAnchor} ref={menuRef}>
+                  <button
+                    type="button"
+                    className={`${css.toolBtn} ${css.toolBtnIconOnly}`}
+                    onClick={() => setMenuOpen((v) => !v)}
+                    aria-expanded={menuOpen}
+                    aria-label="Меню"
+                  >
+                    {I.dots}
+                  </button>
+                  {menuOpen && (
+                    <div className={css.menuPanel} role="menu">
                       <button
                         type="button"
-                        data-grid-filter-toggle
-                        className={
-                          gridFilterOpen || gridFilterActive
-                            ? styles.gridIconBtnOn
-                            : styles.gridIconBtn
-                        }
-                        title="Фильтр"
-                        aria-label="Фильтр"
-                        onClick={toggleGridFilter}
+                        className={css.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          exportCsv();
+                        }}
                       >
-                        <i className="fa fa-filter" aria-hidden />
+                        {I.download}
+                        Экспорт CSV
                       </button>
-                      <button type="button" className={styles.gridIconBtn} title="Закрепить" aria-label="Закрепить">
-                        <i className="fa fa-thumbtack" aria-hidden />
-                      </button>
-                      <span className={styles.gridLimit}>
-                        <i className="fas fa-arrow-down" aria-hidden /> {pageSize} / {filteredRows.length}
-                      </span>
-                      <div className={styles.pageList}>
-                        <button
-                          type="button"
-                          className={styles.pageChev}
-                          disabled={pageSafe <= 1}
-                          onClick={() => setPage((p) => Math.max(1, p - 1))}
-                          aria-label="Предыдущая"
-                        >
-                          <i className="fas fa-chevron-left" aria-hidden />
-                        </button>
-                        {Array.from({ length: Math.min(5, pageCount) }, (_, i) => {
-                          const n = i + 1;
-                          return (
-                            <button
-                              key={n}
-                              type="button"
-                              className={n === pageSafe ? styles.pageNumActive : styles.pageNum}
-                              onClick={() => setPage(n)}
-                            >
-                              {n}
-                            </button>
-                          );
-                        })}
-                        <button
-                          type="button"
-                          className={styles.pageChev}
-                          disabled={pageSafe >= pageCount}
-                          onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                          aria-label="Следующая"
-                        >
-                          <i className="fas fa-chevron-right" aria-hidden />
-                        </button>
-                      </div>
                       <button
                         type="button"
-                        className={styles.gridIconBtn}
-                        title="Обновить"
-                        aria-label="Обновить"
-                        onClick={load}
-                        disabled={loading}
+                        className={css.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          fetchStats(applied);
+                        }}
                       >
-                        <i className={`fas fa-redo${loading ? ` ${styles.spin}` : ''}`} aria-hidden />
+                        {I.refresh}
+                        Обновить данные
                       </button>
-                      <button type="button" className={styles.gridIconBtn} title="Меню" aria-label="Меню">
-                        <i className="fas fa-bars" aria-hidden />
+                      <button
+                        type="button"
+                        className={css.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          resetTableFilters();
+                        }}
+                      >
+                        {I.x}
+                        Сбросить фильтры таблицы
                       </button>
                     </div>
-                  </div>
-
-                  <AttendanceTable
-                    rows={pageRows}
-                    emptyDate={stats?.date ?? 'сегодня'}
-                    showStatus
-                    lightbox={photos}
-                  />
+                  )}
                 </div>
               </div>
-              )}
+            </div>
+
+            {error && <div className={css.errorBanner}>{error}</div>}
+
+            {loading ? (
+              <div className={css.loadingOverlay}>
+                <span className={css.spinner} aria-hidden="true" />
+                Загрузка статистики посещений…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className={css.emptyState}>
+                <div className={css.emptyIcon}>{I.inbox}</div>
+                <div className={css.emptyText}>
+                  Нет данных за{' '}
+                  {formatRuDate(applied.date, { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+                <div className={css.emptySub}>
+                  Измените дату в фильтре справа или сбросьте фильтры таблицы
+                </div>
+              </div>
+            ) : (
+              <div className={`${css.tableScroll} ${pinned ? css.tableScrollPinned : ''}`}>
+                <table className={css.table}>
+                  <thead>
+                    <tr>
+                      <th className={css.tableTh}>ФИО</th>
+                      <th className={css.tableTh}>Приход</th>
+                      <th className={css.tableTh}>Уход</th>
+                      {viewMode === 'chart' && <th className={css.tableTh}>Состояние</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((emp) => {
+                      const src = mediaSrc(emp.photoUrl);
+                      const idx = src ? photoSlides.findIndex((s) => s.src === src) : -1;
+                      const chips = rowChips(emp);
+                      const bucket = rowBucket(emp);
+                      return (
+                        <tr key={emp.employeeId} className={css.tableRow}>
+                          <td className={css.tableTd}>
+                            <div className={css.nameCell}>
+                              {src ? (
+                                <PhotoThumb
+                                  className={css.avatarImg}
+                                  src={src}
+                                  alt=""
+                                  lightbox={photos}
+                                  slides={photoSlides}
+                                  index={idx < 0 ? 0 : idx}
+                                />
+                              ) : (
+                                <span
+                                  className={css.avatarBtn}
+                                  style={{ background: hueFromId(emp.employeeId) }}
+                                  aria-hidden
+                                >
+                                  {initialsOf(emp.fullName)}
+                                </span>
+                              )}
+                              <div className={css.nameMain}>
+                                <Link href={`/employees/${emp.employeeId}`} className={css.nameLink}>
+                                  {emp.fullName}
+                                </Link>
+                                <span className={css.nameSub}>
+                                  {emp.position ?? '—'}
+                                  {emp.tabNumber ? ` · ${emp.tabNumber}` : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={`${css.tableTd} ${css.timeCell}`}>
+                            {emp.firstIn ? (
+                              <span className={bucket === 'late' ? css.timeLate : css.timeOk}>
+                                {emp.firstIn}
+                              </span>
+                            ) : (
+                              <span className={css.timeEmpty}>—</span>
+                            )}
+                          </td>
+                          <td className={`${css.tableTd} ${css.timeCell}`}>
+                            {emp.lastOut ? (
+                              <span
+                                className={
+                                  chips.includes('early_leave') ? css.timeLate : css.timeOk
+                                }
+                              >
+                                {emp.lastOut}
+                              </span>
+                            ) : (
+                              <span className={css.timeEmpty}>—</span>
+                            )}
+                          </td>
+                          {viewMode === 'chart' && (
+                            <td className={css.tableTd}>
+                              <StatusChips chips={chips} />
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className={css.tableFooter}>
+              <span>
+                Показано {rangeFrom}–{rangeTo} из {filtered.length}
+              </span>
+              <span>
+                Режим: {viewMode === 'chart' ? 'Круговая диаграмма' : 'Список'} · Период:{' '}
+                {applied.date}
+              </span>
             </div>
           </section>
         </div>
 
-        {sideOpen ? (
-        <aside className={styles.sideCol}>
-          <button
-            type="button"
-            className={styles.sideCollapse}
-            title="Скрыть фильтр"
-            aria-label="Скрыть фильтр"
-            onClick={() => setSideOpen(false)}
-          >
-            <i className="fas fa-chevron-right" aria-hidden />
-          </button>
-          <section className={styles.sideCard}>
-            <div className={styles.sideCardHeader}>
-              <h2 className={styles.sideCardTitle}>Фильтр</h2>
-              <div className={styles.filterToolbar}>
-                <FilterTemplateMenu
-                  snapshot={filterSnapshot}
-                  activeName={activeTemplateName}
-                  onApply={applyTemplateFilters}
-                  onActiveNameChange={setActiveTemplateName}
-                />
-                <button
-                  type="button"
-                  className={styles.syncBtn}
-                  title="Обновить"
-                  aria-label="Обновить"
-                  onClick={load}
-                >
-                  <i className={`fas fa-sync${loading ? ` ${styles.spin}` : ''}`} aria-hidden />
-                </button>
-              </div>
-            </div>
-            <div className={styles.filterBody}>
-              <div className={styles.formGroup}>
-                <label>Период</label>
-                <PeriodPicker value={period} onChange={(iso) => setPeriod(iso || toYmd(new Date()))} />
-              </div>
-              <MultiFilter
-                label="Подразделения"
-                options={divisions}
-                selected={divisionIds}
-                onChange={setDivisionIds}
-              />
-              <MultiFilter
-                label="Должности"
-                options={positions}
-                selected={positionIds}
-                onChange={setPositionIds}
-              />
-              <MultiFilter
-                label="Рабочие графики"
-                options={schedules}
-                selected={scheduleIds}
-                onChange={setScheduleIds}
-              />
-              <MultiFilter
-                label="Разряды"
-                options={grades}
-                selected={gradeIds}
-                onChange={setGradeIds}
-              />
-              <MultiFilter
-                label="Локации"
-                options={locations}
-                selected={locationIds}
-                onChange={setLocationIds}
-              />
-              <button
-                type="button"
-                className={styles.refreshBtn}
-                onClick={load}
-                disabled={loading}
-              >
-                Обновить
+        <div className={`${css.sidebarCol} ${collapsed ? css.sidebarColCollapsed : ''}`}>
+          {collapsed ? (
+            <div className={css.rail}>
+              <button type="button" className={css.railBtn} onClick={() => setCollapsed(false)}>
+                ‹ Показать фильтр
               </button>
             </div>
-          </section>
-
-          <section className={styles.sideCard}>
-            <div className={styles.sideCardHeader}>
-              <h2 className={styles.sideCardTitle}>Дни рождения</h2>
-            </div>
-            <div className={styles.birthdayBody}>
-              {birthdays.length === 0 ? (
-                <div className={styles.birthdayEmpty}>
-                  <i className="fa fa-gift" aria-hidden />
-                  <p>Здесь Вы будете видеть дни рождения коллег</p>
+          ) : (
+            <>
+              <section className={css.filterCard} aria-label="Фильтр статистики">
+                <div className={css.cardHead}>
+                  <h2 className={css.cardTitle}>Фильтр</h2>
+                  <button type="button" className={css.collapseBtn} onClick={() => setCollapsed(true)}>
+                    Скрыть фильтр ›
+                  </button>
                 </div>
-              ) : (
-                <ul className={styles.birthdayList}>
-                  {birthdays.map((b) => (
-                    <li key={b.employeeId} className={styles.birthdayItem}>
-                      <Link href={`/employees/${b.employeeId}`} className={styles.birthdayLink}>
-                        {mediaSrc(b.photoUrl) ? (
-                          <PhotoThumb
-                            className={styles.birthdayAvatarImg}
-                            src={mediaSrc(b.photoUrl) || ''}
-                            alt=""
-                            lightbox={photos}
-                            slides={birthdaySlides}
-                            index={Math.max(
-                              0,
-                              birthdaySlides.findIndex((s) => s.src === mediaSrc(b.photoUrl)),
-                            )}
-                          />
-                        ) : (
-                          <span className={styles.birthdayAvatar} aria-hidden>
-                            {initials(b.fullName)}
+                <div className={css.filterBody}>
+                  <div>
+                    <label className={css.tplLabel} htmlFor="sidebarTemplate">
+                      Шаблон
+                    </label>
+                    <select
+                      id="sidebarTemplate"
+                      className={css.tplSelect}
+                      value={tplSelected}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        setTplSelected(name);
+                        const tpl = templates.find((t) => t.name === name);
+                        if (tpl) setPending(storedToFilter(tpl));
+                      }}
+                    >
+                      {templates.length === 0 ? (
+                        <option value="">Нет сохранённых</option>
+                      ) : (
+                        <>
+                          <option value="">— Выберите шаблон —</option>
+                          {templates.map((t) => (
+                            <option key={t.id || t.name} value={t.name}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                    <div className={css.tplBtnRow}>
+                      <button
+                        type="button"
+                        className={css.ghostBtnSm}
+                        onClick={() => saveSidebarTemplate('new')}
+                      >
+                        Новый
+                      </button>
+                      <button
+                        type="button"
+                        className={css.ghostBtnSm}
+                        disabled={!tplSelected}
+                        onClick={() => saveSidebarTemplate('overwrite')}
+                      >
+                        Сохранить
+                      </button>
+                      <button
+                        type="button"
+                        className={css.ghostBtnSm}
+                        onClick={() => setPending({ ...applied })}
+                      >
+                        Отменить
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={css.syncBtn}
+                    onClick={() => fetchOptions()}
+                    title="Обновить справочники фильтров"
+                  >
+                    {I.refresh}
+                    Обновить
+                  </button>
+
+                  <div className={css.filterFieldBlock}>
+                    <div className={css.filterSectionLabel}>Период</div>
+                    <Calendar
+                      value={pending.date}
+                      onChange={(iso) => setPending((p) => ({ ...p, date: iso }))}
+                    />
+                  </div>
+
+                  <MultiSelect
+                    idKey="divisionIds"
+                    label="Подразделения"
+                    options={options.divisions}
+                    selected={pending.divisionIds}
+                    onChange={(ids) => setPending((p) => ({ ...p, divisionIds: ids }))}
+                    openId={openDrop}
+                    setOpenId={setOpenDrop}
+                  />
+                  <MultiSelect
+                    idKey="positionIds"
+                    label="Должности"
+                    options={options.positions}
+                    selected={pending.positionIds}
+                    onChange={(ids) => setPending((p) => ({ ...p, positionIds: ids }))}
+                    openId={openDrop}
+                    setOpenId={setOpenDrop}
+                  />
+                  <MultiSelect
+                    idKey="scheduleIds"
+                    label="Рабочие графики"
+                    options={options.schedules}
+                    selected={pending.scheduleIds}
+                    onChange={(ids) => setPending((p) => ({ ...p, scheduleIds: ids }))}
+                    openId={openDrop}
+                    setOpenId={setOpenDrop}
+                  />
+                  <MultiSelect
+                    idKey="gradeIds"
+                    label="Разряды"
+                    options={options.grades}
+                    selected={pending.gradeIds}
+                    onChange={(ids) => setPending((p) => ({ ...p, gradeIds: ids }))}
+                    openId={openDrop}
+                    setOpenId={setOpenDrop}
+                  />
+                  <MultiSelect
+                    idKey="locationIds"
+                    label="Локации"
+                    options={options.locations}
+                    selected={pending.locationIds}
+                    onChange={(ids) => setPending((p) => ({ ...p, locationIds: ids }))}
+                    openId={openDrop}
+                    setOpenId={setOpenDrop}
+                  />
+
+                  <div className={css.filterFieldBlock}>
+                    <button type="button" className={css.applyBtn} onClick={applySidebar}>
+                      {I.refresh}
+                      Обновить
+                    </button>
+                    <p className={css.applyNote}>Фильтры применяются по нажатию «Обновить»</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className={css.filterCard} aria-label="Дни рождения" id="birthdays">
+                <div className={css.cardHead}>
+                  <h2 className={css.cardTitle}>Дни рождения</h2>
+                </div>
+                {birthdays.length === 0 ? (
+                  <div className={css.birthEmpty}>
+                    <div className={css.birthEmptyIcon}>{I.cake}</div>
+                    <div className={css.birthEmptyText}>
+                      Здесь Вы будете видеть дни рождения коллег
+                    </div>
+                  </div>
+                ) : (
+                  <ul className={css.birthList}>
+                    {birthdays.map((b) => {
+                      const src = mediaSrc(b.photoUrl);
+                      const idx = src ? birthdaySlides.findIndex((s) => s.src === src) : -1;
+                      return (
+                        <li key={b.employeeId} className={css.birthRow}>
+                          {src ? (
+                            <PhotoThumb
+                              className={css.birthAvatarImg}
+                              src={src}
+                              alt=""
+                              lightbox={photos}
+                              slides={birthdaySlides}
+                              index={idx < 0 ? 0 : idx}
+                            />
+                          ) : (
+                            <span
+                              className={css.birthAvatar}
+                              style={{ background: hueFromId(b.employeeId) }}
+                              aria-hidden="true"
+                            >
+                              {initialsOf(b.fullName)}
+                            </span>
+                          )}
+                          <span className={css.birthMain}>
+                            <Link href={`/employees/${b.employeeId}`} className={css.birthName}>
+                              {b.fullName}
+                            </Link>
+                            <span className={css.birthPos}>{b.position ?? '—'}</span>
                           </span>
-                        )}
-                        <span className={styles.birthdayMeta}>
-                          <strong>{b.fullName}</strong>
-                          {b.position ? <span className={styles.birthdayRole}>{b.position}</span> : null}
-                        </span>
-                        <span
-                          className={
-                            b.daysUntil === 0 ? styles.birthdayWhenToday : styles.birthdayWhen
-                          }
-                        >
-                          {formatBirthday(b)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </section>
-        </aside>
-        ) : null}
+                          <span
+                            className={`${css.birthDate} ${b.daysUntil === 0 ? css.birthDateToday : ''}`}
+                          >
+                            {formatBirthday(b)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            </>
+          )}
+        </div>
       </div>
 
-      <GridFilterPop
-        open={gridFilterOpen}
-        nameQ={draftName}
-        statuses={draftStatuses}
-        extras={draftExtras}
-        extraValues={draftExtraValues}
-        onNameQ={setDraftName}
-        onToggleStatus={(id) => {
-          const next = new Set(draftStatuses);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          setDraftStatuses(next);
-        }}
-        onToggleExtra={(id) => {
-          const next = new Set(draftExtras);
-          if (next.has(id)) {
-            next.delete(id);
-            setDraftExtraValues((prev) => {
-              const copy = { ...prev };
-              delete copy[id];
-              return copy;
-            });
-          } else {
-            next.add(id);
-          }
-          setDraftExtras(next);
-        }}
-        onExtraValue={(id, v) => setDraftExtraValues((prev) => ({ ...prev, [id]: v }))}
-        onRemoveExtra={(id) => {
-          const next = new Set(draftExtras);
-          next.delete(id);
-          setDraftExtras(next);
-          setDraftExtraValues((prev) => {
-            const copy = { ...prev };
-            delete copy[id];
-            return copy;
-          });
-        }}
-        onApply={applyGridFilter}
-        onShowAll={showAllGridFilter}
-        onDefault={defaultGridFilter}
-        onResetStatuses={() => setDraftStatuses(ALL_STATUS_IDS())}
-        onLoadTpl={(tpl) => {
-          setDraftName(tpl.nameQ);
-          setDraftStatuses(new Set(tpl.statuses.length ? tpl.statuses : TABLE_STATUSES.map((s) => s.id)));
-          setDraftExtras(new Set(tpl.extras));
-          setDraftExtraValues({ ...tpl.extraValues });
-        }}
-        onClose={closeGridFilter}
-      />
+      {modalOpen && (
+        <div
+          className={css.overlay}
+          onMouseDown={(e) => e.target === e.currentTarget && setModalOpen(false)}
+        >
+          <div className={css.modal} role="dialog" aria-modal="true" aria-label="Фильтр таблицы">
+            <div className={css.modalHead}>
+              <h2 className={css.modalTitle}>Фильтр</h2>
+              <button
+                type="button"
+                className={css.modalClose}
+                onClick={() => setModalOpen(false)}
+                aria-label="Закрыть"
+              >
+                {I.x}
+              </button>
+            </div>
+
+            <div className={css.modalBody}>
+              <div className={css.modalTplRow}>
+                <div className={css.modalTplGrow}>
+                  <label className={css.mFieldLabel} htmlFor="gridTemplate">
+                    Шаблон
+                  </label>
+                  <select
+                    id="gridTemplate"
+                    className={css.mSelect}
+                    value={gridTplSelected}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      setGridTplSelected(name);
+                      const tpl = gridTemplates.find((t) => t.name === name);
+                      if (tpl) setGridState(storedToGrid(tpl));
+                    }}
+                  >
+                    <option value="">По умолчанию</option>
+                    {gridTemplates.map((t) => (
+                      <option key={t.id || t.name} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className={css.ghostBtnSm}
+                  style={{ flex: '0 0 auto', padding: '0 12px', height: 36 }}
+                  onClick={saveGridTemplate}
+                >
+                  Новый шаблон
+                </button>
+                <button
+                  type="button"
+                  className={css.ghostBtnSm}
+                  style={{ flex: '0 0 auto', padding: '0 12px', height: 36 }}
+                  onClick={() => {
+                    setGridState(EMPTY_GRID);
+                    setGridTplSelected('');
+                  }}
+                >
+                  По умолчанию
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className={css.linkBtn}
+                onClick={() => setParamsPickerOpen((v) => !v)}
+                aria-expanded={paramsPickerOpen}
+              >
+                Добавить параметры +
+              </button>
+
+              {paramsPickerOpen && (
+                <div className={css.paramsPicker}>
+                  {EXTRA_PARAMS.map((p) => (
+                    <label key={p.key} className={css.checkRow}>
+                      <input
+                        type="checkbox"
+                        checked={gridState.added.includes(p.key)}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          setGridState((g) => {
+                            const added = on
+                              ? [...g.added, p.key]
+                              : g.added.filter((k) => k !== p.key);
+                            const params = { ...g.params };
+                            if (!on) delete params[p.key];
+                            return { ...g, added, params };
+                          });
+                        }}
+                      />
+                      {p.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div>
+                <label className={css.mFieldLabel} htmlFor="fio">
+                  ФИО
+                </label>
+                <input
+                  id="fio"
+                  className={css.mInput}
+                  placeholder="Фамилия, имя или отчество"
+                  value={gridState.fio}
+                  onChange={(e) => setGridState((g) => ({ ...g, fio: e.target.value }))}
+                />
+              </div>
+
+              <div className={css.mSection}>
+                <p className={css.mSectionTitle}>Состояние</p>
+                <div className={css.statusGrid}>
+                  {STATUS_CHECKLIST.map((s) => (
+                    <label key={s.id} className={css.checkRow} htmlFor={s.id}>
+                      <input
+                        type="checkbox"
+                        id={s.id}
+                        checked={gridState.statuses.includes(s.id)}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          setGridState((g) => ({
+                            ...g,
+                            statuses: on
+                              ? [...g.statuses, s.id]
+                              : g.statuses.filter((x) => x !== s.id),
+                          }));
+                        }}
+                      />
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {gridState.added.length > 0 && (
+                <div className={css.mSection}>
+                  <p className={css.mSectionTitle}>Дополнительные параметры</p>
+                  <div className={css.extraGrid}>
+                    {gridState.added.map((key) => {
+                      const def = EXTRA_PARAMS.find((p) => p.key === key)!;
+                      const value = gridState.params[key] ?? '';
+                      return (
+                        <div key={key}>
+                          <label className={css.mFieldLabel} htmlFor={key}>
+                            {def.label}
+                          </label>
+                          {def.type === 'select' || def.type === 'location' ? (
+                            <select
+                              id={key}
+                              className={css.mSelect}
+                              value={value}
+                              onChange={(e) =>
+                                setGridState((g) => ({
+                                  ...g,
+                                  params: { ...g.params, [key]: e.target.value },
+                                }))
+                              }
+                            >
+                              <option value="">Любой</option>
+                              {(def.type === 'location'
+                                ? options.locations.map((l) => ({ v: l.name, l: l.name }))
+                                : (def.options ?? [])
+                              ).map((o) => (
+                                <option key={o.v} value={o.v}>
+                                  {o.l}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              id={key}
+                              className={css.mInput}
+                              type={def.type === 'number' ? 'number' : 'text'}
+                              min={def.type === 'number' ? 0 : undefined}
+                              placeholder={def.label}
+                              value={value}
+                              onChange={(e) =>
+                                setGridState((g) => ({
+                                  ...g,
+                                  params: { ...g.params, [key]: e.target.value },
+                                }))
+                              }
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={css.modalFoot}>
+              <button
+                type="button"
+                className={css.showAllBtn}
+                onClick={() => {
+                  setGridState(EMPTY_GRID);
+                  setGridApplied(EMPTY_GRID);
+                  setGridTplSelected('');
+                  setPage(1);
+                  setModalOpen(false);
+                }}
+              >
+                Показать все
+              </button>
+              <button
+                type="button"
+                className={css.applyPrimary}
+                onClick={() => {
+                  setGridApplied({ ...gridState });
+                  setPage(1);
+                  setModalOpen(false);
+                }}
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {photos.node}
     </div>
   );

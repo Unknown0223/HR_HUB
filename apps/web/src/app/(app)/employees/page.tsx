@@ -2,7 +2,7 @@
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
-import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -89,13 +89,10 @@ function EmployeesPageInner() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flagBusyId, setFlagBusyId] = useState<string | null>(null);
-  const [openMenu, setOpenMenu] = useState<{
-    id: string;
-    kind: 'action' | 'report';
-  } | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const photos = usePhotoLightbox();
   const menuRef = useRef<HTMLDivElement>(null);
-  const rowMenusRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const subnavKey =
     tab === 'dismissed'
@@ -134,6 +131,7 @@ function EmployeesPageInner() {
       setTotal(data.total);
       setTotalPages(data.totalPages);
       setSelected({});
+      setExpandedId(null);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
@@ -170,7 +168,7 @@ function EmployeesPageInner() {
   useEffect(() => {
     function onDocClick(ev: MouseEvent) {
       if (!menuRef.current?.contains(ev.target as Node)) setMenuOpen(false);
-      if (!rowMenusRef.current?.contains(ev.target as Node)) setOpenMenu(null);
+      if (!tableRef.current?.contains(ev.target as Node)) setExpandedId(null);
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
@@ -206,12 +204,15 @@ function EmployeesPageInner() {
             : r,
         ),
       );
-      setOpenMenu(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка флагов');
     } finally {
       setFlagBusyId(null);
     }
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedId((cur) => (cur === id ? null : id));
   }
 
   async function exportCsv() {
@@ -632,11 +633,11 @@ function EmployeesPageInner() {
         </div>
       ) : null}
 
-      <div className={styles.panelTable} ref={rowMenusRef}>
+      <div className={styles.panelTable} ref={tableRef}>
         <table className={styles.dataTable}>
           <thead>
             <tr>
-              <th style={{ width: '2.5rem' }}>
+              <th className={styles.checkCol}>
                 <input
                   type="checkbox"
                   checked={rows.length > 0 && selectedIds.length === rows.length}
@@ -650,7 +651,7 @@ function EmployeesPageInner() {
               <th>Подразделение</th>
               <th>Должность</th>
               <th>Пол</th>
-              <th aria-label="Действия" />
+              <th aria-label="Раскрыть" />
             </tr>
           </thead>
           <tbody>
@@ -658,209 +659,204 @@ function EmployeesPageInner() {
               const photo = mediaSrc(e.faceProfile?.photoUrl);
               const fio = `${e.lastName} ${e.firstName}${e.middleName ? ` ${e.middleName}` : ''}`;
               const flags = e.profileFlags ?? {};
-              const actionOpen =
-                openMenu?.id === e.id && openMenu.kind === 'action';
-              const reportOpen =
-                openMenu?.id === e.id && openMenu.kind === 'report';
               const busy = flagBusyId === e.id;
-              const rowActive = openMenu?.id === e.id;
+              const expanded = expandedId === e.id;
               return (
-                <tr
-                  key={e.id}
-                  className={rowActive ? styles.rowActive : undefined}
-                >
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(selected[e.id])}
-                      onChange={(ev) =>
-                        setSelected((s) => ({
-                          ...s,
-                          [e.id]: ev.target.checked,
-                        }))
-                      }
-                      aria-label={`Выбрать ${e.tabNumber}`}
-                    />
-                  </td>
-                  <td>
-                    <Link className={styles.link} href={`/employees/${e.id}`}>
-                      {e.tabNumber}
-                    </Link>
-                  </td>
-                  <td>
-                    <Link className={styles.fioCell} href={`/employees/${e.id}`}>
-                      {photo ? (
-                        <PhotoThumb
-                          className={styles.avatar}
-                          src={photo}
-                          alt=""
-                          width={32}
-                          height={32}
-                          lightbox={photos}
-                          slides={rows
-                            .map((x) => ({
-                              src: mediaSrc(x.faceProfile?.photoUrl) || '',
-                              caption: `${x.lastName} ${x.firstName}`,
-                            }))
-                            .filter((s) => s.src)}
-                          index={Math.max(
-                            0,
-                            rows
-                              .map((x) => mediaSrc(x.faceProfile?.photoUrl) || '')
-                              .filter(Boolean)
-                              .findIndex((s) => s === photo),
-                          )}
-                        />
-                      ) : (
-                        <span className={styles.avatarFallback}>
-                          {initials(e.lastName, e.firstName)}
-                        </span>
-                      )}
-                      <span className={styles.fioUpper}>{fio}</span>
-                      {(flags.excludeFromStats ||
-                        flags.marksBlocked ||
-                        flags.systemAccessClosed) && (
-                        <span className={styles.flagDots} title="Ограничения">
-                          {flags.excludeFromStats ? (
-                            <span
-                              className={`${styles.flagDot} ${styles.flagDotMuted}`}
-                              title="Исключён из статистики"
-                            />
-                          ) : null}
-                          {flags.marksBlocked ? (
-                            <span
-                              className={`${styles.flagDot} ${styles.flagDotWarn}`}
-                              title="Отметки заблокированы"
-                            />
-                          ) : null}
-                          {flags.systemAccessClosed ? (
-                            <span
-                              className={`${styles.flagDot} ${styles.flagDotDanger}`}
-                              title="Доступ к системе закрыт"
-                            />
-                          ) : null}
-                        </span>
-                      )}
-                    </Link>
-                  </td>
-                  <td>{e.region?.name ?? '—'}</td>
-                  <td>{e.division?.name ?? '—'}</td>
-                  <td>{e.position?.name ?? '—'}</td>
-                  <td>{genderLabel(e.person?.gender)}</td>
-                  <td className={styles.actionsCell}>
-                    <div className={styles.rowHoverActions}>
-                      <Link
-                        className={styles.rowActionBtn}
-                        href={`/employees/${e.id}`}
-                      >
-                        Просмотреть
+                <Fragment key={e.id}>
+                  <tr
+                    className={
+                      expanded
+                        ? `${styles.rowSelected} ${styles.rowActive}`
+                        : undefined
+                    }
+                    onClick={() => toggleExpand(e.id)}
+                    aria-expanded={expanded}
+                  >
+                    <td
+                      className={styles.checkCol}
+                      onClick={(ev) => ev.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selected[e.id])}
+                        onChange={(ev) =>
+                          setSelected((s) => ({
+                            ...s,
+                            [e.id]: ev.target.checked,
+                          }))
+                        }
+                        onClick={(ev) => ev.stopPropagation()}
+                        aria-label={`Выбрать ${e.tabNumber}`}
+                      />
+                    </td>
+                    <td onClick={(ev) => ev.stopPropagation()}>
+                      <Link className={styles.link} href={`/employees/${e.id}`}>
+                        {e.tabNumber}
                       </Link>
-                      <div className={styles.rowActionWrap}>
-                        <button
-                          type="button"
-                          className={styles.rowActionBtn}
-                          aria-expanded={actionOpen}
-                          onClick={() =>
-                            setOpenMenu((cur) =>
-                              cur?.id === e.id && cur.kind === 'action'
-                                ? null
-                                : { id: e.id, kind: 'action' },
-                            )
-                          }
+                    </td>
+                    <td onClick={(ev) => ev.stopPropagation()}>
+                      <Link className={styles.fioCell} href={`/employees/${e.id}`}>
+                        {photo ? (
+                          <PhotoThumb
+                            className={styles.avatar}
+                            src={photo}
+                            alt=""
+                            width={36}
+                            height={36}
+                            lightbox={photos}
+                            slides={rows
+                              .map((x) => ({
+                                src: mediaSrc(x.faceProfile?.photoUrl) || '',
+                                caption: `${x.lastName} ${x.firstName}`,
+                              }))
+                              .filter((s) => s.src)}
+                            index={Math.max(
+                              0,
+                              rows
+                                .map((x) => mediaSrc(x.faceProfile?.photoUrl) || '')
+                                .filter(Boolean)
+                                .findIndex((s) => s === photo),
+                            )}
+                          />
+                        ) : (
+                          <span className={styles.avatarFallback}>
+                            {initials(e.lastName, e.firstName)}
+                          </span>
+                        )}
+                        <span className={styles.fioUpper}>{fio}</span>
+                        {(flags.excludeFromStats ||
+                          flags.marksBlocked ||
+                          flags.systemAccessClosed) && (
+                          <span className={styles.flagDots} title="Ограничения">
+                            {flags.excludeFromStats ? (
+                              <span
+                                className={`${styles.flagDot} ${styles.flagDotMuted}`}
+                                title="Исключён из статистики"
+                              />
+                            ) : null}
+                            {flags.marksBlocked ? (
+                              <span
+                                className={`${styles.flagDot} ${styles.flagDotWarn}`}
+                                title="Отметки заблокированы"
+                              />
+                            ) : null}
+                            {flags.systemAccessClosed ? (
+                              <span
+                                className={`${styles.flagDot} ${styles.flagDotDanger}`}
+                                title="Доступ к системе закрыт"
+                              />
+                            ) : null}
+                          </span>
+                        )}
+                      </Link>
+                    </td>
+                    <td>{e.region?.name ?? '—'}</td>
+                    <td>{e.division?.name ?? '—'}</td>
+                    <td>{e.position?.name ?? '—'}</td>
+                    <td>{genderLabel(e.person?.gender)}</td>
+                    <td className={styles.actionsCell}>
+                      <button
+                        type="button"
+                        className={styles.rowExpandToggle}
+                        aria-label={expanded ? 'Свернуть' : 'Действия'}
+                        aria-expanded={expanded}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          toggleExpand(e.id);
+                        }}
+                      >
+                        {expanded ? '▴' : '▾'}
+                      </button>
+                    </td>
+                  </tr>
+                  {expanded ? (
+                    <tr className={styles.rowExpand}>
+                      <td colSpan={8}>
+                        <div
+                          className={styles.rowExpandInner}
+                          onClick={(ev) => ev.stopPropagation()}
                         >
-                          Действие ▾
-                        </button>
-                        {actionOpen ? (
-                          <div className={styles.rowActionMenu} role="menu">
-                            <button
-                              type="button"
-                              role="menuitem"
-                              disabled={busy}
-                              onClick={() =>
-                                void patchFlags(e.id, {
-                                  excludeFromStats: !flags.excludeFromStats,
-                                })
-                              }
-                            >
-                              <span className={styles.rowActionCheck}>
-                                {!flags.excludeFromStats ? '✓' : ''}
-                              </span>
-                              Включить в статистику
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              disabled={busy}
-                              onClick={() =>
-                                void patchFlags(e.id, {
-                                  marksBlocked: !flags.marksBlocked,
-                                })
-                              }
-                            >
-                              <span className={styles.rowActionCheck}>
-                                {flags.marksBlocked ? '✓' : ''}
-                              </span>
-                              Блокировать возможность отметки
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              disabled={busy}
-                              onClick={() =>
-                                void patchFlags(e.id, {
-                                  systemAccessClosed: !flags.systemAccessClosed,
-                                })
-                              }
-                            >
-                              <span className={styles.rowActionCheck}>
-                                {flags.systemAccessClosed ? '✓' : ''}
-                              </span>
-                              Закрыть доступ к системе
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className={styles.rowActionWrap}>
-                        <button
-                          type="button"
-                          className={styles.rowActionBtn}
-                          aria-expanded={reportOpen}
-                          onClick={() =>
-                            setOpenMenu((cur) =>
-                              cur?.id === e.id && cur.kind === 'report'
-                                ? null
-                                : { id: e.id, kind: 'report' },
-                            )
-                          }
-                        >
-                          Отчет ▾
-                        </button>
-                        {reportOpen ? (
-                          <div className={styles.rowActionMenu} role="menu">
-                            <Link
-                              href={`/employees/${e.id}/reports/attendance`}
-                              onClick={() => setOpenMenu(null)}
-                            >
-                              📄 Отчет по посещениям сотрудников
-                            </Link>
-                            <Link
-                              href={`/employees/${e.id}/reports/attendance?view=settings`}
-                              onClick={() => setOpenMenu(null)}
-                            >
-                              ⚙ Настройки отчёта
-                            </Link>
-                            <Link
-                              href={`/employees/${e.id}/reports/discipline`}
-                              onClick={() => setOpenMenu(null)}
-                            >
-                              Отчет по дисциплине
-                            </Link>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
+                          <Link
+                            className={styles.rowActionBtn}
+                            href={`/employees/${e.id}`}
+                            onClick={(ev) => ev.stopPropagation()}
+                          >
+                            Просмотреть
+                          </Link>
+                          <button
+                            type="button"
+                            className={styles.rowActionBtn}
+                            disabled={busy}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              void patchFlags(e.id, {
+                                excludeFromStats: !flags.excludeFromStats,
+                              });
+                            }}
+                          >
+                            <span className={styles.rowActionCheck}>
+                              {!flags.excludeFromStats ? '✓' : ''}
+                            </span>
+                            Включить в статистику
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.rowActionBtn}
+                            disabled={busy}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              void patchFlags(e.id, {
+                                marksBlocked: !flags.marksBlocked,
+                              });
+                            }}
+                          >
+                            <span className={styles.rowActionCheck}>
+                              {flags.marksBlocked ? '✓' : ''}
+                            </span>
+                            Блокировать отметки
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.rowActionBtn}
+                            disabled={busy}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              void patchFlags(e.id, {
+                                systemAccessClosed: !flags.systemAccessClosed,
+                              });
+                            }}
+                          >
+                            <span className={styles.rowActionCheck}>
+                              {flags.systemAccessClosed ? '✓' : ''}
+                            </span>
+                            Закрыть доступ
+                          </button>
+                          <Link
+                            className={styles.rowActionBtn}
+                            href={`/employees/${e.id}/reports/attendance`}
+                            onClick={(ev) => ev.stopPropagation()}
+                          >
+                            Отчет по посещениям
+                          </Link>
+                          <Link
+                            className={styles.rowActionBtn}
+                            href={`/employees/${e.id}/reports/attendance?view=settings`}
+                            onClick={(ev) => ev.stopPropagation()}
+                          >
+                            Настройки отчёта
+                          </Link>
+                          <Link
+                            className={styles.rowActionBtn}
+                            href={`/employees/${e.id}/reports/discipline`}
+                            onClick={(ev) => ev.stopPropagation()}
+                          >
+                            Отчет по дисциплине
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               );
             })}
             {rows.length === 0 ? (

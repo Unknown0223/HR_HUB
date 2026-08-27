@@ -1,84 +1,106 @@
-# Arena AI — HR HUB: Новостная лента (`/news`)
+# Arena AI — PROMPT 1/2: Новостная лента
 
-**Главная** ichidagi 2/3-sahifa. Login + Dashboard bilan bir xil visual language.
+**Menyu:** Главная → Новостная лента  
+**URL:** `/news`
 
----
-
-## Qayerga qo‘yiladi (Arena natijasini almashtirish)
-
-| Arena bergan fayl | Loyihadagi joy (shu yerga overwrite) |
-|-------------------|--------------------------------------|
-| `page.tsx` (news) | `apps/web/src/app/(app)/news/page.tsx` |
-| `page.module.css` | `apps/web/src/app/(app)/news/page.module.css` |
-
-**Tegmang:** `mega-nav.ts`, `AppShell.tsx`, API, `apps/web/src/app/m/news/*` (mobil alohida).
-
-Tekshiruv: http://localhost:3000/news → **Главная → Новостная лента**
-
----
-
-## PROMPT (copy from here)
+## Qayerga almashtiriladi
 
 ```
-You are doing a DESIGN-ONLY restyle of HR HUB admin page «Новостная лента».
+apps/web/src/app/(app)/news/page.tsx
+apps/web/src/app/(app)/news/page.module.css
+```
 
-CONTEXT
-- Product: multi-tenant HR + attendance + Hikvision Face ID (Uzbekistan / Central Asia).
+---
+
+## PROMPT — to‘liq nusxa qiling (Arena’ga)
+
+```
+You are doing a DESIGN-ONLY restyle of ONE HR HUB page: «Новостная лента».
+
+═══════════════════════════════════════
+PRODUCT & APPROVED VISUAL LANGUAGE
+═══════════════════════════════════════
+- HR admin SaaS: multi-tenant HR + attendance + Hikvision Face ID (Uzbekistan / Central Asia).
 - UI language: Russian.
-- Approved login visual language (match it):
-  - Dark brand ~#070e18, page bg ~#f8fafc, white surfaces
-  - Accent cyan/azure ~#0284c7 (not purple)
-  - Plus Jakarta Sans OR map to existing fonts via CSS variables
-  - Soft radii ~10–14px, calm elevation, 2–3 micro-motions max
-- DO NOT redesign login, dashboard, or invent a left sidebar.
-- Real chrome: TOP mega-nav AppShell (Главная | Кадры | …).
+- Already approved elsewhere (MATCH THIS — do not invent a new brand):
+  • Dark brand / header DNA ~#070e18
+  • Page background ~#f8fafc, white cards/surfaces
+  • Accent cyan/azure ~#0284c7 (biometric feel) — NOT purple, NOT Metronic leftover blue-only theme
+  • Typography: Plus Jakarta Sans (or CSS variables mapped to it)
+  • Radii ~10–14px, soft elevation, calm density
+  • Max 2–3 intentional micro-motions
+- Login and Dashboard (/dashboard: stats + birthdays) already use this language — Новостная лента must feel continuous with them.
+- Real app chrome: TOP mega-nav AppShell (Главная | Кадры | Посещения | …). DO NOT invent a left sidebar.
 
-ROUTE & FILES (only these)
-- Route: /news
-- apps/web/src/app/(app)/news/page.tsx  (classNames / light markup wrappers only)
-- apps/web/src/app/(app)/news/page.module.css  (PRIMARY deliverable)
-Optional token aliases only: apps/web/src/app/globals.css, apps/web/src/components/page-subnav.module.css
-Do NOT change mega-nav.ts, AppShell structure, API handlers, or business logic.
+═══════════════════════════════════════
+SCOPE — ONLY THIS PAGE
+═══════════════════════════════════════
+Route: /news
+Change ONLY:
+  - apps/web/src/app/(app)/news/page.tsx   (classNames / light markup wrappers)
+  - apps/web/src/app/(app)/news/page.module.css   (PRIMARY deliverable)
+Optional: token aliases in globals.css / page-subnav.module.css if needed for continuity.
+FORBIDDEN: mega-nav.ts, AppShell.tsx, Nest API, mobile /m/news, dashboard rewrite, login rewrite.
 
-PAGE STRUCTURE (freeze layout roles)
-1) PageSubnav title: «Новостная лента»
-2) Two-column body:
-   - MAIN: card «Сообщения» (news feed)
-   - ASIDE: card «Дни рождения»
-3) Modal «Добавить сообщение» (compose)
+═══════════════════════════════════════
+PAGE LAYOUT (FREEZE STRUCTURE)
+═══════════════════════════════════════
+Breadcrumb conceptually: Главная / Новостная лента
 
-MAIN — «Сообщения»
-- CTA button: «Добавить сообщение»
-- Loading: «Загрузка…»
+Layout = TWO COLUMNS (same idea as dashboard):
+┌─────────────────────────────┬──────────────────┐
+│ MAIN: «Сообщения»           │ ASIDE:           │
+│  feed + «Добавить сообщение»│ «Дни рождения»   │
+└─────────────────────────────┴──────────────────┘
++ Modal «Добавить сообщение»
+
+MAIN CARD — «Сообщения»
+- Title «Сообщения»
+- Primary/outline CTA «Добавить сообщение» (top-right of card)
+- Loading text: «Загрузка…»
 - Empty: «Нет сообщений»
-- Post list: author/time/body; action «Удалить» per post
-- Keep delete confirmation / API behavior as-is
+- Feed items: author name, published datetime, HTML/body content
+- Per-item action «Удалить» (keep confirm + DELETE API)
+- Sample content may look like «Добро пожаловать в HR HUB» — style posts, don’t hardcode demo text into logic
 
-ASIDE — «Дни рождения»
-- Empty: «Здесь Вы будете видеть дни рождения коллег»
-- Rows: name, date/when; links to /employees/{id}
+ASIDE CARD — «Дни рождения»
+- Must visually match the birthdays panel already on Dashboard (avatar initials circle, name, position, date on the right)
+- Empty copy: «Здесь Вы будете видеть дни рождения коллег»
+- Rows link to /employees/{id}
+- Data from GET /api/news/birthdays (separate from dashboard stats)
 
 MODAL — «Добавить сообщение»
-- Field label «Сообщение *»
-- Placeholder «Введите сообщение…»
-- Checkbox/option «Отправить всем сотрудникам»
-- Rich-text toolbar titles (keep): Отменить, Повторить, Жирный, Курсив, Подчёркнутый, Цитата, Список, Нумерованный, Ссылка
+- Title «Добавить сообщение»
+- Label «Сообщение *»
+- Rich editor (contenteditable) + toolbar — KEEP these tool labels:
+  Отменить, Повторить, Жирный, Курсив, Подчёркнутый, Цитата, Список, Нумерованный, Ссылка
+- Checkbox «Отправить всем сотрудникам»
 - Footer: «Сохранить», «Закрыть»
-- Do not remove toolbar features; only restyle
+- Restyle only; do not remove toolbar commands or fields
 
-DATA FREEZE
-- GET /api/news
-- POST /api/news  (body includes message, sendToAll — keep shape)
+═══════════════════════════════════════
+DATA / LOGIC FREEZE
+═══════════════════════════════════════
+- GET  /api/news
+- POST /api/news     body keeps message + sendToAll (existing shape)
 - DELETE /api/news/:id
-- GET /api/news/birthdays
-- Breadcrumb conceptually: Главная / Новостная лента
+- GET  /api/news/birthdays
+- PageSubnav may wrap the title — keep it; restyle via CSS if needed
 
-STACK
-- Next.js App Router + CSS Modules. No Tailwind system migration. No new npm deps.
-- Prefer scoped CSS variables for login palette continuity; do not break other admin pages’ tokens.
+═══════════════════════════════════════
+STACK RULES
+═══════════════════════════════════════
+- Next.js App Router + CSS Modules only
+- Scope new design tokens under a page root class (like login .container / dashboard .page) so AppShell Metronic tokens don’t break
+- No Tailwind as the design system, no new npm deps
+- No purple-on-white / cream-serif / newspaper clichés
 
-SUCCESS
-- Same IA and Russian labels; looks continuous with approved login
-- Feed + birthdays + compose modal all restyled
-- No left nav invention; APIs and delete/create flow unchanged
+═══════════════════════════════════════
+DELIVERABLES
+═══════════════════════════════════════
+1) Updated page.module.css (main)
+2) Minimal page.tsx className/wrapper tweaks if needed
+3) Short CSS comment listing tokens used
+
+SUCCESS: Same Russian labels and APIs; looks like the same product as login + dashboard; feed + birthdays + modal fully restyled; no left nav.
 ```
