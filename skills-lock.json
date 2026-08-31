@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "skills": {
+    "auditing-performance": {
+      "source": "spencerpauly/awesome-cursor-skills",
+      "sourceType": "github",
+      "skillPath": "resources/auditing-performance/SKILL.md",
+      "computedHash": "f21ce7ea53b9b7f1ebde0e627f0bf4e7d34064ffcce5c42bcc2f3dbf430de3af"
+    },
+    "brooks-audit": {
+      "source": "sickn33/agentic-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/brooks-audit/SKILL.md",
+      "computedHash": "d59519bddcffd284485995690ffa47a1e2bbe7d6877f34e3ea6b0bb366a14a70"
+    },
+    "codebase-audit": {
+      "source": "majiayu000/spellbook",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-audit/SKILL.md",
+      "computedHash": "e13a03d1734219a6849d499279aef6ea55ec18714062a98dca986c3063d52f87"
+    },
+    "gjalla-test-audit": {
+      "source": "gjalla/engineering",
+      "sourceType": "github",
+      "skillPath": "skills/gjalla-test-audit/SKILL.md",
+      "computedHash": "32bce6a887d9d1b75ac8b20e660809c1a8e7b9ea954859b777df6236cb03d6d4"
+    },
+    "nestjs-best-practices": {
+      "source": "kadajett/agent-nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-best-practices/SKILL.md",
+      "computedHash": "29c326e77d1462ed9526996acae5da0cf4003146982abc8c67378f5dbad6b181"
+    },
+    "postgresql-code-review": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/postgresql-code-review/SKILL.md",
+      "computedHash": "1167ec9449aa866e16bc7449e05ab4d391cdce95a0b0c5e1155b793160471eb5"
+    },
+    "react-code-review": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/react-code-review/SKILL.md",
+      "computedHash": "27b826f9a45f56387b0adf0890fbac8114525ed14561921e4a61428ebd027443"
+    },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "0f858feecab83071b81e658c32f361bb8af34b5bf567ba0a86ff94383c055e7f"
+    },
+    "security-review": {
+      "source": "getsentry/skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-review/SKILL.md",
+      "computedHash": "1eee1e41aa0a0e75dbbe0cac387e3d61bedf51af1888f184301a173731e6973e"
+    }
+  }
+}

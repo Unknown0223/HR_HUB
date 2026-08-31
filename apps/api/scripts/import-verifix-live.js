@@ -2,7 +2,8 @@
  * Import live Verifix dump (data/verifix-dump/live/*.json) into local HR Hub.
  *
  * Matches Excel-imported employees by staff/robot code (externalId verifix:{robot_id}
- * and padded tab). Adds dismissed staff, devices, locations, and August punches.
+ * and padded tab). Adds dismissed staff, devices, locations.
+ * Attendance tracks/marks are NOT imported — start punches fresh from devices.
  */
 const { PrismaClient, Prisma } = require('@prisma/client');
 const fs = require('fs');
@@ -69,19 +70,6 @@ function dmy(s) {
   return new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
 }
 
-function dmyTime(s) {
-  const m = String(s || '').match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (!m) return null;
-  return new Date(
-    Number(m[3]),
-    Number(m[2]) - 1,
-    Number(m[1]),
-    Number(m[4]),
-    Number(m[5]),
-    Number(m[6]),
-  );
-}
-
 function padTab(code) {
   const digits = String(code || '').replace(/\D/g, '');
   if (!digits) return null;
@@ -114,13 +102,6 @@ function empStatus(row) {
   return 'active';
 }
 
-function punchDir(row) {
-  const t = String(row.modified_track_type || row.original_type || '');
-  if (t === 'I') return 'IN';
-  if (t === 'O') return 'OUT';
-  return 'AUTO';
-}
-
 async function uniqueCode(existing, base) {
   let code = (base || 'X').slice(0, 36) || 'X';
   let n = 0;
@@ -141,7 +122,6 @@ async function uniqueCode(existing, base) {
   const schedulesDump = readDump('schedules.json');
   const locationsDump = readDump('locations.json');
   const devicesDump = readDump('devices.json');
-  const tracksDump = readDump('tracks.json');
 
   if (!employeesDump.length) throw new Error('live/employees.json yo‘q yoki bo‘sh');
 
@@ -190,7 +170,58 @@ async function uniqueCode(existing, base) {
 
   const existingDivs = await prisma.division.findMany({ where: { tenantId: tenant.id } });
   const divByName = Object.fromEntries(existingDivs.map((d) => [d.name, d]));
+  const divByCode = Object.fromEntries(existingDivs.map((d) => [d.code, d]));
   const divCodes = new Set(existingDivs.map((d) => d.code));
+  const divisionsDump = readDump('divisions.json');
+  const divByVf = {};
+
+  for (const r of divisionsDump) {
+    const name = String(r.name || '').trim();
+    const vfId = String(r.division_id || '').trim();
+    if (!name) continue;
+    const code = vfId ? `VF-${vfId}` : null;
+    const payload = {
+      name,
+      openedAt: dmy(r.opened_date),
+      closedAt: dmy(r.closed_date),
+      isActive: !r.closed_date && !/неактив/i.test(String(r.state_name || '')),
+      sortOrder: Number(r.order_no) || 0,
+    };
+    let found = (code && divByCode[code]) || divByName[name] || null;
+    if (found) {
+      found = await prisma.division.update({ where: { id: found.id }, data: payload });
+    } else {
+      found = await prisma.division.create({
+        data: {
+          tenantId: tenant.id,
+          code: await uniqueCode(divCodes, code || slug(name)),
+          parentId: hq?.id || null,
+          ...payload,
+        },
+      });
+    }
+    divByName[name] = found;
+    divByCode[found.code] = found;
+    if (vfId) divByVf[vfId] = found;
+  }
+
+  for (const r of divisionsDump) {
+    const vfId = String(r.division_id || '').trim();
+    const parentVf = String(r.parent_id || '').trim();
+    const child = divByVf[vfId];
+    const parent = parentVf ? divByVf[parentVf] : null;
+    if (!child) continue;
+    const nextParent = parent?.id || hq?.id || null;
+    if (child.parentId !== nextParent) {
+      const updated = await prisma.division.update({
+        where: { id: child.id },
+        data: { parentId: nextParent },
+      });
+      divByName[updated.name] = updated;
+      if (vfId) divByVf[vfId] = updated;
+    }
+  }
+
   const allDivNames = [
     ...new Set(
       [
@@ -212,7 +243,7 @@ async function uniqueCode(existing, base) {
     });
     divByName[name] = created;
   }
-  console.log('divisions', Object.keys(divByName).length);
+  console.log('divisions', Object.keys(divByName).length, 'tree', divisionsDump.length);
 
   const existingPos = await prisma.position.findMany({ where: { tenantId: tenant.id } });
   const posByName = Object.fromEntries(existingPos.map((p) => [p.name, p]));
@@ -526,7 +557,6 @@ async function uniqueCode(existing, base) {
       })
     ).map((d) => [d.serialNumber, d]),
   );
-  const deviceByVfId = new Map();
   for (const r of devicesDump) {
     const serial = String(r.serial_number || '').trim() || `vf-device-${r.device_id}`;
     const adapterType = /hik/i.test(String(r.device_type_name || '')) ? 'hikvision' : 'mock';
@@ -553,75 +583,9 @@ async function uniqueCode(existing, base) {
       });
       deviceBySerial.set(serial, device);
     }
-    deviceByVfId.set(String(r.device_id), device);
   }
   console.log('devices', devicesDump.length);
-
-  const empByVfId = new Map();
-  for (const [k, e] of empByExt) {
-    const m = String(k).match(/^verifix:(\d+)$/);
-    if (m) empByVfId.set(m[1], e);
-  }
-  for (const r of employeesDump) {
-    const e = empByExt.get(`verifix:${r.employee_id}`);
-    if (e) empByVfId.set(String(r.employee_id), e);
-  }
-
-  const existingMarks = await prisma.attendanceMark.findMany({
-    where: { tenantId: tenant.id, source: 'verifix' },
-    select: { employeeExternalId: true, occurredAt: true },
-  });
-  const seenMark = new Set(
-    existingMarks.map((m) => `${m.employeeExternalId}|${m.occurredAt.toISOString()}`),
-  );
-
-  let marksCreated = 0;
-  let marksSkip = 0;
-  const batch = [];
-  async function flushMarks() {
-    if (!batch.length) return;
-    await prisma.attendanceMark.createMany({ data: batch });
-    marksCreated += batch.length;
-    batch.length = 0;
-  }
-
-  for (const t of tracksDump) {
-    const occurredAt = dmyTime(t.track_time);
-    if (!occurredAt) {
-      marksSkip += 1;
-      continue;
-    }
-    const vfEmp = String(t.person_id || '');
-    const key = `verifix:${vfEmp}|${occurredAt.toISOString()}`;
-    if (seenMark.has(key)) {
-      marksSkip += 1;
-      continue;
-    }
-    seenMark.add(key);
-    const emp = empByVfId.get(vfEmp) || empByFio.get(normName(t.person_name));
-    const device = deviceByVfId.get(String(t.device_id || '')) || null;
-    batch.push({
-      tenantId: tenant.id,
-      employeeId: emp?.id || null,
-      deviceId: device?.id || null,
-      employeeExternalId: vfEmp ? `verifix:${vfEmp}` : null,
-      direction: punchDir(t),
-      occurredAt,
-      source: 'verifix',
-      rawPayload: {
-        trackId: t.track_id,
-        trackDate: t.track_date,
-        type: t.track_type_name,
-        markType: t.mark_type_name,
-        location: t.location_name,
-        device: t.device_name,
-        valid: t.is_valid,
-      },
-    });
-    if (batch.length >= 500) await flushMarks();
-  }
-  await flushMarks();
-  console.log('tracks created', marksCreated, 'skipped', marksSkip);
+  console.log('tracks skip (marks not imported — fresh start)');
 
   const summary = {
     employeesUpdated: updatedEmps,
@@ -630,9 +594,7 @@ async function uniqueCode(existing, base) {
     robots: robotsDump.length,
     locations: locationsDump.length,
     devices: devicesDump.length,
-    tracksCreated: marksCreated,
-    tracksSkipped: marksSkip,
-    tracksDump: tracksDump.length,
+    tracksCreated: 0,
   };
   fs.writeFileSync(
     path.join(DUMP, 'import-live-summary.json'),
