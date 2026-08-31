@@ -1,10 +1,24 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { Open_Sans } from 'next/font/google';
 import { Providers } from '@/components/Providers';
 import './globals.css';
+
+const openSans = Open_Sans({
+  subsets: ['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext'],
+  display: 'swap',
+  variable: '--font-open-sans',
+});
 
 export const metadata: Metadata = {
   title: 'HR HUB',
   description: 'Multi-tenant HR + attendance + payroll',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#eeeeef',
 };
 
 export default function RootLayout({
@@ -13,18 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="uz">
+    <html lang="uz" className={openSans.variable}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
         <link
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
@@ -33,7 +37,7 @@ export default function RootLayout({
           referrerPolicy="no-referrer"
         />
       </head>
-      <body>
+      <body className={openSans.className}>
         <Providers>{children}</Providers>
       </body>
     </html>

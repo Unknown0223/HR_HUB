@@ -1,4 +1,12 @@
-import ExcelJS from 'exceljs';
+import type { Border, Cell } from 'exceljs';
+
+type ExcelJSNS = typeof import('exceljs');
+
+async function loadExcelJS(): Promise<ExcelJSNS> {
+  const mod = await import('exceljs');
+  const ns = (mod as ExcelJSNS & { default?: ExcelJSNS }).default ?? (mod as ExcelJSNS);
+  return ns;
+}
 
 /** Verifix-like table palette (ARGB without #). */
 export const XLSX_COLORS = {
@@ -54,7 +62,7 @@ function cellStyle(c: XlsxCell): XlsxCellStyle | undefined {
   return undefined;
 }
 
-function applyFill(cell: ExcelJS.Cell, argb?: string) {
+function applyFill(cell: Cell, argb?: string) {
   if (!argb) return;
   cell.fill = {
     type: 'pattern',
@@ -63,8 +71,8 @@ function applyFill(cell: ExcelJS.Cell, argb?: string) {
   };
 }
 
-function applyBorder(cell: ExcelJS.Cell) {
-  const edge: Partial<ExcelJS.Border> = {
+function applyBorder(cell: Cell) {
+  const edge: Partial<Border> = {
     style: 'thin',
     color: { argb: XLSX_COLORS.border },
   };
@@ -73,6 +81,7 @@ function applyBorder(cell: ExcelJS.Cell) {
 
 /** Build and download a styled .xlsx that mirrors web table look. */
 export async function downloadStyledXlsx(input: XlsxTableExport): Promise<void> {
+  const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'HR HUB';
   wb.created = new Date();
@@ -189,6 +198,7 @@ export async function downloadAttendanceLikeXlsx(opts: {
   }[];
   footer?: XlsxCell[];
 }): Promise<void> {
+  const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'HR HUB';
   const ws = wb.addWorksheet('Посещения');
@@ -306,6 +316,7 @@ export async function downloadMatrixXlsx(opts: {
   rows: { label: string; values: Array<number | string> }[];
   footer?: { label: string; values: Array<number | string> };
 }): Promise<void> {
+  const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'HR HUB';
   const ws = wb.addWorksheet((opts.sheetName || 'Отчет').replace(/[\\/*?:[\]]/g, '_').slice(0, 31) || 'Sheet1');
@@ -400,6 +411,7 @@ export async function downloadMultiSheetXlsx(opts: {
   dateLine?: string;
   sheets: XlsxSheetExport[];
 }): Promise<void> {
+  const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'HR HUB';
   wb.created = new Date();
@@ -492,6 +504,7 @@ export async function downloadSectionedXlsx(opts: {
   sections: { title: string; columns: string[]; rows: XlsxCell[][] }[];
   colWidths?: number[];
 }): Promise<void> {
+  const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'HR HUB';
   wb.created = new Date();

@@ -447,6 +447,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.shell}>
+      <a className={styles.skipLink} href="#main-content">
+        К основному содержимому
+      </a>
       <header className={styles.topNav} data-no-print>
         <div className={styles.topNavInner}>
           <button
@@ -1146,12 +1149,16 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <span className={styles.crumbPage}>{pageTitle}</span>
         </div>
       )}
-      <main className={styles.main} onClick={() => {
-        setProfileOpen(false);
-        setNotifyOpen(false);
-        setQuickOpen(false);
-        setSearchOpen(false);
-      }}>
+      <main
+        id="main-content"
+        className={styles.main}
+        onClick={() => {
+          setProfileOpen(false);
+          setNotifyOpen(false);
+          setQuickOpen(false);
+          setSearchOpen(false);
+        }}
+      >
         {children}
       </main>
     </div>

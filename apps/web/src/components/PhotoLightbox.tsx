@@ -77,6 +77,8 @@ export function PhotoThumb({
       alt={alt}
       width={width}
       height={height}
+      loading="lazy"
+      decoding="async"
       role="button"
       tabIndex={0}
       style={{ cursor: 'pointer' }}

@@ -6,6 +6,27 @@
   background: var(--bg);
 }
 
+.skipLink {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.5rem;
+  z-index: 200;
+  padding: 0.4rem 0.75rem;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transform: translateY(-150%);
+  box-shadow: var(--shadow-sm);
+}
+
+.skipLink:focus {
+  transform: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* —— Top nav = Verifix #kt_header —— */
 .topNav {
   position: sticky;
@@ -725,6 +746,7 @@
   padding: 1rem 1.25rem 1.5rem;
   animation: fadeIn 0.15s ease both;
   flex: 1;
+  scroll-margin-top: calc(var(--header-height) + 8px);
 }
 
 .loading {

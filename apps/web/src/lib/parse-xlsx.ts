@@ -1,4 +1,12 @@
-import ExcelJS from 'exceljs';
+import type { CellValue } from 'exceljs';
+
+type ExcelJSNS = typeof import('exceljs');
+
+async function loadExcelJS(): Promise<ExcelJSNS> {
+  const mod = await import('exceljs');
+  const ns = (mod as ExcelJSNS & { default?: ExcelJSNS }).default ?? (mod as ExcelJSNS);
+  return ns;
+}
 
 export type XlsxMatrix = {
   sheetName: string;
@@ -6,7 +14,7 @@ export type XlsxMatrix = {
   rows: string[][];
 };
 
-function cellToString(value: ExcelJS.CellValue): string {
+function cellToString(value: CellValue): string {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value).trim();
@@ -21,7 +29,7 @@ function cellToString(value: ExcelJS.CellValue): string {
       return (value as { text: string }).text.trim();
     }
     if ('result' in value) {
-      return cellToString((value as { result: ExcelJS.CellValue }).result);
+      return cellToString((value as { result: CellValue }).result);
     }
     if ('richText' in value && Array.isArray((value as { richText: { text: string }[] }).richText)) {
       return (value as { richText: { text: string }[] }).richText.map((t) => t.text).join('').trim();
@@ -35,6 +43,7 @@ export async function parseXlsxFile(
   file: File,
   preferredSheet?: string | string[],
 ): Promise<XlsxMatrix> {
+  const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   const buf = await file.arrayBuffer();
   await wb.xlsx.load(buf);

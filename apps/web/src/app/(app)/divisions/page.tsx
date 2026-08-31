@@ -172,6 +172,8 @@ function Avatar({
         alt=""
         width={42}
         height={42}
+        loading="lazy"
+        decoding="async"
       />
     );
   }
