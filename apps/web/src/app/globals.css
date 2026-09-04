@@ -1,46 +1,47 @@
 :root {
-  /* Verifix-captured tokens → HR HUB (brand name only differs) */
-  --bg: #eeeeef;
-  --bg-deep: #e8e8e9;
-  --bg-elevated: #f7f7f7;
-  --bg-hover: #f3f3f4;
-  --bg-soft: #f3f6f9;
+  /* redesign-hr-hub-sections design system */
+  --bg: #f3f6fb;
+  --bg-deep: #eaeff6;
+  --bg-elevated: #f2f5f9;
+  --bg-hover: #e8eef6;
+  --bg-soft: #f2f5f9;
   --surface: #ffffff;
-  --surface-muted: #f9f9fa;
-  --ink: #464e5f;
-  --ink-strong: rgba(0, 0, 0, 0.9);
-  --ink-muted: rgba(0, 0, 0, 0.71);
-  --ink-faint: rgba(0, 0, 0, 0.51);
-  --line: #ced4da;
-  --line-soft: #eaeaea;
-  --line-table: rgba(0, 0, 0, 0.1);
-  --line-header: rgba(255, 255, 255, 0.24);
+  --surface-muted: #f2f5f9;
+  --ink: #14213a;
+  --ink-strong: #0a1322;
+  --ink-muted: #64788f;
+  --ink-faint: #8ca0b8;
+  --line: #e3e9f1;
+  --line-soft: #e3e9f1;
+  --line-table: #e3e9f1;
+  --line-header: rgba(255, 255, 255, 0.1);
+  --line-strong: #cbd6e4;
 
-  /* Metronic primary from style.bundle --primary */
-  --accent: #6993ff;
-  --accent-hover: #4377ff;
-  --accent-active: #366eff;
-  --accent-soft: #e1e9ff;
-  --accent-focus: rgba(128, 163, 255, 0.5);
-  --link: #257ab1;
-  --link-soft: #6993ff;
+  /* Accent (azure) */
+  --accent: #0a85e2;
+  --accent-hover: #0770c2;
+  --accent-active: #0a5e9f;
+  --accent-soft: #edf6fe;
+  --accent-focus: rgba(10, 133, 226, 0.25);
+  --link: #0770c2;
+  --link-soft: #0a85e2;
 
-  --ok: #1bc5bd;
-  --ok-soft: #c9f7f5;
-  --warn: #ffa800;
-  --warn-soft: #fff4de;
-  --danger: #f64e60;
-  --danger-soft: #ffe2e5;
-  --info: #8950fc;
-  --info-soft: #eee5ff;
+  --ok: #0e9f6e;
+  --ok-soft: #e8f7f0;
+  --warn: #d97706;
+  --warn-soft: #fcf1e1;
+  --danger: #e11d48;
+  --danger-soft: #fdecef;
+  --info: #7c3aed;
+  --info-soft: #f3efff;
 
-  /* Header / mega-menu (kt_header) */
-  --header: #072030;
-  --header-elev: #384161;
-  --header-ink: rgba(255, 255, 255, 0.9);
-  --header-muted: #c6cad7;
-  --header-faint: rgba(255, 255, 255, 0.71);
-  --header-height: 52px;
+  /* Header */
+  --header: #070e18;
+  --header-elev: #0b1524;
+  --header-ink: rgba(255, 255, 255, 0.92);
+  --header-muted: #94a3b8;
+  --header-faint: rgba(255, 255, 255, 0.55);
+  --header-height: 56px;
 
   /* Aliases kept for existing component usage */
   --sidebar: var(--header);
@@ -49,34 +50,35 @@
   --sidebar-muted: var(--header-muted);
   --accent-2: var(--accent);
 
-  --radius: 4px;
-  --radius-sm: 4px;
-  --radius-lg: 4px;
-  --control-height: 38px;
-  --table-row-pad-y: 8px;
-  --table-row-pad-x: 12px;
-  --table-head-pad-y: 10px;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --control-height: 40px;
+  --table-row-pad-y: 10px;
+  --table-row-pad-x: 14px;
+  --table-head-pad-y: 12px;
   --font-size: 15px;
-  --font-size-sm: 14px;
-  --font-size-xs: 13px;
+  --font-size-sm: 13.5px;
+  --font-size-xs: 12.5px;
   --line-height: 1.45;
 
-  --shadow: 0 0 1px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
-  --shadow-sm: 0 0 1px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 0 50px 0 rgba(82, 63, 105, 0.15);
-  --shadow-mega: 0 0 1px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.2);
+  --shadow: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
+  --shadow-sm: 0 1px 2px rgba(16, 30, 54, 0.05);
+  --shadow-lg: 0 2px 6px rgba(10, 22, 40, 0.08), 0 16px 44px -12px rgba(10, 22, 40, 0.24);
+  --shadow-mega: 0 30px 70px -20px rgba(0, 0, 0, 0.6);
+  --shadow-btn: 0 1px 2px rgba(10, 22, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 
-  --font-display: var(--font-open-sans), "Open Sans", sans-serif;
-  --font-body: var(--font-open-sans), "Open Sans", sans-serif;
-  --motion: 150ms ease;
-  --subheader-btn: #e1e3ea;
+  --font-display: var(--font-plus-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-plus-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --motion: 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  --subheader-btn: #eaeff6;
 
-  /* Dashboard attendance pie (Verifix amCharts palette) */
-  --dash-ontime: #06d6a0;
-  --dash-late: #ffd166;
-  --dash-absent: #ef476f;
-  --dash-dayoff: #a3c4f3;
-  --dash-center: #a0b1ba;
+  /* Attendance status */
+  --dash-ontime: #0e9f6e;
+  --dash-late: #d97706;
+  --dash-absent: #e11d48;
+  --dash-dayoff: #7e93ac;
+  --dash-center: #14213a;
 
   /* Mobile client (/m) — dark skin captured from the Verifix HR phone app */
   --m-bg: #0d1017;
@@ -128,6 +130,45 @@ body {
   line-height: var(--line-height);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(10, 133, 226, 0.18);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c3cedd transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c3cedd;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='menuitem']:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-focus);
 }
 
 h1,
@@ -141,19 +182,6 @@ button,
 a,
 [role='button'] {
   touch-action: manipulation;
-}
-
-button:focus-visible,
-a:focus-visible,
-[role='button']:focus-visible,
-[role='tab']:focus-visible,
-[role='menuitem']:focus-visible,
-summary:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -211,17 +239,17 @@ td {
 }
 
 th {
-  font-size: 13px;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--ink);
-  font-weight: 600;
-  background: var(--surface);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  font-weight: 700;
+  background: rgba(242, 245, 249, 0.6);
   border-bottom: 1px solid var(--line-table);
   position: sticky;
   top: 0;
   z-index: 2;
-  box-shadow: 0 1px 0 var(--line-table);
+  box-shadow: none;
   padding: var(--table-head-pad-y) var(--table-row-pad-x) var(--table-head-pad-y) 10px;
 }
 
@@ -230,7 +258,7 @@ tbody tr:nth-child(odd) {
 }
 
 tbody tr:nth-child(even) {
-  background: var(--bg-elevated);
+  background: var(--surface);
 }
 
 tbody tr {

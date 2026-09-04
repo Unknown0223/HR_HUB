@@ -1,25 +1,52 @@
-import { API_URL } from '@/lib/api';
+import { API_URL, getAccessToken } from '@/lib/api';
 
 /** Turn stored MinIO / API / data URLs into a browser-loadable src. */
 export function mediaSrc(url?: string | null, photoKey?: string | null): string | null {
+  let src: string | null = null;
   if (photoKey && isSafeMediaKey(photoKey)) {
-    return fileProxy(photoKey);
-  }
-  if (!url) return null;
-  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  try {
-    const parsed = new URL(url);
-    if (parsed.pathname.startsWith('/api/storage/file')) {
-      const key = parsed.searchParams.get('key');
-      if (key && isSafeMediaKey(key)) return fileProxy(key);
+    src = fileProxy(photoKey);
+  } else if (!url) {
+    src = null;
+  } else if (url.startsWith('data:') || url.startsWith('blob:')) {
+    src = url;
+  } else if (url.startsWith('/api/')) {
+    src = `${API_URL}${url}`;
+  } else {
+    try {
+      const parsed = new URL(url);
+      if (parsed.pathname.startsWith('/api/storage/file')) {
+        const key = parsed.searchParams.get('key');
+        if (key && isSafeMediaKey(key)) src = fileProxy(key);
+      }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
+    if (!src) {
+      const key = extractMinioKey(url);
+      if (key) src = fileProxy(key);
+      else src = url;
+    }
   }
-  const key = extractMinioKey(url);
-  if (key) return fileProxy(key);
-  return url;
+
+  return withAccessToken(src);
+}
+
+/** <img> cannot send Authorization — append JWT query for /api/storage/file. */
+function withAccessToken(src: string | null): string | null {
+  if (!src) return null;
+  if (src.startsWith('data:') || src.startsWith('blob:')) return src;
+  const token = getAccessToken();
+  if (!token) return src;
+  try {
+    const u = new URL(src, typeof window !== 'undefined' ? window.location.origin : API_URL);
+    if (!u.pathname.includes('/api/storage/file')) return src;
+    if (!u.searchParams.get('access_token')) {
+      u.searchParams.set('access_token', token);
+    }
+    return u.toString();
+  } catch {
+    return src;
+  }
 }
 
 function fileProxy(key: string): string {

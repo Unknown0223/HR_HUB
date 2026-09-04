@@ -135,7 +135,11 @@ function flattenTree(nodes: TreeNode[], q: string): TreeNode[] {
 function collectIds(node: TreeNode): string[] {
   return [node.id, ...(node.children || []).flatMap(collectIds)];
 }
-function fmtHours(n: number, settings: Settings, blankZeroWorked = false) {
+function fmtHours(
+  n: number,
+  settings: { showMinutes: boolean; showHhMm: boolean },
+  blankZeroWorked = false,
+) {
   if (blankZeroWorked && n === 0) return '';
   const sign = n < 0 ? '-' : '';
   const abs = Math.abs(n);
@@ -617,16 +621,16 @@ function Inner() {
         rows: [
           ...payload.rows.map((r) => ({
             cells: [
-              { v: r.division, s: { align: 'left' } },
+              { v: r.division, s: { align: 'left' as const } },
               ...extras.map((c) => extraVal(r, c.key)),
-              { v: r.schedule, s: { align: 'left' } },
+              { v: r.schedule, s: { align: 'left' as const } },
               ...r.cells.map((c) => calCellText(c as CalCell, calSettings)),
               absentText(r.absentTotal || 0),
             ],
           })),
           {
             cells: [
-              { v: 'Всего', s: { align: 'left' } },
+              { v: 'Всего', s: { align: 'left' as const } },
               ...extras.map(() => ''),
               '',
               ...(payload.totals?.cells || []).map((c) => c.text || ''),
@@ -641,7 +645,7 @@ function Inner() {
       { label: '№', span: 1 },
       { label: 'Подразделение', span: 1 },
       { label: 'График работы', span: 1 },
-      ...payload.days.map((d) => ({ label: d.label, span: 3, fill: d.sunday ? XLSX_COLORS.weekendBg : undefined })),
+      ...payload.days.map((d) => ({ label: d.label || d.day || '', span: 3, fill: d.sunday ? XLSX_COLORS.weekendBg : undefined })),
       { label: 'Итого', span: 3 },
     ];
     const subHeader = [
@@ -668,8 +672,8 @@ function Inner() {
         return {
           cells: [
             r.n,
-            { v: r.division, s: { align: 'left' } },
-            { v: r.schedule, s: { align: 'left' } },
+            { v: r.division, s: { align: 'left' as const } },
+            { v: r.schedule, s: { align: 'left' as const } },
             ...r.cells.flatMap((c) => [cellText(c, 'planned'), cellText(c, 'worked'), cellText(c, 'diff')]),
             cellText(t, 'planned', false),
             cellText(t, 'worked', false),

@@ -14,14 +14,14 @@
 }
 
 .radio input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .selectAll {
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;
@@ -70,7 +70,7 @@
 }
 
 .link {
-  color: #3699ff;
+  color: #0a85e2;
   text-decoration: none;
 }
 

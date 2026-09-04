@@ -46,6 +46,8 @@ CLI on this Windows machine may be blocked by App Control — use the dashboard:
 
 Generate a public domain for `api` (Settings → Networking → Generate Domain).
 
+On each deploy the API container runs `prisma migrate deploy` (via `apps/api/scripts/prod-migrate.js`). It does **not** run `db push` and does not reset data. Databases previously created with `db push` are baselined on first boot (history recorded only).
+
 After first deploy succeeds, seed once (Railway shell / one-off):
 
 ```bash

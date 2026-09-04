@@ -15,7 +15,7 @@
   background: none;
   padding: 0;
   margin: 0 0 0.65rem;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.82rem;
   cursor: pointer;
@@ -31,7 +31,7 @@
   background: none;
   padding: 0;
   margin: 0;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -42,7 +42,7 @@
 }
 
 .dateLink {
-  color: #3699ff;
+  color: #0a85e2;
   text-decoration: none;
 }
 
@@ -127,7 +127,7 @@
 
 .limitInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -195,8 +195,8 @@
 }
 
 .check input:checked + .box {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
 }
 
 .check input:checked + .box::after {

@@ -41,7 +41,7 @@
 .btnStatus {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -54,13 +54,13 @@
 }
 
 .btnStatus {
-  background: #0d9488;
+  background: #0a85e2;
 }
 
 .btnClose {
   border: 1px solid #d1d5db;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -113,7 +113,7 @@
 .ok {
   margin: 0;
   padding: 0.45rem 0.7rem;
-  color: #0d9488;
+  color: #0a85e2;
   background: #ecfdf5;
   border-radius: 4px;
 }
@@ -180,7 +180,7 @@
 
 .sideLinkActive {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
   font-weight: 600;
 }
 
@@ -278,7 +278,7 @@
 
 .badgeOk {
   background: #d1fadf;
-  color: #0d9488;
+  color: #0a85e2;
 }
 
 .badgePending {

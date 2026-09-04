@@ -3,6 +3,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 1.25rem 1.5rem 2.5rem;
 }
 
 @keyframes fadeUp {
@@ -40,7 +45,7 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #0d9488;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -55,7 +60,7 @@
 }
 
 .createBtn:hover {
-  background: #0f766e;
+  background: #0770c2;
 }
 
 .createMenu {
@@ -95,12 +100,16 @@
   width: 100%;
   text-align: left;
   text-decoration: none;
+  appearance: none;
+  border: none;
+  background: transparent;
   font: inherit;
   font-size: 0.85rem;
   padding: 0.55rem 0.65rem;
   border-radius: 4px;
   color: #111827;
   box-sizing: border-box;
+  cursor: pointer;
 }
 
 .createMenuLink:hover {
@@ -211,7 +220,7 @@
 .toggleLabel input[type='checkbox'] {
   width: 1.1rem;
   height: 1.1rem;
-  accent-color: #0d9488;
+  accent-color: #0a85e2;
 }
 
 .formGrid input,

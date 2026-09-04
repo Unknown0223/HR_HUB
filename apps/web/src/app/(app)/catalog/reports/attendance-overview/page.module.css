@@ -19,7 +19,7 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.86rem;
   text-align: left;
@@ -55,7 +55,7 @@
 
 .tplItem:hover {
   background: #f1faff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .box {
@@ -63,7 +63,7 @@
   height: 16px;
   margin: 0;
   flex: 0 0 16px;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -150,7 +150,7 @@
 
 .opt input {
   margin-top: 0.12rem;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   flex: 0 0 auto;
 }
 
@@ -184,7 +184,7 @@
 
 .dropField:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -400,8 +400,8 @@
 
 .t13Check input:checked + .t13Box,
 .t13BoxOn {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
 }
 
 .t13Check input:checked + .t13Box::after,
@@ -449,7 +449,7 @@
 
 .t13Search:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
 }
 
@@ -463,7 +463,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.82rem;
   padding: 0.4rem 0.65rem;
@@ -515,7 +515,7 @@
 }
 
 .switchOn {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 

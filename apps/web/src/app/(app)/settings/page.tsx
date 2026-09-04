@@ -731,7 +731,7 @@ export default function SettingsPage() {
         <div className={styles.panel}>
               <p className={styles.lead} style={{ marginBottom: '1rem' }}>
                 Новостная лента: служебные объявления для сотрудников.{' '}
-                <a href="/news" style={{ color: '#3699ff', fontWeight: 600 }}>
+                <a href="/news" style={{ color: '#0a85e2', fontWeight: 600 }}>
                   Открыть ленту →
                 </a>
               </p>

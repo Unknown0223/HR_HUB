@@ -91,8 +91,8 @@
 
 .vline {
   width: 3px;
-  height: 18px;
-  background: #7a93ab;
+  height: 22px;
+  background: #5b7a96;
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -166,7 +166,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
   font-size: 0.75rem;
   font-weight: 700;
@@ -339,9 +339,10 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.25rem;
   position: relative;
-  padding-top: 16px;
+  /* Gap above cards — connector lines sit in this space (negative top) */
+  padding-top: 36px;
 }
 
 .childCol {
@@ -351,38 +352,45 @@
   position: relative;
 }
 
+/* Vertical drop from horizontal bar down to each card */
 .childCol::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: -36px;
   left: 50%;
   transform: translateX(-50%);
   width: 3px;
-  height: 16px;
-  background: #7a93ab;
+  height: 36px;
+  background: #5b7a96;
+  border-radius: 2px;
+  z-index: 1;
+  pointer-events: none;
 }
 
+/* Horizontal branch bar — sits at the TOP of the gap (above cards) */
 .childCol:not(:only-child)::after {
   content: '';
   position: absolute;
-  top: 0;
+  top: -36px;
   height: 3px;
-  background: #7a93ab;
+  background: #5b7a96;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .childCol:first-child:not(:only-child)::after {
   left: 50%;
-  right: -0.5rem;
+  right: calc(-0.625rem);
 }
 
 .childCol:last-child:not(:only-child)::after {
-  left: -0.5rem;
+  left: calc(-0.625rem);
   right: 50%;
 }
 
 .childCol:not(:first-child):not(:last-child)::after {
-  left: -0.5rem;
-  right: -0.5rem;
+  left: calc(-0.625rem);
+  right: calc(-0.625rem);
 }
 
 .childrenRowSingle {
@@ -467,7 +475,7 @@
     flex-direction: column;
     align-items: center;
     gap: 0.35rem;
-    padding-top: 8px;
+    padding-top: 12px;
   }
 
   .childCol::before,

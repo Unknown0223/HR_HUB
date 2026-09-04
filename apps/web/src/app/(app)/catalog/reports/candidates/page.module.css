@@ -38,7 +38,7 @@
 }
 
 .radio input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .pickWrap {
@@ -60,7 +60,7 @@
 
 .pickInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -109,7 +109,7 @@
 .pickOpt:hover,
 .pickOptOn {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .pickEmpty {
@@ -122,7 +122,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

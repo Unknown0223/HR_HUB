@@ -1,0 +1,227 @@
+# HR HUB — GitHub Actions CI
+# Runs on every push and pull request. Does not deploy. Does not use production
+# databases or GitHub secrets. Failures are not ignored (no continue-on-error).
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Dummy Prisma URL so `schema.prisma` env("DATABASE_URL") resolves.
+  # Jobs that do not start Postgres never connect. The Prisma job uses a
+  # throwaway GitHub service container — not production.
+  DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/hrhub_ci?schema=public
+  NEXT_PUBLIC_API_URL: http://localhost:3002
+
+jobs:
+  install:
+    name: Install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run prisma:generate -w @hr-hub/api
+      - name: API tsc (strict)
+        run: npx tsc -p tsconfig.json --noEmit --pretty false
+        working-directory: apps/api
+      - name: Web tsc
+        run: npx tsc --noEmit --pretty false
+        working-directory: apps/web
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: API lint
+        run: |
+          echo "::notice::@hr-hub/api da lint script yo'q (eslint sozlanmagan). Bu qadam yashirish emas — tekshiruv yo'qligi aniq."
+      - name: Web lint
+        run: npm run lint -w @hr-hub/web
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: API unit tests (news XSS)
+        run: npm test -w @hr-hub/api
+      - name: Node smoke tests note
+        run: |
+          echo "## Smoke tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Live \`npm run smoke*\` CI da ishlatilmaydi (production DB yo'q)." >> "$GITHUB_STEP_SUMMARY"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: device-gw unittest
+        working-directory: apps/device-gw
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -v
+
+  build-web:
+    name: Web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: Next.js production build
+        run: npm run build:web
+
+  build-api:
+    name: API build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: NestJS production compile
+        run: npm run build:api
+
+  prisma:
+    name: Prisma
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: hrhub_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d hrhub_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: Validate schema
+        working-directory: apps/api
+        run: npx prisma validate
+      - name: Check migration lock
+        run: |
+          test -f apps/api/prisma/migrations/migration_lock.toml
+          grep -q 'provider = "postgresql"' apps/api/prisma/migrations/migration_lock.toml
+      - name: Schema vs migrations (no apply to prod)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/hrhub_ci?schema=public
+        run: |
+          # Applies migrations only to the CI shadow Postgres, then diffs against schema.prisma.
+          # Never migrate deploy / db push / reset.
+          set +e
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$DATABASE_URL" \
+            --exit-code
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Schema and migrations match."
+            exit 0
+          fi
+          if [ "$status" -eq 2 ]; then
+            echo "::error::Prisma schema.prisma va prisma/migrations mos emas. Yangi migration kerak (yoki schema/migration drift)."
+            exit 1
+          fi
+          echo "::error::prisma migrate diff failed (exit $status)"
+          exit "$status"
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high

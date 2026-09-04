@@ -40,7 +40,7 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #0d9488;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -55,7 +55,7 @@
 }
 
 .createBtn:hover {
-  background: #0f766e;
+  background: #187de4;
 }
 
 .createMenu {
@@ -304,7 +304,7 @@
   width: 15px;
   height: 15px;
   margin: 0;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
   vertical-align: middle;
 }
@@ -329,12 +329,15 @@
   height: 0.95rem;
   margin: 0.15rem 0 0;
   flex-shrink: 0;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
-.nameWithCheck .nameText {
+.nameWithCheck .nameText,
+.nameText {
   line-height: 1.35;
+  font-weight: 500;
+  color: #111827;
 }
 
 .inlineActions {
@@ -353,7 +356,7 @@
   border: none !important;
   background: transparent !important;
   box-shadow: none;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.8rem;
   font-weight: 500;
@@ -386,7 +389,7 @@
   font-size: 0.72rem;
   font-weight: 700;
   background: #e1f0ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .statusMuted {
@@ -456,7 +459,7 @@
 }
 
 .flagSwitch input:checked + .flagTrack {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .flagSwitch input:checked + .flagTrack::after {
@@ -628,7 +631,7 @@
 
 .bulkPrimary {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 

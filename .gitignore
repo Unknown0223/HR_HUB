@@ -87,3 +87,7 @@ data/verifix-dump/
 # Arena zip extract previews
 _arena-redesign-preview/
 
+
+# Design template reference (local only)
+_design/
+

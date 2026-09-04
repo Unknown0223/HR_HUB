@@ -91,7 +91,7 @@
 .col select:focus,
 .col textarea:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
 }
 
@@ -174,7 +174,7 @@
 
 .primary {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -262,7 +262,7 @@
 .full input:focus,
 .full select:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
 }
 
@@ -320,7 +320,7 @@
 }
 
 .switch input:checked + .switchTrack {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .switch input:checked + .switchTrack::after {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
@@ -426,6 +427,18 @@ function GphServicesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="gph-services" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-briefcase" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Услуги по договорам ГПХ</h1>
+          <p className={shared.pageSubtitle}>
+            Услуги и акты по гражданско-правовым договорам
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
@@ -552,14 +565,20 @@ function GphServicesPageInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {panel !== 'none' ? (
+        <FormModal
+          open
+          title={panel === 'edit' ? 'Изменить услугу' : 'Создать услугу'}
+          width="lg"
+          onClose={() => {
+            setPanel('none');
+            setEditId(null);
+          }}
+        >
         <form
           key={`${panel}-${editId || 'new'}`}
-          className={styles.panel}
+          className={styles.modalForm}
           onSubmit={onSubmit}
         >
-          <h2 className={styles.panelTitle}>
-            {panel === 'edit' ? 'Изменить услугу' : 'Создать услугу'}
-          </h2>
           <div className={styles.formGrid}>
             <label>
               Договор
@@ -638,6 +657,7 @@ function GphServicesPageInner() {
             </button>
           </div>
         </form>
+        </FormModal>
       ) : null}
 
       <div className={styles.tableWrap}>

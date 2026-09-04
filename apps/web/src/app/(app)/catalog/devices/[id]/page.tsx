@@ -415,31 +415,39 @@ function DeviceDetailInner() {
     }
   }
 
-  if (loading) return <p>Загрузка…</p>;
-  if (!device) return <p className={styles.error}>{error || 'Устройство не найдено'}</p>;
+  if (loading) return <div className={styles.page}><p style={{ padding: '2rem', color: '#64788f' }}>Загрузка…</p></div>;
+  if (!device) return <div className={styles.page}><p className={styles.error}>{error || 'Устройство не найдено'}</p></div>;
 
   return (
-    <div>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>Устройство (просмотр)</h1>
-        <div className={styles.actions}>
-          <button type="button" className={styles.btnEdit} onClick={() => setEditOpen(true)}>
+    <div className={styles.page}>
+      {/* ── Header ── */}
+      <div className={styles.header}>
+        <div className={styles.iconBadge}>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 20h10M12 16v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+        </div>
+        <div className={styles.headerText}>
+          <h1 className={styles.h1}>{device.name}</h1>
+          <p className={styles.subtitle}>{device.serialNumber}{device.model ? ` · ${device.model}` : ''}{device.location ? ` · ${device.location.name}` : ''}</p>
+        </div>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.btnPrimary} onClick={() => setEditOpen(true)}>
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M16.474 5.408l2.118 2.118m-.756-3.982L12.109 9.27a2.118 2.118 0 00-.58 1.082L11 13l2.648-.529c.404-.08.777-.27 1.082-.58l5.727-5.727a1.853 1.853 0 00-2.983-2.756z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 15v3a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Изменить
           </button>
-          <button type="button" className={styles.btnSync} onClick={() => setSyncOpen(true)}>
-            Синхронизировать устройство
+          <button type="button" className={styles.btnSecondary} onClick={() => setSyncOpen(true)}>
+            Синхронизировать
           </button>
           <button
             type="button"
-            className={styles.btnSync}
+            className={styles.btnGhost}
             disabled={busy}
             onClick={() => void doSyncClock()}
             title="Выставить на терминале время сервера (UTC+5)"
           >
-            Синхронизировать часы
+            ⏱ Часы
           </button>
           <Link href="/catalog/devices" className={styles.btnGhost}>
-            Закрыть
+            ← Назад
           </Link>
         </div>
       </div>
@@ -447,20 +455,21 @@ function DeviceDetailInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.layout}>
+        {/* ── Sidebar ── */}
         <aside className={styles.sidebar}>
-          <div className={styles.deviceId}>
-            {device.serialNumber}
-            {device.model ? ` (${device.model})` : ''}
+          <div className={styles.deviceSerial}>{device.serialNumber}</div>
+          {device.model ? <div className={styles.deviceModel}>{device.model}</div> : null}
+          <div className={styles.sidebarBadges}>
+            <span className={device.isActive ? styles.badgeActive : styles.badgeInactive}>
+              {device.isActive ? 'Активный' : 'Неактивный'}
+            </span>
+            {punchLockActive(device.meta) ? (
+              <span className={styles.badgeLocked}>Заблокирован</span>
+            ) : null}
+            {passwordOutOfSync(device.meta, device.status) ? (
+              <span className={styles.badgeLocked}>Пароль</span>
+            ) : null}
           </div>
-          <span className={device.isActive ? styles.badgeActive : styles.badgeInactive}>
-            {device.isActive ? 'Активный' : 'Неактивный'}
-          </span>
-          {punchLockActive(device.meta) ? (
-            <span className={styles.badgeLocked}>Отметки заблокированы</span>
-          ) : null}
-          {passwordOutOfSync(device.meta, device.status) ? (
-            <span className={styles.badgeLocked}>Пароль не совпадает</span>
-          ) : null}
           <nav className={styles.nav}>
             {TABS.map((t) => (
               <button
@@ -569,11 +578,11 @@ function DeviceDetailInner() {
                   </h2>
                   <button
                     type="button"
-                    className={styles.btnSync}
+                    className={styles.btnSecondary}
                     disabled={busy}
                     onClick={() => void syncPersons()}
                   >
-                    Синхронизировать сотрудников локации
+                    Синхронизировать
                   </button>
                 </div>
                 <input
@@ -583,6 +592,7 @@ function DeviceDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -618,6 +628,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
@@ -634,6 +645,7 @@ function DeviceDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -695,6 +707,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
@@ -745,6 +758,7 @@ function DeviceDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -782,6 +796,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
@@ -832,6 +847,7 @@ function DeviceDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -863,7 +879,7 @@ function DeviceDetailInner() {
                         <td>{d.divisionGroup?.name || '—'}</td>
                         <td>{fmtDate(d.openedAt)}</td>
                         <td>
-                          <span className={styles.pillActive}>
+                          <span className={d.isActive === false ? styles.pillInactive : styles.pillActive}>
                             {d.isActive === false ? 'Неактивный' : 'Активный'}
                           </span>
                         </td>
@@ -872,6 +888,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
@@ -888,6 +905,7 @@ function DeviceDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -932,6 +950,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
         </section>
@@ -964,7 +983,7 @@ function DeviceDetailInner() {
                 </button>
                 <button
                   type="button"
-                  className={styles.btnSync}
+                  className={styles.btnPrimary}
                   disabled={busy}
                   onClick={() => void doSync()}
                 >

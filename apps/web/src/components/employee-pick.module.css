@@ -50,7 +50,7 @@
 
 .search:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.14);
 }
 
@@ -141,7 +141,7 @@
 
 .btnPrimary {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -175,7 +175,7 @@
 
 .lookupInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .lookupInvalid {
@@ -290,7 +290,7 @@
   appearance: none;
   border: none;
   background: none;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

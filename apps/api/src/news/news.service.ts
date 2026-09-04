@@ -6,6 +6,7 @@ import {
 import { EmploymentStatus, NotificationKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { sanitizeNewsHtml } from './news-html';
 
 const NEWS_DICTIONARY_CODE = 'news_feed';
 
@@ -67,7 +68,8 @@ export class NewsService {
 
     return items.map((item) => {
       const meta = (item.meta ?? {}) as Record<string, unknown>;
-      const body = typeof meta.body === 'string' ? meta.body : '';
+      const body =
+        typeof meta.body === 'string' ? sanitizeNewsHtml(meta.body) : '';
       return {
         id: item.id,
         code: item.code,
@@ -92,7 +94,7 @@ export class NewsService {
       authorName?: string;
     },
   ) {
-    const html = String(body.message ?? body.body ?? '').trim();
+    const html = sanitizeNewsHtml(String(body.message ?? body.body ?? '').trim());
     if (!html || !stripHtml(html)) {
       throw new BadRequestException('Сообщение обязательно');
     }

@@ -57,9 +57,15 @@ function money(v?: string | number | null) {
 export function IncidentForm({
   mode,
   incidentId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit';
   incidentId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -83,6 +89,11 @@ export function IncidentForm({
   const [types, setTypes] = useState<Opt[]>([]);
 
   const pageTitle = mode === 'edit' ? 'Инцидент (изменение)' : 'Инцидент (создание)';
+
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/incidents');
+  }
 
   const loadLookups = useCallback(async () => {
     try {
@@ -211,7 +222,8 @@ export function IncidentForm({
           body: JSON.stringify(body),
         });
       }
-      router.push('/catalog/incidents');
+      if (onSuccess) onSuccess();
+      else router.push('/catalog/incidents');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -229,6 +241,7 @@ export function IncidentForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="incidents" />
@@ -237,22 +250,15 @@ export function IncidentForm({
     );
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="incidents" titleOverride={pageTitle} />
-
+  const form = (
       <form onSubmit={onSave}>
         <div className={styles.docHead}>
-          <h2 className={styles.docTitle}>{pageTitle}</h2>
+          {!embedded ? <h2 className={styles.docTitle}>{pageTitle}</h2> : null}
           <div className={styles.docActions}>
             <button type="submit" className={styles.primary} disabled={saving}>
               {saving ? 'Сохранение…' : 'Сохранить'}
             </button>
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => router.push('/catalog/incidents')}
-            >
+            <button type="button" className={styles.secondary} onClick={goBack}>
               Закрыть
             </button>
           </div>
@@ -448,6 +454,14 @@ export function IncidentForm({
           </div>
         </div>
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="incidents" titleOverride={pageTitle} />
+      {form}
     </div>
   );
 }

@@ -2,23 +2,29 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Post,
   Query,
+  Req,
   Res,
+  UnauthorizedException,
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { JwtService } from '@nestjs/jwt';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiQuery, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { EmploymentStatus, FaceSyncStatus, Role } from '@prisma/client';
 import { memoryStorage } from 'multer';
 import { Public, Roles } from '../auth/decorators';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
+import { SkipTenant } from '../tenant/decorators';
 import { PrismaService } from '../prisma/prisma.service';
+import { AUTH_COOKIE_NAME, readCookie } from '../auth/auth-cookie';
 import { StorageService } from './storage.service';
 import {
   employeeLabel,
@@ -34,6 +40,7 @@ export class StorageController {
   constructor(
     private readonly storage: StorageService,
     private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
   ) {}
 
   private requireTenant(tenantId: string | null): string {
@@ -41,19 +48,48 @@ export class StorageController {
     return tenantId;
   }
 
+  /**
+   * Employee face / attendance mark photos.
+   * Auth: Bearer or access_token query (so <img src> still works).
+   * Tenant: key must be faces|{marks}/{callerTenantId}/… (platform_admin: any tenant).
+   */
   @Public()
+  @SkipTenant()
   @Get('file')
-  async file(@Query('key') key: string, @Res() res: Response) {
+  @ApiQuery({ name: 'key', required: true })
+  @ApiQuery({
+    name: 'access_token',
+    required: false,
+    description: 'JWT if Authorization header cannot be sent (img tags)',
+  })
+  async file(
+    @Query('key') key: string,
+    @Query('access_token') accessToken: string | undefined,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const user = await this.requireFileUser(req, accessToken);
     if (!this.storage.isSafeKey(key || '')) {
       throw new BadRequestException('Invalid file key');
+    }
+    const keyTenantId = this.storage.tenantIdFromKey(key);
+    if (!keyTenantId) {
+      throw new BadRequestException('Invalid file key');
+    }
+    if (user.role !== Role.platform_admin && user.tenantId !== keyTenantId) {
+      throw new ForbiddenException('Tenant mismatch');
     }
     let buf = await this.storage.getObjectBuffer(key);
     if (!buf?.length) {
       const profile = await this.prisma.faceProfile.findFirst({
-        where: { photoKey: key },
+        where: { photoKey: key, tenantId: keyTenantId },
         select: { photoUrl: true },
       });
       buf = decodeDataUrl(profile?.photoUrl);
+      // Seed / import often keeps an external avatar URL while MinIO has no object yet
+      if (!buf?.length && isSafeExternalPhotoUrl(profile?.photoUrl)) {
+        return res.redirect(302, profile!.photoUrl!);
+      }
     }
     if (!buf?.length) throw new NotFoundException('File not found');
     const lower = key.toLowerCase();
@@ -68,6 +104,36 @@ export class StorageController {
     res.setHeader('Cache-Control', 'private, max-age=86400');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.send(buf);
+  }
+
+  private async requireFileUser(
+    req: Request,
+    accessToken?: string,
+  ): Promise<{ role: Role; tenantId: string | null }> {
+    const auth = String(req.headers.authorization ?? '');
+    const bearer = auth.toLowerCase().startsWith('bearer ')
+      ? auth.slice(7).trim()
+      : '';
+    const raw =
+      bearer ||
+      String(accessToken ?? '').trim() ||
+      readCookie(req.headers.cookie, AUTH_COOKIE_NAME) ||
+      '';
+    if (!raw) throw new UnauthorizedException();
+    let sub: string;
+    try {
+      const payload = this.jwt.verify<{ sub?: string }>(raw);
+      sub = String(payload?.sub || '');
+    } catch {
+      throw new UnauthorizedException();
+    }
+    if (!sub) throw new UnauthorizedException();
+    const user = await this.prisma.user.findUnique({
+      where: { id: sub },
+      select: { role: true, tenantId: true, isActive: true },
+    });
+    if (!user || !user.isActive) throw new UnauthorizedException();
+    return { role: user.role, tenantId: user.tenantId };
   }
 
   private async attachPhoto(
@@ -269,5 +335,19 @@ function decodeDataUrl(photoUrl?: string | null): Buffer | null {
     return buf.length ? buf : null;
   } catch {
     return null;
+  }
+}
+
+/** Allow redirect only to http(s) avatar hosts we already stored — not open redirect. */
+function isSafeExternalPhotoUrl(photoUrl?: string | null): boolean {
+  if (!photoUrl) return false;
+  try {
+    const u = new URL(photoUrl);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    // Never bounce back into our own file proxy (loop)
+    if (u.pathname.includes('/api/storage/file')) return false;
+    return true;
+  } catch {
+    return false;
   }
 }

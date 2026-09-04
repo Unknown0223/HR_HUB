@@ -95,9 +95,19 @@ type FormProps = {
   mode: 'create' | 'edit';
   correctionId?: string;
   batchDefault?: boolean;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
-function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: FormProps) {
+function TimesheetCorrectionFormInner({
+  mode,
+  correctionId,
+  batchDefault,
+  embedded,
+  onSuccess,
+  onCancel,
+}: FormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const batch = batchDefault ?? searchParams.get('batch') === '1';
@@ -289,7 +299,9 @@ function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: Form
         id = created.id;
         setDocId(id);
         setStatus(created.status || 'draft');
-        router.replace(`/catalog/timesheet-adjustments/${id}`);
+        if (!embedded) {
+          router.replace(`/catalog/timesheet-adjustments/${id}`);
+        }
       }
 
       if (andPost && id) {
@@ -297,6 +309,8 @@ function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: Form
         await apiFetch(`/api/catalog/timesheet-adjustments/${id}/post`, { method: 'POST' });
         setStatus('posted');
       }
+
+      if (onSuccess) onSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -311,7 +325,8 @@ function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: Form
   }
 
   function close() {
-    router.push('/catalog/timesheet-adjustments');
+    if (onCancel) onCancel();
+    else router.push('/catalog/timesheet-adjustments');
   }
 
   function addLine(employeeId = '') {
@@ -396,6 +411,7 @@ function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: Form
   }
 
   if (loading) {
+    if (embedded) return <p className={styles.muted}>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="timesheet-adjustments" />
@@ -404,12 +420,10 @@ function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: Form
     );
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="timesheet-adjustments" />
-
+  const body = (
+    <>
       <div className={styles.docHead}>
-        <h1 className={styles.docTitle}>{pageTitle}</h1>
+        {!embedded ? <h1 className={styles.docTitle}>{pageTitle}</h1> : null}
         <div className={styles.docActions}>
           <button
             type="button"
@@ -823,6 +837,15 @@ function TimesheetCorrectionFormInner({ mode, correctionId, batchDefault }: Form
           onConfirm={applyPick}
         />
       ) : null}
+    </>
+  );
+
+  if (embedded) return <div className={styles.wrap}>{body}</div>;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="timesheet-adjustments" />
+      {body}
     </div>
   );
 }

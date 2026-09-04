@@ -143,7 +143,6 @@ function LocationsInner() {
   const selectedIds = useMemo(() => [...checked], [checked]);
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((r) => checked.has(r.id));
-  const focus = filtered.find((r) => r.id === focusId) || null;
 
   function toggleOne(id: string) {
     setChecked((prev) => {
@@ -230,9 +229,62 @@ function LocationsInner() {
     }
   }
 
+  const metrics = useMemo(() => {
+    let active = 0;
+    let withDevices = 0;
+    let offline = 0;
+    for (const r of rows) {
+      if (r.isActive) active += 1;
+      const dc = r.deviceCount ?? r._count?.devices ?? 0;
+      if (dc > 0) withDevices += 1;
+      if (r.devicesOffline) offline += 1;
+    }
+    return [
+      { label: 'Всего', value: rows.length },
+      { label: 'Активные', value: active, accent: 'ok' as const },
+      { label: 'С устройствами', value: withDevices, accent: 'accent' as const },
+      { label: 'Офлайн-устройства', value: offline, accent: 'danger' as const },
+    ];
+  }, [rows]);
+
   return (
-    <div className={styles.wrap}>
+    <div className={styles.page}>
       <PageSubnav groupKey="locations" />
+
+      <header className={styles.header}>
+        <span className={styles.iconBadge} aria-hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+        </span>
+        <div>
+          <h1 className={styles.h1}>Локации</h1>
+          <p className={styles.subtitle}>Офисы, склады, геозоны и привязка терминалов</p>
+        </div>
+      </header>
+
+      <div className={styles.metrics}>
+        {metrics.map((m) => (
+          <div key={m.label} className={styles.metricCard}>
+            <p className={styles.metricLabel}>{m.label}</p>
+            <p
+              className={`${styles.metricValue} ${
+                m.accent === 'ok'
+                  ? styles.mOk
+                  : m.accent === 'danger'
+                    ? styles.mDanger
+                    : m.accent === 'accent'
+                      ? styles.mAccent
+                      : ''
+              }`}
+            >
+              {m.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button
@@ -255,9 +307,6 @@ function LocationsInner() {
               Удалить {selectedIds.length}
             </button>
           ) : null}
-          <button type="button" className={styles.btnGhost} onClick={() => router.push('/attendance')}>
-            Закрыть
-          </button>
           <label className={styles.filterField}>
             <span>Локация</span>
             <input
@@ -285,17 +334,30 @@ function LocationsInner() {
           </label>
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className={styles.searchWrap}>
+            <span className={styles.searchIcon} aria-hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className={styles.search}
+              placeholder="Поиск..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <span className={styles.pagerMeta}>
             {filtered.length}/{rows.length}
           </span>
-          <button type="button" className={styles.btnGhost} onClick={() => void load()}>
-            Обновить
+          <button type="button" className={styles.iconBtn} onClick={() => void load()} aria-label="Обновить">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" />
+            </svg>
           </button>
         </div>
       </div>
@@ -303,97 +365,135 @@ function LocationsInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.panel}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredSelected}
-                  disabled={!filtered.length || loading}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Название</th>
-              <th>Адрес</th>
-              <th>Тип локации</th>
-              <th>Кол-во устройств</th>
-              <th>Устройства не в сети</th>
-              <th>Кол-во сотрудников</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    disabled={!filtered.length || loading}
+                    onChange={toggleAll}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Локация</th>
+                <th>Адрес</th>
+                <th>Тип</th>
+                <th>Устройства</th>
+                <th>Офлайн</th>
+                <th>Сотрудники</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r) => (
-                <Fragment key={r.id}>
-                  <tr
-                    className={
-                      checked.has(r.id) || focusId === r.id ? styles.selected : undefined
-                    }
-                    onClick={() => setFocusId((id) => (id === r.id ? null : r.id))}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td className={styles.checkCol}>
-                      <input
-                        type="checkbox"
-                        checked={checked.has(r.id)}
-                        onChange={() => toggleOne(r.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>
-                      {r.name}
-                      {r.isGlobal ? (
-                        <span className={styles.badgeOk} style={{ marginLeft: 6 }}>
-                          Глобальная
-                        </span>
-                      ) : null}
-                    </td>
-                    <td>{r.address || '—'}</td>
-                    <td>{r.locationType?.name || '—'}</td>
-                    <td>{r.deviceCount ?? r._count?.devices ?? 0}</td>
-                    <td>{r.devicesOfflineLabel ?? (r.devicesOffline ? 'Да' : 'Нет')}</td>
-                    <td>{r.employeeCount ?? 0}</td>
-                  </tr>
-                  {focus?.id === r.id ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/locations/${r.id}`}>Просмотр</Link>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditing(r);
-                              setModalOpen(true);
-                            }}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((r) => {
+                  const open = focusId === r.id;
+                  const deviceCount = r.deviceCount ?? r._count?.devices ?? 0;
+                  const offlineLabel = r.devicesOfflineLabel ?? (r.devicesOffline ? 'Да' : 'Нет');
+                  return (
+                    <Fragment key={r.id}>
+                      <tr
+                        className={`${checked.has(r.id) || open ? styles.selected : ''} ${open ? styles.rowOpen : ''}`}
+                        onClick={() => setFocusId((id) => (id === r.id ? null : r.id))}
+                      >
+                        <td className={styles.checkCol}>
+                          <input
+                            type="checkbox"
+                            checked={checked.has(r.id)}
+                            onChange={() => toggleOne(r.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td>
+                          <div className={styles.locCell}>
+                            <span className={styles.locIcon} aria-hidden>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                                <circle cx="12" cy="10" r="3" />
+                              </svg>
+                            </span>
+                            <div>
+                              <div className={styles.name}>
+                                {r.name}
+                                {r.isGlobal ? (
+                                  <span className={styles.badgeOk}>Глобальная</span>
+                                ) : null}
+                              </div>
+                              <div className={styles.meta}>{r.code}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{r.address || '—'}</td>
+                        <td>{r.locationType?.name || '—'}</td>
+                        <td>
+                          <span className={styles.countPill}>{deviceCount}</span>
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              r.devicesOffline || offlineLabel === 'Да'
+                                ? styles.offlineYes
+                                : styles.offlineNo
+                            }
                           >
-                            Изменить
-                          </button>
-                          <button type="button" onClick={() => void remove(r.id)}>
-                            Удалить
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
+                            {offlineLabel}
+                          </span>
+                        </td>
+                        <td>{r.employeeCount ?? 0}</td>
+                      </tr>
+                      {open ? (
+                        <tr className={styles.expandRow}>
+                          <td colSpan={7}>
+                            <div className={styles.rowActions}>
+                              <Link href={`/catalog/locations/${r.id}`}>Просмотр</Link>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditing(r);
+                                  setModalOpen(true);
+                                }}
+                              >
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void remove(r.id);
+                                }}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          {' · '}нажмите на строку для действий
+        </div>
       </div>
 
       <LocationFormModal

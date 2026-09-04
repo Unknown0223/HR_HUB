@@ -97,6 +97,17 @@ export class StorageService implements OnModuleInit {
     return /^(faces|marks)\/[A-Za-z0-9._\-/]+$/.test(k);
   }
 
+  /** faces/{tenantId}/… or marks/{tenantId}/… — second path segment is the company id. */
+  tenantIdFromKey(key: string): string | null {
+    const k = (key || '').replace(/^\/+/, '');
+    if (!this.isSafeKey(k)) return null;
+    const tenantId = k.split('/')[1];
+    if (!tenantId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) {
+      return null;
+    }
+    return tenantId;
+  }
+
   extractKeyFromUrl(url: string): string | null {
     try {
       const u = new URL(url);
@@ -110,7 +121,7 @@ export class StorageService implements OnModuleInit {
   }
 
   proxyUrl(key: string): string {
-    const port = this.config.get<string>('API_PORT') || '3001';
+    const port = this.config.get<string>('API_PORT') || '3002';
     const railway =
       this.config.get<string>('RAILWAY_PUBLIC_DOMAIN') ||
       this.config.get<string>('RAILWAY_STATIC_URL');
@@ -124,13 +135,12 @@ export class StorageService implements OnModuleInit {
 
   /** Stable URL for <img src> — avoids expired MinIO signatures. */
   mediaUrl(photoKey?: string | null, photoUrl?: string | null): string | null {
-    // Always prefer the proxy when we have a key so list APIs do not ship base64.
-    // /api/storage/file falls back to FaceProfile.photoUrl if MinIO is down.
-    if (photoKey && this.isSafeKey(photoKey)) {
-      return this.proxyUrl(photoKey);
-    }
     if (photoUrl?.startsWith('data:') || photoUrl?.startsWith('blob:')) {
       return photoUrl;
+    }
+    // Prefer proxy when we have a key (controller falls back / redirects if object missing).
+    if (photoKey && this.isSafeKey(photoKey)) {
+      return this.proxyUrl(photoKey);
     }
     if (!photoUrl) return null;
     const fromSigned = this.extractKeyFromUrl(photoUrl);

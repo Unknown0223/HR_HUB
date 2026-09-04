@@ -176,7 +176,7 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
         apiFetch<Dict[]>('/api/settings/dictionaries?kind=extra'),
         apiFetch<{ tenant?: { name?: string }; settings?: { orgName?: string } }>(
           '/api/settings/org',
-        ).catch(() => ({})),
+        ).catch((): { tenant?: { name?: string }; settings?: { orgName?: string } } => ({})),
       ]);
       const dict = (list || []).find((d) => d.code === DICT_CODE);
       if (!dict) {

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import styles from './form.module.css';
 
@@ -36,9 +37,15 @@ type AbsenceType = {
 export function AbsenceTypeForm({
   typeId,
   mode = 'edit',
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   typeId?: string;
   mode?: 'edit' | 'view';
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const isNew = !typeId;
@@ -65,6 +72,12 @@ export function AbsenceTypeForm({
   const [carryover, setCarryover] = useState('');
   const [createdAt, setCreatedAt] = useState('');
   const [updatedAt, setUpdatedAt] = useState('');
+
+  const title = isNew
+    ? 'Вид отсутствия (создание)'
+    : readOnly
+      ? 'Вид отсутствия (просмотр)'
+      : 'Вид отсутствия (изменение)';
 
   useEffect(() => {
     apiFetch<TimeOpt[] | { items?: TimeOpt[] }>('/api/catalog/time-types')
@@ -98,6 +111,11 @@ export function AbsenceTypeForm({
       .finally(() => setLoading(false));
   }, [typeId, isNew]);
 
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/absence-types');
+  }
+
   async function save() {
     if (!name.trim()) {
       setError('Укажите название');
@@ -129,13 +147,15 @@ export function AbsenceTypeForm({
           method: 'POST',
           body: JSON.stringify(body),
         });
-        router.replace(`/catalog/absence-types/${created.id}`);
+        if (onSuccess) onSuccess();
+        else router.replace(`/catalog/absence-types/${created.id}`);
       } else {
         await apiFetch(`/api/hr/absence-types/${typeId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        setOk('Сохранено');
+        if (onSuccess) onSuccess();
+        else setOk('Сохранено');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
@@ -144,18 +164,20 @@ export function AbsenceTypeForm({
     }
   }
 
-  if (loading) return <p className={styles.muted}>Загрузка…</p>;
+  if (loading) {
+    if (embedded) return <p className={styles.muted}>Загрузка…</p>;
+    return (
+      <div className={styles.page}>
+        <PageSubnav groupKey="absence-types" titleOverride={title} />
+        <p className={styles.muted}>Загрузка…</p>
+      </div>
+    );
+  }
 
-  const title = isNew
-    ? 'Вид отсутствия (создание)'
-    : readOnly
-      ? 'Вид отсутствия (просмотр)'
-      : 'Вид отсутствия (изменение)';
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>{title}</h1>
+  const form = (
+    <>
+      <div className={`${styles.topBar}${embedded ? ` ${styles.topBarEmbedded}` : ''}`}>
+        {embedded ? null : <h1 className={styles.title}>{title}</h1>}
         <div className={styles.actions}>
           {readOnly ? (
             <Link href={`/catalog/absence-types/${typeId}/edit`} className={styles.btnSave}>
@@ -166,9 +188,9 @@ export function AbsenceTypeForm({
               Сохранить
             </button>
           )}
-          <Link href="/catalog/absence-types" className={styles.btnClose}>
+          <button type="button" className={styles.btnClose} onClick={goBack}>
             Закрыть
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -382,6 +404,15 @@ export function AbsenceTypeForm({
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (embedded) return <div className={styles.page}>{form}</div>;
+
+  return (
+    <div className={styles.page}>
+      <PageSubnav groupKey="absence-types" titleOverride={title} />
+      {form}
     </div>
   );
 }

@@ -475,7 +475,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{border:1px solid #cfd3da;padding:5px 8px}
 th{background:#f5f8fa}
 .zebra td{background:#f9fafb}
-.reason a{color:#3699ff;text-decoration:none}
+.reason a{color:#0a85e2;text-decoration:none}
 .num{text-align:right}
 @media print{.btn{display:none}}
 </style></head>

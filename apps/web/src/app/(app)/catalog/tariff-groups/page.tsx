@@ -1,11 +1,13 @@
 'use client';
 import { confirm } from '@/lib/dialogs';
 
-import Link from 'next/link';
-import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
+import { TariffGroupForm } from './TariffGroupForm';
 import styles from './page.module.css';
 
 const FILTER_KEYS = ['name', 'fullName', 'status'] as const;
@@ -34,8 +36,15 @@ function TariffGroupsInner() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [modal, setModal] = useState<null | { mode: 'create' | 'edit'; id?: string }>(
+    null,
+  );
+
+  const closeModal = useCallback(() => setModal(null), []);
+
 
   async function load() {
     setLoading(true);
@@ -62,7 +71,8 @@ function TariffGroupsInner() {
     const statusF = (filters.status || '').trim();
     return rows.filter((r) => {
       if (nameF && !(r.name || '').toLowerCase().includes(nameF)) return false;
-      if (fullF && !(r.fullName || r.name || '').toLowerCase().includes(fullF)) return false;
+      if (fullF && !(r.fullName || r.name || '').toLowerCase().includes(fullF))
+        return false;
       if (statusF === 'active' && !r.isActive) return false;
       if (statusF === 'inactive' && r.isActive) return false;
       if (!q) return true;
@@ -70,11 +80,42 @@ function TariffGroupsInner() {
     });
   }, [rows, search, filters]);
 
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allChecked =
+    filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const someChecked = filtered.some((r) => checked[r.id]) && !allChecked;
+
+  useEffect(() => {
+    setChecked({});
+    setSelectedId(null);
+  }, [search]);
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAll(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
   async function remove(row: TariffGroup) {
     if (!(await confirm('Удалить тарифную группу?'))) return;
     setBusy(true);
     try {
-      await apiFetch(`/api/catalog/tariff-groups/${row.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/catalog/tariff-groups/${row.id}`, {
+        method: 'DELETE',
+      });
       setSelectedId(null);
       await load();
     } catch (e) {
@@ -99,22 +140,92 @@ function TariffGroupsInner() {
     }
   }
 
+  async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
+    if (!checkedIds.length) return;
+    if (action === 'delete') {
+      if (
+        !(await confirm(
+          `Удалить выбранные тарифные группы (${checkedIds.length})?`,
+        ))
+      ) {
+        return;
+      }
+    }
+    setBusy(true);
+    setError('');
+    try {
+      for (const id of checkedIds) {
+        if (action === 'delete') {
+          await apiFetch(`/api/catalog/tariff-groups/${id}`, {
+            method: 'DELETE',
+          });
+        } else {
+          await apiFetch(`/api/catalog/tariff-groups/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isActive: action === 'activate' }),
+          });
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка обработки');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="tariff-groups" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-percentage" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Тарифные группы</h1>
+          <p className={shared.pageSubtitle}>
+            Группы тарифных ставок для расчёта окладов
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/tariff-groups/new" className={styles.createBtn}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => setModal({ mode: 'create' })}
+          >
+            <i className="fas fa-plus" aria-hidden />
             Создать
-          </Link>
+          </button>
           <FilterPanel
             inline
             urlSync
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+              {
+                type: 'text',
+                key: 'name',
+                label: 'Название',
+                placeholder: 'Поиск...',
+              },
               {
                 type: 'text',
                 key: 'fullName',
@@ -134,95 +245,214 @@ function TariffGroupsInner() {
           />
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen
+                ? `${styles.iconBtn} ${styles.iconBtnActive}`
+                : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активный
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('deactivate')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Неактивный
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash-alt" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Название</th>
-              <th>Полное название</th>
-              <th>Дата последнего изменения</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !filtered.length ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={4} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someChecked;
+                    }}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Название</th>
+                <th>Полное название</th>
+                <th>Дата последнего изменения</th>
               </tr>
-            ) : null}
-            {!loading && !filtered.length ? (
-              <tr>
-                <td colSpan={4} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{row.name}</td>
-                    <td>{row.fullName || row.name || '—'}</td>
-                    <td>{fmtDate(row.updatedAt)}</td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={4}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/tariff-groups/${row.id}`}>Изменить</Link>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void toggleActive(row)}
-                          >
-                            {row.isActive ? 'Неактивный' : 'Активный'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void remove(row)}
-                          >
-                            Удалить
-                          </button>
-                        </div>
+            </thead>
+            <tbody>
+              {loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={4} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={4} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={
+                        open || isChecked ? styles.rowSelected : undefined
+                      }
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.name}`}
+                        />
                       </td>
+                      <td className={styles.nameCell}>{row.name}</td>
+                      <td>{row.fullName || row.name || '—'}</td>
+                      <td>{fmtDate(row.updatedAt)}</td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={4}>
+                          <div className={styles.rowActions}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setModal({ mode: 'edit', id: row.id })
+                              }
+                            >
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void toggleActive(row)}
+                            >
+                              {row.isActive ? 'Неактивный' : 'Активный'}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void remove(row)}
+                            >
+                              <i className="fas fa-trash-alt" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <span>
+            Показано{' '}
+            <strong>
+              {filtered.length === 0 ? 0 : `1–${filtered.length}`}
+            </strong>{' '}
+            из <strong>{filtered.length}</strong>
+          </span>
+        </div>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={
+          modal?.mode === 'edit'
+            ? 'Тарифная группа (изменение)'
+            : 'Тарифная группа (создание)'
+        }
+        width="md"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <TariffGroupForm
+            key={modal.mode === 'edit' ? modal.id : 'create'}
+            mode={modal.mode}
+            groupId={modal.id}
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }

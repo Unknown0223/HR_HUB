@@ -39,7 +39,7 @@
 
 .sideOn {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
   font-weight: 600;
 }
 
@@ -77,7 +77,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.86rem;
   cursor: pointer;
@@ -145,7 +145,7 @@
 .opt:hover,
 .optOn {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .optEmpty {
@@ -214,9 +214,9 @@
 }
 
 .dropOn {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .importGrid {

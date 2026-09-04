@@ -15,7 +15,7 @@
   height: 16px;
   margin: 0;
   flex: 0 0 16px;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -161,6 +161,6 @@
 
 .chipCount {
   font-size: 11px;
-  color: #3699ff;
+  color: #0a85e2;
   font-weight: 600;
 }

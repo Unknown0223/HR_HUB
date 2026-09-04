@@ -2,10 +2,13 @@
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
-import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
+import { StaffPositionForm } from './StaffPositionForm';
 import styles from './page.module.css';
 
 const FILTER_KEYS = [
@@ -73,6 +76,12 @@ function StaffPositionsInner() {
   const [closeDate, setCloseDate] = useState(() =>
     new Date().toISOString().slice(0, 10),
   );
+  const [modal, setModal] = useState<null | { mode: 'create' | 'edit'; id?: string }>(
+    null,
+  );
+
+  const closeModal = useCallback(() => setModal(null), []);
+
 
   async function load() {
     setLoading(true);
@@ -80,7 +89,9 @@ function StaffPositionsInner() {
     try {
       const [data, lookups] = await Promise.all([
         apiFetch<StaffPos[]>('/api/catalog/staff-positions'),
-        apiFetch<{ divisions?: Opt[]; positions?: Opt[] }>('/api/catalog/lookups'),
+        apiFetch<{ divisions?: Opt[]; positions?: Opt[] }>(
+          '/api/catalog/lookups',
+        ),
       ]);
       setRows(Array.isArray(data) ? data : []);
       setDivisions(lookups.divisions || []);
@@ -133,21 +144,23 @@ function StaffPositionsInner() {
 
   const allFilteredChecked =
     filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const someFilteredChecked =
+    filtered.some((r) => checked.has(r.id)) && !allFilteredChecked;
 
-  function toggleAll() {
-    if (allFilteredChecked) {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
-        return next;
-      });
-    } else {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
-        return next;
-      });
-    }
+  useEffect(() => {
+    setChecked(new Set());
+    setSelectedId(null);
+  }, [search]);
+
+  function toggleAll(on: boolean) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      for (const r of filtered) {
+        if (on) next.add(r.id);
+        else next.delete(r.id);
+      }
+      return next;
+    });
   }
 
   function toggleOne(id: string) {
@@ -209,7 +222,9 @@ function StaffPositionsInner() {
     if (!(await confirm('Удалить позицию?'))) return;
     setBusy(true);
     try {
-      await apiFetch(`/api/catalog/staff-positions/${row.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/catalog/staff-positions/${row.id}`, {
+        method: 'DELETE',
+      });
       setSelectedId(null);
       setChecked((prev) => {
         const next = new Set(prev);
@@ -228,57 +243,77 @@ function StaffPositionsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="staff-positions" />
 
+      <div className={shared.pageHeader}>
+        <div
+          className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}
+        >
+          <i className="fas fa-briefcase" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Позиции</h1>
+          <p className={shared.pageSubtitle}>
+            Штатные единицы, привязанные к подразделениям и должностям
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/staff-positions/new" className={styles.createBtn}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => setModal({ mode: 'create' })}
+          >
+            <i className="fas fa-plus" aria-hidden />
             Создать
-          </Link>
-          {selectedIds.length > 0 ? (
-            <>
-              <input
-                type="date"
-                className={styles.bulkDate}
-                value={closeDate}
-                onChange={(e) => setCloseDate(e.target.value)}
-                title="Дата закрытия"
-              />
-              <button
-                type="button"
-                className={styles.bulkWarn}
-                disabled={busy}
-                onClick={() => void bulkClose()}
-              >
-                Установить дату закрытия: {selectedIds.length}
-              </button>
-              <button
-                type="button"
-                className={styles.bulkDanger}
-                disabled={busy}
-                onClick={() => void bulkDelete()}
-              >
-                Удалить: {selectedIds.length}
-              </button>
-            </>
-          ) : null}
+          </button>
           <FilterPanel
             inline
             urlSync
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'text', key: 'title', label: 'Название', placeholder: 'Поиск...' },
-              { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+              {
+                type: 'text',
+                key: 'title',
+                label: 'Название',
+                placeholder: 'Поиск...',
+              },
+              {
+                type: 'text',
+                key: 'code',
+                label: 'Код',
+                placeholder: 'Поиск...',
+              },
               {
                 type: 'select',
                 key: 'divisionId',
                 label: 'Подразделение',
-                options: divisions.map((d) => ({ value: d.id, label: d.label })),
+                options: divisions.map((d) => ({
+                  value: d.id,
+                  label: d.label,
+                })),
               },
               {
                 type: 'select',
                 key: 'positionId',
                 label: 'Должность',
-                options: positions.map((p) => ({ value: p.id, label: p.label })),
+                options: positions.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                })),
               },
               {
                 type: 'dateRange',
@@ -299,106 +334,222 @@ function StaffPositionsInner() {
           />
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen
+                ? `${styles.iconBtn} ${styles.iconBtnActive}`
+                : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {selectedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selectedIds.length}</strong>
+          </span>
+          <input
+            type="date"
+            className={styles.bulkDate}
+            value={closeDate}
+            onChange={(e) => setCloseDate(e.target.value)}
+            title="Дата закрытия"
+            aria-label="Дата закрытия"
+          />
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void bulkClose()}
+          >
+            <i className="fas fa-calendar-times" aria-hidden />
+            Установить дату закрытия
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void bulkDelete()}
+          >
+            <i className="fas fa-trash-alt" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredChecked}
-                  onChange={toggleAll}
-                />
-              </th>
-              <th>Название</th>
-              <th>Сотрудники</th>
-              <th>Дата открытия</th>
-              <th>Подразделение</th>
-              <th>Должность</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someFilteredChecked;
+                    }}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Название</th>
+                <th>Сотрудники</th>
+                <th>Дата открытия</th>
+                <th>Подразделение</th>
+                <th>Должность</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const isChecked = checked.has(row.id);
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open || isChecked ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleOne(row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{displayName(row)}</td>
-                    <td>
-                      {(row.employees || []).map(empName).join(', ') || '—'}
-                    </td>
-                    <td>{fmtDate(row.openedAt)}</td>
-                    <td>{row.division?.name || '—'}</td>
-                    <td>{row.position?.name || row.title || '—'}</td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={6}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/staff-positions/${row.id}`}>
-                            Просмотр
-                          </Link>
-                          <Link href={`/catalog/staff-positions/${row.id}/edit`}>
-                            Изменить
-                          </Link>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void removeOne(row)}
-                          >
-                            Удалить
-                          </button>
-                        </div>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = checked.has(row.id);
+                const empLabel =
+                  (row.employees || []).map(empName).join(', ') || '—';
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={
+                        open || isChecked ? styles.rowSelected : undefined
+                      }
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleOne(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${displayName(row)}`}
+                        />
                       </td>
+                      <td className={styles.nameCell}>{displayName(row)}</td>
+                      <td className={empLabel === '—' ? styles.muted : undefined}>
+                        {empLabel}
+                      </td>
+                      <td>{fmtDate(row.openedAt)}</td>
+                      <td>{row.division?.name || '—'}</td>
+                      <td>{row.position?.name || row.title || '—'}</td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={6}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/staff-positions/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотр
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setModal({ mode: 'edit', id: row.id })
+                              }
+                            >
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void removeOne(row)}
+                            >
+                              <i className="fas fa-trash-alt" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <span>
+            Показано{' '}
+            <strong>
+              {filtered.length === 0 ? 0 : `1–${filtered.length}`}
+            </strong>{' '}
+            из <strong>{filtered.length}</strong>
+            {rows.length !== filtered.length ? (
+              <>
+                {' '}
+                (всего <strong>{rows.length}</strong>)
+              </>
+            ) : null}
+          </span>
+        </div>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={
+          modal?.mode === 'edit' ? 'Позиция (изменение)' : 'Позиция (создание)'
+        }
+        width="xl"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <StaffPositionForm
+            key={modal.mode === 'edit' ? modal.id : 'create'}
+            mode={modal.mode}
+            staffPositionId={modal.id}
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }

@@ -465,19 +465,19 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
   locations: {
     title: 'Локации',
     siblings: [
-      { label: 'Типы локаций', href: '/catalog/location-types' },
       { label: 'Устройства', href: '/catalog/devices' },
-      { label: 'Сгенерированные QR-коды', href: '/attendance?tab=qr' },
       { label: 'Новые устройства', href: '/catalog/devices?filter=new' },
+      { label: 'Локации', href: '/catalog/locations' },
+      { label: 'Удалённое управление', href: '/catalog/device-control' },
+      { label: 'Типы локаций', href: '/catalog/location-types' },
     ],
   },
   devices: {
     title: 'Устройства',
     siblings: [
-      { label: 'Локации', href: '/catalog/locations' },
-      { label: 'Типы локаций', href: '/catalog/location-types' },
-      { label: 'Сгенерированные QR-коды', href: '/attendance?tab=qr' },
+      { label: 'Устройства', href: '/catalog/devices' },
       { label: 'Новые устройства', href: '/catalog/devices?filter=new' },
+      { label: 'Локации', href: '/catalog/locations' },
       { label: 'Удалённое управление', href: '/catalog/device-control' },
     ],
   },
@@ -487,6 +487,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
       { label: 'Устройства', href: '/catalog/devices' },
       { label: 'Новые устройства', href: '/catalog/devices?filter=new' },
       { label: 'Локации', href: '/catalog/locations' },
+      { label: 'Удалённое управление', href: '/catalog/device-control' },
     ],
   },
   marks: {

@@ -391,7 +391,7 @@ export function ReportTemplateForm({ templateId }: { templateId?: string }) {
                   <span style={{ color: '#7e8299' }}>{`{{${v}}}`}</span>
                   <button
                     type="button"
-                    style={{ color: '#3699ff' }}
+                    style={{ color: '#0a85e2' }}
                     onClick={() => addVariable(v)}
                   >
                     Добавить

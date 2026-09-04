@@ -29,7 +29,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -49,7 +49,7 @@
 .btnClose {
   border: 1px solid #d1d5db;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -168,8 +168,8 @@
 }
 
 .tabOn {
-  color: #3699ff;
-  box-shadow: inset 0 -2px 0 #3699ff;
+  color: #0a85e2;
+  box-shadow: inset 0 -2px 0 #0a85e2;
 }
 
 .lineBar {
@@ -412,7 +412,7 @@
 
 .optOn {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .optEmpty {

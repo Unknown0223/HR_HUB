@@ -202,7 +202,7 @@ export class ApplyMarkSettingsDto {
 }
 
 export class IngestPunchDto {
-  @ApiProperty() @IsString() tenantId!: string;
+  @ApiProperty() @IsUUID() tenantId!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() deviceId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() gatewayRef?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() serialNumber?: string;
@@ -218,7 +218,7 @@ export class IngestPunchDto {
 
 /** Device-gw online pulse (~8s). Same auth as punches/ingest. */
 export class IngestHeartbeatDto {
-  @ApiProperty() @IsString() tenantId!: string;
+  @ApiProperty() @IsUUID() tenantId!: string;
   @ApiProperty() @IsString() deviceId!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() deviceNow?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() clockDriftSeconds?: number;

@@ -81,7 +81,7 @@
 }
 
 .btnPrimary {
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -90,7 +90,7 @@
 }
 
 .btnBlue {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -127,7 +127,7 @@
 }
 
 .btnMenu {
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
   position: relative;
 }
@@ -231,7 +231,7 @@
 .checkCol input {
   width: 1rem;
   height: 1rem;
-  accent-color: #1bc5bd;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -316,7 +316,7 @@
 }
 
 .dotIn::before {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .dotOut::before {
@@ -423,7 +423,7 @@
 .applyFilter {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font-weight: 700;
   font-size: 0.8rem;
@@ -506,7 +506,7 @@
 }
 
 .pager button.pageBtnActive {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
   color: #fff;
 }

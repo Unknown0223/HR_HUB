@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FilterPanel, type FilterFieldDef } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { StatusBadge } from '@/components/StatusBadge';
-import { apiFetch, PageResult } from '@/lib/api';
+import { apiFetch, getSession, PageResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { useUrlParam } from '@/lib/use-url-state';
 import styles from '../../page-shared.module.css';
@@ -477,7 +477,7 @@ export default function AttendancePage() {
   }
 
   async function ingestDemoPunch() {
-    const session = JSON.parse(localStorage.getItem('hrhub_session') || '{}');
+    const session = getSession();
     const tenantId = session?.tenant?.id;
     if (!tenantId) {
       setError('Tenant не найден — войдите снова');

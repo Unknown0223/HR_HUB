@@ -54,6 +54,7 @@ function statusClass(status: string, locked?: boolean) {
   if (s === 'online' || s === 'в сети') return styles.statusOnline;
   if (s === 'offline' || s === 'не в сети') return styles.statusOffline;
   if (s === 'locked') return styles.statusLocked;
+  if (s === 'new' || s === 'registered') return styles.statusNew;
   return styles.statusOther;
 }
 
@@ -138,7 +139,6 @@ function DevicesInner() {
   const selectedIds = useMemo(() => [...checked], [checked]);
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((d) => checked.has(d.id));
-  const focus = filtered.find((d) => d.id === focusId) || null;
 
   function toggleOne(id: string) {
     setChecked((prev) => {
@@ -285,9 +285,66 @@ function DevicesInner() {
     }
   }
 
+  const metrics = useMemo(() => {
+    let online = 0;
+    let offline = 0;
+    let inactive = 0;
+    let neu = 0;
+    for (const d of rows) {
+      if (!d.isActive) {
+        inactive += 1;
+        continue;
+      }
+      const s = d.status.toLowerCase();
+      if (s === 'online') online += 1;
+      else if (s === 'new' || s === 'registered') neu += 1;
+      else offline += 1;
+    }
+    return [
+      { label: 'Всего', value: rows.length, kind: 'total' as const },
+      { label: 'В сети', value: online, kind: 'online' as const },
+      { label: 'Не в сети', value: offline, kind: 'offline' as const },
+      { label: 'Новые', value: neu, kind: 'new' as const },
+      { label: 'Неактивные', value: inactive, kind: 'inactive' as const },
+    ];
+  }, [rows]);
+
   return (
-    <div className={styles.wrap}>
-      <PageSubnav formKey="devices" />
+    <div className={styles.page}>
+      <PageSubnav
+        groupKey="devices"
+        titleOverride={filterNew ? 'Новые устройства' : 'Устройства'}
+      />
+
+      <header className={styles.header}>
+        <span className={styles.iconBadge} aria-hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="20" height="14" x="2" y="3" rx="2" />
+            <path d="M8 21h8" />
+            <path d="M12 17v4" />
+          </svg>
+        </span>
+        <div>
+          <h1 className={styles.h1}>{filterNew ? 'Новые устройства' : 'Устройства'}</h1>
+          <p className={styles.subtitle}>
+            {filterNew
+              ? 'Терминалы, ожидающие настройки и привязки'
+              : 'Терминалы Face ID, мобильные и QR-точки'}
+          </p>
+        </div>
+      </header>
+
+      {!filterNew ? (
+        <div className={styles.metrics}>
+          {metrics.map((m) => (
+            <div key={m.label} className={styles.metricCard}>
+              <p className={styles.metricLabel}>{m.label}</p>
+              <p className={`${styles.metricValue} ${styles[`m_${m.kind}`]}`}>{m.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button
@@ -310,38 +367,32 @@ function DevicesInner() {
               Удалить {selectedIds.length}
             </button>
           ) : null}
-          <button type="button" className={styles.btnGhost} onClick={() => router.push('/attendance')}>
-            Закрыть
-          </button>
-          <div className={styles.scopeTabs}>
-            <button
-              type="button"
-              className={!filterNew ? styles.scopeTabActive : styles.scopeTab}
-              onClick={() => router.push('/catalog/devices')}
-            >
-              Устройства
-            </button>
-            <button
-              type="button"
-              className={filterNew ? styles.scopeTabActive : styles.scopeTab}
-              onClick={() => router.push('/catalog/devices?filter=new')}
-            >
-              Новые устройства
-            </button>
-          </div>
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск: название, серийный, локация..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className={styles.searchWrap}>
+            <span className={styles.searchIcon} aria-hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className={styles.search}
+              placeholder="Поиск: название, серийный, локация..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <span className={styles.pagerMeta}>
             {filtered.length}/{rows.length}
           </span>
-          <button type="button" className={styles.btnGhost} onClick={() => void load()}>
-            Обновить
+          <button type="button" className={styles.iconBtn} onClick={() => void load()} aria-label="Обновить">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" />
+            </svg>
           </button>
         </div>
       </div>
@@ -349,105 +400,143 @@ function DevicesInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.panel}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredSelected}
-                  disabled={!filtered.length || loading}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Тип устройства</th>
-              <th>Название</th>
-              <th>Локация</th>
-              <th>Временная зона</th>
-              <th>Статус</th>
-              <th>Последняя активность</th>
-              <th>Заряд батареи</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    disabled={!filtered.length || loading}
+                    onChange={toggleAll}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Устройство</th>
+                <th>Локация</th>
+                <th>Зона</th>
+                <th>Статус</th>
+                <th>Активность</th>
+                <th>Батарея</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              filtered.map((d) => (
-                <Fragment key={d.id}>
-                  <tr
-                    className={
-                      checked.has(d.id) || focusId === d.id ? styles.selected : undefined
-                    }
-                    onClick={() => setFocusId((id) => (id === d.id ? null : d.id))}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td className={styles.checkCol}>
-                      <input
-                        type="checkbox"
-                        checked={checked.has(d.id)}
-                        onChange={() => toggleOne(d.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{deviceTypeLabel(d)}</td>
-                    <td>{d.name}</td>
-                    <td>{d.location?.name || '—'}</td>
-                    <td>
-                      {(typeof d.meta?.timezone === 'string' && d.meta.timezone) ||
-                        d.location?.timezone ||
-                        '—'}
-                    </td>
-                    <td>
-                      <span className={statusClass(d.status, punchLockActive(d.meta))}>
-                        {statusLabel(d.status, d.isActive, punchLockActive(d.meta))}
-                      </span>
-                    </td>
-                    <td>{fmtDt(d.lastSeenAt)}</td>
-                    <td>
-                      {typeof d.meta?.battery === 'number' ? `${d.meta.battery}%` : '—'}
-                    </td>
-                  </tr>
-                  {focus?.id === d.id ? (
-                    <tr>
-                      <td colSpan={8} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/devices/${d.id}`}>Просмотр</Link>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditing(d);
-                              setModalOpen(true);
-                            }}
-                          >
-                            Изменить
-                          </button>
-                          <button type="button" onClick={() => void remove(d.id)}>
-                            Удалить
-                          </button>
-                          <button type="button" onClick={() => openApply(d)}>
-                            Применить настройки для отметок
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className={styles.empty}>
+                    {filterNew ? 'Нет новых устройств' : 'Нет данных'}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((d) => {
+                  const online = d.isActive && d.status.toLowerCase() === 'online';
+                  const open = focusId === d.id;
+                  return (
+                    <Fragment key={d.id}>
+                      <tr
+                        className={`${checked.has(d.id) || open ? styles.selected : ''} ${open ? styles.rowOpen : ''}`}
+                        onClick={() => setFocusId((id) => (id === d.id ? null : d.id))}
+                      >
+                        <td className={styles.checkCol}>
+                          <input
+                            type="checkbox"
+                            checked={checked.has(d.id)}
+                            onChange={() => toggleOne(d.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td>
+                          <div className={styles.deviceCell}>
+                            <span
+                              className={`${styles.deviceIcon} ${online ? styles.deviceIconOn : styles.deviceIconOff}`}
+                              aria-hidden
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect width="20" height="14" x="2" y="3" rx="2" />
+                                <path d="M8 21h8M12 17v4" />
+                              </svg>
+                            </span>
+                            <div>
+                              <div className={styles.name}>{d.name}</div>
+                              <div className={styles.meta}>
+                                {deviceTypeLabel(d)}
+                                {d.serialNumber ? ` · ${d.serialNumber}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{d.location?.name || '—'}</td>
+                        <td className={styles.mono}>
+                          {(typeof d.meta?.timezone === 'string' && d.meta.timezone) ||
+                            d.location?.timezone ||
+                            '—'}
+                        </td>
+                        <td>
+                          <span className={`${styles.statusChip} ${statusClass(d.status, punchLockActive(d.meta))}`}>
+                            {statusLabel(d.status, d.isActive, punchLockActive(d.meta))}
+                          </span>
+                        </td>
+                        <td className={styles.mono}>{fmtDt(d.lastSeenAt)}</td>
+                        <td>
+                          {typeof d.meta?.battery === 'number' ? `${d.meta.battery}%` : '—'}
+                        </td>
+                      </tr>
+                      {open ? (
+                        <tr className={styles.expandRow}>
+                          <td colSpan={7}>
+                            <div className={styles.rowActions}>
+                              <Link href={`/catalog/devices/${d.id}`}>Просмотр</Link>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditing(d);
+                                  setModalOpen(true);
+                                }}
+                              >
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void remove(d.id);
+                                }}
+                              >
+                                Удалить
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openApply(d);
+                                }}
+                              >
+                                Применить настройки отметок
+                              </button>
+                              <Link href="/catalog/device-control">Удалённое управление</Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          {' · '}нажмите на строку для действий
+        </div>
       </div>
 
       <DeviceFormModal

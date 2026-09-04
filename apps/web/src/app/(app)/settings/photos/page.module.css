@@ -40,7 +40,7 @@
 }
 
 .folderBtn:hover {
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .folderBtnEmpty {
@@ -61,7 +61,7 @@
 .uploadBtn {
   appearance: none;
   border: none;
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -112,8 +112,8 @@
 }
 
 .tabOn {
-  color: #3699ff;
-  box-shadow: inset 0 -2px 0 #3699ff;
+  color: #0a85e2;
+  box-shadow: inset 0 -2px 0 #0a85e2;
 }
 
 .toolbar {

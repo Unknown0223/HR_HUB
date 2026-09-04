@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiFetch, getSession, setSession, Session } from '@/lib/api';
+import { apiFetch, getAccessToken, getSession, setMediaAccessToken, setSession, Session } from '@/lib/api';
 import { MEGA_NAV, findSectionByPath } from '@/lib/mega-nav';
 import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
 import styles from './shell.module.css';
@@ -20,6 +20,35 @@ function linkActive(pathname: string, search: string, href: string) {
   if (pathname !== path && !(path !== '/' && pathname.startsWith(path + '/'))) return false;
   if (!qs) return true;
   return search.includes(qs);
+}
+
+function MegaLinkContent({
+  label,
+  faIcon,
+  iconAccent,
+  iconClass,
+  iconColoredClass,
+}: {
+  label: string;
+  faIcon?: string;
+  iconAccent?: string;
+  iconClass: string;
+  iconColoredClass: string;
+}) {
+  return (
+    <>
+      {faIcon ? (
+        <span
+          className={iconAccent ? `${iconClass} ${iconColoredClass}` : iconClass}
+          style={iconAccent ? { background: iconAccent } : undefined}
+          aria-hidden
+        >
+          <i className={`fas ${faIcon}`} />
+        </span>
+      ) : null}
+      <span>{label}</span>
+    </>
+  );
 }
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
@@ -72,6 +101,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       return;
     }
     setLocal(s);
+    // Hydrate JWT for <img src> storage URLs (cookie is httpOnly)
+    if (!getAccessToken()) {
+      void apiFetch<{ accessToken: string }>('/api/auth/media-token')
+        .then((r) => {
+          if (r?.accessToken) setMediaAccessToken(r.accessToken);
+        })
+        .catch(() => undefined);
+    }
   }, [router]);
 
   useEffect(() => {
@@ -386,6 +423,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }, [pathname, search, siblingGroup]);
 
   function logout() {
+    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setSession(null);
     setLocal(null);
     setProfileOpen(false);
@@ -393,6 +431,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }
 
   function logoutForgetDevice() {
+    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     try {
       localStorage.clear();
       sessionStorage.clear();
@@ -468,7 +507,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </button>
 
           <Link href="/dashboard" className={styles.brandLink} onClick={() => setOpenId(null)}>
-            <span className={styles.brandMark}>H</span>
+            <span className={styles.brandMark} aria-hidden>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 10h.01" />
+                <path d="M15 10h.01" />
+                <path d="M12 2a8 8 0 0 0-8 8v1.5a2.5 2.5 0 0 0 2.5 2.5H9l3 5 3-5h2.5A2.5 2.5 0 0 0 20 11.5V10a8 8 0 0 0-8-8z" />
+                <path d="M8 21h8" />
+              </svg>
+            </span>
             <span className={styles.brandText}>
               <strong>HR HUB</strong>
               <small>{session.tenant?.name ?? 'Platform'}</small>
@@ -1003,7 +1049,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                                   }
                                   onClick={() => setMobileOpen(false)}
                                 >
-                                  {item.label}
+                                  <MegaLinkContent
+                                    label={item.label}
+                                    faIcon={item.faIcon}
+                                    iconAccent={item.iconAccent}
+                                    iconClass={styles.megaLinkIcon}
+                                    iconColoredClass={styles.megaLinkIconColored}
+                                  />
                                 </Link>
                               </li>
                             );
@@ -1076,7 +1128,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                                 }
                                 onClick={() => setOpenId(null)}
                               >
-                                {item.label}
+                                <MegaLinkContent
+                                  label={item.label}
+                                  faIcon={item.faIcon}
+                                  iconAccent={item.iconAccent}
+                                  iconClass={styles.megaLinkIcon}
+                                  iconColoredClass={styles.megaLinkIconColored}
+                                />
                               </Link>
                             </li>
                           );
@@ -1089,38 +1147,103 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
               return (
                 <div className={styles.megaGrid}>
-                  {columns.map((col, idx) => {
-                    const items = col.items.filter(
-                      (i) =>
-                        i.badge !== 'platform' ||
-                        session.user.role === 'platform_admin',
-                    );
-                    return (
-                      <div key={col.title || `col-${idx}`} className={styles.megaCol}>
-                        {col.title ? (
-                          <div className={styles.megaColTitle}>{col.title}</div>
-                        ) : null}
-                        <ul className={styles.megaList}>
-                          {items.map((item) => {
-                            const active = linkActive(pathname, search, item.href);
-                            return (
-                              <li key={item.href + item.label}>
+                  {openSection.id === 'home' ? (
+                    <div className={styles.homeMega}>
+                      <div className={styles.homeMegaHead}>Раздел «Главная»</div>
+                      <div className={styles.homeMegaList}>
+                        {columns.flatMap((col) =>
+                          col.items
+                            .filter(
+                              (i) =>
+                                i.badge !== 'platform' ||
+                                session.user.role === 'platform_admin',
+                            )
+                            .map((item) => {
+                              const active = linkActive(pathname, search, item.href);
+                              const iconCls =
+                                item.icon === 'news'
+                                  ? styles.homeMegaIconNews
+                                  : item.icon === 'devices'
+                                    ? styles.homeMegaIconDevices
+                                    : styles.homeMegaIconChart;
+                              return (
                                 <Link
+                                  key={item.href + item.label}
                                   href={item.href}
                                   className={
-                                    active ? styles.megaLinkActive : styles.megaLink
+                                    active
+                                      ? `${styles.homeMegaItem} ${styles.homeMegaItemActive}`
+                                      : styles.homeMegaItem
                                   }
                                   onClick={() => setOpenId(null)}
                                 >
-                                  {item.label}
+                                  <span className={`${styles.homeMegaIcon} ${iconCls}`}>
+                                    {item.icon === 'news' ? (
+                                      <i className="fas fa-newspaper" aria-hidden />
+                                    ) : item.icon === 'devices' ? (
+                                      <i className="fas fa-desktop" aria-hidden />
+                                    ) : (
+                                      <i className="fas fa-chart-pie" aria-hidden />
+                                    )}
+                                  </span>
+                                  <span className={styles.homeMegaText}>
+                                    <span className={styles.homeMegaLabel}>{item.label}</span>
+                                    {item.description ? (
+                                      <span className={styles.homeMegaDesc}>
+                                        {item.description}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  <i
+                                    className={`fas fa-arrow-right ${styles.homeMegaArrow}`}
+                                    aria-hidden
+                                  />
                                 </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
+                              );
+                            }),
+                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ) : (
+                    columns.map((col, idx) => {
+                      const items = col.items.filter(
+                        (i) =>
+                          i.badge !== 'platform' ||
+                          session.user.role === 'platform_admin',
+                      );
+                      return (
+                        <div key={col.title || `col-${idx}`} className={styles.megaCol}>
+                          {col.title ? (
+                            <div className={styles.megaColTitle}>{col.title}</div>
+                          ) : null}
+                          <ul className={styles.megaList}>
+                            {items.map((item) => {
+                              const active = linkActive(pathname, search, item.href);
+                              return (
+                                <li key={item.href + item.label}>
+                                  <Link
+                                    href={item.href}
+                                    className={
+                                      active ? styles.megaLinkActive : styles.megaLink
+                                    }
+                                    onClick={() => setOpenId(null)}
+                                  >
+                                    <MegaLinkContent
+                                      label={item.label}
+                                      faIcon={item.faIcon}
+                                      iconAccent={item.iconAccent}
+                                      iconClass={styles.megaLinkIcon}
+                                      iconColoredClass={styles.megaLinkIconColored}
+                                    />
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               );
             })()}

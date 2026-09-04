@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'crypto';
-import { BadRequestException, BadGatewayException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { BadRequestException, BadGatewayException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import {
   DayStatus,
   FaceSyncStatus,
@@ -4086,8 +4086,39 @@ export class AttendanceService {
     return { occurredAt, extra };
   }
 
+  /** Body tenantId cannot attach a device that already belongs to another company. */
+  private async rejectIngestDeviceTenantMismatch(dto: IngestPunchDto) {
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const or: Prisma.DeviceWhereInput[] = [];
+    if (dto.deviceId) {
+      if (uuidRe.test(dto.deviceId)) or.push({ id: dto.deviceId });
+      or.push({ gatewayRef: dto.deviceId });
+    }
+    if (dto.gatewayRef) or.push({ gatewayRef: dto.gatewayRef });
+    if (dto.serialNumber) or.push({ serialNumber: dto.serialNumber });
+    if (!or.length) return;
+
+    const foreign = await this.prisma.device.findFirst({
+      where: { tenantId: { not: dto.tenantId }, OR: or },
+      select: { id: true },
+    });
+    if (foreign) {
+      throw new ForbiddenException('Device does not belong to tenant');
+    }
+  }
+
   async ingestPunch(dto: IngestPunchDto) {
     const tenantId = dto.tenantId;
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, isActive: true },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new BadRequestException('Unknown or inactive tenant');
+    }
+    await this.rejectIngestDeviceTenantMismatch(dto);
+
     let deviceId: string | null = null;
 
     if (dto.deviceId) {

@@ -1001,7 +1001,8 @@ export class AttendanceController {
 
   /**
    * Device gateway / integrations punch ingest.
-   * Optional: set PUNCH_INGEST_API_KEY → require X-Punch-Key (or Bearer).
+   * Production: PUNCH_INGEST_API_KEY is required (API will not start without it).
+   * Local/dev: empty key stays open for lab. Set key → require X-Punch-Key (or Bearer).
    * Optional: PUNCH_INGEST_RATE_LIMIT_PER_MIN → per-IP rate limit (0/unset = off).
    * NATS consumer path is separate and unaffected.
    */
@@ -1011,7 +1012,8 @@ export class AttendanceController {
   @ApiHeader({
     name: 'X-Punch-Key',
     required: false,
-    description: 'Required when PUNCH_INGEST_API_KEY is set',
+    description:
+      'Required in production and whenever PUNCH_INGEST_API_KEY is set',
   })
   @Post('punches/ingest')
   ingest(@Body() dto: IngestPunchDto) {
@@ -1025,7 +1027,8 @@ export class AttendanceController {
   @ApiHeader({
     name: 'X-Punch-Key',
     required: false,
-    description: 'Required when PUNCH_INGEST_API_KEY is set',
+    description:
+      'Required in production and whenever PUNCH_INGEST_API_KEY is set',
   })
   @Post('heartbeats/ingest')
   ingestHeartbeat(@Body() dto: IngestHeartbeatDto) {

@@ -656,7 +656,7 @@ export default function ShiftsReportPage() {
         return markLines(r).map((line) => [
           { v: r.dateLabel, s: r.dateWarn ? { fill: XLSX_COLORS.offDay, fontColor: 'FFC27D00', bold: true } : undefined },
           r.tabNumber,
-          { v: r.employee, s: { align: 'left' } },
+          { v: r.employee, s: { align: 'left' as const } },
           { v: r.shiftType, s: night ? nightFill : undefined },
           { v: r.planIn, s: planFill },
           { v: r.planOut, s: planFill },
@@ -719,7 +719,7 @@ export default function ShiftsReportPage() {
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .wrap{padding:16px}

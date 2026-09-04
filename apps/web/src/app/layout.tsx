@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { Open_Sans } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
-const openSans = Open_Sans({
-  subsets: ['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext'],
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ['latin', 'latin-ext'],
   display: 'swap',
-  variable: '--font-open-sans',
+  variable: '--font-plus-jakarta',
+  weight: ['400', '500', '600', '700', '800'],
 });
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#eeeeef',
+  themeColor: '#f3f6fb',
 };
 
 export default function RootLayout({
@@ -27,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="uz" className={openSans.variable}>
+    <html lang="uz" className={plusJakarta.variable}>
       <head>
         <link
           rel="stylesheet"
@@ -37,7 +38,7 @@ export default function RootLayout({
           referrerPolicy="no-referrer"
         />
       </head>
-      <body className={openSans.className}>
+      <body className={plusJakarta.className}>
         <Providers>{children}</Providers>
       </body>
     </html>

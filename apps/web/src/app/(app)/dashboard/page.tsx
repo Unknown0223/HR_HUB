@@ -422,6 +422,14 @@ const I = {
       <line x1="3" x2="3.01" y1="18" y2="18" />
     </svg>
   ),
+  users: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
   search: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" />
@@ -1075,30 +1083,48 @@ export default function DashboardPage() {
         <div>
           <h1 className={css.h1}>Статистика посещений сотрудников</h1>
           <p className={css.dateLine}>
-            Данные за <span className={css.dateLineStrong}>{dateLabel}</span>
+            <span className={css.dateLineStrong}>{dateLabel}</span>
+            <span className={css.dateDot}>·</span>
+            статистика посещений
           </p>
         </div>
-        <div className={css.viewSwitch} role="tablist" aria-label="Режим отображения">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'chart'}
-            className={`${css.viewBtn} ${viewMode === 'chart' ? css.viewBtnActive : ''}`}
-            onClick={() => setViewMode('chart')}
-          >
-            {I.chart}
-            Круговая диаграмма
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'list'}
-            className={`${css.viewBtn} ${viewMode === 'list' ? css.viewBtnActive : ''}`}
-            onClick={() => setViewMode('list')}
-          >
-            {I.list}
-            Список
-          </button>
+        <div className={css.pageHeadRight}>
+          <div className={css.sectionLegend} aria-hidden="true">
+            <span className={`${css.legendChip} ${css.legendChip1}`}>
+              <span className={css.legendChipNum}>1</span>
+              Диаграмма
+            </span>
+            <span className={`${css.legendChip} ${css.legendChip2}`}>
+              <span className={css.legendChipNum}>2</span>
+              Таблица
+            </span>
+            <span className={`${css.legendChip} ${css.legendChip3}`}>
+              <span className={css.legendChipNum}>3</span>
+              Фильтры
+            </span>
+          </div>
+          <div className={css.viewSwitch} role="tablist" aria-label="Режим отображения">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'chart'}
+              className={`${css.viewBtn} ${viewMode === 'chart' ? css.viewBtnActive : ''}`}
+              onClick={() => setViewMode('chart')}
+            >
+              {I.chart}
+              Диаграмма
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'list'}
+              className={`${css.viewBtn} ${viewMode === 'list' ? css.viewBtnActive : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              {I.list}
+              Список
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1106,7 +1132,23 @@ export default function DashboardPage() {
         <div className={css.mainCol}>
           <div className={css.viewArea} key={viewMode}>
             {viewMode === 'chart' ? (
-              <section className={css.chartCard} aria-label="Круговая диаграмма посещений">
+              <section className={`${css.card} ${css.chartCard}`} aria-label="Статистика посещаемости">
+                <div className={css.sectionHead}>
+                  <div className={css.sectionHeadLeft}>
+                    <span className={`${css.sectionIcon} ${css.sectionIconChart}`}>{I.chart}</span>
+                    <div>
+                      <h2 className={css.sectionTitle}>
+                        Посещаемость за день
+                        <span className={`${css.sectionBadge} ${css.sectionBadge1}`}>01</span>
+                      </h2>
+                      <p className={css.sectionSub}>Распределение статусов по выбранной выборке</p>
+                    </div>
+                  </div>
+                  <div className={css.livePill}>
+                    <span className={css.liveDot} aria-hidden="true" />
+                    данные Face ID
+                  </div>
+                </div>
                 <div className={css.chartBody}>
                   <DonutChart working={working} counts={counts} />
                   <ul className={css.legend}>
@@ -1121,6 +1163,14 @@ export default function DashboardPage() {
                             : b.id === 'absent'
                               ? css.dotAbsent
                               : css.dotNotStarted;
+                      const barCls =
+                        b.id === 'on_time'
+                          ? css.barOnTime
+                          : b.id === 'late'
+                            ? css.barLate
+                            : b.id === 'absent'
+                              ? css.barAbsent
+                              : css.barNotStarted;
                       return (
                         <li key={b.id}>
                           <button
@@ -1129,10 +1179,15 @@ export default function DashboardPage() {
                             onClick={() => setQuick(b.id)}
                             aria-pressed={quickFilter === b.id}
                           >
-                            <span className={`${css.legendDot} ${dotCls}`} aria-hidden="true" />
-                            <span className={css.legendLabel}>{b.label}</span>
-                            <span className={css.legendCount}>{n}</span>
-                            <span className={css.legendPct}>{pct}%</span>
+                            <div className={css.legendRow}>
+                              <span className={`${css.legendDot} ${dotCls}`} aria-hidden="true" />
+                              <span className={css.legendLabel}>{b.label}</span>
+                              <span className={css.legendCount}>{n}</span>
+                              <span className={css.legendPct}>{pct}%</span>
+                            </div>
+                            <div className={css.legendBarTrack}>
+                              <span className={`${css.legendBar} ${barCls}`} style={{ width: `${pct}%` }} />
+                            </div>
                           </button>
                         </li>
                       );
@@ -1187,12 +1242,28 @@ export default function DashboardPage() {
           </div>
 
           <section className={`${css.card} ${css.tableCard}`} aria-label="Таблица посещений">
+            <div className={`${css.sectionHead} ${css.sectionHeadTable}`}>
+              <div className={css.sectionHeadLeft}>
+                <span className={`${css.sectionIcon} ${css.sectionIconTable}`}>{I.users}</span>
+                <div>
+                  <h2 className={css.sectionTitle}>
+                    Сотрудники · отметки
+                    <span className={`${css.sectionBadge} ${css.sectionBadge2}`}>02</span>
+                  </h2>
+                  <p className={css.sectionSub}>Приход, уход и состояние за выбранную дату</p>
+                </div>
+              </div>
+              <div className={css.countPill}>
+                <span className={css.countPillDot} aria-hidden="true" />
+                всего строк: <strong>{filtered.length}</strong>
+              </div>
+            </div>
             <div className={css.toolbar}>
               <div className={css.searchWrap}>
                 <span className={css.searchIcon}>{I.search}</span>
                 <input
                   className={css.searchInput}
-                  placeholder="Поиск..."
+                  placeholder="Поиск по ФИО…"
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -1348,6 +1419,7 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th className={css.tableTh}>ФИО</th>
+                      <th className={css.tableTh}>Табельный №</th>
                       <th className={css.tableTh}>Приход</th>
                       <th className={css.tableTh}>Уход</th>
                       {viewMode === 'chart' && <th className={css.tableTh}>Состояние</th>}
@@ -1371,6 +1443,15 @@ export default function DashboardPage() {
                                   lightbox={photos}
                                   slides={photoSlides}
                                   index={idx < 0 ? 0 : idx}
+                                  fallback={
+                                    <span
+                                      className={css.avatarBtn}
+                                      style={{ background: hueFromId(emp.employeeId) }}
+                                      aria-hidden
+                                    >
+                                      {initialsOf(emp.fullName)}
+                                    </span>
+                                  }
                                 />
                               ) : (
                                 <span
@@ -1385,12 +1466,14 @@ export default function DashboardPage() {
                                 <Link href={`/employees/${emp.employeeId}`} className={css.nameLink}>
                                   {emp.fullName}
                                 </Link>
-                                <span className={css.nameSub}>
-                                  {emp.position ?? '—'}
-                                  {emp.tabNumber ? ` · ${emp.tabNumber}` : ''}
-                                </span>
+                                {emp.position ? (
+                                  <span className={css.nameSub}>{emp.position}</span>
+                                ) : null}
                               </div>
                             </div>
+                          </td>
+                          <td className={`${css.tableTd} ${css.tabCell}`}>
+                            {emp.tabNumber || '—'}
                           </td>
                           <td className={`${css.tableTd} ${css.timeCell}`}>
                             {emp.firstIn ? (
@@ -1450,9 +1533,18 @@ export default function DashboardPage() {
             <>
               <section className={css.filterCard} aria-label="Фильтр статистики">
                 <div className={css.cardHead}>
-                  <h2 className={css.cardTitle}>Фильтр</h2>
+                  <div className={css.sectionHeadLeft}>
+                    <span className={`${css.sectionIcon} ${css.sectionIconFilter}`}>{I.sliders}</span>
+                    <div>
+                      <h2 className={css.cardTitle}>
+                        Фильтры
+                        <span className={`${css.sectionBadge} ${css.sectionBadge3}`}>03</span>
+                      </h2>
+                      <p className={css.sectionSub}>настройте выборку данных</p>
+                    </div>
+                  </div>
                   <button type="button" className={css.collapseBtn} onClick={() => setCollapsed(true)}>
-                    Скрыть фильтр ›
+                    Скрыть ›
                   </button>
                 </div>
                 <div className={css.filterBody}>

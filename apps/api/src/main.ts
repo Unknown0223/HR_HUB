@@ -28,7 +28,8 @@ async function bootstrap() {
 
   const corsOrigins = process.env.CORS_ORIGIN?.split(',')
     .map((s) => s.trim())
-    .filter(Boolean) ?? ['http://localhost:3000'];
+    .filter(Boolean) ?? ['http://localhost:3001'];
+  app.set('trust proxy', 1);
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
@@ -59,8 +60,8 @@ async function bootstrap() {
   }
 
   if (isProd && !(process.env.PUNCH_INGEST_API_KEY ?? '').trim()) {
-    logger.warn(
-      'PUNCH_INGEST_API_KEY unset in production — public punch ingest is open. See docs/SECURITY_CHECKLIST.md',
+    throw new Error(
+      'PUNCH_INGEST_API_KEY is required in production. Punch ingest must not start open.',
     );
   }
 
@@ -75,7 +76,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   // Railway / PaaS inject PORT; local/dev still use API_PORT.
-  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3002);
   await app.listen(port, '0.0.0.0');
   logger.log(`HR HUB API listening on http://0.0.0.0:${port}`);
   logger.log(`Swagger: http://localhost:${port}/docs`);

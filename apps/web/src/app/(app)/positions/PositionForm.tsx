@@ -31,9 +31,15 @@ function uid() {
 export function PositionForm({
   mode,
   positionId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit';
   positionId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -164,14 +170,14 @@ export function PositionForm({
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        router.push('/positions?tab=positions');
       } else {
         await apiFetch('/api/organization/positions', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        router.push('/positions?tab=positions');
       }
+      if (onSuccess) onSuccess();
+      else router.push('/positions?tab=positions');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -180,6 +186,7 @@ export function PositionForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="position-form" titleOverride={pageTitle} />
@@ -188,20 +195,18 @@ export function PositionForm({
     );
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="position-form" titleOverride={pageTitle} />
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/positions?tab=positions');
+  }
 
+  const form = (
       <form onSubmit={onSave} className={styles.cardWide}>
         <div className={styles.actions}>
           <button type="submit" className={styles.primary} disabled={saving}>
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => router.push('/positions?tab=positions')}
-          >
+          <button type="button" className={styles.secondary} onClick={goBack}>
             Закрыть
           </button>
         </div>
@@ -380,6 +385,14 @@ export function PositionForm({
           </div>
         </div>
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="position-form" titleOverride={pageTitle} />
+      {form}
     </div>
   );
 }

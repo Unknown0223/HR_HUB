@@ -53,8 +53,8 @@
 }
 
 .subTabActive {
-  color: #3699ff;
-  border-bottom-color: #3699ff;
+  color: #0a85e2;
+  border-bottom-color: #0a85e2;
 }
 
 .toolbar {
@@ -68,7 +68,7 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -132,7 +132,7 @@
   margin-top: 0.15rem;
   width: 1rem;
   height: 1rem;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   flex-shrink: 0;
 }
 
@@ -228,7 +228,7 @@
 }
 
 .switch input:checked + .slider {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .switch input:checked + .slider::before {
@@ -369,13 +369,13 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .payAdd:hover {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   background: #e1f0ff;
 }

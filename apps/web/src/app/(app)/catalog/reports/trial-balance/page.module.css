@@ -28,14 +28,14 @@
 }
 
 .tabOn {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
 .btnPrimary {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.85rem;
@@ -61,7 +61,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
@@ -92,8 +92,8 @@
 }
 
 .refreshBtn:hover {
-  border-color: #3699ff;
-  color: #3699ff;
+  border-color: #0a85e2;
+  color: #0a85e2;
 }
 
 .error {
@@ -161,7 +161,7 @@
 
 .field input:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -187,7 +187,7 @@
 }
 
 .check input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .actions {

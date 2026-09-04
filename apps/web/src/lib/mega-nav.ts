@@ -12,6 +12,16 @@ export type MegaLink = {
   href: string;
   label: string;
   badge?: string;
+  /** Short label for rich home cards */
+  short?: string;
+  description?: string;
+  /** CSS gradient for icon tile: "from #a to #b" handled in shell */
+  accent?: string;
+  icon?: 'chart' | 'news' | 'devices';
+  /** Font Awesome class without prefix, e.g. fa-users */
+  faIcon?: string;
+  /** CSS linear-gradient for colorful mega icon tile */
+  iconAccent?: string;
 };
 
 export type MegaColumn = {
@@ -31,19 +41,31 @@ export const MEGA_NAV: MegaSection[] = [
     label: 'Главная',
     columns: [
       {
-        title: '',
+        title: 'Раздел «Главная»',
         items: [
           {
             href: '/dashboard',
             label: 'Статистика посещений сотрудников',
+            short: 'Статистика',
+            description: 'Диаграмма, таблица явки и фильтры по дню',
+            accent: 'chart',
+            icon: 'chart',
           },
           {
             href: '/news',
             label: 'Новостная лента',
+            short: 'Новости',
+            description: 'Объявления, приказы и события компании',
+            accent: 'news',
+            icon: 'news',
           },
           {
             href: '/catalog/device-control',
             label: 'Удалённое управление устройствами',
+            short: 'Устройства',
+            description: 'Терминалы Face ID, синхронизация, статусы',
+            accent: 'devices',
+            icon: 'devices',
           },
         ],
       },
@@ -56,42 +78,154 @@ export const MEGA_NAV: MegaSection[] = [
       {
         title: 'Главное',
         items: [
-          { href: '/employees', label: 'Сотрудники' },
-          { href: '/catalog/hr-documents', label: 'Все кадровые документы' },
-          { href: '/catalog/transfers', label: 'Кадровые переводы' },
-          { href: '/catalog/absences', label: 'Все отсутствия сотрудников' },
-          { href: '/catalog/timesheet-adjustments', label: 'Корректировки табеля' },
+          {
+            href: '/employees',
+            label: 'Сотрудники',
+            faIcon: 'fa-users',
+            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)',
+          },
+          {
+            href: '/catalog/hr-documents',
+            label: 'Все кадровые документы',
+            faIcon: 'fa-file-alt',
+            iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
+          },
+          {
+            href: '/catalog/transfers',
+            label: 'Кадровые переводы',
+            faIcon: 'fa-exchange-alt',
+            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #d946ef 100%)',
+          },
+          {
+            href: '/catalog/absences',
+            label: 'Все отсутствия сотрудников',
+            faIcon: 'fa-calendar-times',
+            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+          },
+          {
+            href: '/catalog/timesheet-adjustments',
+            label: 'Корректировки табеля',
+            faIcon: 'fa-th',
+            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #0e9f6e 100%)',
+          },
           {
             href: '/catalog/hr-requests',
             label: 'Заявки на кадровые изменения',
+            faIcon: 'fa-file-signature',
+            iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0a85e2 100%)',
           },
-          { href: '/catalog/clearance-sheets', label: 'Обходные листы' },
-          { href: '/catalog/wage-changes', label: 'Все изменения в оплате труда' },
-          { href: '/catalog/incidents', label: 'Инциденты' },
+          {
+            href: '/catalog/clearance-sheets',
+            label: 'Обходные листы',
+            faIcon: 'fa-clipboard-list',
+            iconAccent: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
+          },
+          {
+            href: '/catalog/wage-changes',
+            label: 'Все изменения в оплате труда',
+            faIcon: 'fa-money-bill-wave',
+            iconAccent: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          },
+          {
+            href: '/catalog/incidents',
+            label: 'Инциденты',
+            faIcon: 'fa-exclamation-circle',
+            iconAccent: 'linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)',
+          },
         ],
       },
       {
         title: 'Организация',
         items: [
-          { href: '/divisions?tab=divisions', label: 'Подразделения' },
-          { href: '/positions?tab=positions', label: 'Должности' },
-          { href: '/catalog/grades', label: 'Разряды' },
-          { href: '/catalog/staff-positions', label: 'Позиции' },
-          { href: '/catalog/staff-positions/structure', label: 'Оргструктура по позициям' },
-          { href: '/catalog/tariff-groups', label: 'Тарифные группы' },
-          { href: '/catalog/tariff-approvals', label: 'Утверждения тарифных групп' },
-          { href: '/catalog/grade-history', label: 'Повышение разрядов' },
-          { href: '/catalog/career-paths', label: 'Карьерный путь' },
+          {
+            href: '/divisions?tab=divisions',
+            label: 'Подразделения',
+            faIcon: 'fa-sitemap',
+            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)',
+          },
+          {
+            href: '/positions?tab=positions',
+            label: 'Должности',
+            faIcon: 'fa-briefcase',
+            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #d946ef 100%)',
+          },
+          {
+            href: '/catalog/grades',
+            label: 'Разряды',
+            faIcon: 'fa-layer-group',
+            iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0a85e2 100%)',
+          },
+          {
+            href: '/catalog/staff-positions',
+            label: 'Позиции',
+            faIcon: 'fa-code-branch',
+            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+          },
+          {
+            href: '/catalog/staff-positions/structure',
+            label: 'Оргструктура по позициям',
+            faIcon: 'fa-project-diagram',
+            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #d946ef 100%)',
+          },
+          {
+            href: '/catalog/tariff-groups',
+            label: 'Тарифные группы',
+            faIcon: 'fa-percent',
+            iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
+          },
+          {
+            href: '/catalog/tariff-approvals',
+            label: 'Утверждения тарифных групп',
+            faIcon: 'fa-clipboard-check',
+            iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0a85e2 100%)',
+          },
+          {
+            href: '/catalog/grade-history',
+            label: 'Повышение разрядов',
+            faIcon: 'fa-chart-line',
+            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+          },
+          {
+            href: '/catalog/career-paths',
+            label: 'Карьерный путь',
+            faIcon: 'fa-route',
+            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #d946ef 100%)',
+          },
         ],
       },
       {
         title: 'Дашборд',
         items: [
-          { href: '/catalog/dismissal-analytics', label: 'Причины увольнений' },
-          { href: '/catalog/personnel-changes', label: 'Кадровые изменения' },
-          { href: '/catalog/personnel-changes?groupBy=position', label: 'Кадровые перемещения' },
-          { href: '/catalog/division-stats', label: 'Статистика работы подразделений' },
-          { href: '/catalog/year-summary', label: 'Итоги года' },
+          {
+            href: '/catalog/dismissal-analytics',
+            label: 'Причины увольнений',
+            faIcon: 'fa-chart-line',
+            iconAccent: 'linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)',
+          },
+          {
+            href: '/catalog/personnel-changes',
+            label: 'Кадровые изменения',
+            faIcon: 'fa-exchange-alt',
+            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)',
+          },
+          {
+            href: '/catalog/personnel-changes?groupBy=position',
+            label: 'Кадровые перемещения',
+            faIcon: 'fa-chart-bar',
+            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #d946ef 100%)',
+          },
+          {
+            href: '/catalog/division-stats',
+            label: 'Статистика работы подразделений',
+            faIcon: 'fa-calendar-alt',
+            iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
+          },
+          {
+            href: '/catalog/year-summary',
+            label: 'Итоги года',
+            faIcon: 'fa-chart-area',
+            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+          },
         ],
       },
     ],

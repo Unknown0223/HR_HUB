@@ -1,14 +1,16 @@
 'use client';
 
-import Link from 'next/link';
-import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
+import { TimesheetCorrectionForm } from './TimesheetCorrectionForm';
 
 type EmpRef = {
   id: string;
@@ -92,6 +94,15 @@ function TimesheetAdjustmentsInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const createMenuRef = useRef<HTMLDivElement>(null);
+  const [modal, setModal] = useState<null | {
+    mode: 'create' | 'edit';
+    id?: string;
+    batch?: boolean;
+  }>(null);
+
+  const closeModal = useCallback(() => setModal(null), []);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -173,6 +184,14 @@ function TimesheetAdjustmentsInner() {
       });
   }, []);
 
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!createMenuRef.current?.contains(e.target as Node)) setCreateMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
   function applySearch() {
     const params = new URLSearchParams(searchParams?.toString() ?? '');
     if (searchDraft.trim()) params.set('q', searchDraft.trim());
@@ -206,15 +225,6 @@ function TimesheetAdjustmentsInner() {
   function exportCsv() {
     downloadCsv(
       `timesheet-corrections-${new Date().toISOString().slice(0, 10)}.csv`,
-      [
-        'documentDate',
-        'number',
-        'employees',
-        'division',
-        'periodFrom',
-        'periodTo',
-        'posted',
-      ],
       filtered.map((r) => ({
         documentDate: fmtDate(r.documentDate),
         number: r.number || '',
@@ -246,11 +256,49 @@ function TimesheetAdjustmentsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="timesheet-adjustments" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-clock" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Корректировки табеля</h1>
+          <p className={shared.pageSubtitle}>Ручные корректировки учёта рабочего времени</p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/timesheet-adjustments/new" className={styles.createBtn}>
-            Создать
-          </Link>
+          <div className={styles.createWrap} ref={createMenuRef}>
+            <button
+              type="button"
+              className={styles.createBtn}
+              onClick={() => setCreateMenuOpen((v) => !v)}
+            >
+              Создать ▾
+            </button>
+            {createMenuOpen ? (
+              <div className={styles.createMenu}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    setModal({ mode: 'create', batch: false });
+                  }}
+                >
+                  Корректировка табеля
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    setModal({ mode: 'create', batch: true });
+                  }}
+                >
+                  Корректировка табеля списком
+                </button>
+              </div>
+            ) : null}
+          </div>
           <FilterPanel
             inline
             open={filtersOpen}
@@ -391,9 +439,12 @@ function TimesheetAdjustmentsInner() {
                     <tr className={styles.actionsRow}>
                       <td colSpan={7}>
                         <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
-                          <Link href={`/catalog/timesheet-adjustments/${row.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => setModal({ mode: 'edit', id: row.id })}
+                          >
                             {row.status === 'draft' ? 'Изменить' : 'Открыть'}
-                          </Link>
+                          </button>
                           {row.status === 'draft' ? (
                             <button
                               type="button"
@@ -432,6 +483,40 @@ function TimesheetAdjustmentsInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={
+          modal?.mode === 'edit'
+            ? 'Корректировка табеля (изменение)'
+            : modal?.batch
+              ? 'Корректировка табеля списком (создание)'
+              : 'Корректировка табеля (создание)'
+        }
+        width="xl"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <TimesheetCorrectionForm
+            key={
+              modal.mode === 'edit'
+                ? modal.id
+                : modal.batch
+                  ? 'create-batch'
+                  : 'create'
+            }
+            mode={modal.mode}
+            correctionId={modal.id}
+            batchDefault={modal.batch}
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }

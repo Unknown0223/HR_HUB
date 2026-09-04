@@ -31,9 +31,15 @@ function todayInput() {
 export function DivisionForm({
   mode,
   divisionId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit';
   divisionId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -170,13 +176,15 @@ export function DivisionForm({
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        router.push(`/divisions/${divisionId}`);
+        if (onSuccess) onSuccess();
+        else router.push(`/divisions/${divisionId}`);
       } else {
         const created = await apiFetch<{ id: string }>('/api/organization/divisions', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        router.push(`/divisions/${created.id}`);
+        if (onSuccess) onSuccess();
+        else router.push(`/divisions/${created.id}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
@@ -186,6 +194,7 @@ export function DivisionForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="division-form" titleOverride={pageTitle} />
@@ -194,26 +203,23 @@ export function DivisionForm({
     );
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="division-form" titleOverride={pageTitle} />
+  function goBack() {
+    if (onCancel) onCancel();
+    else
+      router.push(
+        mode === 'edit' && divisionId
+          ? `/divisions/${divisionId}`
+          : '/divisions?tab=divisions',
+      );
+  }
 
+  const form = (
       <form onSubmit={onSave} className={styles.card}>
         <div className={styles.actions}>
           <button type="submit" className={styles.primary} disabled={saving}>
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() =>
-              router.push(
-                mode === 'edit' && divisionId
-                  ? `/divisions/${divisionId}`
-                  : '/divisions?tab=divisions',
-              )
-            }
-          >
+          <button type="button" className={styles.secondary} onClick={goBack}>
             Закрыть
           </button>
         </div>
@@ -339,6 +345,14 @@ export function DivisionForm({
           </div>
         </div>
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="division-form" titleOverride={pageTitle} />
+      {form}
     </div>
   );
 }

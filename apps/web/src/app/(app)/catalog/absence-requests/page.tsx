@@ -9,6 +9,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { AbsenceRequestCreateModal } from './AbsenceRequestCreateModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
 
@@ -246,21 +247,34 @@ function AbsenceRequestsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="absence-requests" />
 
-      <div className={styles.scopeTabs}>
-        <button
-          type="button"
-          className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('mine')}
-        >
-          Мои
-        </button>
-        <button
-          type="button"
-          className={scope === 'available' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('available')}
-        >
-          Доступные
-        </button>
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeRequest}`}>
+          <i className="fas fa-calendar-check" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Запросы на отсутствие</h1>
+          <p className={shared.pageSubtitle}>
+            Согласование отпусков, отгулов и прочих отсутствий
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.scopeTabs}>
+            <button
+              type="button"
+              className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('mine')}
+            >
+              Мои
+            </button>
+            <button
+              type="button"
+              className={scope === 'available' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('available')}
+            >
+              Доступные
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className={styles.toolbar}>

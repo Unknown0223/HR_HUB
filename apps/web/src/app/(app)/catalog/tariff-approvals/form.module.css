@@ -22,6 +22,14 @@
   gap: 0.75rem;
 }
 
+.formEmbedded {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: none;
+  width: 100%;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -44,7 +52,7 @@
 
 .primary {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -184,7 +192,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;

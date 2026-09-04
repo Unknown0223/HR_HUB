@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { apiFetch } from '@/lib/api';
-import { downloadStyledXlsx, type XlsxCell } from '@/lib/xlsx-download';
+import { downloadStyledXlsx } from '@/lib/xlsx-download';
 import layout from '../staffing/page.module.css';
 import extra from '../movement-divisions/page.module.css';
 import treeS from '../dismissals-by-reason/page.module.css';
@@ -836,15 +836,14 @@ export default function PayrollGroupedReportPage() {
     if (!data) return;
     const cols = activeCols;
     const header1 = dualHeader(cols);
-    const matrix: XlsxCell[][] = [
-      [{ v: data.periodLine }],
-      [{ v: data.positionTypeLabel }],
-      [],
-      header1.flatMap((h) => Array.from({ length: h.span }, (_, i) => ({ v: i === 0 ? h.label : '' }))),
-      cols.map((c) => ({ v: c.group ? c.label : '' })),
-      ...activeRows.map((r) => cols.map((c) => ({ v: cellValue(r, c), t: c.money || typeof r[c.key] === 'number' ? ('n' as const) : ('s' as const) }))),
-    ];
-    await downloadStyledXlsx(`${FILE_BASE}(${fileStamp(data.generatedAt)}).xlsx`, TITLE, matrix);
+    await downloadStyledXlsx({
+      filename: `${FILE_BASE}(${fileStamp(data.generatedAt)}).xlsx`,
+      title: TITLE,
+      preamble: [data.periodLine, data.positionTypeLabel, ''],
+      topHeader: header1.flatMap((h) => Array.from({ length: h.span }, (_, i) => (i === 0 ? h.label : ''))),
+      columns: cols.map((c) => (c.group ? c.label : '')),
+      rows: activeRows.map((r) => cols.map((c) => cellValue(r, c))),
+    });
   }
 
   function exportCsv() {
@@ -893,7 +892,7 @@ ${activeRows.map((r) => row(cols.map((c) => cellValue(r, c)))).join('\n')}
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 table{border-collapse:collapse;font-size:10px}
 th,td{border:1px solid #cfd3da;padding:2px 4px;text-align:center}
 th{background:#eef0f4}

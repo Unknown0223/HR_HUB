@@ -23,9 +23,10 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/api/prisma apps/api/prisma
+COPY --from=build /app/apps/api/scripts/prod-migrate.js apps/api/scripts/prod-migrate.js
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 
 EXPOSE 3001
-# Railway sets PORT; prisma push on boot for first deploy (replace with migrate deploy later)
-CMD ["sh", "-c", "cd apps/api && npx prisma db push --skip-generate && node dist/main.js"]
+# Apply versioned migrations only (never db push / reset). See apps/api/scripts/prod-migrate.js
+CMD ["sh", "-c", "cd apps/api && node scripts/prod-migrate.js && node dist/main.js"]

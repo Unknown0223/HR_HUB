@@ -57,9 +57,13 @@ Prod overlay:
 ```bash
 export $(grep -v '^#' .env.prod | xargs)   # or source carefully on Windows
 npm run db:generate
-npm run db:push        # or prisma migrate deploy when you adopt migrate history
-npm run db:seed        # demo tenant — disable / replace in real prod
+npm run db:deploy        # prisma migrate deploy — never db push in production
+npm run db:seed          # demo tenant — disable / replace in real prod
 ```
+
+Docker/Railway API image runs `apps/api/scripts/prod-migrate.js` on boot (`migrate deploy`). If the database already has tables from older `db push` deploys and no Prisma history, the script records existing migrations as applied (no SQL, no data drop), then deploys only newer migrations.
+
+Local development still uses `npm run start:dev` and optional `npm run db:push`.
 
 Demo login (seed only): `admin@demo.local` / `Demo1234!` — **change or remove before go-live**.
 

@@ -47,14 +47,14 @@
 }
 
 .tabBtnActive {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
   color: #fff;
 }
 
 .tabBtnPrimary {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
   color: #fff;
 }
 
@@ -350,7 +350,7 @@
 }
 
 .dateLink {
-  color: #3699ff !important;
+  color: #0a85e2 !important;
   font-weight: 600;
   text-align: left !important;
 }

@@ -15,7 +15,7 @@
 
 .periodBtn:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -60,7 +60,7 @@
 .preset:hover,
 .presetOn {
   background: #f1faff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .calendars {
@@ -131,7 +131,7 @@
 }
 
 .dayOn {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -155,7 +155,7 @@
 }
 
 .apply {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -203,7 +203,7 @@
 
 .treeSearch:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .treeRow {
@@ -226,7 +226,7 @@
 }
 
 .treeRow input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .legend {
@@ -304,7 +304,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;

@@ -230,7 +230,7 @@ function FactsPageInner() {
           <button
             type="button"
             className={styles.createBtn}
-            style={{ background: '#3699ff' }}
+            style={{ background: '#0a85e2' }}
             onClick={openCreate}
           >
             Создать
@@ -239,7 +239,7 @@ function FactsPageInner() {
             href="/catalog/facts/import"
             className={styles.exportBtn}
             style={{
-              background: '#1bc5bd',
+              background: '#0a85e2',
               color: '#fff',
               border: 'none',
               textDecoration: 'none',
@@ -252,7 +252,7 @@ function FactsPageInner() {
           <button
             type="button"
             className={styles.exportBtn}
-            style={{ background: '#1bc5bd', color: '#fff', border: 'none' }}
+            style={{ background: '#0a85e2', color: '#fff', border: 'none' }}
             onClick={() => router.push('/catalog/facts/import')}
           >
             Загрузить

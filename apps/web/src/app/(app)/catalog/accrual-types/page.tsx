@@ -108,7 +108,7 @@ function AccrualTypesPageInner() {
           <Link
             href="/catalog/accrual-types/new"
             className={styles.createBtn}
-            style={{ background: '#3699ff', textDecoration: 'none' }}
+            style={{ background: '#0a85e2', textDecoration: 'none' }}
           >
             Создать
           </Link>

@@ -60,7 +60,7 @@
 
 .monthBtn:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -94,7 +94,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font-size: 1.1rem;
   cursor: pointer;
   padding: 0.15rem 0.4rem;
@@ -123,7 +123,7 @@
 }
 
 .monthOn {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -142,7 +142,7 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.88rem;
   text-align: left;
@@ -192,8 +192,8 @@
 }
 
 .tplActions .save {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
   color: #fff;
 }
 
@@ -225,8 +225,8 @@
 }
 
 .subOn {
-  color: #3699ff;
-  border-bottom-color: #3699ff;
+  color: #0a85e2;
+  border-bottom-color: #0a85e2;
   font-weight: 600;
 }
 
@@ -335,7 +335,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.84rem;
   padding: 0.35rem 0;
@@ -543,6 +543,6 @@
 .savedOk {
   margin: 0 0 0.65rem;
   font-size: 0.84rem;
-  color: #1bc5bd;
+  color: #0a85e2;
 }
 

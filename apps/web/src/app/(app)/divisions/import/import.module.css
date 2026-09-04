@@ -13,9 +13,9 @@
 }
 
 .btnActive {
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
-  border-color: #1bc5bd;
+  border-color: #0a85e2;
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -27,9 +27,9 @@
 }
 
 .btnBlue {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
-  border: 1px solid #3699ff;
+  border: 1px solid #0a85e2;
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -98,7 +98,7 @@
 
 .drop:hover,
 .dropActive {
-  border-color: #1bc5bd;
+  border-color: #0a85e2;
   background: rgba(27, 197, 189, 0.06);
   color: #0d8a84;
 }
@@ -329,7 +329,7 @@
 
 .cellInput:hover,
 .cellInput:focus {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   background: #fff;
   outline: none;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.15);

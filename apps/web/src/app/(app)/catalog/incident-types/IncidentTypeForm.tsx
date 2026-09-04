@@ -23,9 +23,15 @@ const DEFAULT_ACCRUALS = [
 export function IncidentTypeForm({
   mode,
   typeId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit';
   typeId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -38,6 +44,11 @@ export function IncidentTypeForm({
 
   const pageTitle =
     mode === 'edit' ? 'Тип инцидента (изменение)' : 'Тип инцидента (создание)';
+
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/incident-types');
+  }
 
   const accrualOptions = useMemo(() => {
     const set = new Set([...DEFAULT_ACCRUALS, ...knownAccruals]);
@@ -103,7 +114,8 @@ export function IncidentTypeForm({
           body: JSON.stringify(body),
         });
       }
-      router.push('/catalog/incident-types');
+      if (onSuccess) onSuccess();
+      else router.push('/catalog/incident-types');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -112,6 +124,7 @@ export function IncidentTypeForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="incident-types" />
@@ -120,64 +133,65 @@ export function IncidentTypeForm({
     );
   }
 
+  const form = (
+    <form onSubmit={onSave}>
+      <div className={styles.docHead}>
+        {!embedded ? <h2 className={styles.docTitle}>{pageTitle}</h2> : null}
+        <div className={styles.docActions}>
+          <button type="submit" className={styles.primary} disabled={saving}>
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <button type="button" className={styles.secondary} onClick={goBack}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.card} style={{ maxWidth: 520 }}>
+        <label className={styles.full}>
+          Название *
+          <input required value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+
+        <label className={styles.full}>
+          Начисление *
+          <input
+            list="incident-accrual-options"
+            required
+            placeholder="Поиск"
+            value={accrualName}
+            onChange={(e) => setAccrualName(e.target.value)}
+          />
+          <datalist id="incident-accrual-options">
+            {accrualOptions.map((a) => (
+              <option key={a} value={a} />
+            ))}
+          </datalist>
+        </label>
+
+        <label className={styles.switchLabel}>
+          Статус
+          <span className={styles.switchRight}>
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            Активный
+          </span>
+        </label>
+      </div>
+    </form>
+  );
+
+  if (embedded) return form;
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="incident-types" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave}>
-        <div className={styles.docHead}>
-          <h2 className={styles.docTitle}>{pageTitle}</h2>
-          <div className={styles.docActions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => router.push('/catalog/incident-types')}
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.card} style={{ maxWidth: 520 }}>
-          <label className={styles.full}>
-            Название *
-            <input required value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-
-          <label className={styles.full}>
-            Начисление *
-            <input
-              list="incident-accrual-options"
-              required
-              placeholder="Поиск"
-              value={accrualName}
-              onChange={(e) => setAccrualName(e.target.value)}
-            />
-            <datalist id="incident-accrual-options">
-              {accrualOptions.map((a) => (
-                <option key={a} value={a} />
-              ))}
-            </datalist>
-          </label>
-
-          <label className={styles.switchLabel}>
-            Статус
-            <span className={styles.switchRight}>
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-              Активный
-            </span>
-          </label>
-        </div>
-      </form>
+      {form}
     </div>
   );
 }

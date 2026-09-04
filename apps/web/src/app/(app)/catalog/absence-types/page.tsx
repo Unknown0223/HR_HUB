@@ -1,15 +1,18 @@
 'use client';
 import { confirm } from '@/lib/dialogs';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
+import { AbsenceTypeForm } from './AbsenceTypeForm';
 
 type TimeTypeRef = { id: string; code: string; name: string };
 
@@ -81,13 +84,30 @@ function AbsenceTypesPageInner() {
   const [filtersOpen, setFiltersOpen] = useState(Boolean(q || statusFilter));
   const [busy, setBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [searchDraft, setSearchDraft] = useState(q);
+  const [modal, setModal] = useState<null | { mode: 'create' | 'edit'; id?: string }>(
+    null,
+  );
+
+  const closeModal = useCallback(() => {
+    setModal(null);
+    if (searchParams.get('create') === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      const qs = params.toString();
+      router.replace(
+        qs ? `/catalog/absence-types?${qs}` : '/catalog/absence-types',
+        { scroll: false },
+      );
+    }
+  }, [router, searchParams]);
 
   useEffect(() => {
     if (searchParams.get('create') === '1') {
-      router.replace('/catalog/absence-types/new');
+      setModal({ mode: 'create' });
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -113,6 +133,11 @@ function AbsenceTypesPageInner() {
     return list;
   }, [rows, q, statusFilter]);
 
+  const checkedIds = useMemo(() => [...checked], [checked]);
+  const allChecked =
+    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const someChecked = filtered.some((r) => checked.has(r.id)) && !allChecked;
+
   async function load() {
     setLoading(true);
     setError('');
@@ -128,7 +153,7 @@ function AbsenceTypesPageInner() {
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   function applySearch() {
@@ -142,16 +167,42 @@ function AbsenceTypesPageInner() {
     );
   }
 
-  function openCreate() {
-    router.push('/catalog/absence-types/new');
-  }
-
   async function runDelete(row: AbsenceTypeRow) {
     if (!(await confirm(`Удалить / деактивировать «${row.name}»?`))) return;
     setBusy(true);
     setError('');
     try {
       await apiFetch(`/api/hr/absence-types/${row.id}`, { method: 'DELETE' });
+      setSelectedId(null);
+      setChecked((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulkDelete() {
+    if (!checkedIds.length) return;
+    if (
+      !(await confirm(
+        `Удалить / деактивировать выбранные виды (${checkedIds.length})?`,
+      ))
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      for (const id of checkedIds) {
+        await apiFetch(`/api/hr/absence-types/${id}`, { method: 'DELETE' });
+      }
+      setChecked(new Set());
       setSelectedId(null);
       await load();
     } catch (err) {
@@ -202,18 +253,53 @@ function AbsenceTypesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="absence-types" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeAbsence}`}>
+          <i className="fas fa-tags" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Виды отсутствий</h1>
+          <p className={shared.pageSubtitle}>
+            Типы отпусков, больничных и прочих отсутствий
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <input
+            className={styles.search}
+            placeholder="Поиск..."
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applySearch();
+            }}
+            aria-label="Поиск"
+          />
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button
             type="button"
             className={styles.createBtn}
-            onClick={openCreate}
+            onClick={() => setModal({ mode: 'create' })}
           >
             Создать
           </button>
-          <Link href="/catalog/absence-requests" className={styles.exportBtn}>
-            Закрыть
-          </Link>
+          <ListBulkBar
+            count={checkedIds.length}
+            busy={busy}
+            onClear={() => setChecked(new Set())}
+            actions={[
+              {
+                key: 'delete',
+                label: 'Удалить',
+                count: checkedIds.length,
+                variant: 'danger',
+                onClick: () => void runBulkDelete(),
+              },
+            ]}
+          />
           <FilterPanel
             inline
             open={filtersOpen}
@@ -233,22 +319,13 @@ function AbsenceTypesPageInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
           <button type="button" className={styles.toolBtn} onClick={applySearch}>
             Найти
           </button>
           <button type="button" className={styles.exportBtn} onClick={exportCsv}>
             CSV
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()}>
+          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
             Обновить
           </button>
           <span className={styles.pagerMeta}>
@@ -263,6 +340,20 @@ function AbsenceTypesPageInner() {
         <table className={styles.table}>
           <thead>
             <tr>
+              <th className={styles.checkCol}>
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someChecked;
+                  }}
+                  onChange={(e) =>
+                    setChecked(togglePage(checked, filtered.map((r) => r.id), e.target.checked))
+                  }
+                  disabled={!filtered.length}
+                  aria-label="Выбрать все"
+                />
+              </th>
               <th>Название</th>
               <th>Вид времени</th>
               <th className={styles.flagCell}>Ежегодный</th>
@@ -275,47 +366,55 @@ function AbsenceTypesPageInner() {
           <tbody>
             {loading && filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className={styles.empty}>
+                <td colSpan={8} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className={styles.empty}>
+                <td colSpan={8} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
             ) : null}
             {filtered.map((row) => {
               const open = selectedId === row.id;
+              const isChecked = checked.has(row.id);
               return (
                 <tr
                   key={row.id}
-                  className={open ? styles.rowSelected : undefined}
+                  className={open || isChecked ? styles.rowSelected : undefined}
                   onClick={() => setSelectedId(open ? null : row.id)}
                   style={{ cursor: 'pointer' }}
                 >
+                  <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) =>
+                        setChecked(toggleSelect(checked, row.id, e.target.checked))
+                      }
+                      aria-label={`Выбрать ${row.name}`}
+                    />
+                  </td>
                   <td className={styles.nameCell}>
-                    <label className={styles.nameWithCheck}>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <span className={styles.nameText}>
-                        {row.name}
-                        {!row.isActive ? ' (неакт.)' : ''}
-                      </span>
-                    </label>
+                    <span className={styles.nameText}>
+                      {row.name}
+                      {!row.isActive ? ' (неакт.)' : ''}
+                    </span>
                     {open ? (
                       <div
                         className={`${styles.inlineActions} ${styles.rowActions}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Link href={`/catalog/absence-types/${row.id}`}>Просмотр</Link>
-                        <Link href={`/catalog/absence-types/${row.id}/edit`}>Изменить</Link>
+                        <button
+                          type="button"
+                          onClick={() => setModal({ mode: 'edit', id: row.id })}
+                        >
+                          Изменить
+                        </button>
                         <Link href={`/catalog/absence-types/${row.id}/employees`}>
                           Сотрудники
                         </Link>
@@ -366,19 +465,38 @@ function AbsenceTypesPageInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={
+          modal?.mode === 'edit'
+            ? 'Вид отсутствия (изменение)'
+            : 'Вид отсутствия (создание)'
+        }
+        width="lg"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <AbsenceTypeForm
+            key={modal.mode === 'edit' ? modal.id : 'create'}
+            typeId={modal.mode === 'edit' ? modal.id : undefined}
+            mode="edit"
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }
 
 export default function AbsenceTypesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
       <AbsenceTypesPageInner />
     </Suspense>
   );

@@ -7,7 +7,7 @@
   height: 16px;
   margin: 0;
   flex: 0 0 16px;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -87,7 +87,7 @@
 
 .dropField:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -167,7 +167,7 @@
   border: none;
   border-top: 1px solid #e4e6ef;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.8rem;
   text-align: right;
@@ -228,7 +228,7 @@
   appearance: none;
   border: none;
   background: none;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
@@ -279,7 +279,7 @@
   background: none;
   padding: 0;
   font: inherit;
-  color: #3699ff;
+  color: #0a85e2;
   cursor: pointer;
   text-align: left;
   white-space: normal;

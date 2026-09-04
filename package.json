@@ -20,6 +20,7 @@
     "build:web": "npm run build -w @hr-hub/web",
     "db:generate": "npm run prisma:generate -w @hr-hub/api",
     "db:migrate": "npm run prisma:migrate -w @hr-hub/api",
+    "db:deploy": "npm run prisma:deploy -w @hr-hub/api",
     "db:seed": "npm run prisma:seed -w @hr-hub/api",
     "db:push": "npm run prisma:push -w @hr-hub/api",
     "backlog": "node scripts/generate-backlog.js",

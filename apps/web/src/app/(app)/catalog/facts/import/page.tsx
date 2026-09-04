@@ -204,7 +204,7 @@ function FactsImportInner() {
               const f = e.dataTransfer.files?.[0];
               if (f) void onFile(f);
             }}
-            style={drag ? { borderColor: '#3699ff', background: '#f3f9ff' } : undefined}
+            style={drag ? { borderColor: '#0a85e2', background: '#f3f9ff' } : undefined}
           >
             {file ? (
               <strong>{file.name}</strong>

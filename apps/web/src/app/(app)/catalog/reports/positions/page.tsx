@@ -406,7 +406,7 @@ h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .tabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid #e4e6ef}
 .tab{border:0;background:transparent;padding:8px 12px;cursor:pointer;color:#5e6278;font:inherit;font-size:13px;font-weight:600}
-.tab.on{color:#3699ff;border-bottom:2px solid #3699ff}
+.tab.on{color:#0a85e2;border-bottom:2px solid #0a85e2}
 .meta{padding:10px 16px;font-size:13px}
 .wrap{padding:0 16px 16px}
 table{border-collapse:collapse;width:100%;font-size:13px}

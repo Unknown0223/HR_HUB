@@ -11,13 +11,14 @@ import {
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch, PageResult } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadCsv } from '@/lib/csv';
-import listStyles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
+import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
 type Region = { id: string; code: string; name: string };
@@ -184,6 +185,12 @@ function PersonsPageInner() {
   }, [attachMode]);
 
   const selectedIds = useMemo(() => [...selected], [selected]);
+  const formOpen = mode === 'create' || mode === 'edit';
+  const listMode = mode === 'attach' ? 'attach' : 'list';
+
+  function closeForm() {
+    setMode(attachMode ? 'attach' : 'list');
+  }
 
   function openCreate() {
     setEditId(null);
@@ -419,24 +426,374 @@ function PersonsPageInner() {
     });
   }
 
-  const pageTitle =
-    mode === 'create'
-      ? 'Физическое лицо (создание)'
-      : mode === 'edit'
-        ? 'Физическое лицо (изменение)'
-        : mode === 'attach'
-          ? 'Физические лица (прикрепление)'
-          : 'Физические лица';
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="persons" />
 
-  if (mode === 'create' || mode === 'edit') {
-    return (
-      <div className={listStyles.wrap}>
-        <PageSubnav
-          group={{
-            title: pageTitle,
-            siblings: [{ label: 'Физические лица', href: '/catalog/persons' }],
-          }}
-        />
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-user" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>
+            {attachMode
+              ? 'Физические лица (прикрепление)'
+              : 'Физические лица'}
+          </h1>
+          <p className={shared.pageSubtitle}>
+            Справочник физлиц: ФИО, контакты, документы и фото
+          </p>
+        </div>
+      </div>
+
+      <div className={styles.toolbar}>
+        <div className={styles.leftActions}>
+          {listMode === 'attach' ? (
+            <>
+              <button
+                type="button"
+                className={styles.btnAttach}
+                disabled={!selectedIds.length || busy}
+                onClick={() => void bulkPin(true)}
+              >
+                Прикрепить {selectedIds.length || ''}
+              </button>
+              <button
+                type="button"
+                className={styles.toolBtn}
+                onClick={() => router.push('/catalog/persons')}
+              >
+                Закрыть
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.createBtn}
+                onClick={openCreate}
+              >
+                Создать
+              </button>
+              <div className={styles.menuWrap}>
+                <button
+                  type="button"
+                  className={styles.btnStatus}
+                  disabled={!selectedIds.length || busy}
+                  onClick={() => setStatusMenu((v) => !v)}
+                >
+                  Изменить статус
+                </button>
+                {statusMenu ? (
+                  <div className={styles.menu}>
+                    <button
+                      type="button"
+                      onClick={() => void bulkStatus(false)}
+                    >
+                      Деактивировать {selectedIds.length}
+                    </button>
+                    <button type="button" onClick={() => void bulkStatus(true)}>
+                      Активировать {selectedIds.length}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className={styles.btnUnpin}
+                disabled={!selectedIds.length || busy}
+                onClick={() => void bulkPin(false)}
+              >
+                Открепить {selectedIds.length || ''}
+              </button>
+              {selectedIds.length ? (
+                <button
+                  type="button"
+                  className={styles.btnDanger}
+                  disabled={busy}
+                  onClick={() => void bulkDelete()}
+                >
+                  Удалить {selectedIds.length}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={styles.toolBtn}
+                onClick={() => router.push('/catalog/persons?mode=attach')}
+              >
+                Прикрепление
+              </button>
+            </>
+          )}
+          <FilterPanel
+            inline
+            urlSync
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            onApply={() => {
+              setPage(1);
+              void load();
+            }}
+            fields={[
+              {
+                type: 'text',
+                key: 'fio',
+                label: 'ФИО',
+                placeholder: 'Поиск...',
+              },
+              {
+                type: 'select',
+                key: 'gender',
+                label: 'Пол',
+                options: [
+                  { value: 'M', label: 'Мужской' },
+                  { value: 'F', label: 'Женский' },
+                ],
+              },
+              {
+                type: 'dateRange',
+                fromKey: 'birthFrom',
+                toKey: 'birthTo',
+                label: 'Дата рождения',
+              },
+              {
+                type: 'select',
+                key: 'regionId',
+                label: 'Регион',
+                options: regions.map((r) => ({ value: r.id, label: r.name })),
+              },
+              {
+                type: 'text',
+                key: 'phone',
+                label: 'Телефон',
+                placeholder: 'Поиск...',
+              },
+              {
+                type: 'select',
+                key: 'blacklisted',
+                label: 'В черном списке',
+                options: [
+                  { value: '1', label: 'Да' },
+                  { value: '0', label: 'Нет' },
+                ],
+              },
+              {
+                type: 'select',
+                key: 'isActive',
+                label: 'Статус',
+                options: [
+                  { value: '1', label: 'Активный' },
+                  { value: '0', label: 'Неактивный' },
+                ],
+              },
+            ]}
+          />
+        </div>
+        <div className={styles.rightTools}>
+          <input
+            className={styles.search}
+            placeholder="Поиск..."
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applySearch();
+            }}
+          />
+          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
+            Excel
+          </button>
+          <span className={styles.pagerMeta}>
+            {rows.length} / {total}
+          </span>
+          <button
+            type="button"
+            className={styles.pagerBtn}
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            ‹
+          </button>
+          <span className={styles.pagerMeta}>{page}</span>
+          <button
+            type="button"
+            className={styles.pagerBtn}
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            ›
+          </button>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void load()}
+          >
+            Обновить
+          </button>
+        </div>
+      </div>
+
+      {error && !formOpen ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}>
+                <input
+                  type="checkbox"
+                  checked={
+                    rows.length > 0 && rows.every((r) => selected.has(r.id))
+                  }
+                  onChange={(e) => toggleAll(e.target.checked)}
+                />
+              </th>
+              <th style={{ width: 48 }} />
+              <th>ФИО</th>
+              <th>ИНН</th>
+              <th>Код</th>
+              <th>В черном списке</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className={styles.empty}>
+                  Загрузка…
+                </td>
+              </tr>
+            ) : null}
+            {!loading && rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className={styles.empty}>
+                  нет данных
+                </td>
+              </tr>
+            ) : null}
+            {rows.map((row) => {
+              const open = focusId === row.id;
+              return (
+                <tr
+                  key={row.id}
+                  className={open ? styles.rowSelected : undefined}
+                  onClick={() => setFocusId(open ? null : row.id)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.id)}
+                      onChange={(e) => toggleOne(row.id, e.target.checked)}
+                    />
+                  </td>
+                  <td>
+                    {row.photoUrl ? (
+                      <PhotoThumb
+                        className={styles.avatar}
+                        src={mediaSrc(row.photoUrl) || row.photoUrl}
+                        alt=""
+                        lightbox={photos}
+                        slides={rows
+                          .map((x) => ({
+                            src: mediaSrc(x.photoUrl) || '',
+                            caption: fio(x),
+                          }))
+                          .filter((s) => s.src)}
+                        index={Math.max(
+                          0,
+                          rows
+                            .map((x) => mediaSrc(x.photoUrl) || '')
+                            .filter(Boolean)
+                            .findIndex(
+                              (s) => s === (mediaSrc(row.photoUrl) || ''),
+                            ),
+                        )}
+                      />
+                    ) : (
+                      <span className={styles.avatarFallback}>
+                        {initials(row)}
+                      </span>
+                    )}
+                  </td>
+                  <td className={styles.nameCell}>
+                    <span className={styles.nameText}>{fio(row)}</span>
+                    {open ? (
+                      <div
+                        className={`${styles.inlineActions} ${styles.rowActions}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {listMode === 'attach' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelected(new Set([row.id]));
+                              void bulkPin(true);
+                            }}
+                          >
+                            Прикрепить
+                          </button>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => openEdit(row)}>
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void setActiveOne(row, row.isActive === false)
+                              }
+                            >
+                              {row.isActive === false
+                                ? 'Активировать'
+                                : 'Деактивировать'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void apiFetch(`/api/persons/${row.id}`, {
+                                  method: 'PATCH',
+                                  body: JSON.stringify({
+                                    isPinned: !row.isPinned,
+                                  }),
+                                }).then(() => load())
+                              }
+                            >
+                              {row.isPinned ? 'Открепить' : 'Прикрепить'}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              Удалить
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td>{row.inn || ''}</td>
+                  <td>{row.code || ''}</td>
+                  <td>{row.isBlacklisted ? 'Да' : ''}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <FormModal
+        open={formOpen}
+        title={
+          mode === 'edit'
+            ? 'Физическое лицо (изменение)'
+            : 'Физическое лицо (создание)'
+        }
+        width="xl"
+        onClose={closeForm}
+      >
         <div className={formStyles.actions} style={{ marginBottom: '0.5rem' }}>
           <button
             type="button"
@@ -449,12 +806,12 @@ function PersonsPageInner() {
           <button
             type="button"
             className={formStyles.btnClose}
-            onClick={() => setMode(attachMode ? 'attach' : 'list')}
+            onClick={closeForm}
           >
             Закрыть
           </button>
         </div>
-        {error ? <p className={listStyles.error}>{error}</p> : null}
+        {error ? <p className={styles.error}>{error}</p> : null}
 
         <div className={styles.formCard}>
           <h2 className={styles.sectionTitle}>Основная информация</h2>
@@ -546,7 +903,9 @@ function PersonsPageInner() {
                           type="radio"
                           name="gender"
                           checked={form.gender === 'M'}
-                          onChange={() => setForm((f) => ({ ...f, gender: 'M' }))}
+                          onChange={() =>
+                            setForm((f) => ({ ...f, gender: 'M' }))
+                          }
                         />
                         Мужской
                       </label>
@@ -555,7 +914,9 @@ function PersonsPageInner() {
                           type="radio"
                           name="gender"
                           checked={form.gender === 'F'}
-                          onChange={() => setForm((f) => ({ ...f, gender: 'F' }))}
+                          onChange={() =>
+                            setForm((f) => ({ ...f, gender: 'F' }))
+                          }
                         />
                         Женский
                       </label>
@@ -739,350 +1100,8 @@ function PersonsPageInner() {
             </div>
           ) : null}
         </div>
-        {photos.node}
-      </div>
-    );
-  }
+      </FormModal>
 
-  return (
-    <div className={`${listStyles.wrap} ${styles.layout}`}>
-      <PageSubnav group={{ title: pageTitle, siblings: [] }} />
-
-      <div className={listStyles.toolbar}>
-        <div className={listStyles.leftActions}>
-          {mode === 'attach' ? (
-            <>
-              <button
-                type="button"
-                className={styles.btnAttach}
-                disabled={!selectedIds.length || busy}
-                onClick={() => void bulkPin(true)}
-              >
-                Прикрепить {selectedIds.length || ''}
-              </button>
-              <button
-                type="button"
-                className={listStyles.toolBtn}
-                onClick={() => router.push('/catalog/persons')}
-              >
-                Закрыть
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className={listStyles.createBtn}
-                onClick={openCreate}
-              >
-                Создать
-              </button>
-              <div className={styles.menuWrap}>
-                <button
-                  type="button"
-                  className={styles.btnStatus}
-                  disabled={!selectedIds.length || busy}
-                  onClick={() => setStatusMenu((v) => !v)}
-                >
-                  Изменить статус
-                </button>
-                {statusMenu ? (
-                  <div className={styles.menu}>
-                    <button
-                      type="button"
-                      onClick={() => void bulkStatus(false)}
-                    >
-                      Деактивировать {selectedIds.length}
-                    </button>
-                    <button type="button" onClick={() => void bulkStatus(true)}>
-                      Активировать {selectedIds.length}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                className={styles.btnUnpin}
-                disabled={!selectedIds.length || busy}
-                onClick={() => void bulkPin(false)}
-              >
-                Открепить {selectedIds.length || ''}
-              </button>
-              {selectedIds.length ? (
-                <button
-                  type="button"
-                  className={styles.btnDanger}
-                  disabled={busy}
-                  onClick={() => void bulkDelete()}
-                >
-                  Удалить {selectedIds.length}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={listStyles.toolBtn}
-                onClick={() => router.push('/catalog/persons?mode=attach')}
-              >
-                Прикрепление
-              </button>
-            </>
-          )}
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            onApply={() => {
-              setPage(1);
-              void load();
-            }}
-            fields={[
-              {
-                type: 'text',
-                key: 'fio',
-                label: 'ФИО',
-                placeholder: 'Поиск...',
-              },
-              {
-                type: 'select',
-                key: 'gender',
-                label: 'Пол',
-                options: [
-                  { value: 'M', label: 'Мужской' },
-                  { value: 'F', label: 'Женский' },
-                ],
-              },
-              {
-                type: 'dateRange',
-                fromKey: 'birthFrom',
-                toKey: 'birthTo',
-                label: 'Дата рождения',
-              },
-              {
-                type: 'select',
-                key: 'regionId',
-                label: 'Регион',
-                options: regions.map((r) => ({ value: r.id, label: r.name })),
-              },
-              {
-                type: 'text',
-                key: 'phone',
-                label: 'Телефон',
-                placeholder: 'Поиск...',
-              },
-              {
-                type: 'select',
-                key: 'blacklisted',
-                label: 'В черном списке',
-                options: [
-                  { value: '1', label: 'Да' },
-                  { value: '0', label: 'Нет' },
-                ],
-              },
-              {
-                type: 'select',
-                key: 'isActive',
-                label: 'Статус',
-                options: [
-                  { value: '1', label: 'Активный' },
-                  { value: '0', label: 'Неактивный' },
-                ],
-              },
-            ]}
-          />
-        </div>
-        <div className={listStyles.rightTools}>
-          <input
-            className={listStyles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={listStyles.exportBtn} onClick={exportCsv}>
-            Excel
-          </button>
-          <span className={listStyles.pagerMeta}>
-            {rows.length} / {total}
-          </span>
-          <button
-            type="button"
-            className={listStyles.pagerBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            ‹
-          </button>
-          <span className={listStyles.pagerMeta}>{page}</span>
-          <button
-            type="button"
-            className={listStyles.pagerBtn}
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            ›
-          </button>
-          <button
-            type="button"
-            className={listStyles.toolBtn}
-            onClick={() => void load()}
-          >
-            Обновить
-          </button>
-        </div>
-      </div>
-
-      {error ? <p className={listStyles.error}>{error}</p> : null}
-
-      <div className={listStyles.tableWrap}>
-        <table className={listStyles.table}>
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>
-                <input
-                  type="checkbox"
-                  checked={
-                    rows.length > 0 && rows.every((r) => selected.has(r.id))
-                  }
-                  onChange={(e) => toggleAll(e.target.checked)}
-                />
-              </th>
-              <th style={{ width: 48 }} />
-              <th>ФИО</th>
-              <th>ИНН</th>
-              <th>Код</th>
-              <th>В черном списке</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={listStyles.empty}>
-                  Загрузка…
-                </td>
-              </tr>
-            ) : null}
-            {!loading && rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={listStyles.empty}>
-                  нет данных
-                </td>
-              </tr>
-            ) : null}
-            {rows.map((row) => {
-              const open = focusId === row.id;
-              return (
-                <tr
-                  key={row.id}
-                  className={open ? listStyles.rowSelected : undefined}
-                  onClick={() => setFocusId(open ? null : row.id)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.id)}
-                      onChange={(e) => toggleOne(row.id, e.target.checked)}
-                    />
-                  </td>
-                  <td>
-                    {row.photoUrl ? (
-                      <PhotoThumb
-                        className={styles.avatar}
-                        src={mediaSrc(row.photoUrl) || row.photoUrl}
-                        alt=""
-                        lightbox={photos}
-                        slides={rows
-                          .map((x) => ({
-                            src: mediaSrc(x.photoUrl) || '',
-                            caption: fio(x),
-                          }))
-                          .filter((s) => s.src)}
-                        index={Math.max(
-                          0,
-                          rows
-                            .map((x) => mediaSrc(x.photoUrl) || '')
-                            .filter(Boolean)
-                            .findIndex((s) => s === (mediaSrc(row.photoUrl) || '')),
-                        )}
-                      />
-                    ) : (
-                      <span className={styles.avatarFallback}>
-                        {initials(row)}
-                      </span>
-                    )}
-                  </td>
-                  <td className={listStyles.nameCell}>
-                    <span className={listStyles.nameText}>{fio(row)}</span>
-                    {open ? (
-                      <div
-                        className={`${listStyles.inlineActions} ${listStyles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {mode === 'attach' ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelected(new Set([row.id]));
-                              void bulkPin(true);
-                            }}
-                          >
-                            Прикрепить
-                          </button>
-                        ) : (
-                          <>
-                            <button type="button" onClick={() => openEdit(row)}>
-                              Изменить
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void setActiveOne(row, row.isActive === false)
-                              }
-                            >
-                              {row.isActive === false
-                                ? 'Активировать'
-                                : 'Деактивировать'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void apiFetch(`/api/persons/${row.id}`, {
-                                  method: 'PATCH',
-                                  body: JSON.stringify({
-                                    isPinned: !row.isPinned,
-                                  }),
-                                }).then(() => load())
-                              }
-                            >
-                              {row.isPinned ? 'Открепить' : 'Прикрепить'}
-                            </button>
-                            <button
-                              type="button"
-                              className={listStyles.danger}
-                              disabled={busy}
-                              onClick={() => void runDelete(row)}
-                            >
-                              Удалить
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{row.inn || ''}</td>
-                  <td>{row.code || ''}</td>
-                  <td>{row.isBlacklisted ? 'Да' : ''}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
       {photos.node}
     </div>
   );
@@ -1090,7 +1109,7 @@ function PersonsPageInner() {
 
 export default function PersonsPage() {
   return (
-    <Suspense fallback={<div className={listStyles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
       <PersonsPageInner />
     </Suspense>
   );

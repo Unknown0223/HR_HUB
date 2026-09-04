@@ -29,7 +29,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -50,7 +50,7 @@
 .btnClose {
   border: 1px solid #d1d5db;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -132,7 +132,7 @@
 .field select:focus,
 .field textarea:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -179,7 +179,7 @@
 }
 
 .toggleOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .toggleOn::after {
@@ -208,8 +208,8 @@
 }
 
 .tabOn {
-  color: #3699ff;
-  border-bottom-color: #3699ff;
+  color: #0a85e2;
+  border-bottom-color: #0a85e2;
   font-weight: 600;
 }
 
@@ -265,7 +265,7 @@
 .radio input,
 .check input {
   margin-top: 0.15rem;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   flex-shrink: 0;
 }
 
@@ -273,7 +273,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;

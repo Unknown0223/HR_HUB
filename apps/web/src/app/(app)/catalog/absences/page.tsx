@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -103,6 +104,16 @@ function isPosted(row: AbsenceRow) {
   return row.status === 'approved';
 }
 
+function daysBetween(start?: string | null, end?: string | null) {
+  if (!start || !end) return '—';
+  const a = new Date(start);
+  const b = new Date(end);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return '—';
+  const ms = b.getTime() - a.getTime();
+  const days = Math.floor(ms / 86400000) + 1;
+  return days > 0 ? String(days) : '—';
+}
+
 function AbsencesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -139,6 +150,7 @@ function AbsencesPageInner() {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [searchDraft, setSearchDraft] = useState(q);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -196,6 +208,31 @@ function AbsencesPageInner() {
     from,
     to,
   ]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allFilteredChecked =
+    filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const someFilteredChecked =
+    filtered.some((r) => checked[r.id]) && !allFilteredChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllFiltered(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
 
   async function load() {
     setLoading(true);
@@ -347,9 +384,74 @@ function AbsencesPageInner() {
         });
       }
       setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка действия');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'post' | 'unpost' | 'delete') {
+    if (checkedIds.length === 0) return;
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'delete') {
+      if (
+        !(await confirm(
+          `Удалить выбранные отсутствия (${targets.length} шт.)?`,
+        ))
+      ) {
+        return;
+      }
+    } else if (action === 'post') {
+      const draft = targets.filter((r) => !isPosted(r));
+      if (draft.length === 0) {
+        setError('Нет непроведённых документов среди выбранных');
+        return;
+      }
+    } else if (action === 'unpost') {
+      const posted = targets.filter((r) => isPosted(r));
+      if (posted.length === 0) {
+        setError('Нет проведённых документов среди выбранных');
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            if (isPosted(row) && row.status !== 'cancelled') continue;
+            await apiFetch(`/api/hr/absences/${row.id}`, { method: 'DELETE' });
+          } else if (action === 'post') {
+            if (isPosted(row)) continue;
+            await apiFetch(`/api/hr/absences/${row.id}/post`, { method: 'POST' });
+          } else {
+            if (!isPosted(row)) continue;
+            await apiFetch(`/api/hr/absences/${row.id}/unpost`, {
+              method: 'POST',
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) {
+        setError(`Часть операций не выполнена: ${failed}`);
+      }
     } finally {
       setBusy(false);
     }
@@ -375,6 +477,33 @@ function AbsencesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="absences" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeAbsence}`}>
+          <i className="fas fa-calendar-times" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Все отсутствия сотрудников</h1>
+          <p className={shared.pageSubtitle}>
+            Отпуска, больничные, командировки и отгулы
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <div className={styles.createWrap} ref={menuRef}>
@@ -383,7 +512,8 @@ function AbsencesPageInner() {
               className={styles.createBtn}
               onClick={() => setMenuOpen((v) => !v)}
             >
-              Создать ▾
+              <i className="fas fa-plus" aria-hidden />
+              Добавить отсутствие
             </button>
             {menuOpen ? (
               <div className={styles.createMenu}>
@@ -438,41 +568,105 @@ function AbsencesPageInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()}>
-            Обновить
-          </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn}
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      {panel !== 'none' ? (
-        <form className={styles.panel} onSubmit={onSubmit}>
-          <h2 className={styles.panelTitle}>
-            {panel === 'edit'
-              ? 'Изменить отсутствие'
-              : batchMode
-                ? 'Создать отсутствие списком'
-                : 'Создать отсутствие'}
-          </h2>
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('post')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Провести
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('unpost')}
+          >
+            <i className="fas fa-undo" aria-hidden />
+            Отменить проведение
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash-alt" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <FormModal
+        open={panel !== 'none'}
+        title={
+          panel === 'edit'
+            ? 'Изменить отсутствие'
+            : batchMode
+              ? 'Создать отсутствие списком'
+              : 'Создать отсутствие'
+        }
+        width="lg"
+        onClose={() => {
+          setPanel('none');
+          setEditId(null);
+          setBatchMode(false);
+        }}
+      >
+        <form
+          key={`${panel}-${editId || 'new'}-${batchMode ? 'batch' : 'single'}`}
+          className={styles.modalForm}
+          onSubmit={onSubmit}
+        >
           <div className={styles.formGrid}>
             <label>
               Дата *
@@ -594,122 +788,156 @@ function AbsencesPageInner() {
             </button>
           </div>
         </form>
-      ) : null}
+      </FormModal>
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Дата ↑</th>
-              <th>Номер</th>
-              <th>Тип документа</th>
-              <th>Табельный номер</th>
-              <th>Сотрудник</th>
-              <th>Дата начала</th>
-              <th>Дата окончания</th>
-              <th>Проведен</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={9} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someFilteredChecked;
+                    }}
+                    onChange={(e) => toggleAllFiltered(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата</th>
+                <th>Номер</th>
+                <th>Тип документа</th>
+                <th>Таб. №</th>
+                <th>Сотрудник</th>
+                <th>Начало</th>
+                <th>Окончание</th>
+                <th>Дней</th>
+                <th>Проведен</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={9} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{fmtDate(rowDocDate(row))}</td>
-                    <td>{rowNumber(row)}</td>
-                    <td>{rowDocType(row)}</td>
-                    <td>{row.employee?.tabNumber || '—'}</td>
-                    <td className={styles.empName}>{empFull(row.employee)}</td>
-                    <td>{fmtDate(row.startDate)}</td>
-                    <td>{fmtDate(row.endDate)}</td>
-                    <td>
-                      {isPosted(row) ? (
-                        <span className={styles.postedYes}>Да</span>
-                      ) : (
-                        <span className={styles.postedNo}>Нет</span>
-                      )}
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={9}>
-                        <div className={styles.rowActions}>
-                          {!isPosted(row) ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(row, 'post')}
-                            >
-                              Провести
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(row, 'unpost')}
-                            >
-                              Отменить проведение
-                            </button>
-                          )}
-                          {!isPosted(row) ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => openEdit(row)}
-                            >
-                              Изменить
-                            </button>
-                          ) : null}
-                          <Link href={`/employees/${row.employeeId}?tab=absences`}>
-                            Карточка
-                          </Link>
-                          {!isPosted(row) || row.status === 'cancelled' ? (
-                            <button
-                              type="button"
-                              className={styles.danger}
-                              disabled={busy}
-                              onClick={() => runAction(row, 'delete')}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className={styles.empty}>
+                    Нет данных по запросу
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={
+                        open || isChecked ? styles.rowSelected : undefined
+                      }
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${rowNumber(row)}`}
+                        />
+                      </td>
+                      <td>{fmtDate(rowDocDate(row))}</td>
+                      <td>{rowNumber(row)}</td>
+                      <td>{rowDocType(row)}</td>
+                      <td>{row.employee?.tabNumber || '—'}</td>
+                      <td className={styles.empName}>{empFull(row.employee)}</td>
+                      <td>{fmtDate(row.startDate)}</td>
+                      <td>{fmtDate(row.endDate)}</td>
+                      <td className={styles.daysCell}>
+                        {daysBetween(row.startDate, row.endDate)}
+                      </td>
+                      <td>
+                        {isPosted(row) ? (
+                          <span className={styles.postedYes}>Да</span>
+                        ) : (
+                          <span className={styles.postedNo}>Нет</span>
+                        )}
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={10}>
+                          <div className={styles.rowActions}>
+                            {!isPosted(row) ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => runAction(row, 'post')}
+                              >
+                                <i className="fas fa-check" aria-hidden />
+                                Провести
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => runAction(row, 'unpost')}
+                              >
+                                <i className="fas fa-undo" aria-hidden />
+                                Отменить проведение
+                              </button>
+                            )}
+                            {!isPosted(row) ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => openEdit(row)}
+                              >
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </button>
+                            ) : null}
+                            <Link href={`/employees/${row.employeeId}?tab=absences`}>
+                              <i className="fas fa-user" aria-hidden />
+                              Карточка
+                            </Link>
+                            {!isPosted(row) || row.status === 'cancelled' ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => runAction(row, 'delete')}
+                              >
+                                <i className="fas fa-trash-alt" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано{' '}
+            <strong>
+              {filtered.length === 0 ? 0 : 1}–{filtered.length}
+            </strong>{' '}
+            из <strong>{filtered.length}</strong>
+          </p>
+        </div>
       </div>
     </div>
   );

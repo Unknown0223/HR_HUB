@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch, PageResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -355,6 +356,16 @@ function HrDocumentsPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="hr-documents" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-file-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Все кадровые документы</h1>
+          <p className={shared.pageSubtitle}>Приказы, заявления и кадровые документы организации</p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <div className={styles.createWrap} ref={menuRef}>
@@ -470,10 +481,13 @@ function HrDocumentsPageInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {panel === 'create' ? (
-        <form className={styles.panel} onSubmit={onCreate}>
-          <h2 className={styles.panelTitle}>
-            Создать: {typeLabel(createType)}
-          </h2>
+        <FormModal
+          open
+          title={`Создать: ${typeLabel(createType)}`}
+          width="lg"
+          onClose={() => setPanel('none')}
+        >
+        <form className={styles.modalForm} onSubmit={onCreate}>
           <div className={styles.formGrid}>
             <label>
               Тип
@@ -617,6 +631,7 @@ function HrDocumentsPageInner() {
             </button>
           </div>
         </form>
+        </FormModal>
       ) : null}
 
       <div className={styles.tableWrap}>

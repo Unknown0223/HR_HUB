@@ -7,7 +7,7 @@
   height: 16px;
   margin: 0;
   flex: 0 0 16px;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -87,7 +87,7 @@
 
 .dropField:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -226,7 +226,7 @@
 
 .opt input {
   margin-top: 0.15rem;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .dim {

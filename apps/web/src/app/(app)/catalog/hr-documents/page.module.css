@@ -3,6 +3,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 1.25rem 1.5rem 2.5rem;
 }
 
 @keyframes fadeUp {
@@ -38,24 +43,27 @@
 
 .createBtn {
   appearance: none;
-  border: none;
-  border-radius: 4px;
-  background: #0d9488;
-  color: #fff;
+  border: 1px solid rgba(14, 159, 110, 0.5);
+  border-radius: 10px;
+  background: #fff;
+  color: #0e9f6e;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.9rem;
+  height: 36px;
+  padding: 0 14px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .createBtn:hover {
-  background: #0f766e;
+  background: #e8f7f0;
+  border-color: #0e9f6e;
 }
 
 .createMenu {
@@ -160,6 +168,11 @@
   gap: 0.65rem;
 }
 
+.modalForm {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .panelTitle {
   margin: 0;
   font-size: 0.95rem;
@@ -218,7 +231,7 @@
 
 .primary {
   border: none;
-  background: #2563eb;
+  background: linear-gradient(180deg, #0a85e2, #0770c2);
   color: #fff;
 }
 

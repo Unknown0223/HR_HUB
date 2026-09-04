@@ -3,6 +3,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 1.25rem 1.5rem 2.5rem;
 }
 
 @keyframes fadeUp {
@@ -40,7 +45,7 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #0d9488;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -56,7 +61,7 @@
 }
 
 .createBtn:hover {
-  background: #0f766e;
+  background: #0770c2;
 }
 
 .createMenu {

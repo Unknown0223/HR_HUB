@@ -144,7 +144,7 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
         apiFetch<{ employees?: Opt[]; locations?: Opt[] }>('/api/catalog/lookups'),
         apiFetch<{ tenant?: { name?: string }; settings?: { orgName?: string } }>(
           '/api/settings/org',
-        ).catch(() => ({})),
+        ).catch((): { tenant?: { name?: string }; settings?: { orgName?: string } } => ({})),
       ]);
       const dict = (list || []).find((d) => d.code === DICT_CODE);
       const cur = (list || []).find((d) => d.code === 'currencies');

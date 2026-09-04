@@ -1,12 +1,14 @@
 'use client';
 
-import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import shared from '../../../page-shared.module.css';
+import { ClearanceSheetForm } from './ClearanceSheetForm';
 import styles from './page.module.css';
 
 type EmpRef = {
@@ -72,9 +74,14 @@ function signedCount(row: ClearanceRow) {
   return items.filter((i) => i.status === 'done' || i.status === 'skipped').length;
 }
 
+function statusClass(status: string) {
+  if (status === 'completed') return styles.statusOk;
+  if (status === 'cancelled') return styles.statusBad;
+  if (status === 'in_progress') return styles.statusWarn;
+  return styles.statusMuted;
+}
+
 function ClearanceSheetsPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
   const q = filters.q;
   const statusFilter = filters.status;
@@ -92,11 +99,14 @@ function ClearanceSheetsPageInner() {
   const [busy, setBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
-  const [searchDraft, setSearchDraft] = useState(q);
+  const [search, setSearch] = useState(q);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const closeCreate = useCallback(() => setCreateOpen(false), []);
 
   const filtered = useMemo(() => {
     let list = rows;
-    const qq = q.trim().toLowerCase();
+    const qq = (search || q).trim().toLowerCase();
     if (qq) {
       list = list.filter((r) => {
         const blob = [
@@ -125,7 +135,7 @@ function ClearanceSheetsPageInner() {
       list = list.filter((r) => new Date(r.documentDate || r.createdAt).getTime() <= t);
     }
     return list;
-  }, [rows, q, statusFilter, employeeIdFilter, from, to]);
+  }, [rows, search, q, statusFilter, employeeIdFilter, from, to]);
 
   async function load() {
     setLoading(true);
@@ -151,15 +161,9 @@ function ClearanceSheetsPageInner() {
       .catch(() => setEmployees([]));
   }, []);
 
-  function applySearch() {
-    const params = new URLSearchParams(searchParams?.toString() ?? '');
-    if (searchDraft.trim()) params.set('q', searchDraft.trim());
-    else params.delete('q');
-    const qs = params.toString();
-    router.replace(qs ? `/catalog/clearance-sheets?${qs}` : '/catalog/clearance-sheets', {
-      scroll: false,
-    });
-  }
+  useEffect(() => {
+    setSelectedId(null);
+  }, [search]);
 
   async function runAction(row: ClearanceRow, action: 'complete' | 'cancel' | 'delete') {
     setBusy(true);
@@ -227,10 +231,41 @@ function ClearanceSheetsPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="clearance-sheets" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeClearance}`}>
+          <i className="fas fa-tasks" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Обходные листы</h1>
+          <p className={shared.pageSubtitle}>Обходные листы при увольнении сотрудников</p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => setCreateOpen(true)}
+          >
+            <i className="fas fa-plus" aria-hidden />
+            Создать
+          </button>
           <FilterPanel
             inline
+            urlSync
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
@@ -255,172 +290,208 @@ function ClearanceSheetsPageInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
+          </span>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
           </button>
           <button
             type="button"
-            className={styles.exportBtn}
+            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
+            title="Excel"
+            aria-label="Excel"
           >
-            {exportBusy ? 'Excel…' : 'Excel'}
+            <i className="fas fa-file-excel" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()}>
-            Обновить
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>
-            {filtered.length} / {rows.length}
-          </span>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Номер</th>
-              <th>Дата</th>
-              <th>Владелец</th>
-              <th>Количество подписаний</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={5} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th>Номер</th>
+                <th>Дата</th>
+                <th>Владелец</th>
+                <th>Количество подписаний</th>
+                <th>Статус</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const total = (row.items || []).length;
-              const signed = signedCount(row);
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>{row.number || '—'}</td>
-                    <td>{fmtDate(row.documentDate || row.createdAt)}</td>
-                    <td className={styles.empName}>{empName(row.employee)}</td>
-                    <td>
-                      {signed} / {total}
-                    </td>
-                    <td>
-                      <span
-                        className={
-                          row.status === 'completed'
-                            ? styles.postedYes
-                            : row.status === 'cancelled'
-                              ? styles.postedNo
-                              : styles.statusOpen
-                        }
-                      >
-                        {STATUS_LABEL[row.status] || row.status}
-                      </span>
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={5}>
-                        <div className={styles.detailBlock}>
-                          <div className={styles.rowActions}>
-                            {row.status !== 'completed' && row.status !== 'cancelled' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => runAction(row, 'complete')}
-                              >
-                                Завершить
-                              </button>
-                            ) : null}
-                            {row.status !== 'completed' && row.status !== 'cancelled' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => runAction(row, 'cancel')}
-                              >
-                                Отменить
-                              </button>
-                            ) : null}
-                            {row.status !== 'completed' ? (
-                              <button
-                                type="button"
-                                className={styles.danger}
-                                disabled={busy}
-                                onClick={() => runAction(row, 'delete')}
-                              >
-                                Удалить
-                              </button>
-                            ) : null}
-                          </div>
-                          {(row.items || []).length > 0 ? (
-                            <ul className={styles.itemList}>
-                              {(row.items || []).map((it) => (
-                                <li key={it.id}>
-                                  <span>
-                                    {it.title}
-                                    {it.department ? ` (${it.department})` : ''}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    disabled={busy || row.status === 'completed'}
-                                    onClick={() =>
-                                      toggleItem(
-                                        it,
-                                        it.status === 'done' ? 'pending' : 'done',
-                                      )
-                                    }
-                                  >
-                                    {it.status === 'done' ? '✓ Подписано' : 'Подписать'}
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </div>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const total = (row.items || []).length;
+                const signed = signedCount(row);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>{row.number || '—'}</td>
+                      <td>{fmtDate(row.documentDate || row.createdAt)}</td>
+                      <td className={styles.nameCell}>{empName(row.employee)}</td>
+                      <td>
+                        {signed} / {total}
+                      </td>
+                      <td>
+                        <span
+                          className={`${styles.statusBadge} ${statusClass(row.status)}`}
+                        >
+                          {STATUS_LABEL[row.status] || row.status}
+                        </span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={5}>
+                          <div className={styles.detailBlock}>
+                            <div className={styles.rowActions}>
+                              {row.status !== 'completed' && row.status !== 'cancelled' ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void runAction(row, 'complete')}
+                                >
+                                  <i className="fas fa-check" aria-hidden />
+                                  Завершить
+                                </button>
+                              ) : null}
+                              {row.status !== 'completed' && row.status !== 'cancelled' ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void runAction(row, 'cancel')}
+                                >
+                                  <i className="fas fa-ban" aria-hidden />
+                                  Отменить
+                                </button>
+                              ) : null}
+                              {row.status !== 'completed' ? (
+                                <button
+                                  type="button"
+                                  className={styles.danger}
+                                  disabled={busy}
+                                  onClick={() => void runAction(row, 'delete')}
+                                >
+                                  <i className="fas fa-trash-alt" aria-hidden />
+                                  Удалить
+                                </button>
+                              ) : null}
+                            </div>
+                            {(row.items || []).length > 0 ? (
+                              <ul className={styles.itemList}>
+                                {(row.items || []).map((it) => (
+                                  <li key={it.id}>
+                                    <span>
+                                      {it.title}
+                                      {it.department ? ` (${it.department})` : ''}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={busy || row.status === 'completed'}
+                                      onClick={() =>
+                                        void toggleItem(
+                                          it,
+                                          it.status === 'done' ? 'pending' : 'done',
+                                        )
+                                      }
+                                    >
+                                      {it.status === 'done' ? '✓ Подписано' : 'Подписать'}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <span>
+            Показано{' '}
+            <strong>{filtered.length === 0 ? 0 : `1–${filtered.length}`}</strong> из{' '}
+            <strong>{filtered.length}</strong>
+          </span>
+        </div>
       </div>
+
+      <FormModal
+        open={createOpen}
+        title="Обходной лист (создание)"
+        width="md"
+        onClose={closeCreate}
+      >
+        <ClearanceSheetForm
+          key={createOpen ? 'open' : 'closed'}
+          embedded
+          onSuccess={() => {
+            closeCreate();
+            void load();
+          }}
+          onCancel={closeCreate}
+        />
+      </FormModal>
     </div>
   );
 }
 
 export default function ClearanceSheetsPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
+    <Suspense fallback={<p className={styles.empty}>Загрузка…</p>}>
       <ClearanceSheetsPageInner />
     </Suspense>
   );

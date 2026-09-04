@@ -161,7 +161,7 @@ function DynamicFieldsPageInner() {
           <button
             type="button"
             className={styles.createBtn}
-            style={{ background: '#3699ff' }}
+            style={{ background: '#0a85e2' }}
             onClick={() => router.push('/catalog/dynamic-fields/new')}
           >
             Создать

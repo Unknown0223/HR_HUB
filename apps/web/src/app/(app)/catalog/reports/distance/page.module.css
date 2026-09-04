@@ -95,7 +95,7 @@
 
 .numInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
 }
 
@@ -143,8 +143,8 @@
 }
 
 .check input:checked + .box {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
 }
 
 .check input:checked + .box::after {

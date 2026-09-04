@@ -40,7 +40,7 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #0d9488;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -56,7 +56,51 @@
 }
 
 .createBtn:hover {
-  background: #0f766e;
+  background: #0770c2;
+}
+
+.bulkBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(10, 133, 226, 0.25);
+  background: #edf6fe;
+}
+
+.bulkMeta {
+  font-size: 13px;
+  color: #374151;
+  margin-right: 4px;
+}
+
+.bulkMeta strong {
+  color: #111827;
+}
+
+.bulkBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bulkBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.bulkDanger {
+  border-color: #fecaca;
+  color: #b91c1c;
 }
 
 .createMenu {

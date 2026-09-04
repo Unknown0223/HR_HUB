@@ -17,9 +17,15 @@ type GradeRow = {
 export function GradeForm({
   mode,
   gradeId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit';
   gradeId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -45,7 +51,8 @@ export function GradeForm({
         setLevel(row.level != null ? String(row.level) : '');
         setIsActive(row.isActive !== false);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : 'Ошибка загрузки');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -54,6 +61,11 @@ export function GradeForm({
       cancelled = true;
     };
   }, [mode, gradeId]);
+
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/grades');
+  }
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -81,7 +93,8 @@ export function GradeForm({
           body: JSON.stringify(body),
         });
       }
-      router.push('/catalog/grades');
+      if (onSuccess) onSuccess();
+      else router.push('/catalog/grades');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -90,6 +103,7 @@ export function GradeForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="grades" titleOverride={pageTitle} />
@@ -98,59 +112,67 @@ export function GradeForm({
     );
   }
 
+  const form = (
+    <form
+      onSubmit={onSave}
+      className={embedded ? styles.formEmbedded : styles.form}
+    >
+      <div className={styles.actions}>
+        <button type="submit" className={styles.primary} disabled={saving}>
+          {saving ? 'Сохранение…' : 'Сохранить'}
+        </button>
+        <button type="button" className={styles.secondary} onClick={goBack}>
+          Закрыть
+        </button>
+      </div>
+
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.card}>
+        <label>
+          Код
+          <input value={code} onChange={(e) => setCode(e.target.value)} />
+        </label>
+        <label>
+          Название <span className={styles.req}>*</span>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <label>
+          Порядковый номер
+          <input
+            type="number"
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+          />
+        </label>
+        <div className={styles.switchRow}>
+          <span className={styles.switchLabel}>Статус</span>
+          <label className={styles.switch}>
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            <span className={styles.switchTrack} />
+            <span className={styles.switchText}>
+              {isActive ? 'Активный' : 'Неактивный'}
+            </span>
+          </label>
+        </div>
+      </div>
+    </form>
+  );
+
+  if (embedded) return form;
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="grades" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave} className={styles.form}>
-        <div className={styles.actions}>
-          <button type="submit" className={styles.primary} disabled={saving}>
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => router.push('/catalog/grades')}
-          >
-            Закрыть
-          </button>
-        </div>
-
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.card}>
-          <label>
-            Код
-            <input value={code} onChange={(e) => setCode(e.target.value)} />
-          </label>
-          <label>
-            Название <span className={styles.req}>*</span>
-            <input required value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label>
-            Порядковый номер
-            <input
-              type="number"
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-            />
-          </label>
-          <div className={styles.switchRow}>
-            <span className={styles.switchLabel}>Статус</span>
-            <label className={styles.switch}>
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-              <span className={styles.switchTrack} />
-              <span className={styles.switchText}>
-                {isActive ? 'Активный' : 'Неактивный'}
-              </span>
-            </label>
-          </div>
-        </div>
-      </form>
+      {form}
     </div>
   );
 }

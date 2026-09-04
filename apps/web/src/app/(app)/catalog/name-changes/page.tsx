@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -323,6 +324,18 @@ function NameChangesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="name-changes" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-id-card" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Изменение имени</h1>
+          <p className={shared.pageSubtitle}>
+            Документы об изменении ФИО сотрудников
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
@@ -402,10 +415,22 @@ function NameChangesPageInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {panel !== 'none' ? (
-        <form className={styles.panel} onSubmit={onSubmit}>
-          <h2 className={styles.panelTitle}>
-            {panel === 'edit' ? 'Изменить документ' : 'Создать изменение имени'}
-          </h2>
+        <FormModal
+          open
+          title={
+            panel === 'edit' ? 'Изменить документ' : 'Создать изменение имени'
+          }
+          width="lg"
+          onClose={() => {
+            setPanel('none');
+            setEditId(null);
+          }}
+        >
+        <form
+          key={`${panel}-${editId || 'new'}`}
+          className={styles.modalForm}
+          onSubmit={onSubmit}
+        >
           <div className={styles.formGrid}>
             <label>
               Дата *
@@ -508,6 +533,7 @@ function NameChangesPageInner() {
             </button>
           </div>
         </form>
+        </FormModal>
       ) : null}
 
       <div className={styles.tableWrap}>

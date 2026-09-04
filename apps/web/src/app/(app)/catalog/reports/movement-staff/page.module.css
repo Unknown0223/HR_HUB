@@ -38,14 +38,14 @@
 }
 
 .tabOn {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
 .refresh {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   width: 34px;
   height: 34px;
@@ -65,7 +65,7 @@
   appearance: none;
   border: none;
   background: #eef3f7;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.7rem;
   font-weight: 700;
@@ -117,7 +117,7 @@
 .check input {
   margin-top: 0.18rem;
   flex: 0 0 auto;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .checkBody {
@@ -190,7 +190,7 @@
   appearance: none;
   border: none;
   background: #e1f0ff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.7rem;
   font-weight: 700;
@@ -227,7 +227,7 @@
 }
 
 .checkRow input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .dropHeadEmp,
@@ -261,7 +261,7 @@
 }
 
 .checkRowEmp input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .view {

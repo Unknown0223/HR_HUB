@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { ModalPortal } from '@/components/ModalPortal';
 import { mediaSrc } from '@/lib/media';
 import styles from './PhotoLightbox.module.css';
@@ -53,6 +60,7 @@ export function PhotoThumb({
   lightbox,
   width,
   height,
+  fallback,
 }: {
   src: string;
   className?: string;
@@ -62,13 +70,33 @@ export function PhotoThumb({
   lightbox: PhotoLightboxApi;
   width?: number;
   height?: number;
+  /** Shown when the image fails to load (e.g. initials avatar). */
+  fallback?: ReactNode;
 }) {
-  const resolved = mediaSrc(src) || src;
+  const [failed, setFailed] = useState(false);
+  const [tokenEpoch, setTokenEpoch] = useState(0);
+  // Re-read token after hydrate (tokenEpoch) so ?access_token= is attached
+  const resolved = (tokenEpoch >= 0 ? mediaSrc(src) : null) || src;
+
+  useEffect(() => {
+    const bump = () => setTokenEpoch((n) => n + 1);
+    window.addEventListener('hrhub-media-token', bump);
+    return () => window.removeEventListener('hrhub-media-token', bump);
+  }, []);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [resolved, tokenEpoch]);
+
   const open = (e: MouseEvent | ReactKeyboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (failed || !resolved) return;
     lightbox.open(slides.length ? slides : [{ src: resolved, caption: alt }], index);
   };
+  if (failed || !resolved) {
+    return <>{fallback ?? null}</>;
+  }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -78,14 +106,16 @@ export function PhotoThumb({
       width={width}
       height={height}
       loading="lazy"
-      decoding="async"
-      role="button"
-      tabIndex={0}
-      style={{ cursor: 'pointer' }}
       onClick={open}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') open(e);
       }}
+      onError={() => setFailed(true)}
+      role="button"
+      tabIndex={0}
+      style={{ cursor: 'pointer' }}
+      decoding="async"
+      referrerPolicy="no-referrer"
     />
   );
 }

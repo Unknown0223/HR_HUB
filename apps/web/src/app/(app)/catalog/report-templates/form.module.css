@@ -30,7 +30,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -51,7 +51,7 @@
 .btnClose {
   border: 1px solid #d1d5db;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -141,7 +141,7 @@
 
 .field textarea:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -169,7 +169,7 @@
 .field input:not([type='radio']):not([type='checkbox']):focus,
 .field select:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -193,7 +193,7 @@
   height: 1rem;
   margin: 0.12rem 0 0;
   flex-shrink: 0;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -230,7 +230,7 @@
   border: none;
   box-shadow: none;
   background: transparent;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -271,9 +271,9 @@
 }
 
 .typeBtnOn {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   background: #e8f3ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .statusBlock {
@@ -306,7 +306,7 @@
 }
 
 .toggleOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .toggle::after {
@@ -345,9 +345,9 @@
 
 .dropZone:hover,
 .dropZoneActive {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   background: #f3f9ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .dropHint {
@@ -445,6 +445,6 @@
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #3699ff;
+  color: #0a85e2;
   cursor: pointer;
 }

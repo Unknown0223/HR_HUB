@@ -542,7 +542,7 @@ function FactTypesPageInner() {
                 marginTop: 8,
                 border: 'none',
                 background: 'transparent',
-                color: '#3699ff',
+                color: '#0a85e2',
                 fontWeight: 700,
                 cursor: 'pointer',
               }}
@@ -559,7 +559,7 @@ function FactTypesPageInner() {
               <button
                 type="button"
                 className={styles.createBtn}
-                style={{ background: '#3699ff' }}
+                style={{ background: '#0a85e2' }}
                 disabled={regSaving}
                 onClick={() => void saveRegistry()}
               >

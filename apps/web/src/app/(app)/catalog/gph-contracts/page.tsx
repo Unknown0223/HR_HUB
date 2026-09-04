@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -357,6 +358,18 @@ function GphContractsPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="gph-contracts" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-file-contract" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Договоры ГПХ</h1>
+          <p className={shared.pageSubtitle}>
+            Гражданско-правовые договоры с физическими лицами
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
@@ -436,10 +449,22 @@ function GphContractsPageInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {panel !== 'none' ? (
-        <form className={styles.panel} onSubmit={onSubmit}>
-          <h2 className={styles.panelTitle}>
-            {panel === 'edit' ? 'Изменить договор ГПХ' : 'Создать договор ГПХ'}
-          </h2>
+        <FormModal
+          open
+          title={
+            panel === 'edit' ? 'Изменить договор ГПХ' : 'Создать договор ГПХ'
+          }
+          width="lg"
+          onClose={() => {
+            setPanel('none');
+            setEditId(null);
+          }}
+        >
+        <form
+          key={`${panel}-${editId || 'new'}`}
+          className={styles.modalForm}
+          onSubmit={onSubmit}
+        >
           <div className={styles.formGrid}>
             <label>
               Номер договора *
@@ -555,6 +580,7 @@ function GphContractsPageInner() {
             </button>
           </div>
         </form>
+        </FormModal>
       ) : null}
 
       <div className={styles.tableWrap}>

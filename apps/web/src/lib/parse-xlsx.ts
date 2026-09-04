@@ -2,6 +2,12 @@ import type { CellValue } from 'exceljs';
 
 type ExcelJSNS = typeof import('exceljs');
 
+/** Keep in sync with apps/api/src/common/excel-import.ts */
+export const EXCEL_IMPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const EXCEL_IMPORT_MAX_SHEETS = 8;
+const EXCEL_IMPORT_MAX_ROWS = 10_000;
+const EXCEL_IMPORT_MAX_COLS = 64;
+
 async function loadExcelJS(): Promise<ExcelJSNS> {
   const mod = await import('exceljs');
   const ns = (mod as ExcelJSNS & { default?: ExcelJSNS }).default ?? (mod as ExcelJSNS);
@@ -38,15 +44,38 @@ function cellToString(value: CellValue): string {
   return String(value).trim();
 }
 
-/** Parse first worksheet of an .xlsx/.xls file into a string matrix. */
+export function assertExcelImportFile(file: File): void {
+  const name = (file.name || '').trim().toLowerCase();
+  if (!name.endsWith('.xlsx') || name.includes('..') || name.endsWith('.xlsm')) {
+    throw new Error('Разрешён только файл Excel (.xlsx)');
+  }
+  if (file.size > EXCEL_IMPORT_MAX_BYTES) {
+    throw new Error('Файл слишком большой (макс. 5 МБ)');
+  }
+}
+
+function hasXlsxZipMagic(buf: ArrayBuffer): boolean {
+  if (buf.byteLength < 4) return false;
+  const b = new Uint8Array(buf, 0, 4);
+  return b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04;
+}
+
+/** Parse first worksheet of an .xlsx file into a string matrix. */
 export async function parseXlsxFile(
   file: File,
   preferredSheet?: string | string[],
 ): Promise<XlsxMatrix> {
+  assertExcelImportFile(file);
   const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
   const buf = await file.arrayBuffer();
+  if (!hasXlsxZipMagic(buf)) {
+    throw new Error('Файл не является корректным Excel (.xlsx)');
+  }
   await wb.xlsx.load(buf);
+  if (wb.worksheets.length > EXCEL_IMPORT_MAX_SHEETS) {
+    throw new Error('Слишком много листов в книге');
+  }
 
   const preferred = (
     Array.isArray(preferredSheet)
@@ -64,10 +93,17 @@ export async function parseXlsxFile(
     if (found) ws = found;
   }
   if (!ws) return { sheetName: '', rows: [] };
+  if ((ws.columnCount || 0) > EXCEL_IMPORT_MAX_COLS) {
+    throw new Error('Слишком много столбцов в файле');
+  }
+  if ((ws.rowCount || 0) > EXCEL_IMPORT_MAX_ROWS) {
+    throw new Error('Слишком много строк в файле');
+  }
 
   const rows: string[][] = [];
-  const colCount = Math.max(ws.columnCount || 0, 9);
+  const colCount = Math.min(Math.max(ws.columnCount || 0, 9), EXCEL_IMPORT_MAX_COLS);
   ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    if (rowNumber > EXCEL_IMPORT_MAX_ROWS) return;
     const cells: string[] = [];
     for (let c = 1; c <= colCount; c++) {
       cells.push(cellToString(row.getCell(c).value));

@@ -1,20 +1,23 @@
 'use client';
 
-import Link from 'next/link';
-import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 import {
   CREATE_PRESETS,
   KIND_LABELS,
   STATUS_LABELS,
+  formPageTitle,
   type HrChangeKind,
 } from './kinds';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { HrChangeRequestForm } from './HrChangeRequestForm';
 
 type ChangeRow = {
   id: string;
@@ -85,6 +88,13 @@ function HrRequestsInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchDraft, setSearchDraft] = useState(q);
   const [exportBusy, setExportBusy] = useState(false);
+  const [modal, setModal] = useState<null | {
+    mode: 'create' | 'edit';
+    id?: string;
+    kind?: HrChangeKind;
+  }>(null);
+
+  const closeModal = useCallback(() => setModal(null), []);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -189,7 +199,6 @@ function HrRequestsInner() {
   function exportCsv() {
     downloadCsv(
       `hr-requests-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['requestDate', 'number', 'kind', 'position', 'createdBy', 'createdAt', 'status'],
       filtered.map((r) => ({
         requestDate: fmtDate(r.requestDate),
         number: r.number || '',
@@ -221,6 +230,16 @@ function HrRequestsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="hr-requests" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeRequest}`}>
+          <i className="fas fa-clipboard-check" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Заявки на кадровые изменения</h1>
+          <p className={shared.pageSubtitle}>Заявки на перевод, увольнение и другие кадровые операции</p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <div className={styles.createWrap} ref={createMenuRef}>
@@ -234,14 +253,17 @@ function HrRequestsInner() {
             {createMenuOpen ? (
               <div className={styles.createMenu}>
                 {CREATE_PRESETS.map((p) => (
-                  <Link
+                  <button
                     key={p.kind}
-                    href={`/catalog/hr-requests/new?kind=${p.kind}`}
+                    type="button"
                     className={styles.createMenuLink}
-                    onClick={() => setCreateMenuOpen(false)}
+                    onClick={() => {
+                      setCreateMenuOpen(false);
+                      setModal({ mode: 'create', kind: p.kind });
+                    }}
                   >
                     {p.label}
-                  </Link>
+                  </button>
                 ))}
               </div>
             ) : null}
@@ -380,11 +402,14 @@ function HrRequestsInner() {
                     <tr className={styles.actionsRow}>
                       <td colSpan={8}>
                         <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
-                          <Link href={`/catalog/hr-requests/${row.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => setModal({ mode: 'edit', id: row.id, kind: row.kind })}
+                          >
                             {row.status === 'draft' || row.status === 'pending'
                               ? 'Изменить'
                               : 'Открыть'}
-                          </Link>
+                          </button>
                           {row.status === 'draft' ? (
                             <button
                               type="button"
@@ -439,6 +464,42 @@ function HrRequestsInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={
+          modal
+            ? formPageTitle(
+                modal.kind || 'open_position',
+                modal.mode,
+                modal.mode === 'edit'
+                  ? rows.find((r) => r.id === modal.id)?.status
+                  : undefined,
+              )
+            : ''
+        }
+        width="xl"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <HrChangeRequestForm
+            key={
+              modal.mode === 'edit'
+                ? modal.id
+                : `create-${modal.kind || 'open_position'}`
+            }
+            mode={modal.mode}
+            requestId={modal.id}
+            kindDefault={modal.kind}
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }

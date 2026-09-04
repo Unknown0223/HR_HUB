@@ -1,12 +1,306 @@
-.layout {
+/* Persons list — Arena tokens (accent #0a85e2) + form layout */
+
+.wrap {
+  --canvas: #f3f6fb;
+  --surface: #ffffff;
+  --surface-subtle: #f2f5f9;
+  --ink-950: #0a1322;
+  --ink-900: #14213a;
+  --ink-700: #354862;
+  --ink-500: #64788f;
+  --ink-400: #8ca0b8;
+  --line: #e3e9f1;
+  --accent: #0a85e2;
+  --accent-soft: rgba(10, 133, 226, 0.08);
+  --st-ok: #0e9f6e;
+  --st-ok-bg: #e8f7f0;
+  --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04),
+    0 10px 28px -16px rgba(16, 30, 54, 0.16);
+  animation: fadeUp 0.22s ease both;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 1.25rem 1.5rem 2.5rem;
+  color: var(--ink-900);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.65rem;
 }
+
+.leftActions,
+.rightTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.createBtn {
+  appearance: none;
+  border: 1px solid rgba(14, 159, 110, 0.5);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--st-ok);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  height: 36px;
+  padding: 0 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.createBtn:hover {
+  background: var(--st-ok-bg);
+  border-color: var(--st-ok);
+}
+
+.search {
+  min-width: 220px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+  outline: none;
+  color: var(--ink-900);
+}
+
+.search:focus {
+  border-color: rgba(10, 133, 226, 0.5);
+  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+}
+
+.toolBtn,
+.exportBtn {
+  appearance: none;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.toolBtn:hover,
+.exportBtn:hover {
+  background: var(--surface-subtle);
+  color: var(--accent);
+}
+
+.pagerMeta {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+
+.pagerBtn {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-700);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.pagerBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+  font-size: 13px;
+}
+
+.tableWrap {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-400);
+  background: rgba(242, 245, 249, 0.65);
+  white-space: nowrap;
+}
+
+.table tbody tr:hover:not(.actionsRow) td {
+  background: rgba(237, 246, 254, 0.4);
+}
+
+.rowSelected td {
+  background: rgba(237, 246, 254, 0.65) !important;
+}
+
+.nameCell {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink-950);
+}
+
+.nameText {
+  font-weight: 700;
+  color: var(--ink-950);
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.85rem;
+  margin: 0.35rem 0 0.05rem;
+}
+
+.inlineActions button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0;
+  cursor: pointer;
+}
+
+.inlineActions button:hover {
+  text-decoration: underline;
+}
+
+.inlineActions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0.45rem;
+  padding: 10px 12px;
+  border: 1px solid rgba(10, 133, 226, 0.18);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.rowActions button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface-subtle);
+  color: var(--ink-700);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rowActions button:hover {
+  background: #edf6fe;
+  border-color: rgba(10, 133, 226, 0.35);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.rowActions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.danger {
+  color: #b91c1c !important;
+  border-color: #fecaca !important;
+  background: #fff1f2 !important;
+}
+
+.danger:hover {
+  background: #ffe4e6 !important;
+  color: #9f1239 !important;
+}
+
+.empty {
+  text-align: center;
+  color: var(--ink-400);
+  padding: 3rem 1rem !important;
+  font-weight: 600;
+}
+
+/* Form (modal) */
 
 .formCard {
   background: #fff;
   border: 1px solid #eef0f4;
   border-radius: 8px;
-  padding: 1.1rem 1.25rem;
+  padding: 0.25rem 0.15rem 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -48,6 +342,19 @@
   .nameRow {
     grid-template-columns: 1fr;
   }
+
+  .wrap {
+    padding: 12px 12px 40px;
+  }
+
+  .search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .rightTools {
+    width: 100%;
+  }
 }
 
 .twoCol {
@@ -79,7 +386,7 @@
 }
 
 .check input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .photoCol {
@@ -136,60 +443,56 @@
 .btnAttach {
   appearance: none;
   border: none;
-  border-radius: 4px;
-  background: #3699ff;
+  border-radius: 10px;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.9rem;
+  height: 36px;
+  padding: 0 14px;
   cursor: pointer;
 }
 
 .btnStatus {
   appearance: none;
-  border: 1px solid #93c5fd;
-  border-radius: 4px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid rgba(10, 133, 226, 0.35);
+  border-radius: 10px;
+  background: #edf6fe;
+  color: #0a85e2;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.9rem;
+  height: 36px;
+  padding: 0 14px;
   cursor: pointer;
 }
 
 .btnUnpin {
   appearance: none;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   background: #f1416c;
   color: #fff;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.9rem;
+  height: 36px;
+  padding: 0 14px;
   cursor: pointer;
 }
 
 .btnDanger {
   appearance: none;
   border: 1px solid #fecaca;
-  border-radius: 4px;
+  border-radius: 10px;
   background: #fff;
   color: #b91c1c;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.9rem;
+  height: 36px;
+  padding: 0 14px;
   cursor: pointer;
 }
 
@@ -212,9 +515,9 @@
   z-index: 40;
   min-width: 220px;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
   padding: 0.35rem;
 }
 
@@ -228,12 +531,12 @@
   font: inherit;
   font-size: 0.85rem;
   padding: 0.55rem 0.65rem;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
 .menu button:hover {
-  background: #f3f4f6;
+  background: var(--surface-subtle);
 }
 
 .avatar,
@@ -248,8 +551,8 @@
 }
 
 .avatarFallback {
-  background: #e0e7ff;
-  color: #3730a3;
+  background: #edf6fe;
+  color: #0a85e2;
   font-size: 0.72rem;
   font-weight: 700;
 }

@@ -1,14 +1,16 @@
 'use client';
 import { confirm } from '@/lib/dialogs';
 
-import Link from 'next/link';
-import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
+import { IncidentForm } from './IncidentForm';
 
 type EmpRef = {
   id: string;
@@ -66,6 +68,11 @@ function IncidentsInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [modal, setModal] = useState<null | { mode: 'create' | 'edit'; id?: string }>(
+    null,
+  );
+
+  const closeModal = useCallback(() => setModal(null), []);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -156,11 +163,25 @@ function IncidentsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="incidents" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeIncident}`}>
+          <i className="fas fa-exclamation-triangle" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Инциденты</h1>
+          <p className={shared.pageSubtitle}>Регистрация и учёт дисциплинарных инцидентов</p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/incidents/new" className={styles.createBtn}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => setModal({ mode: 'create' })}
+          >
             Создать
-          </Link>
+          </button>
         </div>
         <div className={styles.rightTools}>
           <input
@@ -253,7 +274,12 @@ function IncidentsInner() {
                     <tr className={styles.actionsRow}>
                       <td colSpan={7}>
                         <div className={styles.rowActions}>
-                          <Link href={`/catalog/incidents/${row.id}`}>Изменить</Link>
+                          <button
+                            type="button"
+                            onClick={() => setModal({ mode: 'edit', id: row.id })}
+                          >
+                            Изменить
+                          </button>
                           <button type="button" disabled={busy} onClick={() => remove(row)}>
                             Удалить
                           </button>
@@ -267,6 +293,27 @@ function IncidentsInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={modal?.mode === 'edit' ? 'Инцидент (изменение)' : 'Инцидент (создание)'}
+        width="xl"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <IncidentForm
+            key={modal.mode === 'edit' ? modal.id : 'create'}
+            mode={modal.mode}
+            incidentId={modal.id}
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }

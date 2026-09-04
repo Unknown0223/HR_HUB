@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { DynamicObjectsPageInner } from '../dynamic-objects/page';
+import { DynamicObjectsPageInner } from '../dynamic-objects/DynamicObjectsPageInner';
 import shared from '../../../page-shared.module.css';
 
 export default function DynamicFactsPage() {

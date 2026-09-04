@@ -62,7 +62,7 @@
 }
 
 .switchOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .knob {
@@ -100,7 +100,7 @@
 
 .pickInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -161,7 +161,7 @@
 }
 
 .pickOpt input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .pickAll {
@@ -170,7 +170,7 @@
   border: none;
   border-top: 1px solid #e4e6ef;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   padding: 0.4rem;
   font: inherit;
   font-size: 0.78rem;
@@ -285,7 +285,7 @@
 }
 
 .check input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 @media (max-width: 720px) {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiDownload, apiFetch } from '@/lib/api';
+import { assertExcelImportFile } from '@/lib/parse-xlsx';
 import type { ScheduleKind } from './page';
 import styles from './form.module.css';
 
@@ -474,6 +475,7 @@ export function PositionScheduleForm({
     setError('');
     setOkMsg('');
     try {
+      assertExcelImportFile(file);
       const fd = new FormData();
       fd.append('file', file);
       if (docId) fd.append('documentId', docId);

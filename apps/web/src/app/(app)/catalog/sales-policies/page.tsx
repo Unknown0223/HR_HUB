@@ -8,7 +8,7 @@ import type { SalesRateRow } from '@/lib/sales-accruals';
 import form from '../../payroll/accruals/form.module.css';
 import list from '../absence-types/page.module.css';
 
-export function SalesRatesPage() {
+function SalesRatesPage() {
   const router = useRouter();
   const [rows, setRows] = useState<SalesRateRow[]>([]);
   const [error, setError] = useState('');

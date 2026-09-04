@@ -3,6 +3,7 @@
  * Sheets: data (row per employee/position) + metadata (shift definitions).
  */
 import ExcelJS from 'exceljs';
+import { loadExcelImportWorkbook, EXCEL_IMPORT_MAX_ROWS } from '../common/excel-import';
 
 const WEEKDAYS_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
@@ -157,8 +158,7 @@ export async function buildIndividualScheduleTemplateBuffer(opts: {
 export async function parseIndividualScheduleWorkbook(
   buffer: Buffer,
 ): Promise<ParsedVerifixSchedule> {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+  const wb = await loadExcelImportWorkbook(buffer);
 
   const dataSheet =
     wb.getWorksheet('data') ||
@@ -172,6 +172,7 @@ export async function parseIndividualScheduleWorkbook(
   if (metaSheet) {
     metaSheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
+      if (shifts.length >= 200) return;
       const code = cellText(row.getCell(1).value);
       if (!code || /^1\./.test(code)) return;
       const startTime = cellText(row.getCell(2).value);
@@ -210,6 +211,7 @@ export async function parseIndividualScheduleWorkbook(
 
     dataSheet.eachRow((row, rowNumber) => {
       if (rowNumber <= 2) return;
+      if (rows.length >= EXCEL_IMPORT_MAX_ROWS) return;
       const id = cellText(row.getCell(1).value);
       const staff = cellText(row.getCell(2).value);
       const employee = cellText(row.getCell(3).value);
