@@ -18,8 +18,8 @@ import { apiFetch, PageResult } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadCsv } from '@/lib/csv';
+import listStyles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
-import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -187,12 +187,6 @@ function PersonsPageInner() {
   }, [attachMode]);
 
   const selectedIds = useMemo(() => [...selected], [selected]);
-  const formOpen = mode === 'create' || mode === 'edit';
-  const listMode = mode === 'attach' ? 'attach' : 'list';
-
-  function closeForm() {
-    setMode(attachMode ? 'attach' : 'list');
-  }
 
   function openCreate() {
     setEditId(null);
@@ -428,9 +422,14 @@ function PersonsPageInner() {
     });
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="persons" />
+  const pageTitle =
+    mode === 'create'
+      ? 'Физическое лицо (создание)'
+      : mode === 'edit'
+        ? 'Физическое лицо (изменение)'
+        : mode === 'attach'
+          ? 'Физические лица (прикрепление)'
+          : 'Физические лица';
 
 
   const formOpen = mode === 'create' || mode === 'edit';
@@ -925,9 +924,7 @@ function PersonsPageInner() {
                           type="radio"
                           name="gender"
                           checked={form.gender === 'M'}
-                          onChange={() =>
-                            setForm((f) => ({ ...f, gender: 'M' }))
-                          }
+                          onChange={() => setForm((f) => ({ ...f, gender: 'M' }))}
                         />
                         Мужской
                       </label>
@@ -936,9 +933,7 @@ function PersonsPageInner() {
                           type="radio"
                           name="gender"
                           checked={form.gender === 'F'}
-                          onChange={() =>
-                            setForm((f) => ({ ...f, gender: 'F' }))
-                          }
+                          onChange={() => setForm((f) => ({ ...f, gender: 'F' }))}
                         />
                         Женский
                       </label>

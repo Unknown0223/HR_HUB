@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
-import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';

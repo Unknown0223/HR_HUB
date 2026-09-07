@@ -4,7 +4,6 @@ import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { FormModal } from '@/components/FormModal';
 import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiDownload, apiFetch, PageResult } from '@/lib/api';
@@ -81,10 +80,7 @@ function EmployeesPageInner() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [persons, setPersons] = useState<PersonOpt[]>([]);
   const [error, setError] = useState('');
-  const [modal, setModal] = useState<'none' | 'create' | 'attach' | 'import'>(
-    'none',
-  );
-  const closeModal = () => setModal('none');
+  const [panel, setPanel] = useState<'none' | 'create' | 'attach' | 'import'>('none');
   const [menuOpen, setMenuOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(
     () => Boolean(q || divisionId || positionId),
@@ -301,7 +297,7 @@ function EmployeesPageInner() {
         }),
       });
       form.reset();
-      closeModal();
+      setPanel('none');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed');
@@ -337,7 +333,7 @@ function EmployeesPageInner() {
         }),
       });
       form.reset();
-      closeModal();
+      setPanel('none');
       await load();
       await loadUnattachedPersons();
     } catch (err) {
@@ -349,7 +345,7 @@ function EmployeesPageInner() {
 
   function openAttach() {
     setMenuOpen(false);
-    setModal('attach');
+    setPanel('attach');
     void loadUnattachedPersons();
   }
 
@@ -398,7 +394,7 @@ function EmployeesPageInner() {
                   role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
-                    setModal('import');
+                    setPanel('import');
                   }}
                 >
                   Импортировать
@@ -440,6 +436,38 @@ function EmployeesPageInner() {
           },
         ]}
       />
+
+      {panel === 'import' ? (
+        <div className={styles.panel} style={{ marginBottom: '1rem' }}>
+          <div className={styles.rowActions} style={{ marginBottom: '0.65rem' }}>
+            <strong>Импорт сотрудников</strong>
+            <button
+              type="button"
+              className={styles.btnGhost}
+              onClick={() => setPanel('none')}
+            >
+              Закрыть
+            </button>
+          </div>
+          <ImportPanel
+            endpoint="/api/employees/import"
+            hint="Обязательные: tabNumber, firstName, lastName. Опционально: middleName, email, divisionCode, positionCode, baseSalary, employmentType (staff|gph), hireDate. Дубликат tabNumber пропускается."
+            templates={[
+              {
+                href: '/api/employees/import/template.csv',
+                label: 'Шаблон CSV',
+                filename: 'employees-import-template.csv',
+              },
+              {
+                href: '/api/employees/import/template.xlsx',
+                label: 'Шаблон Excel',
+                filename: 'employees-import-template.xlsx',
+              },
+            ]}
+            onDone={() => void load()}
+          />
+        </div>
+      ) : null}
 
       {selectedIds.length > 0 && tab !== 'dismissed' ? (
         <div className={styles.rowActions} style={{ marginBottom: '0.85rem' }}>
@@ -957,191 +985,6 @@ function EmployeesPageInner() {
           </button>
         </div>
       </div>
-
-      <FormModal
-        open={modal === 'create'}
-        title="Сотрудник (создание)"
-        width="lg"
-        onClose={closeModal}
-      >
-        <form className={styles.form} onSubmit={onCreate}>
-          <label>
-            Таб. номер <span className={styles.req}>*</span>
-            <input name="tabNumber" required />
-          </label>
-          <label>
-            Фамилия <span className={styles.req}>*</span>
-            <input name="lastName" required />
-          </label>
-          <label>
-            Имя <span className={styles.req}>*</span>
-            <input name="firstName" required />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" />
-          </label>
-          <label>
-            Подразделение
-            <select name="divisionId">
-              <option value="">—</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Должность
-            <select name="positionId">
-              <option value="">—</option>
-              {positions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Тип
-            <select name="employmentType" defaultValue="staff">
-              <option value="staff">Штат</option>
-              <option value="gph">ГПХ</option>
-            </select>
-          </label>
-          <label>
-            Face / external ID
-            <input name="externalId" placeholder="face-0003" />
-          </label>
-          <label>
-            Дата приёма
-            <input name="hiredAt" type="date" />
-          </label>
-          <div className={styles.formFooter}>
-            <button type="button" className={styles.btnGhost} onClick={closeModal}>
-              Отмена
-            </button>
-            <button className={styles.btn} type="submit" disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-          </div>
-        </form>
-      </FormModal>
-
-      <FormModal
-        open={modal === 'attach'}
-        title="Прикрепить физическое лицо"
-        width="lg"
-        onClose={closeModal}
-      >
-        <p className={styles.hint}>
-          Прикрепить существующее физическое лицо как сотрудника (таб. номер + орг.
-          данные).
-        </p>
-        <form className={styles.form} onSubmit={onAttach}>
-          <label>
-            Физическое лицо <span className={styles.req}>*</span>
-            <select name="personId" required defaultValue="">
-              <option value="" disabled>
-                — выберите —
-              </option>
-              {persons.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.lastName} {p.firstName}
-                  {p.middleName ? ` ${p.middleName}` : ''} ({genderLabel(p.gender)})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Таб. номер <span className={styles.req}>*</span>
-            <input name="tabNumber" required placeholder="0000000100" />
-          </label>
-          <label>
-            Подразделение
-            <select name="divisionId">
-              <option value="">—</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Должность
-            <select name="positionId">
-              <option value="">—</option>
-              {positions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Тип
-            <select name="employmentType" defaultValue="staff">
-              <option value="staff">Штат</option>
-              <option value="gph">ГПХ</option>
-            </select>
-          </label>
-          <label>
-            Дата приёма
-            <input name="hiredAt" type="date" />
-          </label>
-          <div className={styles.formFooter}>
-            <button type="button" className={styles.btnGhost} onClick={closeModal}>
-              Отмена
-            </button>
-            <button
-              className={styles.btn}
-              type="submit"
-              disabled={saving || persons.length === 0}
-            >
-              {saving ? 'Сохранение…' : 'Прикрепить'}
-            </button>
-          </div>
-        </form>
-        {persons.length === 0 ? (
-          <p className={styles.muted}>
-            Нет свободных физлиц.{' '}
-            <Link className={styles.link} href="/catalog/persons">
-              Создать в «Физические лица»
-            </Link>
-          </p>
-        ) : null}
-      </FormModal>
-
-      <FormModal
-        open={modal === 'import'}
-        title="Импорт сотрудников"
-        width="lg"
-        onClose={closeModal}
-      >
-        <ImportPanel
-          endpoint="/api/employees/import"
-          hint="Обязательные: tabNumber, firstName, lastName. Опционально: middleName, email, divisionCode, positionCode, baseSalary, employmentType (staff|gph), hireDate. Дубликат tabNumber пропускается."
-          templates={[
-            {
-              href: '/api/employees/import/template.csv',
-              label: 'Шаблон CSV',
-              filename: 'employees-import-template.csv',
-            },
-            {
-              href: '/api/employees/import/template.xlsx',
-              label: 'Шаблон Excel',
-              filename: 'employees-import-template.xlsx',
-            },
-          ]}
-          onDone={() => {
-            closeModal();
-            void load();
-          }}
-        />
-      </FormModal>
-
       {photos.node}
     </div>
   );

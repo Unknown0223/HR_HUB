@@ -1,9 +1,9 @@
 'use client';
 
-import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -16,7 +16,6 @@ import {
   CREATE_PRESETS,
   KIND_LABELS,
   STATUS_LABELS,
-  formPageTitle,
   type HrChangeKind,
 } from './kinds';
 
@@ -125,13 +124,6 @@ function HrRequestsInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [searchDraft, setSearchDraft] = useState(q);
   const [exportBusy, setExportBusy] = useState(false);
-  const [modal, setModal] = useState<null | {
-    mode: 'create' | 'edit';
-    id?: string;
-    kind?: HrChangeKind;
-  }>(null);
-
-  const closeModal = useCallback(() => setModal(null), []);
 
   const filtered = useMemo(() => {
     let list = rows;

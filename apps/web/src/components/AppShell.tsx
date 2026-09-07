@@ -61,35 +61,6 @@ function MegaLinkContent({
   );
 }
 
-function MegaLinkContent({
-  label,
-  faIcon,
-  iconAccent,
-  iconClass,
-  iconColoredClass,
-}: {
-  label: string;
-  faIcon?: string;
-  iconAccent?: string;
-  iconClass: string;
-  iconColoredClass: string;
-}) {
-  return (
-    <>
-      {faIcon ? (
-        <span
-          className={iconAccent ? `${iconClass} ${iconColoredClass}` : iconClass}
-          style={iconAccent ? { background: iconAccent } : undefined}
-          aria-hidden
-        >
-          <i className={`fas ${faIcon}`} />
-        </span>
-      ) : null}
-      <span>{label}</span>
-    </>
-  );
-}
-
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();

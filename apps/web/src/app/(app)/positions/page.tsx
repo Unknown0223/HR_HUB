@@ -238,11 +238,7 @@ function PositionsPageInner() {
       if (statusF === 'active' && !g.isActive) return false;
       if (statusF === 'inactive' && g.isActive) return false;
       if (!q) return true;
-      return [g.code, g.name]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(q);
+      return [g.code, g.name].filter(Boolean).join(' ').toLowerCase().includes(q);
     });
   }, [groups, search, filters]);
 
@@ -476,7 +472,53 @@ function PositionsPageInner() {
             urlSync
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
-            fields={filterFields}
+            fields={
+              tab === 'positions'
+                ? [
+                    { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+                    { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                    {
+                      type: 'select',
+                      key: 'groupId',
+                      label: 'Группа должностей',
+                      options: groupFilterOptions,
+                    },
+                    {
+                      type: 'text',
+                      key: 'createdBy',
+                      label: 'Создал',
+                      placeholder: 'Поиск...',
+                    },
+                    {
+                      type: 'dateRange',
+                      fromKey: 'from',
+                      toKey: 'to',
+                      label: 'Дата создания',
+                    },
+                    {
+                      type: 'select',
+                      key: 'status',
+                      label: 'Статус',
+                      options: [
+                        { value: 'active', label: 'Активный' },
+                        { value: 'inactive', label: 'Неактивный' },
+                      ],
+                    },
+                  ]
+                : [
+                    { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+                    { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                    {
+                      type: 'select',
+                      key: 'status',
+                      label: 'Статус',
+                      options: [
+                        { value: 'active', label: 'Активный' },
+                        { value: 'inactive', label: 'Неактивный' },
+                      ],
+                    },
+                  ]
+            }
           />
         </div>
 

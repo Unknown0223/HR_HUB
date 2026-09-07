@@ -497,9 +497,6 @@ function DivisionsPageInner() {
   const [groupActive, setGroupActive] = useState(true);
   const exportRef = useRef<HTMLDivElement>(null);
 
-  const closeModal = useCallback(() => setModal(null), []);
-
-
   async function load() {
     try {
       const [t, d, g] = await Promise.all([
@@ -873,53 +870,6 @@ function DivisionsPageInner() {
     return d.toLocaleString('ru-RU');
   }
 
-  const filterFields =
-    tab === 'divisions'
-      ? [
-          { type: 'text' as const, key: 'code', label: 'Код', placeholder: 'Поиск...' },
-          { type: 'text' as const, key: 'name', label: 'Название', placeholder: 'Поиск...' },
-          {
-            type: 'select' as const,
-            key: 'groupId',
-            label: 'Группа подразделений',
-            options: groupFilterOptions,
-          },
-          {
-            type: 'text' as const,
-            key: 'createdBy',
-            label: 'Создал',
-            placeholder: 'Поиск...',
-          },
-          {
-            type: 'dateRange' as const,
-            fromKey: 'from',
-            toKey: 'to',
-            label: 'Дата создания',
-          },
-          {
-            type: 'select' as const,
-            key: 'status',
-            label: 'Статус',
-            options: [
-              { value: 'active', label: 'Активный' },
-              { value: 'inactive', label: 'Неактивный' },
-            ],
-          },
-        ]
-      : [
-          { type: 'text' as const, key: 'code', label: 'Код', placeholder: 'Поиск...' },
-          { type: 'text' as const, key: 'name', label: 'Название', placeholder: 'Поиск...' },
-          {
-            type: 'select' as const,
-            key: 'status',
-            label: 'Статус',
-            options: [
-              { value: 'active', label: 'Активный' },
-              { value: 'inactive', label: 'Неактивный' },
-            ],
-          },
-        ];
-
   return (
     <div className={list.wrap}>
       <PageSubnav groupKey={subnavKey} />
@@ -963,18 +913,10 @@ function DivisionsPageInner() {
               </button>
               {exportOpen ? (
                 <div className={list.exportMenu} role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => void exportOrg('xlsx')}
-                  >
+                  <button type="button" role="menuitem" onClick={() => void exportOrg('xlsx')}>
                     Excel
                   </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => void exportOrg('csv')}
-                  >
+                  <button type="button" role="menuitem" onClick={() => void exportOrg('csv')}>
                     CSV
                   </button>
                 </div>
@@ -1011,7 +953,53 @@ function DivisionsPageInner() {
               urlSync
               open={filtersOpen}
               onToggle={() => setFiltersOpen((v) => !v)}
-              fields={filterFields}
+              fields={
+                tab === 'divisions'
+                  ? [
+                      { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+                      { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                      {
+                        type: 'select',
+                        key: 'groupId',
+                        label: 'Группа подразделений',
+                        options: groupFilterOptions,
+                      },
+                      {
+                        type: 'text',
+                        key: 'createdBy',
+                        label: 'Создал',
+                        placeholder: 'Поиск...',
+                      },
+                      {
+                        type: 'dateRange',
+                        fromKey: 'from',
+                        toKey: 'to',
+                        label: 'Дата создания',
+                      },
+                      {
+                        type: 'select',
+                        key: 'status',
+                        label: 'Статус',
+                        options: [
+                          { value: 'active', label: 'Активный' },
+                          { value: 'inactive', label: 'Неактивный' },
+                        ],
+                      },
+                    ]
+                  : [
+                      { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+                      { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                      {
+                        type: 'select',
+                        key: 'status',
+                        label: 'Статус',
+                        options: [
+                          { value: 'active', label: 'Активный' },
+                          { value: 'inactive', label: 'Неактивный' },
+                        ],
+                      },
+                    ]
+              }
             />
           ) : null}
         </div>
@@ -1143,18 +1131,14 @@ function DivisionsPageInner() {
             <div className={chart.modeSwitch}>
               <button
                 type="button"
-                className={
-                  chartMode === 'focus' ? chart.modeBtnActive : chart.modeBtn
-                }
+                className={chartMode === 'focus' ? chart.modeBtnActive : chart.modeBtn}
                 onClick={() => setChartMode('focus')}
               >
                 Ветка
               </button>
               <button
                 type="button"
-                className={
-                  chartMode === 'full' ? chart.modeBtnActive : chart.modeBtn
-                }
+                className={chartMode === 'full' ? chart.modeBtnActive : chart.modeBtn}
                 onClick={() => setChartMode('full')}
               >
                 Вся схема

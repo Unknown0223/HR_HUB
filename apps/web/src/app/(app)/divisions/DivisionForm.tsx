@@ -349,27 +349,28 @@ export function DivisionForm({
     <div className={styles.wrap}>
       <PageSubnav groupKey="division-form" titleOverride={pageTitle} />
 
-  const form = (
       <form onSubmit={onSave} className={styles.card}>
         <div className={styles.actions}>
           <button type="submit" className={styles.primary} disabled={saving}>
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
-          <button type="button" className={styles.secondary} onClick={goBack}>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() =>
+              router.push(
+                mode === 'edit' && divisionId
+                  ? `/divisions/${divisionId}`
+                  : '/divisions?tab=divisions',
+              )
+            }
+          >
             Закрыть
           </button>
         </div>
 
         {fields}
       </form>
-  );
-
-  if (embedded) return form;
-
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="division-form" titleOverride={pageTitle} />
-      {form}
     </div>
   );
 }
