@@ -23,13 +23,21 @@ export type PageResult<T> = {
 };
 
 const SESSION_KEY = 'hrhub_session';
-/** JWT for <img src> media (?access_token=) — cookie is httpOnly and may miss on cross-origin img. */
+/**
+ * JWT for API Authorization + <img src>?access_token=.
+ * Cookie (httpOnly) is preferred when same-site; on Railway web/api are
+ * cross-origin and third-party cookies are often blocked — keep a JS-readable
+ * copy so Bearer auth still works.
+ */
 const MEDIA_TOKEN_KEY = 'hrhub_media_at';
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return sessionStorage.getItem(MEDIA_TOKEN_KEY);
+    return (
+      sessionStorage.getItem(MEDIA_TOKEN_KEY) ||
+      localStorage.getItem(MEDIA_TOKEN_KEY)
+    );
   } catch {
     return null;
   }
@@ -38,8 +46,13 @@ export function getAccessToken(): string | null {
 export function setMediaAccessToken(token: string | null) {
   if (typeof window === 'undefined') return;
   try {
-    if (!token) sessionStorage.removeItem(MEDIA_TOKEN_KEY);
-    else sessionStorage.setItem(MEDIA_TOKEN_KEY, token);
+    if (!token) {
+      sessionStorage.removeItem(MEDIA_TOKEN_KEY);
+      localStorage.removeItem(MEDIA_TOKEN_KEY);
+    } else {
+      sessionStorage.setItem(MEDIA_TOKEN_KEY, token);
+      localStorage.setItem(MEDIA_TOKEN_KEY, token);
+    }
   } catch {
     /* ignore */
   }
@@ -67,20 +80,11 @@ export function setSession(session: Session | null) {
   if (typeof window === 'undefined') return;
   if (!session) {
     localStorage.removeItem(SESSION_KEY);
-    try {
-      sessionStorage.removeItem(MEDIA_TOKEN_KEY);
-    } catch {
-      /* ignore */
-    }
+    setMediaAccessToken(null);
     return;
   }
   if (session.accessToken) {
-    try {
-      sessionStorage.setItem(MEDIA_TOKEN_KEY, session.accessToken);
-      window.dispatchEvent(new Event('hrhub-media-token'));
-    } catch {
-      /* ignore */
-    }
+    setMediaAccessToken(session.accessToken);
   }
   localStorage.setItem(
     SESSION_KEY,
@@ -91,6 +95,10 @@ export function setSession(session: Session | null) {
 function authHeaders(extra?: HeadersInit, tenantIdOverride?: string | null): Headers {
   const session = getSession();
   const headers = new Headers(extra);
+  const token = getAccessToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
   const tenantId =
     tenantIdOverride ?? session?.tenant?.id ?? session?.user.tenantId;
   if (tenantId) headers.set('X-Tenant-Id', tenantId);

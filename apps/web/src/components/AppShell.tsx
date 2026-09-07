@@ -127,13 +127,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       return;
     }
     setLocal(s);
-    // Hydrate JWT for <img src> storage URLs (cookie is httpOnly)
+    // Hydrate JWT for API Bearer + <img> when cross-origin cookie is blocked
     if (!getAccessToken()) {
       void apiFetch<{ accessToken: string }>('/api/auth/media-token')
         .then((r) => {
           if (r?.accessToken) setMediaAccessToken(r.accessToken);
         })
-        .catch(() => undefined);
+        .catch(() => {
+          // Cookie unavailable (common on Railway web≠api hosts) — force re-login
+          setSession(null);
+          router.replace('/');
+        });
     }
   }, [router]);
 
