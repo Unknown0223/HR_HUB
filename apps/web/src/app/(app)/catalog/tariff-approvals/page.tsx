@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -26,8 +27,18 @@ type Approval = {
   status: string;
   createdAt?: string;
   tariffGroupId: string;
-  tariffGroup?: { id: string; name: string; fullName?: string | null; baseRate?: string | number } | null;
+  tariffGroup?: {
+    id: string;
+    name: string;
+    fullName?: string | null;
+    baseRate?: string | number;
+  } | null;
 };
+
+type ModalState =
+  | null
+  | { mode: 'create' }
+  | { mode: 'edit' | 'view'; id: string };
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -40,7 +51,10 @@ function fmtMoney(v?: string | number | null) {
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return String(v);
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return n.toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }
 
 function statusLabel(s: string) {
@@ -79,7 +93,9 @@ function ApprovalsInner() {
     try {
       const [data, lookups] = await Promise.all([
         apiFetch<Approval[]>('/api/catalog/tariff-approvals'),
-        apiFetch<{ tariffGroups?: { id: string; label: string }[] }>('/api/catalog/lookups'),
+        apiFetch<{ tariffGroups?: { id: string; label: string }[] }>(
+          '/api/catalog/lookups',
+        ),
       ]);
       setRows(Array.isArray(data) ? data : []);
       setGroups(lookups.tariffGroups || []);
@@ -137,8 +153,10 @@ function ApprovalsInner() {
     if (to) to.setHours(23, 59, 59, 999);
 
     return rows.filter((r) => {
-      if (numF && !(r.documentNumber || '').toLowerCase().includes(numF)) return false;
-      if (groupF && r.tariffGroupId !== groupF && r.tariffGroup?.id !== groupF) return false;
+      if (numF && !(r.documentNumber || '').toLowerCase().includes(numF))
+        return false;
+      if (groupF && r.tariffGroupId !== groupF && r.tariffGroup?.id !== groupF)
+        return false;
       if (statusF && r.status !== statusF) return false;
       const dateVal = r.documentDate || r.createdAt;
       if (from || to) {
@@ -197,7 +215,9 @@ function ApprovalsInner() {
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`/api/catalog/tariff-approvals/${row.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/catalog/tariff-approvals/${row.id}`, {
+        method: 'DELETE',
+      });
       setSelectedId(null);
       dropChecked(row.id);
       await load();
@@ -212,7 +232,9 @@ function ApprovalsInner() {
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`/api/catalog/tariff-approvals/${row.id}/post`, { method: 'POST' });
+      await apiFetch(`/api/catalog/tariff-approvals/${row.id}/post`, {
+        method: 'POST',
+      });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка проведения');

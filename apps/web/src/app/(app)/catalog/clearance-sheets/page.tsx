@@ -3,6 +3,7 @@
 import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { confirm } from '@/lib/dialogs';
@@ -83,8 +84,6 @@ function statusClass(status: string) {
 }
 
 function ClearanceSheetsPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
   const q = filters.q;
   const statusFilter = filters.status;
@@ -108,7 +107,7 @@ function ClearanceSheetsPageInner() {
 
   const filtered = useMemo(() => {
     let list = rows;
-    const qq = q.trim().toLowerCase();
+    const qq = (search || q).trim().toLowerCase();
     if (qq) {
       list = list.filter((r) => {
         const blob = [
@@ -137,7 +136,7 @@ function ClearanceSheetsPageInner() {
       list = list.filter((r) => new Date(r.documentDate || r.createdAt).getTime() <= t);
     }
     return list;
-  }, [rows, q, statusFilter, employeeIdFilter, from, to]);
+  }, [rows, search, q, statusFilter, employeeIdFilter, from, to]);
 
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
@@ -382,6 +381,7 @@ function ClearanceSheetsPageInner() {
           </button>
           <FilterPanel
             inline
+            urlSync
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[

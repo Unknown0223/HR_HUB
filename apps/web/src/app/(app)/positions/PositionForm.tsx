@@ -396,22 +396,27 @@ export function PositionForm({
     <div className={styles.wrap}>
       <PageSubnav groupKey="position-form" titleOverride={pageTitle} />
 
+  const form = (
       <form onSubmit={onSave} className={styles.cardWide}>
         <div className={styles.actions}>
           <button type="submit" className={styles.primary} disabled={saving}>
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => router.push('/positions?tab=positions')}
-          >
+          <button type="button" className={styles.secondary} onClick={goBack}>
             Закрыть
           </button>
         </div>
 
         {fields}
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="position-form" titleOverride={pageTitle} />
+      {form}
     </div>
   );
 }

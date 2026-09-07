@@ -37,9 +37,15 @@ type TemplateRow = {
 export function ClearanceTemplateForm({
   mode,
   templateId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit';
   templateId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -120,6 +126,11 @@ export function ClearanceTemplateForm({
     };
   }, [mode, templateId]);
 
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/clearance-templates');
+  }
+
   async function onSave(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -137,14 +148,14 @@ export function ClearanceTemplateForm({
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        router.push('/catalog/clearance-templates');
       } else {
         await apiFetch('/api/catalog/clearance-templates', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        router.push('/catalog/clearance-templates');
       }
+      if (onSuccess) onSuccess();
+      else router.push('/catalog/clearance-templates');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -169,6 +180,7 @@ export function ClearanceTemplateForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="clearance-templates" />
@@ -177,148 +189,157 @@ export function ClearanceTemplateForm({
     );
   }
 
+  const form = (
+    <form onSubmit={onSave} className={embedded ? styles.formEmbedded : styles.form}>
+      <div className={styles.docHead}>
+        {!embedded ? <h2 className={styles.docTitle}>{pageTitle}</h2> : null}
+        <div className={styles.docActions}>
+          <button type="submit" className={styles.primary} disabled={saving}>
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <button type="button" className={styles.secondary} onClick={goBack}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.card}>
+        <div className={styles.grid2}>
+          <label>
+            Подразделение
+            <select value={divisionId} onChange={(e) => setDivisionId(e.target.value)}>
+              <option value="">Поиск...</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Должность
+            <select value={positionId} onChange={(e) => setPositionId(e.target.value)}>
+              <option value="">Поиск...</option>
+              {positions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className={styles.checkRow}>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={requireManagerSign}
+              onChange={(e) => setRequireManagerSign(e.target.checked)}
+            />
+            Руководитель
+          </label>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={requireHigherManagerSign}
+              onChange={(e) => setRequireHigherManagerSign(e.target.checked)}
+            />
+            Вышестоящий руководитель
+          </label>
+        </div>
+
+        <div className={styles.linesHead}>
+          <div className={styles.linesActions}>
+            <button type="button" className={styles.ghost} onClick={() => setPickOpen(true)}>
+              Создать
+            </button>
+            {selectedKeys.length > 0 ? (
+              <button type="button" className={styles.danger} onClick={removeSelected}>
+                Удалить
+              </button>
+            ) : null}
+          </div>
+          <input
+            className={styles.lineSearch}
+            placeholder="Поиск"
+            value={lineSearch}
+            onChange={(e) => setLineSearch(e.target.value)}
+          />
+          <span className={styles.pagerMeta}>
+            {filteredEmployees.length} / {employeeIds.length}
+          </span>
+        </div>
+
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.checkCol} />
+                <th>Сотрудники</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEmployees.length === 0 ? (
+                <tr>
+                  <td colSpan={2} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : (
+                filteredEmployees.map((id) => {
+                  const checked = selectedKeys.includes(id);
+                  return (
+                    <tr key={id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setSelectedKeys((prev) =>
+                              checked ? prev.filter((x) => x !== id) : [...prev, id],
+                            )
+                          }
+                        />
+                      </td>
+                      <td>{empMap.get(id)?.label || id}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </form>
+  );
+
+  const pickModal = pickOpen ? (
+    <EmployeePickModal
+      title="Сотрудники"
+      confirmText="Добавить"
+      items={toPickItems(employees)}
+      excludeIds={employeeIds}
+      onClose={() => setPickOpen(false)}
+      onConfirm={addPicked}
+    />
+  ) : null;
+
+  if (embedded) {
+    return (
+      <>
+        {form}
+        {pickModal}
+      </>
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="clearance-templates" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave}>
-        <div className={styles.docHead}>
-          <h2 className={styles.docTitle}>{pageTitle}</h2>
-          <div className={styles.docActions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => router.push('/catalog/clearance-templates')}
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.card}>
-          <div className={styles.grid2}>
-            <label>
-              Подразделение
-              <select value={divisionId} onChange={(e) => setDivisionId(e.target.value)}>
-                <option value="">Поиск...</option>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Должность
-              <select value={positionId} onChange={(e) => setPositionId(e.target.value)}>
-                <option value="">Поиск...</option>
-                {positions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className={styles.checkRow}>
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                checked={requireManagerSign}
-                onChange={(e) => setRequireManagerSign(e.target.checked)}
-              />
-              Руководитель
-            </label>
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                checked={requireHigherManagerSign}
-                onChange={(e) => setRequireHigherManagerSign(e.target.checked)}
-              />
-              Вышестоящий руководитель
-            </label>
-          </div>
-
-          <div className={styles.linesHead}>
-            <div className={styles.linesActions}>
-              <button type="button" className={styles.ghost} onClick={() => setPickOpen(true)}>
-                Создать
-              </button>
-              {selectedKeys.length > 0 ? (
-                <button type="button" className={styles.danger} onClick={removeSelected}>
-                  Удалить
-                </button>
-              ) : null}
-            </div>
-            <input
-              className={styles.lineSearch}
-              placeholder="Поиск"
-              value={lineSearch}
-              onChange={(e) => setLineSearch(e.target.value)}
-            />
-            <span className={styles.pagerMeta}>
-              {filteredEmployees.length} / {employeeIds.length}
-            </span>
-          </div>
-
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.checkCol} />
-                  <th>Сотрудники</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEmployees.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className={styles.empty}>
-                      Нет данных
-                    </td>
-                  </tr>
-                ) : (
-                  filteredEmployees.map((id) => {
-                    const checked = selectedKeys.includes(id);
-                    return (
-                      <tr key={id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() =>
-                              setSelectedKeys((prev) =>
-                                checked ? prev.filter((x) => x !== id) : [...prev, id],
-                              )
-                            }
-                          />
-                        </td>
-                        <td>{empMap.get(id)?.label || id}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </form>
-
-      {pickOpen ? (
-        <EmployeePickModal
-          title="Сотрудники"
-          confirmText="Добавить"
-          items={toPickItems(employees)}
-          excludeIds={employeeIds}
-          onClose={() => setPickOpen(false)}
-          onConfirm={addPicked}
-        />
-      ) : null}
+      {form}
+      {pickModal}
     </div>
   );
 }

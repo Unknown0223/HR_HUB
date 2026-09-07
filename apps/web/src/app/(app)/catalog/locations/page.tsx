@@ -396,7 +396,7 @@ function LocationsInner() {
   }, [rows]);
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.page}>
       <PageSubnav groupKey="locations" />
 
       <div className={shared.pageHeader}>

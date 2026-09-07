@@ -81,6 +81,15 @@ function IncidentTypesInner() {
     });
   }
 
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allChecked =
+    filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const someChecked = filtered.some((r) => checked[r.id]) && !allChecked;
+
   async function load() {
     setLoading(true);
     setError('');

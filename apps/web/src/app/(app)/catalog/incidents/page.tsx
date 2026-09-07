@@ -693,6 +693,27 @@ function IncidentsInner() {
           </div>
         </div>
       </div>
+
+      <FormModal
+        open={modal !== null}
+        title={modal?.mode === 'edit' ? 'Инцидент (изменение)' : 'Инцидент (создание)'}
+        width="xl"
+        onClose={closeModal}
+      >
+        {modal ? (
+          <IncidentForm
+            key={modal.mode === 'edit' ? modal.id : 'create'}
+            mode={modal.mode}
+            incidentId={modal.id}
+            embedded
+            onSuccess={() => {
+              closeModal();
+              void load();
+            }}
+            onCancel={closeModal}
+          />
+        ) : null}
+      </FormModal>
     </div>
   );
 }

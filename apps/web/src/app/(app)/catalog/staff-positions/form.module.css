@@ -22,6 +22,14 @@
   gap: 0.75rem;
 }
 
+.formEmbedded {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: none;
+  width: 100%;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

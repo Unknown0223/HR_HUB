@@ -65,13 +65,19 @@ function emptyLine(): Line {
 export function TariffApprovalForm({
   mode,
   approvalId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit' | 'view';
   approvalId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const forceEdit = searchParams.get('edit') === '1';
+  const forceEdit = !embedded && searchParams.get('edit') === '1';
   const [loading, setLoading] = useState(mode !== 'create');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -259,12 +265,18 @@ export function TariffApprovalForm({
       if (andPost && id) {
         await apiFetch(`/api/catalog/tariff-approvals/${id}/post`, { method: 'POST' });
       }
-      router.push('/catalog/tariff-approvals');
+      if (onSuccess) onSuccess();
+      else router.push('/catalog/tariff-approvals');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
       setSaving(false);
     }
+  }
+
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/tariff-approvals');
   }
 
   function onSave(e: FormEvent) {
@@ -274,6 +286,7 @@ export function TariffApprovalForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="tariff-approvals" titleOverride={pageTitle} />
@@ -286,11 +299,11 @@ export function TariffApprovalForm({
   const groupInvalid = touched && !tariffGroupId;
   const effectiveInvalid = touched && !effectiveAt;
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="tariff-approvals" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave} className={styles.form}>
+  const form = (
+      <form
+        onSubmit={onSave}
+        className={embedded ? styles.formEmbedded : styles.form}
+      >
         <div className={styles.actions}>
           {!readOnly ? (
             <>
@@ -310,7 +323,7 @@ export function TariffApprovalForm({
           <button
             type="button"
             className={styles.secondary}
-            onClick={() => router.push('/catalog/tariff-approvals')}
+            onClick={goBack}
           >
             Закрыть
           </button>
@@ -570,6 +583,14 @@ export function TariffApprovalForm({
           </div>
         </div>
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="tariff-approvals" titleOverride={pageTitle} />
+      {form}
     </div>
   );
 }

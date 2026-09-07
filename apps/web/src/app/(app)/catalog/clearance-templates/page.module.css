@@ -165,8 +165,41 @@
   color: var(--accent);
 }
 
-.pagerBtn:disabled {
-  opacity: 0.4;
+.bulkMeta {
+  font-size: 13px;
+  color: var(--ink-700);
+  margin-right: 4px;
+}
+
+.bulkMeta strong {
+  color: var(--ink-950);
+  font-variant-numeric: tabular-nums;
+}
+
+.bulkBtn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-700);
+  font-size: 12.5px;
+  font-weight: 700;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulkBtn:hover:not(:disabled) {
+  border-color: rgba(10, 133, 226, 0.4);
+  color: var(--accent);
+  background: #fff;
+}
+
+.bulkBtn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 

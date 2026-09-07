@@ -115,12 +115,22 @@ type FormProps = {
   mode: 'create' | 'edit';
   requestId?: string;
   kindDefault?: HrChangeKind;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
-function HrChangeRequestFormInner({ mode, requestId, kindDefault }: FormProps) {
+function HrChangeRequestFormInner({
+  mode,
+  requestId,
+  kindDefault,
+  embedded,
+  onSuccess,
+  onCancel,
+}: FormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const kindFromQuery = (searchParams.get('kind') || kindDefault || 'open_position') as HrChangeKind;
+  const kindFromQuery = (kindDefault || searchParams.get('kind') || 'open_position') as HrChangeKind;
 
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
@@ -275,8 +285,11 @@ function HrChangeRequestFormInner({ mode, requestId, kindDefault }: FormProps) {
         setDocId(created.id);
         setNumber(created.number || '');
         setStatus(created.status || 'draft');
-        router.replace(`/catalog/hr-requests/${created.id}`);
+        if (!embedded) {
+          router.replace(`/catalog/hr-requests/${created.id}`);
+        }
       }
+      if (onSuccess) onSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -285,7 +298,8 @@ function HrChangeRequestFormInner({ mode, requestId, kindDefault }: FormProps) {
   }
 
   function close() {
-    router.push('/catalog/hr-requests');
+    if (onCancel) onCancel();
+    else router.push('/catalog/hr-requests');
   }
 
   const filteredLines = useMemo(() => {
@@ -311,6 +325,7 @@ function HrChangeRequestFormInner({ mode, requestId, kindDefault }: FormProps) {
   );
 
   if (loading) {
+    if (embedded) return <p className={styles.muted}>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav
@@ -322,10 +337,8 @@ function HrChangeRequestFormInner({ mode, requestId, kindDefault }: FormProps) {
     );
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav group={{ title: pageTitle, siblings: [] }} titleOverride={pageTitle} />
-
+  const body = (
+    <>
       <div className={styles.docHead}>
         <div className={styles.docActions}>
           {!readOnly ? (
@@ -921,6 +934,15 @@ function HrChangeRequestFormInner({ mode, requestId, kindDefault }: FormProps) {
           </>
         ) : null}
       </div>
+    </>
+  );
+
+  if (embedded) return <div className={styles.wrap}>{body}</div>;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav group={{ title: pageTitle, siblings: [] }} titleOverride={pageTitle} />
+      {body}
     </div>
   );
 }

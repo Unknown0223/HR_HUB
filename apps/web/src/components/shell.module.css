@@ -935,6 +935,36 @@
   color: #fff;
 }
 
+.megaLinkIcon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(10, 133, 226, 0.22);
+  color: #7dd3fc;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.megaLinkIconColored {
+  color: #fff !important;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.5);
+}
+
+.megaLink:hover .megaLinkIcon:not(.megaLinkIconColored),
+.megaLinkActive .megaLinkIcon:not(.megaLinkIconColored) {
+  background: rgba(10, 133, 226, 0.4);
+  color: #fff;
+}
+
+.megaLink:hover .megaLinkIconColored,
+.megaLinkActive .megaLinkIconColored {
+  filter: brightness(1.08);
+  color: #fff;
+}
+
 .megaLink:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;

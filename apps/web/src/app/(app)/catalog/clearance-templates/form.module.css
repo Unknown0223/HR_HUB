@@ -16,6 +16,18 @@
   }
 }
 
+.form,
+.formEmbedded {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.formEmbedded {
+  max-width: none;
+  width: 100%;
+}
+
 .docHead {
   display: flex;
   flex-wrap: wrap;
@@ -28,7 +40,7 @@
   margin: 0;
   font-size: 1.15rem;
   font-weight: 650;
-  color: #111827;
+  color: #14213a;
 }
 
 .docActions {
@@ -54,8 +66,12 @@
 
 .primary {
   border: none;
-  background: #2563eb;
+  background: #0a85e2;
   color: #fff;
+}
+
+.primary:hover:not(:disabled) {
+  background: #187de4;
 }
 
 .primary:disabled {
@@ -213,7 +229,7 @@
 .switchLabel input[type='checkbox'] {
   width: 1.05rem;
   height: 1.05rem;
-  accent-color: #0d9488;
+  accent-color: #0a85e2;
 }
 
 .periodRow {
@@ -443,7 +459,7 @@
 .check input {
   width: 1.05rem;
   height: 1.05rem;
-  accent-color: #0d9488;
+  accent-color: #0a85e2;
 }
 
 .linesHead {

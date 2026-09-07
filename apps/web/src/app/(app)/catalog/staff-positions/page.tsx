@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -102,7 +103,9 @@ function StaffPositionsInner() {
     try {
       const [data, lookups] = await Promise.all([
         apiFetch<StaffPos[]>('/api/catalog/staff-positions'),
-        apiFetch<{ divisions?: Opt[]; positions?: Opt[] }>('/api/catalog/lookups'),
+        apiFetch<{ divisions?: Opt[]; positions?: Opt[] }>(
+          '/api/catalog/lookups',
+        ),
       ]);
       setRows(Array.isArray(data) ? data : []);
       setDivisions(lookups.divisions || []);
@@ -230,7 +233,9 @@ function StaffPositionsInner() {
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`/api/catalog/staff-positions/${row.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/catalog/staff-positions/${row.id}`, {
+        method: 'DELETE',
+      });
       setSelectedId(null);
       setChecked((prev) => {
         const next = { ...prev };
@@ -402,13 +407,19 @@ function StaffPositionsInner() {
                 type: 'select',
                 key: 'divisionId',
                 label: 'Подразделение',
-                options: divisions.map((d) => ({ value: d.id, label: d.label })),
+                options: divisions.map((d) => ({
+                  value: d.id,
+                  label: d.label,
+                })),
               },
               {
                 type: 'select',
                 key: 'positionId',
                 label: 'Должность',
-                options: positions.map((p) => ({ value: p.id, label: p.label })),
+                options: positions.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                })),
               },
               {
                 type: 'dateRange',

@@ -199,14 +199,40 @@
   color: var(--accent);
 }
 
-.toolBtn:disabled,
-.exportBtn:disabled {
-  opacity: 0.45;
+.iconBtn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .exportWrap {
   position: relative;
+}
+
+.exportBtn {
+  appearance: none;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 0 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exportBtn:hover:not(:disabled) {
+  background: var(--surface-subtle);
+  color: var(--accent);
+}
+
+.exportBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .exportMenu {

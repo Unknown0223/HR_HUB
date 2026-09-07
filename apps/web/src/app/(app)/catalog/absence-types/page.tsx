@@ -6,12 +6,15 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { AbsenceTypeFormModal } from './AbsenceTypeFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
+import { AbsenceTypeForm } from './AbsenceTypeForm';
 
 type TimeTypeRef = { id: string; code: string; name: string };
 
@@ -160,7 +163,7 @@ function AbsenceTypesPageInner() {
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   useEffect(() => {

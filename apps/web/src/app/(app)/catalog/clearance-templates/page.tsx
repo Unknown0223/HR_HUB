@@ -34,14 +34,10 @@ function yesNo(v: boolean) {
 }
 
 function ClearanceTemplatesInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const q = searchParams.get('q') || '';
-
   const [rows, setRows] = useState<TemplateRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [searchDraft, setSearchDraft] = useState(q);
+  const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -52,7 +48,7 @@ function ClearanceTemplatesInner() {
   const [pageSize, setPageSize] = useState<number>(50);
 
   const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
+    const qq = search.trim().toLowerCase();
     if (!qq) return rows;
     return rows.filter((r) => {
       const blob = [r.name, r.code, r.division?.name, r.position?.name]
@@ -61,7 +57,15 @@ function ClearanceTemplatesInner() {
         .toLowerCase();
       return blob.includes(qq);
     });
-  }, [rows, q]);
+  }, [rows, search]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const someChecked = filtered.some((r) => checked[r.id]) && !allChecked;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = useMemo(
@@ -255,6 +259,11 @@ function ClearanceTemplatesInner() {
       setExportBusy(false);
     }
   }
+
+  const modalTitle =
+    modal?.mode === 'edit'
+      ? 'Шаблон обходного листа (изменение)'
+      : 'Шаблон обходного листа (создание)';
 
   return (
     <div className={styles.wrap}>

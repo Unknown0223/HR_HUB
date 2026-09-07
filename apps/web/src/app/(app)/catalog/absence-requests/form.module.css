@@ -54,7 +54,7 @@
 }
 
 .btnStatus {
-  background: #0d9488;
+  background: #0a85e2;
 }
 
 .btnClose {
@@ -113,7 +113,7 @@
 .ok {
   margin: 0;
   padding: 0.45rem 0.7rem;
-  color: #0d9488;
+  color: #0a85e2;
   background: #ecfdf5;
   border-radius: 4px;
 }
@@ -278,7 +278,7 @@
 
 .badgeOk {
   background: #d1fadf;
-  color: #0d9488;
+  color: #0a85e2;
 }
 
 .badgePending {

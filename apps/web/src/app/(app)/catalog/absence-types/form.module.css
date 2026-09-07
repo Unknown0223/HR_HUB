@@ -12,6 +12,10 @@
   flex-wrap: wrap;
 }
 
+.topBarEmbedded {
+  justify-content: flex-end;
+}
+
 .title {
   margin: 0;
   font-size: 1.05rem;
@@ -41,6 +45,7 @@
 }
 
 .btnClose {
+  appearance: none;
   border: 1px solid #d1d5db;
   background: #fff;
   color: #0a85e2;
@@ -52,6 +57,7 @@
   padding: 0.5rem 1.05rem;
   border-radius: 4px;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .error {
@@ -65,8 +71,8 @@
 .ok {
   margin: 0;
   padding: 0.45rem 0.7rem;
-  color: #0d9488;
-  background: #ecfdf5;
+  color: #0a85e2;
+  background: #eef6ff;
   border-radius: 4px;
 }
 
@@ -306,8 +312,8 @@ a.sideLink:hover {
 }
 
 .badgeOk {
-  background: #d1fadf;
-  color: #0d9488;
+  background: #e1f0ff;
+  color: #0a85e2;
 }
 
 .badgeMuted {

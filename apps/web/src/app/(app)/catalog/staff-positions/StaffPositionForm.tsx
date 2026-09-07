@@ -50,9 +50,15 @@ function toInputDate(iso?: string | null) {
 export function StaffPositionForm({
   mode,
   staffPositionId,
+  embedded,
+  onSuccess,
+  onCancel,
 }: {
   mode: 'create' | 'edit' | 'view';
   staffPositionId?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const readOnly = mode === 'view';
@@ -247,7 +253,8 @@ export function StaffPositionForm({
           body: JSON.stringify(body),
         });
       }
-      router.push('/catalog/staff-positions');
+      if (onSuccess) onSuccess();
+      else router.push('/catalog/staff-positions');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -351,6 +358,7 @@ export function StaffPositionForm({
   }
 
   if (loading) {
+    if (embedded) return <p>Загрузка…</p>;
     return (
       <div className={styles.wrap}>
         <PageSubnav groupKey="staff-positions" titleOverride={pageTitle} />
@@ -359,11 +367,13 @@ export function StaffPositionForm({
     );
   }
 
-  return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="staff-positions" titleOverride={pageTitle} />
+  function goBack() {
+    if (onCancel) onCancel();
+    else router.push('/catalog/staff-positions');
+  }
 
-      <form onSubmit={onSave} className={styles.form}>
+  const form = (
+      <form onSubmit={onSave} className={embedded ? styles.formEmbedded : styles.form}>
         <div className={styles.actions}>
           {!readOnly ? (
             <button type="submit" className={styles.primary} disabled={saving}>
@@ -383,7 +393,7 @@ export function StaffPositionForm({
           <button
             type="button"
             className={styles.secondary}
-            onClick={() => router.push('/catalog/staff-positions')}
+            onClick={goBack}
           >
             Закрыть
           </button>
@@ -637,6 +647,14 @@ export function StaffPositionForm({
           </div>
         )}
       </form>
+  );
+
+  if (embedded) return form;
+
+  return (
+    <div className={styles.wrap}>
+      <PageSubnav groupKey="staff-positions" titleOverride={pageTitle} />
+      {form}
     </div>
   );
 }

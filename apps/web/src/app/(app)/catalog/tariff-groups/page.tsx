@@ -5,6 +5,7 @@ import { confirm } from '@/lib/dialogs';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -185,7 +186,9 @@ function TariffGroupsInner() {
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`/api/catalog/tariff-groups/${row.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/catalog/tariff-groups/${row.id}`, {
+        method: 'DELETE',
+      });
       setSelectedId(null);
       setChecked((prev) => {
         const next = { ...prev };
