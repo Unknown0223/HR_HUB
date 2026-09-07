@@ -20,6 +20,7 @@ import {
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import imp from '../../attendance/marks/import/page.module.css';
+import shared from '../../../page-shared.module.css';
 import ui from './page.module.css';
 
 const PAGE_SIZE = 50;
@@ -176,7 +177,18 @@ export function PersonDocsImportPage() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={{ title: 'Импорт персональных документов', siblings: [] }} />
+      <PageSubnav groupKey="settings-admin" />
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-id-card" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Импорт персональных документов</h1>
+          <p className={shared.pageSubtitle}>
+            Импорт персональных документов сотрудников из Excel
+          </p>
+        </div>
+      </div>
       <div className={imp.actions} style={{ marginBottom: '0.65rem' }}>
         <button
           type="button"
@@ -280,7 +292,7 @@ export function PersonDocsImportPage() {
                 type="button"
                 className={imp.drop}
                 style={{
-                  borderColor: drag ? '#3699ff' : undefined,
+                  borderColor: drag ? '#0a85e2' : undefined,
                   background: drag ? '#eef6ff' : undefined,
                 }}
                 onClick={() => inputRef.current?.click()}

@@ -1,7 +1,13 @@
 'use client';
 
-import { ReportTemplateForm } from '../ReportTemplateForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewReportTemplatePage() {
-  return <ReportTemplateForm />;
+/** Legacy /new → list with create modal */
+export default function NewReportTemplateRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/report-templates?create=1');
+  }, [router]);
+  return null;
 }

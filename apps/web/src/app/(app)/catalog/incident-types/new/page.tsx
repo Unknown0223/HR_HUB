@@ -1,7 +1,13 @@
 'use client';
 
-import { IncidentTypeForm } from '../IncidentTypeForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewIncidentTypePage() {
-  return <IncidentTypeForm mode="create" />;
+/** Legacy /new → list with create modal */
+export default function NewIncidentTypeRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/incident-types?create=1');
+  }, [router]);
+  return null;
 }

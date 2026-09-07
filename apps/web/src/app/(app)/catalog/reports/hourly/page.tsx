@@ -4,11 +4,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx, XLSX_COLORS, type XlsxCell } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
-import treeS from '../dismissals-by-reason/page.module.css';
-import empS from '../employees/page.module.css';
-import att from '../attendance-overview/page.module.css';
 import local from './page.module.css';
 
 type Tab = 'filter' | 'view' | 'settings';
@@ -170,6 +168,20 @@ function downloadBlob(filename: string, blob: Blob) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function fmtGen(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 function loadSettings(): Settings {
   try {
@@ -373,7 +385,7 @@ function DivisionPick({
     const expanded = open.has(node.id) || !!q || depth === 0;
     return (
       <>
-        <div className={`${extra.treeRow} ${selected.has(node.id) ? att.treeOn : ''}`} style={{ paddingLeft: depth * 14 }}>
+        <div className={`${extra.treeRow} ${selected.has(node.id) ? arena.treeOn : ''}`} style={{ paddingLeft: depth * 14 }}>
           {kids.length ? (
             <button
               type="button"
@@ -392,12 +404,12 @@ function DivisionPick({
           ) : (
             <span className={extra.exp} />
           )}
-          <input type="checkbox" className={att.box} checked={selected.has(node.id)} onChange={() => toggleOne(node.id)} />
-          <button type="button" className={selected.has(node.id) ? `${att.treeName} ${att.treeNameOn}` : att.treeName} onClick={() => toggleOne(node.id)}>
+          <input type="checkbox" className={arena.box} checked={selected.has(node.id)} onChange={() => toggleOne(node.id)} />
+          <button type="button" className={selected.has(node.id) ? `${arena.treeName} ${arena.treeNameOn}` : arena.treeName} onClick={() => toggleOne(node.id)}>
             {node.name}
           </button>
           {kids.length ? (
-            <button type="button" className={treeS.selectAll} onClick={() => selectBranch(node)}>
+            <button type="button" className={arena.selectAll} onClick={() => selectBranch(node)}>
               выбрать все
             </button>
           ) : null}
@@ -407,19 +419,19 @@ function DivisionPick({
     );
   }
   return (
-    <div className={`${att.dropWrap}${menuOpen ? ` ${att.dropOpen}` : ''}`} ref={wrapRef}>
+    <div className={`${arena.dropWrap}${menuOpen ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className={`${att.dropField}${selected.size ? '' : ` ${att.dropEmpty}`}`}
+        className={`${arena.dropField}${selected.size ? '' : ` ${arena.dropEmpty}`}`}
         onClick={() => setMenuOpen((v) => { if (v) setQ(''); return !v; })}
       >
         {selected.size ? `${selected.size} выбранных` : 'Поиск...'}
       </button>
-      <div className={att.dropPanel} hidden={!menuOpen}>
+      <div className={arena.dropPanel} hidden={!menuOpen}>
         {menuOpen ? (
           <>
-            <input className={att.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            {visible.length === 0 ? <div className={empS.pickEmpty}>Нет данных</div> : null}
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {visible.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {visible.map((n) => (
               <Row key={n.id} node={n} depth={0} />
             ))}
@@ -466,36 +478,36 @@ function EmpPick({
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   }
   return (
-    <div className={`${att.dropWrap}${open ? ` ${att.dropOpen}` : ''}`} ref={wrapRef}>
+    <div className={`${arena.dropWrap}${open ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className={`${att.dropField}${selected.length ? '' : ` ${att.dropEmpty}`}`}
+        className={`${arena.dropField}${selected.length ? '' : ` ${arena.dropEmpty}`}`}
         onClick={() => setOpen((v) => { if (v) setQ(''); return !v; })}
       >
         {selected.length ? `Выбрано: ${selected.length}` : 'Поиск...'}
       </button>
-      <div className={`${att.dropPanel} ${att.empWide}`} hidden={!open}>
+      <div className={`${arena.dropPanel} ${arena.empWide}`} hidden={!open}>
         {open ? (
           <>
-            <input className={att.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            <div className={att.empHead} style={{ gridTemplateColumns: '28px 140px 1fr 1fr' }}>
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className={arena.empHead} style={{ gridTemplateColumns: '28px 140px 1fr 1fr' }}>
               <span />
               <span>Табельный номер</span>
               <span>Сотрудник</span>
               <span>Вид занятости</span>
             </div>
-            {filtered.length === 0 ? <div className={empS.pickEmpty}>Нет данных</div> : null}
+            {filtered.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {filtered.map((o) => {
               const on = selected.includes(o.id);
               return (
                 <button
                   type="button"
                   key={o.id}
-                  className={on ? `${att.empRow} ${att.empOn}` : att.empRow}
+                  className={on ? `${arena.empRow} ${arena.empOn}` : arena.empRow}
                   style={{ gridTemplateColumns: '28px 140px 1fr 1fr' }}
                   onClick={() => toggle(o.id)}
                 >
-                  <input type="checkbox" className={att.box} readOnly checked={on} tabIndex={-1} />
+                  <input type="checkbox" className={arena.box} readOnly checked={on} tabIndex={-1} />
                   <span>{o.tabNumber || '—'}</span>
                   <span>{empName(o)}</span>
                   <span>{empKind(o.employmentType)}</span>
@@ -503,7 +515,7 @@ function EmpPick({
               );
             })}
             {!showAll && !q.trim() && options.length > 8 ? (
-              <button type="button" className={att.showAll} onClick={() => setShowAll(true)}>Показать все</button>
+              <button type="button" className={arena.showAll} onClick={() => setShowAll(true)}>Показать все</button>
             ) : null}
           </>
         ) : null}
@@ -776,7 +788,7 @@ export default function HourlyAttendanceReportPage() {
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .wrap{padding:16px}
@@ -812,7 +824,7 @@ th{background:#eef0f4}
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .wrap{padding:16px}
@@ -852,59 +864,76 @@ th{background:#eef0f4}
   }
 
   const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : extra.exportLinks}>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${FILE_BASE}(${fileStamp(d.generatedAt)}).csv`, new Blob([csvText(d)], { type: 'text/csv;charset=utf-8' })))}>CSV</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${FILE_BASE}(${fileStamp(d.generatedAt)}).xml`, new Blob([xmlText(d)], { type: 'application/xml;charset=utf-8' })))}>XML</button>
+    <div className={ghost ? arena.exportBtns : arena.exportLinks}>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${FILE_BASE}(${fileStamp(d.generatedAt)}).csv`, new Blob([csvText(d)], { type: 'text/csv;charset=utf-8' })))}>CSV</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${FILE_BASE}(${fileStamp(d.generatedAt)}).xml`, new Blob([xmlText(d)], { type: 'application/xml;charset=utf-8' })))}>XML</button>
     </div>
   );
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>{TITLE}</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>Фильтр</button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!timesOk()) {
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button type="button" className={tab === 'filter' ? arena.tabOn : arena.tab} onClick={() => setTab('filter')}>Фильтр</button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!timesOk()) {
               setError('Укажите время начала и время конца');
               return;
-            }
-            if (!report || loadedQs !== queryQs) void generate();
-          }}
-        >
-          Просмотр
-        </button>
-        <button type="button" className={tab === 'settings' ? layout.tabOn : layout.tab} onClick={() => setTab('settings')}>Настройки</button>
+              }
+              if (!report || loadedQs !== queryQs) void generate();
+            }}
+          >
+            Просмотр
+          </button>
+          <button type="button" className={tab === 'settings' ? arena.tabOn : arena.tab} onClick={() => setTab('settings')}>Настройки</button>
+        </div>
         {tab === 'settings' ? (
           <>
-            <button type="button" className={layout.tab} onClick={saveSettings}>Сохранить</button>
-            <button type="button" className={layout.tab} onClick={resetSettings}>Сбросить</button>
+            <button type="button" className={arena.ghostBtn} onClick={saveSettings}>Сохранить</button>
+            <button type="button" className={arena.ghostBtn} onClick={resetSettings}>Сбросить</button>
           </>
         ) : null}
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
             {exportBtns(true)}
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-clock" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>{TITLE}</h1>
+          <p className={shared.pageSubtitle}>Фактические часы посещений по сотрудникам за период</p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${local.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={`${arena.settingsCard} ${local.card}`} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Дата</label>
             <PeriodRangePicker from={from} to={to} onChange={(a, b) => { setFrom(a); setTo(b); }} />
           </div>
           <div className={local.times}>
-            <div className={layout.field}>
+            <div className={arena.field}>
               <label className={local.req}>Время начала</label>
               <input
                 className={`${local.timeInput}${startTime ? '' : ` ${local.timeBad}`}`}
@@ -914,7 +943,7 @@ th{background:#eef0f4}
                 onChange={(e) => setStartTime(e.target.value)}
               />
             </div>
-            <div className={layout.field}>
+            <div className={arena.field}>
               <label className={local.req}>Время конца</label>
               <input
                 className={`${local.timeInput}${endTime ? '' : ` ${local.timeBad}`}`}
@@ -925,16 +954,16 @@ th{background:#eef0f4}
               />
             </div>
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Подразделения</label>
             <DivisionPick nodes={tree} selected={new Set(divisionIds)} onChange={(next) => setDivisionIds([...next])} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Сотрудники</label>
             <EmpPick options={employees} selected={employeeIds} onChange={setEmployeeIds} />
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
             {exportBtns(false)}
@@ -943,19 +972,37 @@ th{background:#eef0f4}
       ) : null}
 
       {tab === 'view' ? (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : selectedRow ? (
             <>
-              <button type="button" className={local.back} onClick={() => setSelectedEmp(null)}>
+              <button type="button" className={arena.back} onClick={() => setSelectedEmp(null)}>
                 ← Все сотрудники
               </button>
-              <p className={local.meta}>{selectedRow.employee}</p>
-              <p className={local.meta}>{report.periodLine}</p>
-              <p className={local.meta}>{report.timeLine}</p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-user" aria-hidden />
+                  {selectedRow.employee}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {report.periodLine}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-clock" aria-hidden />
+                  {report.timeLine}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <div className={local.tableWrap}>
                 <table className={local.table}>
                   <thead>
@@ -1006,8 +1053,23 @@ th{background:#eef0f4}
             </>
           ) : (
             <>
-              <p className={local.meta}>{report.periodLine}</p>
-              <p className={local.meta}>{report.timeLine}</p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {report.periodLine}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-clock" aria-hidden />
+                  {report.timeLine}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-users" aria-hidden />
+                  Строк: {report.rows.length}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <div className={local.tableWrap}>
                 <table className={local.table}>
                   <thead>
@@ -1063,31 +1125,33 @@ th{background:#eef0f4}
       ) : null}
 
       {tab === 'settings' ? (
-        <div className={local.settings}>
-          <div className={local.col}>
-            <h3>Настройки фильтра</h3>
-            <Check on={settings.tabNumber} onChange={(v) => setSettings((p) => ({ ...p, tabNumber: v }))} label="Табельный номер" />
-            <Check on={settings.position} onChange={(v) => setSettings((p) => ({ ...p, position: v }))} label="Показать должность" />
-            <Check on={settings.division} onChange={(v) => setSettings((p) => ({ ...p, division: v }))} label="Показать подразделение" />
-            <Check on={settings.staffPosition} onChange={(v) => setSettings((p) => ({ ...p, staffPosition: v }))} label="Позиция" />
-          </div>
-          <div className={local.col}>
-            <h3>Настройки отчета</h3>
-            <Check
-              on={settings.showMinutes}
-              onChange={(v) => setSettings((p) => ({ ...p, showMinutes: v }))}
-              label="Показать минуты"
-            />
-            <Check
-              on={settings.showHhMm}
-              onChange={(v) => setSettings((p) => ({ ...p, showHhMm: v, showOnlyMinutes: v ? false : p.showOnlyMinutes }))}
-              label="Показать (чч:мин)"
-            />
-            <Check
-              on={settings.showOnlyMinutes}
-              onChange={(v) => setSettings((p) => ({ ...p, showOnlyMinutes: v, showHhMm: v ? false : p.showHhMm }))}
-              label="Показать только минуты"
-            />
+        <div className={arena.settingsCard}>
+          <div className={local.settings}>
+            <div className={local.col}>
+              <h3>Настройки фильтра</h3>
+              <Check on={settings.tabNumber} onChange={(v) => setSettings((p) => ({ ...p, tabNumber: v }))} label="Табельный номер" />
+              <Check on={settings.position} onChange={(v) => setSettings((p) => ({ ...p, position: v }))} label="Показать должность" />
+              <Check on={settings.division} onChange={(v) => setSettings((p) => ({ ...p, division: v }))} label="Показать подразделение" />
+              <Check on={settings.staffPosition} onChange={(v) => setSettings((p) => ({ ...p, staffPosition: v }))} label="Позиция" />
+            </div>
+            <div className={local.col}>
+              <h3>Настройки отчета</h3>
+              <Check
+                on={settings.showMinutes}
+                onChange={(v) => setSettings((p) => ({ ...p, showMinutes: v }))}
+                label="Показать минуты"
+              />
+              <Check
+                on={settings.showHhMm}
+                onChange={(v) => setSettings((p) => ({ ...p, showHhMm: v, showOnlyMinutes: v ? false : p.showOnlyMinutes }))}
+                label="Показать (чч:мин)"
+              />
+              <Check
+                on={settings.showOnlyMinutes}
+                onChange={(v) => setSettings((p) => ({ ...p, showOnlyMinutes: v, showHhMm: v ? false : p.showHhMm }))}
+                label="Показать только минуты"
+              />
+            </div>
           </div>
         </div>
       ) : null}

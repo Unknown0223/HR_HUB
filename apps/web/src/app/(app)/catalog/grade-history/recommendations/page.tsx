@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import styles from '../page.module.css';
+import shared from '../../../../page-shared.module.css';
 
 type Row = {
   id: string;
@@ -66,20 +67,38 @@ function RecommendationsInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="grade-recommendations" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-clock" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Рекомендации в ожидании</h1>
+          <p className={shared.pageSubtitle}>
+            Сотрудники, рекомендованные к повышению разряда
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <Link href="/catalog/grade-history" className={styles.toolBtn}>
+            <i className="fas fa-arrow-left" aria-hidden />
             Закрыть
           </Link>
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className={styles.pagerMeta}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
         </div>
@@ -88,46 +107,44 @@ function RecommendationsInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Сотрудник</th>
-              <th>Дата</th>
-              <th>Разряд</th>
-              <th>Подразделение</th>
-              <th>Должность</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !filtered.length ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th>Сотрудник</th>
+                <th>Дата</th>
+                <th>Разряд</th>
+                <th>Подразделение</th>
+                <th>Должность</th>
               </tr>
-            ) : null}
-            {!loading && !filtered.length ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <input type="checkbox" />
-                </td>
-                <td>{empName(row.employee)}</td>
-                <td>{fmtDate(row.recommendedAt)}</td>
-                <td>{row.grade?.name || '—'}</td>
-                <td>{row.division?.name || '—'}</td>
-                <td>{row.position?.name || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={5} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={5} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => (
+                <tr key={row.id}>
+                  <td className={styles.empNames}>{empName(row.employee)}</td>
+                  <td className={styles.numCell}>{fmtDate(row.recommendedAt)}</td>
+                  <td>{row.grade?.name || '—'}</td>
+                  <td>{row.division?.name || '—'}</td>
+                  <td>{row.position?.name || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

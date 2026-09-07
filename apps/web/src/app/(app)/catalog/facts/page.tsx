@@ -1,15 +1,15 @@
 'use client';
 
 import { confirm } from '@/lib/dialogs';
-import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
-import styles from '../absence-types/page.module.css';
+import { FactFormModal } from './FactFormModal';
+import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
-import form from './facts.module.css';
 
 type Emp = {
   id: string;
@@ -33,6 +33,9 @@ type FactRow = {
   factType?: FactType | null;
 };
 
+const FILTER_KEYS = ['q', 'status'] as const;
+const COL_COUNT = 8;
+
 function empName(e?: Emp | null) {
   if (!e) return '—';
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
@@ -47,76 +50,85 @@ function fmtDate(iso?: string | null) {
   }
 }
 
-function todayInput() {
-  return new Date().toISOString().slice(0, 10);
+function isActiveStatus(status?: string | null) {
+  return !status || status === 'active';
 }
 
 function FactsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const q = searchParams?.get('q') || '';
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const q = filters.q;
+  const statusFilter = filters.status;
 
   const [rows, setRows] = useState<FactRow[]>([]);
-  const [types, setTypes] = useState<FactType[]>([]);
-  const [employees, setEmployees] = useState<(Emp & { divisionId?: string })[]>(
-    [],
-  );
-  const [divisions, setDivisions] = useState<Division[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(Boolean(q || statusFilter));
   const [searchDraft, setSearchDraft] = useState(q);
-  const [modal, setModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const [factDate, setFactDate] = useState(todayInput());
-  const [employeeId, setEmployeeId] = useState('');
-  const [divisionId, setDivisionId] = useState('');
-  const [factTypeId, setFactTypeId] = useState('');
-  const [value, setValue] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
 
   const filtered = useMemo(() => {
+    let list = rows;
     const qq = q.trim().toLowerCase();
-    if (!qq) return rows;
-    return rows.filter((r) => {
-      const blob = [
-        empName(r.employee),
-        r.division?.name,
-        r.factType?.name,
-        r.value,
-        r.employmentSource,
-        r.status,
-        fmtDate(r.factDate),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return blob.includes(qq);
+    if (qq) {
+      list = list.filter((r) => {
+        const blob = [
+          empName(r.employee),
+          r.division?.name,
+          r.factType?.name,
+          r.value,
+          r.employmentSource,
+          r.status,
+          fmtDate(r.factDate),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return blob.includes(qq);
+      });
+    }
+    if (statusFilter === 'active') list = list.filter((r) => isActiveStatus(r.status));
+    else if (statusFilter === 'inactive') {
+      list = list.filter((r) => !isActiveStatus(r.status));
+    }
+    return list;
+  }, [rows, q, statusFilter]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
     });
-  }, [rows, q]);
+  }
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const [facts, ft, emps, divs] = await Promise.all([
-        apiFetch<FactRow[] | { items: FactRow[] }>('/api/catalog/facts'),
-        apiFetch<FactType[] | { items: FactType[] }>('/api/catalog/fact-types'),
-        apiFetch<{ items?: Emp[] } | Emp[]>(
-          '/api/employees?status=active&limit=500',
-        ),
-        apiFetch<Division[] | { items?: Division[] }>('/api/catalog/divisions'),
-      ]);
+      const facts = await apiFetch<FactRow[] | { items: FactRow[] }>(
+        '/api/catalog/facts',
+      );
       setRows(Array.isArray(facts) ? facts : facts.items || []);
-      setTypes(Array.isArray(ft) ? ft : ft.items || []);
-      const el = Array.isArray(emps)
-        ? emps
-        : Array.isArray((emps as { items?: Emp[] }).items)
-          ? (emps as { items: Emp[] }).items
-          : [];
-      setEmployees(el as (Emp & { divisionId?: string })[]);
-      setDivisions(Array.isArray(divs) ? divs : divs.items || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
       setRows([]);
@@ -129,76 +141,92 @@ function FactsPageInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setModalOpen(true);
+  }, [searchParams]);
+
   function applySearch() {
     const params = new URLSearchParams(searchParams?.toString() ?? '');
     if (searchDraft.trim()) params.set('q', searchDraft.trim());
     else params.delete('q');
     const qs = params.toString();
-    router.replace(qs ? `/catalog/facts?${qs}` : '/catalog/facts', {
-      scroll: false,
-    });
+    router.replace(qs ? `/catalog/facts?${qs}` : '/catalog/facts', { scroll: false });
   }
 
   function openCreate() {
-    setFactDate(todayInput());
-    setEmployeeId('');
-    setDivisionId('');
-    setFactTypeId('');
-    setValue('');
-    setModal(true);
+    setModalOpen(true);
   }
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
-    if (!employeeId || !factTypeId || !value.trim() || !factDate) {
-      setError('Заполните обязательные поля');
-      return;
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      const qs = params.toString();
+      router.replace(qs ? `/catalog/facts?${qs}` : '/catalog/facts', {
+        scroll: false,
+      });
     }
-    setSaving(true);
+  }
+
+  async function runDelete(row: FactRow) {
+    if (!(await confirm(`Удалить факт «${row.value}»?`))) return;
+    setBusy(true);
     setError('');
     try {
-      let div = divisionId;
-      if (!div) {
-        const emp = employees.find((x) => x.id === employeeId);
-        if (emp?.divisionId) div = emp.divisionId;
-      }
-      await apiFetch('/api/catalog/facts', {
-        method: 'POST',
-        body: JSON.stringify({
-          employeeId,
-          divisionId: div || null,
-          factTypeId,
-          value: value.trim(),
-          factDate,
-          status: 'active',
-        }),
+      await apiFetch(`/api/catalog/facts/${row.id}`, { method: 'DELETE' });
+      setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
       });
-      setModal(false);
       await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка удаления');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  async function runDelete(ids: string[]) {
-    if (!ids.length) return;
-    if (!(await confirm(`Удалить факты (${ids.length})?`))) return;
-    setBusy(true);
-    try {
-      const chunk = 8;
-      for (let i = 0; i < ids.length; i += chunk) {
-        await Promise.all(
-          ids.slice(i, i + chunk).map((id) =>
-            apiFetch(`/api/catalog/facts/${id}`, { method: 'DELETE' }),
-          ),
-        );
+  async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'delete') {
+      if (!(await confirm(`Удалить выбранные факты (${targets.length} шт.)?`))) {
+        return;
       }
-      setSelected(new Set());
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/catalog/facts/${row.id}`, { method: 'DELETE' });
+          } else {
+            const status = action === 'activate' ? 'active' : 'inactive';
+            if (row.status === status) continue;
+            await apiFetch(`/api/catalog/facts/${row.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ status }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
     } finally {
       setBusy(false);
     }
@@ -214,268 +242,277 @@ function FactsPageInner() {
         'Значение факта': r.value,
         Дата: fmtDate(r.factDate),
         'Источник занятости': r.employmentSource || '',
-        Статус: r.status === 'active' ? 'Активный' : r.status,
+        Статус: isActiveStatus(r.status) ? 'Активный' : r.status || 'Неактивный',
       })),
     );
   }
-
-  const allChecked = filtered.length > 0 && selected.size === filtered.length;
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="facts" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-chart-bar" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Факты</h1>
+          <p className={shared.pageSubtitle}>
+            Учёт производственных и прочих фактов по сотрудникам
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
+          <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
+            Создать
+          </button>
           <button
             type="button"
             className={styles.createBtn}
-            style={{ background: '#3699ff' }}
-            onClick={openCreate}
-          >
-            Создать
-          </button>
-          <Link
-            href="/catalog/facts/import"
-            className={styles.exportBtn}
-            style={{
-              background: '#1bc5bd',
-              color: '#fff',
-              border: 'none',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            Импорт
-          </Link>
-          <button
-            type="button"
-            className={styles.exportBtn}
-            style={{ background: '#1bc5bd', color: '#fff', border: 'none' }}
             onClick={() => router.push('/catalog/facts/import')}
           >
-            Загрузить
+            <i className="fas fa-file-import" aria-hidden />
+            Импорт
           </button>
-          {selected.size > 0 ? (
-            <button
-              type="button"
-              style={{
-                background: '#f64e60',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: '0.78rem',
-                textTransform: 'uppercase',
-                padding: '0.5rem 0.9rem',
-                cursor: 'pointer',
-              }}
-              disabled={busy}
-              onClick={() => void runDelete([...selected])}
-            >
-              Удалить {selected.size}
-            </button>
-          ) : null}
-        </div>
-        <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
+          <FilterPanel
+            inline
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
+              {
+                type: 'select',
+                key: 'status',
+                label: 'Статус',
+                options: [
+                  { value: 'active', label: 'Активный' },
+                  { value: 'inactive', label: 'Неактивный' },
+                ],
+              },
+            ]}
           />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            Обновить
-          </button>
-          <span className={styles.pagerMeta}>
+        </div>
+
+        <div className={styles.rightTools}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th style={{ width: '2rem' }}>
-                <input
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={() => {
-                    if (allChecked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
-                  }}
-                />
-              </th>
-              <th>Сотрудник</th>
-              <th>Подразделение</th>
-              <th>Тип</th>
-              <th>Значение факта</th>
-              <th>Дата</th>
-              <th>Источник занятости</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Загрузка…
-                </td>
-              </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className={styles.empty}>
-                  нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(row.id)}
-                    onChange={() => {
-                      setSelected((prev) => {
-                        const n = new Set(prev);
-                        if (n.has(row.id)) n.delete(row.id);
-                        else n.add(row.id);
-                        return n;
-                      });
-                    }}
-                  />
-                </td>
-                <td>{empName(row.employee)}</td>
-                <td>{row.division?.name || ''}</td>
-                <td>{row.factType?.name || ''}</td>
-                <td>{row.value}</td>
-                <td>{fmtDate(row.factDate)}</td>
-                <td>{row.employmentSource || ''}</td>
-                <td>
-                  <span className={styles.statusActive}>
-                    {row.status === 'active' ? 'Активный' : row.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {modal ? (
-        <div className={form.overlay} onClick={() => setModal(false)}>
-          <div className={form.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={form.modalTitle}>Добавить факт</h2>
-            <form className={form.modalBody} onSubmit={onSave}>
-              <label>
-                Дата <span className={form.req}>*</span>
-                <input
-                  type="date"
-                  required
-                  value={factDate}
-                  onChange={(e) => setFactDate(e.target.value)}
-                />
-              </label>
-              <label>
-                Сотрудник <span className={form.req}>*</span>
-                <select
-                  required
-                  value={employeeId}
-                  onChange={(e) => {
-                    setEmployeeId(e.target.value);
-                    const emp = employees.find((x) => x.id === e.target.value);
-                    if (emp?.divisionId) setDivisionId(emp.divisionId);
-                  }}
-                >
-                  <option value="">Поиск...</option>
-                  {employees.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {empName(e)}
-                      {e.tabNumber ? ` (${e.tabNumber})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Подразделение
-                <select
-                  value={divisionId}
-                  onChange={(e) => setDivisionId(e.target.value)}
-                >
-                  <option value="">Поиск...</option>
-                  {divisions.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Тип факта <span className={form.req}>*</span>
-                <select
-                  required
-                  value={factTypeId}
-                  onChange={(e) => setFactTypeId(e.target.value)}
-                >
-                  <option value="">Поиск...</option>
-                  {types.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Значение факта <span className={form.req}>*</span>
-                <input
-                  required
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                />
-              </label>
-              <div className={form.modalFooter}>
-                <button type="submit" className={form.btnSave} disabled={saving}>
-                  {saving ? '…' : 'Сохранить'}
-                </button>
-                <button
-                  type="button"
-                  className={form.btnClose}
-                  onClick={() => setModal(false)}
-                >
-                  Закрыть
-                </button>
-              </div>
-            </form>
-          </div>
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активировать
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('deactivate')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Деактивировать
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
         </div>
       ) : null}
+
+      <div className={styles.tableWrap}>
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Сотрудник</th>
+                <th>Подразделение</th>
+                <th>Тип</th>
+                <th>Значение факта</th>
+                <th>Дата</th>
+                <th>Источник занятости</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const active = isActiveStatus(row.status);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.value}`}
+                        />
+                      </td>
+                      <td className={styles.nameCell}>{empName(row.employee)}</td>
+                      <td>{row.division?.name || '—'}</td>
+                      <td>{row.factType?.name || '—'}</td>
+                      <td>{row.value}</td>
+                      <td>{fmtDate(row.factDate)}</td>
+                      <td>{row.employmentSource || '—'}</td>
+                      <td>
+                        {active ? (
+                          <span className={styles.statusActive}>Активный</span>
+                        ) : (
+                          <span className={styles.statusMuted}>
+                            {row.status || 'Неактивный'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
+      </div>
+
+      <FactFormModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function FactsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <FactsPageInner />
     </Suspense>
   );

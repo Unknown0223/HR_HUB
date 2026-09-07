@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import type { SalesRateRow } from '@/lib/sales-accruals';
-import form from '../../payroll/accruals/form.module.css';
-import list from '../absence-types/page.module.css';
+import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
-export function SalesRatesPage() {
+function SalesRatesPage() {
   const router = useRouter();
   const [rows, setRows] = useState<SalesRateRow[]>([]);
   const [error, setError] = useState('');
@@ -31,10 +31,14 @@ export function SalesRatesPage() {
     void load();
   }, []);
 
-  function patch(i: number, field: 'personalPercent' | 'divisionPercent', value: string) {
+  function patch(positionId: string, field: 'personalPercent' | 'divisionPercent', value: string) {
     const n = Number(value);
     setRows((prev) =>
-      prev.map((r, idx) => (idx === i ? { ...r, [field]: Number.isFinite(n) ? n : 0 } : r)),
+      prev.map((r) =>
+        r.positionId === positionId
+          ? { ...r, [field]: Number.isFinite(n) ? n : 0 }
+          : r,
+      ),
     );
   }
 
@@ -61,71 +65,103 @@ export function SalesRatesPage() {
     }
   }
 
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [rows],
+  );
+
   return (
-    <div className={form.page}>
+    <div className={styles.wrap}>
       <PageSubnav groupKey="sales-policies" />
-      <div className={form.topBar}>
-        <h1 className={form.title}>Настройка процентов продаж</h1>
-        <div className={form.actions}>
-          <button type="button" className={form.btnSave} disabled={saving} onClick={() => void save()}>
-            Сохранить
-          </button>
-          <button type="button" className={form.btnClose} onClick={() => router.push('/catalog/sales-accruals')}>
-            Закрыть
-          </button>
-        </div>
-      </div>
-      {error ? <p className={form.error}>{error}</p> : null}
-      {loading ? <p>Загрузка…</p> : null}
-      <div className={form.card} style={{ maxWidth: 720 }}>
-        <div className={form.tableWrap}>
-          <table className={form.table}>
-            <thead>
-              <tr>
-                <th style={{ width: 48 }}>№</th>
-                <th>Должность</th>
-                <th>Личные продажи</th>
-                <th>Продажи подразделения</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan={4} className={form.empty}>
-                    Нет данных
-                  </td>
-                </tr>
-              ) : null}
-              {rows.map((r, i) => (
-                <tr key={r.positionId}>
-                  <td>{r.sortOrder}</td>
-                  <td>{r.positionName}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={r.personalPercent || ''}
-                        onChange={(e) => patch(i, 'personalPercent', e.target.value)}
-                      />
-                      <span className={list.pagerMeta}>%</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={r.divisionPercent || ''}
-                        onChange={(e) => patch(i, 'divisionPercent', e.target.value)}
-                      />
-                      <span className={list.pagerMeta}>%</span>
-                    </div>
-                  </td>
-                </tr>
+
+      <div className={styles.shell}>
+        <header className={shared.pageHeader}>
+          <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`} aria-hidden>
+            <i className="fas fa-percent" />
+          </div>
+          <div className={shared.pageHeaderText}>
+            <h1 className={shared.pageTitle}>Настройка процентов продаж</h1>
+            <p className={shared.pageSubtitle}>
+              Проценты личных и подразделенийских продаж по должностям
+            </p>
+          </div>
+          <div className={shared.pageHeaderActions}>
+            <button
+              type="button"
+              className={styles.btnSave}
+              disabled={saving || loading}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={styles.btnClose}
+              onClick={() => router.push('/catalog/sales-accruals')}
+            >
+              Закрыть
+            </button>
+          </div>
+        </header>
+
+        {error ? <p className={styles.error}>{error}</p> : null}
+
+        <div className={styles.card}>
+          <div className={styles.legend}>
+            <span>
+              <i className="fas fa-user" aria-hidden /> Личные продажи
+            </span>
+            <span>
+              <i className="fas fa-sitemap" aria-hidden /> Продажи подразделения
+            </span>
+          </div>
+
+          {loading ? (
+            <p className={styles.hint}>Загрузка…</p>
+          ) : sorted.length === 0 ? (
+            <p className={styles.hint}>Нет данных</p>
+          ) : (
+            <div className={styles.grid}>
+              {sorted.map((r) => (
+                <article key={r.positionId} className={styles.row}>
+                  <div className={styles.rowHead}>
+                    <span className={styles.num}>{r.sortOrder}</span>
+                    <h2 className={styles.posName}>{r.positionName}</h2>
+                  </div>
+                  <div className={styles.fields}>
+                    <label className={styles.field}>
+                      <span>Личные</span>
+                      <div className={styles.inputWrap}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={r.personalPercent || ''}
+                          onChange={(e) =>
+                            patch(r.positionId, 'personalPercent', e.target.value)
+                          }
+                        />
+                        <span className={styles.suffix}>%</span>
+                      </div>
+                    </label>
+                    <label className={styles.field}>
+                      <span>Подразделение</span>
+                      <div className={styles.inputWrap}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={r.divisionPercent || ''}
+                          onChange={(e) =>
+                            patch(r.positionId, 'divisionPercent', e.target.value)
+                          }
+                        />
+                        <span className={styles.suffix}>%</span>
+                      </div>
+                    </label>
+                  </div>
+                </article>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

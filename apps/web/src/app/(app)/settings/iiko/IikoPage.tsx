@@ -21,6 +21,7 @@ import {
 } from '@/lib/iiko';
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
+import shared from '../../../page-shared.module.css';
 import extra from '../artix/page.module.css';
 import local from './page.module.css';
 
@@ -384,6 +385,17 @@ function IikoInner({ section }: { section: IikoSection }) {
             siblings: [{ label: 'Продажи IIKO', href: '/settings/iiko-sales' }],
           }}
         />
+        <div className={shared.pageHeader}>
+          <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}>
+            <i className="fas fa-utensils" aria-hidden />
+          </div>
+          <div className={shared.pageHeaderText}>
+            <h1 className={shared.pageTitle}>Настройки IIKO</h1>
+            <p className={shared.pageSubtitle}>
+              Интеграция с iiko: пользователи, должности, подразделения и журнал ошибок
+            </p>
+          </div>
+        </div>
         <div className={local.topActions}>
           <button
             type="button"

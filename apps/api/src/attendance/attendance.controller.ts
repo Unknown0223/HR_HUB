@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -19,8 +20,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AttendanceService } from './attendance.service';
+import { DeviceCredentialAuditService } from './device-credential-audit.service';
 import {
   AssignScheduleDto,
   ApplyMarkSettingsDto,
@@ -52,6 +54,7 @@ import {
 import { ImportRowsDto } from '../common/import.dto';
 import { sendExcelAttachment } from '../common/excel';
 import { Roles, Public } from '../auth/decorators';
+import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import { SkipTenant } from '../tenant/decorators';
 import { PunchIngestGuard } from './punch-ingest.guard';
@@ -141,9 +144,14 @@ export class AttendanceController {
   @ApiQuery({ name: 'filter', required: false, description: 'new = never seen AND status new/registered' })
   listDevices(
     @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
     @Query('filter') filter?: string,
   ) {
-    return this.attendance.listDevices(this.attendance.requireTenant(tenantId), filter);
+    return this.attendance.listDevices(
+      this.attendance.requireTenant(tenantId),
+      filter,
+      user?.role,
+    );
   }
 
   @ApiBearerAuth()
@@ -190,9 +198,37 @@ export class AttendanceController {
   @Get('devices/:id')
   getDevice(
     @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
+    @Req() req: Request,
   ) {
-    return this.attendance.getDevice(this.attendance.requireTenant(tenantId), id);
+    return this.attendance.getDevice(
+      this.attendance.requireTenant(tenantId),
+      id,
+      user?.role,
+      {
+        userId: user?.userId,
+        ip: DeviceCredentialAuditService.clientIp(req),
+      },
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin)
+  @Get('devices/:id/credential-audits')
+  @ApiQuery({ name: 'limit', required: false })
+  listCredentialAudits(
+    @CurrentTenant() tenantId: string | null,
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const n = limit ? Number(limit) : undefined;
+    return this.attendance.listDeviceCredentialAudits(
+      this.attendance.requireTenant(tenantId),
+      id,
+      Number.isFinite(n) ? n : undefined,
+    );
   }
 
   @ApiBearerAuth()
@@ -213,13 +249,19 @@ export class AttendanceController {
   @Post('devices/:id/change-password')
   changeDevicePassword(
     @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() dto: ChangeDevicePasswordDto,
+    @Req() req: Request,
   ) {
     return this.attendance.changeDevicePassword(
       this.attendance.requireTenant(tenantId),
       id,
       dto.newPassword,
+      {
+        userId: user?.userId,
+        ip: DeviceCredentialAuditService.clientIp(req),
+      },
     );
   }
 
@@ -229,13 +271,19 @@ export class AttendanceController {
   @Post('devices/:id/sync-password')
   syncDevicePassword(
     @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() dto: SyncDevicePasswordDto,
+    @Req() req: Request,
   ) {
     return this.attendance.syncDevicePassword(
       this.attendance.requireTenant(tenantId),
       id,
       dto.password,
+      {
+        userId: user?.userId,
+        ip: DeviceCredentialAuditService.clientIp(req),
+      },
     );
   }
 
@@ -1001,7 +1049,8 @@ export class AttendanceController {
 
   /**
    * Device gateway / integrations punch ingest.
-   * Optional: set PUNCH_INGEST_API_KEY → require X-Punch-Key (or Bearer).
+   * Production: PUNCH_INGEST_API_KEY is required (API will not start without it).
+   * Local/dev: empty key stays open for lab. Set key → require X-Punch-Key (or Bearer).
    * Optional: PUNCH_INGEST_RATE_LIMIT_PER_MIN → per-IP rate limit (0/unset = off).
    * NATS consumer path is separate and unaffected.
    */
@@ -1011,7 +1060,8 @@ export class AttendanceController {
   @ApiHeader({
     name: 'X-Punch-Key',
     required: false,
-    description: 'Required when PUNCH_INGEST_API_KEY is set',
+    description:
+      'Required in production and whenever PUNCH_INGEST_API_KEY is set',
   })
   @Post('punches/ingest')
   ingest(@Body() dto: IngestPunchDto) {
@@ -1025,7 +1075,8 @@ export class AttendanceController {
   @ApiHeader({
     name: 'X-Punch-Key',
     required: false,
-    description: 'Required when PUNCH_INGEST_API_KEY is set',
+    description:
+      'Required in production and whenever PUNCH_INGEST_API_KEY is set',
   })
   @Post('heartbeats/ingest')
   ingestHeartbeat(@Body() dto: IngestHeartbeatDto) {

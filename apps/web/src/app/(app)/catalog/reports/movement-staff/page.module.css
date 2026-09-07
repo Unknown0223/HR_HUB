@@ -1,105 +1,10 @@
-.wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-.title {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #181c32;
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.tab,
-.tabOn {
-  appearance: none;
-  border: none;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 0.48rem 0.9rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.tab {
-  background: #eef3f7;
-  color: #5e6278;
-}
-
-.tabOn {
-  background: #3699ff;
-  color: #fff;
-}
-
-.refresh {
-  appearance: none;
-  border: none;
-  background: #3699ff;
-  color: #fff;
-  width: 34px;
-  height: 34px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.refresh:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.viewExport {
-  appearance: none;
-  border: none;
-  background: #eef3f7;
-  color: #3699ff;
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 0.48rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.viewExport:hover {
-  background: #e4e6ef;
-}
-
-.viewExport:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.filterCard {
-  width: min(100%, 760px);
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 1.15rem 1.25rem 1.2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+.checksWide {
+  grid-column: 1 / -1;
 }
 
 .checks {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem 0.85rem;
 }
 
@@ -117,7 +22,7 @@
 .check input {
   margin-top: 0.18rem;
   flex: 0 0 auto;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .checkBody {
@@ -141,12 +46,6 @@
   line-height: 1.35;
 }
 
-.fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.8rem 1rem;
-}
-
 .span2 {
   grid-column: 1 / -1;
 }
@@ -165,49 +64,18 @@
   left: 0;
   right: 0;
   top: calc(100% + 2px);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(180px, 28vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 4px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-  padding: 0.4rem 0.5rem 0.5rem;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
-  padding-top: 0.15rem;
-}
-
-.exportRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.exportBtn {
-  appearance: none;
-  border: none;
-  background: #e1f0ff;
-  color: #3699ff;
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.72rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.exportBtn:hover {
-  background: #d4e9ff;
-}
-
-.exportBtn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+  box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
+  padding: 0.35rem 0.4rem 0.4rem;
 }
 
 .checkRow {
@@ -227,7 +95,7 @@
 }
 
 .checkRow input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .dropHeadEmp,
@@ -261,13 +129,7 @@
 }
 
 .checkRowEmp input {
-  accent-color: #3699ff;
-}
-
-.view {
-  min-width: 0;
-  background: #fff;
-  padding: 0.75rem 0 1.5rem;
+  accent-color: #0a85e2;
 }
 
 /* Not a <table> — globals.css `table { width: 100% }` must not stretch this. */
@@ -278,6 +140,8 @@
   border: 1px solid #cfd3da;
   margin: 0 0 1.15rem;
   background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .kpiHead,
@@ -312,12 +176,16 @@
 
 .tableWrap {
   overflow: auto;
+  border: 1px solid var(--line, #e3e9f1);
+  border-radius: 12px;
   background: #fff;
+  max-height: min(70vh, 820px);
 }
 
 .table {
   width: 100% !important;
-  border-collapse: collapse !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
   font-size: 0.78rem !important;
   background: #fff !important;
   color: #181c32 !important;
@@ -325,8 +193,9 @@
 
 .table :global(th),
 .table :global(td) {
-  border: 1px solid #cfd3da !important;
-  border-bottom: 1px solid #cfd3da !important;
+  border: none !important;
+  border-bottom: 1px solid #e8eef5 !important;
+  border-right: 1px solid #eef2f7 !important;
   padding: 0.28rem 0.45rem !important;
   color: #181c32 !important;
   vertical-align: middle !important;
@@ -342,8 +211,23 @@
   letter-spacing: 0 !important;
 }
 
+.table :global(th:last-child),
+.table :global(td:last-child) {
+  border-right: none !important;
+}
+
+.table :global(thead th) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  background: #f2f5f9 !important;
+  font-weight: 700 !important;
+  color: #354862 !important;
+  box-shadow: 0 1px 0 #e3e9f1 !important;
+}
+
 .table :global(thead tr:first-child th) {
-  background: #f0f0f0 !important;
+  background: #edf0f5 !important;
   font-weight: 600 !important;
   font-size: 0.84rem !important;
   text-align: left !important;
@@ -351,7 +235,8 @@
 }
 
 .table :global(thead tr:last-child th) {
-  background: #f5f8fa !important;
+  top: 2.35rem !important;
+  background: #f2f5f9 !important;
   font-weight: 600 !important;
   font-size: 0.78rem !important;
   text-align: center !important;
@@ -373,8 +258,20 @@
 }
 
 @media (max-width: 720px) {
-  .checks,
-  .fields {
+  .checks {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .tableWrap {
+    overflow: visible;
+    border: 0;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .table :global(thead th) {
+    position: static !important;
   }
 }

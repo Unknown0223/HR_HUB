@@ -3,11 +3,14 @@
 import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = {
   id: string;
@@ -210,79 +213,6 @@ function EducationTypesPageInner() {
     );
   }
 
-  if (mode !== 'none') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title:
-              mode === 'edit'
-                ? 'Вид образования (изменение)'
-                : 'Вид образования (создание)',
-            siblings: [
-              {
-                label: 'Виды образования',
-                href: '/catalog/education-types',
-              },
-            ],
-          }}
-        />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button
-              type="button"
-              className={formStyles.btnSave}
-              disabled={saving}
-              onClick={() => void save()}
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              className={formStyles.btnClose}
-              onClick={() => setMode('none')}
-            >
-              Закрыть
-            </button>
-          </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={formStyles.card} style={{ maxWidth: 640 }}>
-            <div className={formStyles.field}>
-              <label>Код</label>
-              <input value={code} onChange={(e) => setCode(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>
-                Название <span className={formStyles.req}>*</span>
-              </label>
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>Порядковый номер</label>
-              <input
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-              />
-            </div>
-            <div className={formStyles.statusBlock}>
-              <span className={formStyles.fieldLabel}>Статус</span>
-              <label className={formStyles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                  onClick={() => setActive((v) => !v)}
-                  aria-pressed={active}
-                />
-                <span>Активный</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.wrap}>
       <PageSubnav
@@ -301,9 +231,22 @@ function EducationTypesPageInner() {
         }}
       />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-graduation-cap" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Виды образования</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник видов образования сотрудников
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
         </div>
@@ -316,14 +259,28 @@ function EducationTypesPageInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') applySearch();
             }}
+            aria-label="Поиск"
           />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
+          <button
+            type="button"
+            className={styles.exportBtn}
+            onClick={exportCsv}
+            title="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
         </div>
@@ -409,13 +366,81 @@ function EducationTypesPageInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode !== 'none'}
+        title={
+          mode === 'edit'
+            ? 'Вид образования (изменение)'
+            : 'Вид образования (создание)'
+        }
+        width="md"
+        onClose={() => {
+          setMode('none');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('none');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>Код</label>
+          <input value={code} onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>
+            Название <span className={modal.req}>*</span>
+          </label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>Порядковый номер</label>
+          <input
+            type="number"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          />
+        </div>
+        <div className={modal.field}>
+          <span>Статус</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+              onClick={() => setActive((v) => !v)}
+              aria-pressed={active}
+            />
+            <span>{active ? 'Активный' : 'Неактивный'}</span>
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }
 
 export default function EducationTypesPage() {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <EducationTypesPageInner />
     </Suspense>
   );

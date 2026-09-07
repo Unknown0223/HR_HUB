@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense } from 'react';
-import { GradePromotionForm } from '../GradePromotionForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewGradePromotionPage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <GradePromotionForm mode="create" />
-    </Suspense>
-  );
+/** Legacy /new → list with create modal */
+export default function NewGradePromotionRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/grade-history?create=1');
+  }, [router]);
+  return null;
 }

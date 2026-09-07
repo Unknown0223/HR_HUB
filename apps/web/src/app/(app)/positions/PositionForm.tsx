@@ -31,9 +31,18 @@ function uid() {
 export function PositionForm({
   mode,
   positionId,
+  variant = 'page',
+  formId,
+  onSavingChange,
+  onSaved,
 }: {
   mode: 'create' | 'edit';
   positionId?: string;
+  /** `modal` renders only the fields; the host supplies chrome and actions. */
+  variant?: 'page' | 'modal';
+  formId?: string;
+  onSavingChange?: (saving: boolean) => void;
+  onSaved?: (id: string) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -98,6 +107,10 @@ export function PositionForm({
   }, [loadLookups]);
 
   useEffect(() => {
+    onSavingChange?.(saving);
+  }, [saving, onSavingChange]);
+
+  useEffect(() => {
     if (mode !== 'edit' || !positionId) return;
     let cancelled = false;
     (async () => {
@@ -159,19 +172,22 @@ export function PositionForm({
         isActive,
         createdByLabel: 'Admin',
       };
+      let savedId: string;
       if (mode === 'edit' && positionId) {
         await apiFetch(`/api/organization/positions/${positionId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        router.push('/positions?tab=positions');
+        savedId = positionId;
       } else {
-        await apiFetch('/api/organization/positions', {
+        const created = await apiFetch<{ id: string }>('/api/organization/positions', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        router.push('/positions?tab=positions');
+        savedId = created?.id ?? '';
       }
+      if (onSaved) onSaved(savedId);
+      else router.push('/positions?tab=positions');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -180,11 +196,199 @@ export function PositionForm({
   }
 
   if (loading) {
-    return (
+    return variant === 'modal' ? (
+      <p>Загрузка…</p>
+    ) : (
       <div className={styles.wrap}>
         <PageSubnav groupKey="position-form" titleOverride={pageTitle} />
         <p>Загрузка…</p>
       </div>
+    );
+  }
+
+  const fields = (
+    <>
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.twoCol}>
+        <div className={styles.col}>
+          <label>
+            Код
+            <input value={code} onChange={(e) => setCode(e.target.value)} />
+          </label>
+          <label>
+            Порядковый номер
+            <input
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            />
+          </label>
+          <label className={styles.full}>
+            Название <span className={styles.req}>*</span>
+            <input required value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className={styles.full}>
+            Группа должностей
+            <select
+              value={positionGroupId}
+              onChange={(e) => setPositionGroupId(e.target.value)}
+            >
+              <option value="">Поиск...</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.full}>
+            Роли
+            <input
+              placeholder="Поиск..."
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            />
+          </label>
+          <label className={styles.full}>
+            Описание должности
+            <textarea
+              rows={5}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className={styles.col}>
+          <label className={styles.full}>
+            Подразделения
+            <select
+              value={divisionIds}
+              onChange={(e) => setDivisionIds(e.target.value)}
+            >
+              <option value="">Поиск...</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.full}>
+            Счет затрат
+            <input
+              placeholder="Поиск..."
+              value={costAccount}
+              onChange={(e) => setCostAccount(e.target.value)}
+            />
+          </label>
+          <label className={styles.full}>
+            Классификатор mehnat
+            <input
+              placeholder="Поиск..."
+              value={laborClassifier}
+              onChange={(e) => setLaborClassifier(e.target.value)}
+            />
+          </label>
+
+          <div className={styles.aliasBlock}>
+            <div className={styles.aliasHead}>
+              <span>Псевдонимы</span>
+              <button
+                type="button"
+                className={styles.teal}
+                onClick={() =>
+                  setAliases((prev) => [...prev, { id: uid(), grade: '', alias: '' }])
+                }
+              >
+                Добавить
+              </button>
+            </div>
+            <table className={styles.aliasTable}>
+              <thead>
+                <tr>
+                  <th />
+                  <th>Разряд</th>
+                  <th>Псевдоним</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aliases.length ? (
+                  aliases.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.rowDel}
+                          onClick={() =>
+                            setAliases((prev) => prev.filter((x) => x.id !== a.id))
+                          }
+                        >
+                          ×
+                        </button>
+                      </td>
+                      <td>
+                        <input
+                          value={a.grade}
+                          onChange={(e) =>
+                            setAliases((prev) =>
+                              prev.map((x) =>
+                                x.id === a.id ? { ...x, grade: e.target.value } : x,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          value={a.alias}
+                          onChange={(e) =>
+                            setAliases((prev) =>
+                              prev.map((x) =>
+                                x.id === a.id ? { ...x, alias: e.target.value } : x,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className={styles.emptyCell}>
+                      нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={styles.switchRow}>
+            <span className={styles.switchLabel}>Статус</span>
+            <label className={styles.switch}>
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+              />
+              <span className={styles.switchTrack} />
+              <span className={styles.switchText}>
+                {isActive ? 'Активный' : 'Неактивный'}
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  if (variant === 'modal') {
+    return (
+      <form id={formId} onSubmit={onSave} className={styles.modalForm}>
+        {fields}
+      </form>
     );
   }
 
@@ -206,179 +410,7 @@ export function PositionForm({
           </button>
         </div>
 
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.twoCol}>
-          <div className={styles.col}>
-            <label>
-              Код
-              <input value={code} onChange={(e) => setCode(e.target.value)} />
-            </label>
-            <label>
-              Порядковый номер
-              <input
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-              />
-            </label>
-            <label className={styles.full}>
-              Название <span className={styles.req}>*</span>
-              <input required value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label className={styles.full}>
-              Группа должностей
-              <select
-                value={positionGroupId}
-                onChange={(e) => setPositionGroupId(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={styles.full}>
-              Роли
-              <input
-                placeholder="Поиск..."
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              />
-            </label>
-            <label className={styles.full}>
-              Описание должности
-              <textarea
-                rows={5}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-          </div>
-
-          <div className={styles.col}>
-            <label className={styles.full}>
-              Подразделения
-              <select
-                value={divisionIds}
-                onChange={(e) => setDivisionIds(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={styles.full}>
-              Счет затрат
-              <input
-                placeholder="Поиск..."
-                value={costAccount}
-                onChange={(e) => setCostAccount(e.target.value)}
-              />
-            </label>
-            <label className={styles.full}>
-              Классификатор mehnat
-              <input
-                placeholder="Поиск..."
-                value={laborClassifier}
-                onChange={(e) => setLaborClassifier(e.target.value)}
-              />
-            </label>
-
-            <div className={styles.aliasBlock}>
-              <div className={styles.aliasHead}>
-                <span>Псевдонимы</span>
-                <button
-                  type="button"
-                  className={styles.teal}
-                  onClick={() =>
-                    setAliases((prev) => [...prev, { id: uid(), grade: '', alias: '' }])
-                  }
-                >
-                  Добавить
-                </button>
-              </div>
-              <table className={styles.aliasTable}>
-                <thead>
-                  <tr>
-                    <th />
-                    <th>Разряд</th>
-                    <th>Псевдоним</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {aliases.length ? (
-                    aliases.map((a) => (
-                      <tr key={a.id}>
-                        <td>
-                          <button
-                            type="button"
-                            className={styles.rowDel}
-                            onClick={() =>
-                              setAliases((prev) => prev.filter((x) => x.id !== a.id))
-                            }
-                          >
-                            ×
-                          </button>
-                        </td>
-                        <td>
-                          <input
-                            value={a.grade}
-                            onChange={(e) =>
-                              setAliases((prev) =>
-                                prev.map((x) =>
-                                  x.id === a.id ? { ...x, grade: e.target.value } : x,
-                                ),
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            value={a.alias}
-                            onChange={(e) =>
-                              setAliases((prev) =>
-                                prev.map((x) =>
-                                  x.id === a.id ? { ...x, alias: e.target.value } : x,
-                                ),
-                              )
-                            }
-                          />
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className={styles.emptyCell}>
-                        нет данных
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className={styles.switchRow}>
-              <span className={styles.switchLabel}>Статус</span>
-              <label className={styles.switch}>
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                />
-                <span className={styles.switchTrack} />
-                <span className={styles.switchText}>
-                  {isActive ? 'Активный' : 'Неактивный'}
-                </span>
-              </label>
-            </div>
-          </div>
-        </div>
+        {fields}
       </form>
     </div>
   );

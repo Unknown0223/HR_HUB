@@ -1,13 +1,15 @@
 'use client';
 
 import { confirm } from '@/lib/dialogs';
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
-import styles from '../absence-types/page.module.css';
+import { TimeTypeFormModal } from './TimeTypeForm';
+import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 type ParentRef = { id: string; name: string; code: string };
@@ -25,6 +27,9 @@ type TimeTypeRow = {
   isActive?: boolean;
   parent?: ParentRef | null;
 };
+
+const FILTER_KEYS = ['q', 'status', 'planLoad'] as const;
+const COL_COUNT = 8;
 
 const PLAN_LOADS: { value: string; label: string }[] = [
   { value: 'partial', label: 'Частичная' },
@@ -46,34 +51,72 @@ function letterOf(row: TimeTypeRow) {
 function TimeTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const q = searchParams?.get('q') || '';
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const q = filters.q;
+  const statusFilter = filters.status;
+  const planFilter = filters.planLoad;
 
   const [rows, setRows] = useState<TimeTypeRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(
+    Boolean(q || statusFilter || planFilter),
+  );
   const [searchDraft, setSearchDraft] = useState(q);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
+    let list = rows;
     const qq = q.trim().toLowerCase();
-    if (!qq) return rows;
-    return rows.filter((r) => {
-      const blob = [
-        r.name,
-        r.code,
-        r.letterCode,
-        r.digitalCode,
-        r.parent?.name,
-        planLoadLabel(r.planLoad),
-        r.color,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return blob.includes(qq);
+    if (qq) {
+      list = list.filter((r) => {
+        const blob = [
+          r.name,
+          r.code,
+          r.letterCode,
+          r.digitalCode,
+          r.parent?.name,
+          planLoadLabel(r.planLoad),
+          r.color,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return blob.includes(qq);
+      });
+    }
+    if (statusFilter === 'active') list = list.filter((r) => r.isActive !== false);
+    else if (statusFilter === 'inactive') list = list.filter((r) => r.isActive === false);
+    if (planFilter) list = list.filter((r) => (r.planLoad || '') === planFilter);
+    return list;
+  }, [rows, q, statusFilter, planFilter]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
     });
-  }, [rows, q]);
+  }
 
   async function load() {
     setLoading(true);
@@ -100,6 +143,19 @@ function TimeTypesPageInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    const create = searchParams.get('create') === '1';
+    const edit = searchParams.get('edit');
+    if (create || edit) {
+      setEditId(edit || null);
+      setModalOpen(true);
+    }
+  }, [searchParams]);
+
   function applySearch() {
     const params = new URLSearchParams(searchParams?.toString() ?? '');
     if (searchDraft.trim()) params.set('q', searchDraft.trim());
@@ -111,23 +167,101 @@ function TimeTypesPageInner() {
   }
 
   function openCreate() {
-    router.push('/catalog/time-types/new');
+    setEditId(null);
+    setModalOpen(true);
   }
 
-  function openEdit(row: TimeTypeRow) {
-    router.push(`/catalog/time-types/${row.id}/edit`);
+  function openEdit(id: string) {
+    setEditId(id);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditId(null);
+    if (searchParams.get('create') === '1' || searchParams.get('edit')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      params.delete('edit');
+      const qs = params.toString();
+      router.replace(qs ? `/catalog/time-types?${qs}` : '/catalog/time-types', {
+        scroll: false,
+      });
+    }
   }
 
   async function runDelete(row: TimeTypeRow) {
-    const ok = await confirm(`Удалить вид «${row.name}»?`);
-    if (!ok) return;
+    if (!(await confirm(`Удалить вид «${row.name}»?`))) return;
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/time-types/${row.id}`, { method: 'DELETE' });
       setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка удаления');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'delete') {
+      if (!(await confirm(`Удалить выбранные виды времени (${targets.length} шт.)?`))) {
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/catalog/time-types/${row.id}`, { method: 'DELETE' });
+          } else {
+            const isActive = action === 'activate';
+            if ((row.isActive !== false) === isActive) continue;
+            await apiFetch(`/api/catalog/time-types/${row.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleActive(row: TimeTypeRow, value: boolean) {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/catalog/time-types/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: value }),
+      });
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, isActive: value } : r)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
       setBusy(false);
     }
@@ -143,6 +277,7 @@ function TimeTypesPageInner() {
         'Цифровой код': r.digitalCode || '',
         'Нагрузка на план': planLoadLabel(r.planLoad),
         Цвет: r.color || '',
+        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
       })),
     );
   }
@@ -151,145 +286,293 @@ function TimeTypesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="time-types" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-clock" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Виды рабочего времени</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник видов рабочего времени, кодов и нагрузки на план
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          <Link href="/catalog/absence-types" className={styles.exportBtn}>
-            Закрыть
-          </Link>
+          <FilterPanel
+            inline
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
+              {
+                type: 'select',
+                key: 'status',
+                label: 'Статус',
+                options: [
+                  { value: 'active', label: 'Активный' },
+                  { value: 'inactive', label: 'Неактивный' },
+                ],
+              },
+              {
+                type: 'select',
+                key: 'planLoad',
+                label: 'Нагрузка',
+                options: PLAN_LOADS.map((p) => ({ value: p.value, label: p.label })),
+              },
+            ]}
+          />
         </div>
 
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            Обновить
-          </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активировать
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('deactivate')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Деактивировать
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>Родитель</th>
-              <th>Буквенный код</th>
-              <th>Цифровой код</th>
-              <th>Нагрузка на план</th>
-              <th>Цвет</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Название</th>
+                <th>Родитель</th>
+                <th>Буквенный код</th>
+                <th>Цифровой код</th>
+                <th>Нагрузка на план</th>
+                <th>Цвет</th>
+                <th>Статус</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const hex = row.color || '';
-              return (
-                <tr
-                  key={row.id}
-                  className={open ? styles.rowSelected : undefined}
-                  onClick={() => setSelectedId(open ? null : row.id)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <td className={styles.nameCell}>
-                    <label className={styles.nameWithCheck}>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <span className={styles.nameText}>
-                        {row.name}
-                        {row.isActive === false ? ' (неакт.)' : ''}
-                      </span>
-                    </label>
-                    {open ? (
-                      <div
-                        className={`${styles.inlineActions} ${styles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button type="button" onClick={() => openEdit(row)}>
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.danger}
-                          disabled={busy}
-                          onClick={() => void runDelete(row)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{row.parent?.name || ''}</td>
-                  <td>{letterOf(row)}</td>
-                  <td>{row.digitalCode || ''}</td>
-                  <td>{planLoadLabel(row.planLoad)}</td>
-                  <td>
-                    {hex ? (
-                      <span className={styles.colorSwatch}>
-                        <span className={styles.colorBox} style={{ background: hex }} />
-                        <span className={styles.colorHex}>{hex}</span>
-                      </span>
-                    ) : (
-                      ''
-                    )}
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const hex = row.color || '';
+                const active = row.isActive !== false;
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.name}`}
+                        />
+                      </td>
+                      <td className={styles.nameCell}>{row.name}</td>
+                      <td>{row.parent?.name || '—'}</td>
+                      <td className={styles.codeCell}>{letterOf(row) || '—'}</td>
+                      <td className={styles.codeCell}>{row.digitalCode || '—'}</td>
+                      <td>{planLoadLabel(row.planLoad)}</td>
+                      <td>
+                        {hex ? (
+                          <span className={styles.colorSwatch}>
+                            <span
+                              className={styles.colorBox}
+                              style={{ background: hex }}
+                            />
+                            <span className={styles.colorHex}>{hex}</span>
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        {active ? (
+                          <span className={styles.statusActive}>Активный</span>
+                        ) : (
+                          <span className={styles.statusMuted}>Неактивный</span>
+                        )}
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <button type="button" onClick={() => openEdit(row.id)}>
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void toggleActive(row, !active)}
+                            >
+                              <i
+                                className={active ? 'fas fa-ban' : 'fas fa-check'}
+                                aria-hidden
+                              />
+                              {active ? 'Деактивировать' : 'Активировать'}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <TimeTypeFormModal
+        open={modalOpen}
+        editId={editId}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function TimeTypesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <TimeTypesPageInner />
     </Suspense>
   );

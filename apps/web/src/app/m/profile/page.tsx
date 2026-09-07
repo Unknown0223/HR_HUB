@@ -44,6 +44,7 @@ export default function MobileProfilePage() {
   }, [load]);
 
   function logout() {
+    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setSession(null);
     router.replace('/m/login');
   }

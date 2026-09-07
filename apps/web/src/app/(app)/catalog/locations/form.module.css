@@ -1,0 +1,65 @@
+/* Location create/edit modal — extras on top of form-modal.module.css */
+.muted {
+  margin: 0;
+  color: #64788f;
+  font-size: 0.84rem;
+}
+
+.hint {
+  margin: 0.25rem 0 0;
+  color: #8ca0b8;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+@media (max-width: 520px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e3e9f1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  color: #1f2937;
+  cursor: pointer;
+  margin: 0;
+}
+
+.check input {
+  accent-color: #0a85e2;
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  flex-shrink: 0;
+}
+
+.checkText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkText small {
+  color: #8ca0b8;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}

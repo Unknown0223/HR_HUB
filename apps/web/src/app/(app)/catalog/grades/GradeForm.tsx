@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { PageSubnav } from '@/components/PageSubnav';
+import { useEffect, useState } from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import styles from './form.module.css';
 
@@ -14,54 +14,57 @@ type GradeRow = {
   isActive: boolean;
 };
 
-export function GradeForm({
-  mode,
-  gradeId,
+export function GradeFormModal({
+  open,
+  onClose,
+  onSaved,
+  editId,
 }: {
-  mode: 'create' | 'edit';
-  gradeId?: string;
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  editId?: string | null;
 }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(mode === 'edit');
-  const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(editId);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [code, setCode] = useState('');
+
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [level, setLevel] = useState('');
   const [isActive, setIsActive] = useState(true);
 
-  const pageTitle = mode === 'edit' ? 'Разряд (изменение)' : 'Разряд (создание)';
-
   useEffect(() => {
-    if (mode !== 'edit' || !gradeId) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const row = await apiFetch<GradeRow>(`/api/catalog/grades/${gradeId}`);
-        if (cancelled) return;
-        setCode(row.code || '');
+    if (!open) return;
+    setError('');
+    setBusy(false);
+    if (!editId) {
+      setName('');
+      setCode('');
+      setLevel('');
+      setIsActive(true);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    apiFetch<GradeRow>(`/api/catalog/grades/${editId}`)
+      .then((row) => {
         setName(row.name || '');
+        setCode(row.code || '');
         setLevel(row.level != null ? String(row.level) : '');
         setIsActive(row.isActive !== false);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, gradeId]);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false));
+  }, [open, editId]);
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
+  async function save() {
     if (!name.trim()) {
       setError('Название обязательно');
       return;
     }
-    setSaving(true);
+    setBusy(true);
     setError('');
     try {
       const body = {
@@ -70,87 +73,93 @@ export function GradeForm({
         level: Number(level) || 1,
         isActive,
       };
-      if (mode === 'edit' && gradeId) {
-        await apiFetch(`/api/catalog/grades/${gradeId}`, {
+      if (isEdit && editId) {
+        await apiFetch(`/api/catalog/grades/${editId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
+        onSaved(editId);
       } else {
-        await apiFetch('/api/catalog/grades', {
+        const created = await apiFetch<GradeRow>('/api/catalog/grades', {
           method: 'POST',
           body: JSON.stringify(body),
         });
+        onSaved(created?.id || '');
       }
-      router.push('/catalog/grades');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav groupKey="grades" titleOverride={pageTitle} />
-        <p>Загрузка…</p>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="grades" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave} className={styles.form}>
-        <div className={styles.actions}>
-          <button type="submit" className={styles.primary} disabled={saving}>
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
+    <FormModal
+      open={open}
+      title={isEdit ? 'Разряд (изменение)' : 'Разряд (создание)'}
+      onClose={onClose}
+      width="md"
+      footer={
+        <>
           <button
             type="button"
-            className={styles.secondary}
-            onClick={() => router.push('/catalog/grades')}
+            className={modal.btnPrimary}
+            disabled={busy || loading}
+            onClick={() => void save()}
           >
+            {busy ? '…' : 'Сохранить'}
+          </button>
+          <button type="button" className={modal.btnGhost} onClick={onClose}>
             Закрыть
           </button>
-        </div>
+        </>
+      }
+    >
+      {error ? <p className={modal.error}>{error}</p> : null}
+      {loading ? (
+        <p className={styles.muted}>Загрузка…</p>
+      ) : (
+        <div className={modal.fields}>
+          <label className={modal.field}>
+            <span>
+              Название <em className={modal.req}>*</em>
+            </span>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
 
-        {error ? <p className={styles.error}>{error}</p> : null}
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Код</span>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder={isEdit ? '' : 'авто'}
+              />
+            </label>
 
-        <div className={styles.card}>
-          <label>
-            Код
-            <input value={code} onChange={(e) => setCode(e.target.value)} />
-          </label>
-          <label>
-            Название <span className={styles.req}>*</span>
-            <input required value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label>
-            Порядковый номер
-            <input
-              type="number"
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-            />
-          </label>
-          <div className={styles.switchRow}>
-            <span className={styles.switchLabel}>Статус</span>
-            <label className={styles.switch}>
+            <label className={modal.field}>
+              <span>Порядковый номер</span>
+              <input
+                type="number"
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                placeholder="1"
+              />
+            </label>
+          </div>
+
+          <div className={styles.checkGroup}>
+            <label className={styles.check}>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
-              <span className={styles.switchTrack} />
-              <span className={styles.switchText}>
-                {isActive ? 'Активный' : 'Неактивный'}
-              </span>
+              Активный
             </label>
           </div>
         </div>
-      </form>
-    </div>
+      )}
+    </FormModal>
   );
 }

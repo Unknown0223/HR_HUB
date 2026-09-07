@@ -11,6 +11,7 @@ import {
   type OvertimeFormValues,
 } from './OvertimeRequestFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
 
@@ -178,8 +179,9 @@ function OvertimeRequestsInner() {
 
   const allFilteredChecked =
     filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
   const selectedIds = useMemo(() => [...checked], [checked]);
-  const colCount = scope === 'available' ? 10 : 9;
+  const colCount = scope === 'available' ? 9 : 8;
 
   function toggleAll() {
     if (allFilteredChecked) {
@@ -272,21 +274,28 @@ function OvertimeRequestsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="overtime-requests" />
 
-      <div className={styles.scopeTabs}>
-        <button
-          type="button"
-          className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('mine')}
-        >
-          Мои
-        </button>
-        <button
-          type="button"
-          className={scope === 'available' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('available')}
-        >
-          Доступные
-        </button>
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-hourglass-half" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Запросы на сверхурочные</h1>
+          <p className={shared.pageSubtitle}>
+            Согласование заявок на сверхурочную работу и другие типы времени
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
       </div>
 
       <div className={styles.toolbar}>
@@ -296,36 +305,25 @@ function OvertimeRequestsInner() {
             className={styles.createBtn}
             onClick={() => setCreateOpen(true)}
           >
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          {selectedIds.length > 0 ? (
-            <div className={styles.bulkBar}>
-              <span className={styles.bulkCount}>{selectedIds.length}</span>
-              <button
-                type="button"
-                className={styles.bulkOk}
-                disabled={busy}
-                onClick={() => bulkAction('approve', 'Подтвердить')}
-              >
-                Подтвердить
-              </button>
-              <button
-                type="button"
-                className={styles.bulkDanger}
-                disabled={busy}
-                onClick={() => bulkAction('reject', 'Отклонить')}
-              >
-                Отклонить
-              </button>
-              <button
-                type="button"
-                className={styles.bulkClear}
-                onClick={() => setChecked(new Set())}
-              >
-                Сбросить
-              </button>
-            </div>
-          ) : null}
+          <div className={styles.scopeTabs}>
+            <button
+              type="button"
+              className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('mine')}
+            >
+              Мои
+            </button>
+            <button
+              type="button"
+              className={scope === 'available' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('available')}
+            >
+              Доступные
+            </button>
+          </div>
           <FilterPanel
             inline
             urlSync
@@ -348,151 +346,223 @@ function OvertimeRequestsInner() {
           />
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            ↻
-          </button>
-          <span className={styles.pagerMeta}>
-            {filtered.length}/{rows.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={loading}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
       {info ? <p className={styles.info}>{info}</p> : null}
 
+      {selectedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selectedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkOk}`}
+            disabled={busy}
+            onClick={() => void bulkAction('approve', 'Подтвердить')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Подтвердить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void bulkAction('reject', 'Отклонить')}
+          >
+            <i className="fas fa-times" aria-hidden />
+            Отклонить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void bulkAction('delete', 'Удалить')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredChecked}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Дата запроса</th>
-              {scope === 'available' ? (
-                <>
-                  <th>Сотрудник</th>
-                  <th>Подразделение</th>
-                  <th>Должность</th>
-                </>
-              ) : null}
-              <th>Время</th>
-              {scope === 'mine' ? <th>Дата создания</th> : null}
-              <th>Типы времени</th>
-              <th>Примечание</th>
-              {scope === 'mine' ? <th>Примечание руководителя</th> : null}
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={colCount} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredChecked}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate = someFilteredChecked && !allFilteredChecked;
+                    }}
+                    onChange={toggleAll}
+                    disabled={!filtered.length}
+                    title="Выбрать все"
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата запроса</th>
+                {scope === 'available' ? (
+                  <>
+                    <th>Сотрудник</th>
+                    <th>Подразделение</th>
+                    <th>Должность</th>
+                  </>
+                ) : null}
+                <th>Время</th>
+                {scope === 'mine' ? <th>Дата создания</th> : null}
+                <th>Типы времени</th>
+                <th>Примечание</th>
+                {scope === 'mine' ? <th>Примечание руководителя</th> : null}
+                <th>Статус</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={colCount} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              filtered.map((row) => {
-                const st = statusLabel(row.status);
-                return (
-                  <Fragment key={row.id}>
-                    <tr
-                      className={checked.has(row.id) ? styles.rowSelected : undefined}
-                      onClick={() =>
-                        setExpandedId((id) => (id === row.id ? null : row.id))
-                      }
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={checked.has(row.id)}
-                          onChange={(e) => toggleOne(row.id, e)}
-                        />
-                      </td>
-                      <td>{requestDateOf(row)}</td>
-                      {scope === 'available' ? (
-                        <>
-                          <td>{empName(row.employee)}</td>
-                          <td>{row.employee.division?.name || '—'}</td>
-                          <td>{row.employee.position?.name || '—'}</td>
-                        </>
-                      ) : null}
-                      <td>{timeOf(row)}</td>
-                      {scope === 'mine' ? <td>{fmtDt(row.createdAt)}</td> : null}
-                      <td>{timeTypeOf(row)}</td>
-                      <td>{noteOf(row)}</td>
-                      {scope === 'mine' ? <td>{managerNoteOf(row)}</td> : null}
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
-                    </tr>
-                    {expandedId === row.id ? (
-                      <tr className={styles.actionsRow}>
-                        <td colSpan={colCount}>
-                          <div className={styles.rowActions}>
-                            {(row.status === 'pending' ||
-                              row.status === 'draft' ||
-                              row.status === 'rejected') && (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => setEditRow(row)}
-                              >
-                                Изменить
-                              </button>
-                            )}
-                            {row.status === 'pending' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void review(row.id, 'approved')}
-                                >
-                                  Подтвердить
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void review(row.id, 'rejected')}
-                                >
-                                  Отклонить
-                                </button>
-                              </>
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void remove(row.id)}
-                            >
-                              Удалить
-                            </button>
-                          </div>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((row) => {
+                  const st = statusLabel(row.status);
+                  const isChecked = checked.has(row.id);
+                  const expanded = expandedId === row.id;
+                  return (
+                    <Fragment key={row.id}>
+                      <tr
+                        className={
+                          expanded || isChecked ? styles.rowSelected : undefined
+                        }
+                        onClick={() => setExpandedId(expanded ? null : row.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td className={styles.checkCol}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => toggleOne(row.id, e)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Выбрать ${empName(row.employee)}`}
+                          />
+                        </td>
+                        <td>{requestDateOf(row)}</td>
+                        {scope === 'available' ? (
+                          <>
+                            <td className={styles.empName}>{empName(row.employee)}</td>
+                            <td>{row.employee.division?.name || '—'}</td>
+                            <td>{row.employee.position?.name || '—'}</td>
+                          </>
+                        ) : null}
+                        <td>{timeOf(row)}</td>
+                        {scope === 'mine' ? <td>{fmtDt(row.createdAt)}</td> : null}
+                        <td>{timeTypeOf(row)}</td>
+                        <td>{noteOf(row)}</td>
+                        {scope === 'mine' ? <td>{managerNoteOf(row)}</td> : null}
+                        <td>
+                          <span className={st.cls}>{st.text}</span>
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      {expanded ? (
+                        <tr className={styles.actionsRow}>
+                          <td colSpan={colCount}>
+                            <div className={styles.rowActions}>
+                              {(row.status === 'pending' ||
+                                row.status === 'draft' ||
+                                row.status === 'rejected') && (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => setEditRow(row)}
+                                >
+                                  <i className="fas fa-pen" aria-hidden />
+                                  Изменить
+                                </button>
+                              )}
+                              {row.status === 'pending' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void review(row.id, 'approved')}
+                                  >
+                                    <i className="fas fa-check" aria-hidden />
+                                    Подтвердить
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void review(row.id, 'rejected')}
+                                  >
+                                    <i className="fas fa-times" aria-hidden />
+                                    Отклонить
+                                  </button>
+                                </>
+                              ) : null}
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void remove(row.id)}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <OvertimeRequestFormModal
@@ -532,7 +602,7 @@ function OvertimeRequestsInner() {
 
 export default function OvertimeRequestsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <OvertimeRequestsInner />
     </Suspense>
   );

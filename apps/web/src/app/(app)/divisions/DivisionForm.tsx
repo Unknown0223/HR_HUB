@@ -31,9 +31,18 @@ function todayInput() {
 export function DivisionForm({
   mode,
   divisionId,
+  variant = 'page',
+  formId,
+  onSavingChange,
+  onSaved,
 }: {
   mode: 'create' | 'edit';
   divisionId?: string;
+  /** `modal` renders only the fields; the host supplies chrome and actions. */
+  variant?: 'page' | 'modal';
+  formId?: string;
+  onSavingChange?: (saving: boolean) => void;
+  onSaved?: (id: string) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(mode === 'edit');
@@ -104,6 +113,10 @@ export function DivisionForm({
   }, [loadLookups]);
 
   useEffect(() => {
+    onSavingChange?.(saving);
+  }, [saving, onSavingChange]);
+
+  useEffect(() => {
     if (mode !== 'edit' || !divisionId) return;
     let cancelled = false;
     (async () => {
@@ -165,19 +178,22 @@ export function DivisionForm({
         createdByLabel: 'Admin',
         updatedByLabel: 'Admin',
       };
+      let savedId: string;
       if (mode === 'edit' && divisionId) {
         await apiFetch(`/api/organization/divisions/${divisionId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        router.push(`/divisions/${divisionId}`);
+        savedId = divisionId;
       } else {
         const created = await apiFetch<{ id: string }>('/api/organization/divisions', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        router.push(`/divisions/${created.id}`);
+        savedId = created.id;
       }
+      if (onSaved) onSaved(savedId);
+      else router.push(`/divisions/${savedId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally {
@@ -186,11 +202,146 @@ export function DivisionForm({
   }
 
   if (loading) {
-    return (
+    return variant === 'modal' ? (
+      <p>Загрузка…</p>
+    ) : (
       <div className={styles.wrap}>
         <PageSubnav groupKey="division-form" titleOverride={pageTitle} />
         <p>Загрузка…</p>
       </div>
+    );
+  }
+
+  const fields = (
+    <>
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.grid}>
+        <label>
+          Код
+          <input value={code} onChange={(e) => setCode(e.target.value)} />
+        </label>
+        <label>
+          Порядковый номер
+          <input
+            type="number"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          />
+        </label>
+        <label className={styles.full}>
+          Родитель
+          <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
+            <option value="">Поиск...</option>
+            {divisions.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.full}>
+          Название <span className={styles.req}>*</span>
+          <input required value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className={styles.full}>
+          Группа подразделений
+          <select
+            value={divisionGroupId}
+            onChange={(e) => setDivisionGroupId(e.target.value)}
+          >
+            <option value="">Поиск...</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.full}>
+          Режим работы
+          <select value={scheduleId} onChange={(e) => setScheduleId(e.target.value)}>
+            <option value="">Поиск...</option>
+            {schedules.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {mode === 'edit' ? (
+          <label className={styles.full}>
+            Руководитель
+            <select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+              <option value="">Поиск...</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <label className={styles.full}>
+          Основная локация
+          <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+            <option value="">Поиск...</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Дата открытия <span className={styles.req}>*</span>
+          <input
+            type="date"
+            required
+            value={openedAt}
+            onChange={(e) => setOpenedAt(e.target.value)}
+          />
+        </label>
+        <label>
+          Дата закрытия
+          <input
+            type="date"
+            value={closedAt}
+            onChange={(e) => setClosedAt(e.target.value)}
+            placeholder="Выбрать дату"
+          />
+        </label>
+        <label className={styles.full}>
+          Юридическое лицо
+          <input
+            placeholder="Поиск..."
+            value={legalEntity}
+            onChange={(e) => setLegalEntity(e.target.value)}
+          />
+        </label>
+        <div className={styles.switchRow}>
+          <span className={styles.switchLabel}>Статус</span>
+          <label className={styles.switch}>
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            <span className={styles.switchTrack} />
+            <span className={styles.switchText}>
+              {isActive ? 'Активный' : 'Неактивный'}
+            </span>
+          </label>
+        </div>
+      </div>
+    </>
+  );
+
+  if (variant === 'modal') {
+    return (
+      <form id={formId} onSubmit={onSave} className={styles.modalForm}>
+        {fields}
+      </form>
     );
   }
 
@@ -218,126 +369,7 @@ export function DivisionForm({
           </button>
         </div>
 
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.grid}>
-          <label>
-            Код
-            <input value={code} onChange={(e) => setCode(e.target.value)} />
-          </label>
-          <label>
-            Порядковый номер
-            <input
-              type="number"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-            />
-          </label>
-          <label className={styles.full}>
-            Родитель
-            <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
-              <option value="">Поиск...</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.full}>
-            Название <span className={styles.req}>*</span>
-            <input required value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label className={styles.full}>
-            Группа подразделений
-            <select
-              value={divisionGroupId}
-              onChange={(e) => setDivisionGroupId(e.target.value)}
-            >
-              <option value="">Поиск...</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.full}>
-            Режим работы
-            <select value={scheduleId} onChange={(e) => setScheduleId(e.target.value)}>
-              <option value="">Поиск...</option>
-              {schedules.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {mode === 'edit' ? (
-            <label className={styles.full}>
-              Руководитель
-              <select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-                <option value="">Поиск...</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <label className={styles.full}>
-            Основная локация
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              <option value="">Поиск...</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Дата открытия <span className={styles.req}>*</span>
-            <input
-              type="date"
-              required
-              value={openedAt}
-              onChange={(e) => setOpenedAt(e.target.value)}
-            />
-          </label>
-          <label>
-            Дата закрытия
-            <input
-              type="date"
-              value={closedAt}
-              onChange={(e) => setClosedAt(e.target.value)}
-              placeholder="Выбрать дату"
-            />
-          </label>
-          <label className={styles.full}>
-            Юридическое лицо
-            <input
-              placeholder="Поиск..."
-              value={legalEntity}
-              onChange={(e) => setLegalEntity(e.target.value)}
-            />
-          </label>
-          <div className={styles.switchRow}>
-            <span className={styles.switchLabel}>Статус</span>
-            <label className={styles.switch}>
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-              <span className={styles.switchTrack} />
-              <span className={styles.switchText}>
-                {isActive ? 'Активный' : 'Неактивный'}
-              </span>
-            </label>
-          </div>
-        </div>
+        {fields}
       </form>
     </div>
   );

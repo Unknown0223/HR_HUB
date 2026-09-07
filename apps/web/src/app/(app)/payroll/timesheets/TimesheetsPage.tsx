@@ -5,17 +5,20 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ListBulkBar, runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
+import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { formatMonthRu } from '@/lib/fine-policies';
-import { padNumber, type TimesheetSettings, type TimesheetSheetRow } from '@/lib/timesheets';
-import styles from '../../catalog/absence-types/page.module.css';
-import local from './page.module.css';
+import { padNumber, type TimesheetSheetRow } from '@/lib/timesheets';
+import { TimesheetFormModal } from './TimesheetFormModal';
+import { TimesheetSettingsModal } from './TimesheetSettingsModal';
+import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const PATH = '/payroll/timesheets';
 const PAGE_SIZE = 50;
+const COL_COUNT = 6;
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'divisionId', 'month'] as const;
 
 type Opt = { id: string; label: string };
@@ -70,16 +73,9 @@ function TimesheetsInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searchDraft, setSearchDraft] = useState(q);
   const [page, setPage] = useState(1);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<TimesheetSettings>({
-    allTimeTypes: true,
-    timeTypeIds: [],
-    showPlannedDays: true,
-    showPlannedHours: true,
-    showWorkedHours: true,
-    showWorkedDays: true,
-  });
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(filters.number || filters.posted || filters.from || filters.to || filters.divisionId),
   );
@@ -96,8 +92,6 @@ function TimesheetsInner() {
         setCorrections(await apiFetch<CorrectionRow[]>('/api/catalog/timesheet-adjustments'));
       } else {
         setSheets(await apiFetch<TimesheetSheetRow[]>('/api/payroll/timesheets'));
-        const ui = await apiFetch<TimesheetSettings>('/api/payroll/timesheets/settings');
-        setSettings(ui);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -111,8 +105,19 @@ function TimesheetsInner() {
     setSelected(new Set());
     setFocusId(null);
     setPage(1);
+    setCreateMenuOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && tab === 'timesheets') {
+      setModalOpen(true);
+    }
+  }, [searchParams, tab]);
 
   const filteredSheets = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -167,9 +172,11 @@ function TimesheetsInner() {
   const paged = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const pageIds = paged.map((r) => r.id);
-  const selectedRows = (
-    tab === 'corrections' ? corrections : sheets
-  ).filter((r) => selected.has(r.id));
+  const allPageChecked = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageChecked = pageIds.some((id) => selected.has(id)) && !allPageChecked;
+  const selectedRows = (tab === 'corrections' ? corrections : sheets).filter((r) =>
+    selected.has(r.id),
+  );
   const postCount = selectedRows.filter((r) => r.status === 'draft').length;
   const cancelCount = selectedRows.filter((r) => r.status === 'posted').length;
   const deleteCount = selectedRows.filter((r) => r.status !== 'posted').length;
@@ -181,7 +188,18 @@ function TimesheetsInner() {
       else sp.set(k, v);
     }
     const qs = sp.toString();
-    router.replace(qs ? `${PATH}?${qs}` : PATH);
+    router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
+  }
+
+  function openCreate() {
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1') {
+      patchUrl({ create: null });
+    }
   }
 
   async function bulk(kind: 'post' | 'cancel' | 'delete') {
@@ -205,8 +223,6 @@ function TimesheetsInner() {
         );
         if (!ok) return;
         for (const id of ids) {
-          const row = corrections.find((r) => r.id === id);
-          if (!row) continue;
           if (kind === 'post') {
             await apiFetch(`/api/catalog/timesheet-adjustments/${id}/post`, { method: 'POST' });
           } else if (kind === 'cancel') {
@@ -248,6 +264,7 @@ function TimesheetsInner() {
     setError('');
     try {
       if (action === 'delete') {
+        if (!(await confirm({ message: 'Удалить документ?', variant: 'danger' }))) return;
         await apiFetch(`/api/payroll/timesheets/${row.id}`, { method: 'DELETE' });
       } else {
         await apiFetch(`/api/payroll/timesheets/${row.id}/${action}`, { method: 'POST' });
@@ -265,6 +282,7 @@ function TimesheetsInner() {
     setError('');
     try {
       if (action === 'delete') {
+        if (!(await confirm({ message: 'Удалить документ?', variant: 'danger' }))) return;
         await apiFetch(`/api/catalog/timesheet-adjustments/${row.id}`, { method: 'DELETE' });
       } else {
         await apiFetch(`/api/catalog/timesheet-adjustments/${row.id}/${action}`, { method: 'POST' });
@@ -272,22 +290,6 @@ function TimesheetsInner() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveSettings() {
-    setBusy(true);
-    try {
-      const next = await apiFetch<TimesheetSettings>('/api/payroll/timesheets/settings', {
-        method: 'PATCH',
-        body: JSON.stringify(settings),
-      });
-      setSettings(next);
-      setSettingsOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка сохранения настроек');
     } finally {
       setBusy(false);
     }
@@ -322,14 +324,44 @@ function TimesheetsInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="timesheet" />
-      <div className={local.tabs}>
-        <Link href={PATH} className={tab === 'timesheets' ? local.tabOn : local.tab}>
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-calendar-check" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Табели</h1>
+          <p className={shared.pageSubtitle}>
+            Учёт рабочего времени по подразделениям, проведение и корректировки
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.tabs}>
+        <Link href={PATH} className={tab === 'timesheets' ? styles.tabOn : styles.tab}>
+          <i className="fas fa-calendar-alt" aria-hidden />
           Табель
         </Link>
         <Link
           href={`${PATH}?tab=corrections`}
-          className={tab === 'corrections' ? local.tabOn : local.tab}
+          className={tab === 'corrections' ? styles.tabOn : styles.tab}
         >
+          <i className="fas fa-pen-to-square" aria-hidden />
           Корректировки табеля
         </Link>
       </div>
@@ -341,21 +373,28 @@ function TimesheetsInner() {
               <button
                 type="button"
                 className={styles.createBtn}
-                onClick={() => setCreateOpen((v) => !v)}
+                onClick={() => setCreateMenuOpen((v) => !v)}
               >
-                Создать ▾
+                <i className="fas fa-plus" aria-hidden />
+                Создать
               </button>
-              {createOpen ? (
+              {createMenuOpen ? (
                 <div className={styles.createMenu}>
                   <button
                     type="button"
-                    onClick={() => router.push('/catalog/timesheet-adjustments/new')}
+                    onClick={() => {
+                      setCreateMenuOpen(false);
+                      router.push('/catalog/timesheet-adjustments/new');
+                    }}
                   >
                     Корректировка табеля
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.push('/catalog/timesheet-adjustments/new?batch=1')}
+                    onClick={() => {
+                      setCreateMenuOpen(false);
+                      router.push('/catalog/timesheet-adjustments/new?batch=1');
+                    }}
                   >
                     Корректировка табеля списком
                   </button>
@@ -363,45 +402,11 @@ function TimesheetsInner() {
               ) : null}
             </div>
           ) : (
-            <Link href={`${PATH}/new`} className={styles.createBtn}>
+            <button type="button" className={styles.createBtn} onClick={openCreate}>
+              <i className="fas fa-plus" aria-hidden />
               Создать
-            </Link>
-          )}
-          <ListBulkBar
-            count={selected.size}
-            busy={busy}
-            onClear={() => setSelected(new Set())}
-            actions={[
-              { key: 'post', label: 'Провести', count: postCount, onClick: () => void bulk('post') },
-              { key: 'cancel', label: 'Отменить', count: cancelCount, variant: 'danger', onClick: () => void bulk('cancel') },
-              { key: 'delete', label: 'Удалить', count: deleteCount, variant: 'danger', onClick: () => void bulk('delete') },
-            ]}
-          />
-          {tab === 'timesheets' ? (
-            <button type="button" className={local.btnSettings} onClick={() => setSettingsOpen(true)}>
-              Настройки
             </button>
-          ) : null}
-        </div>
-        <div className={styles.rightTools}>
-          <label className={local.monthFilter}>
-            месяц
-            <input
-              type="date"
-              placeholder="Выбрать дату"
-              value={monthFilter}
-              onChange={(e) => patchUrl({ month: e.target.value || null })}
-            />
-          </label>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
-            }}
-          />
+          )}
           <FilterPanel
             inline
             urlSync
@@ -419,321 +424,405 @@ function TimesheetsInner() {
               { type: 'postedChecks', key: 'posted', label: 'Проведен' },
             ]}
           />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <span className={styles.pagerMeta}>
-            {paged.length}/{filteredRows.length}
+          {tab === 'timesheets' ? (
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => setSettingsOpen(true)}
+            >
+              <i className="fas fa-cog" aria-hidden />
+              Настройки
+            </button>
+          ) : null}
+        </div>
+
+        <div className={styles.rightTools}>
+          <label className={styles.monthFilter}>
+            месяц
+            <input
+              type="month"
+              value={monthFilter ? monthFilter.slice(0, 7) : ''}
+              onChange={(e) =>
+                patchUrl({ month: e.target.value ? `${e.target.value}-01` : null })
+              }
+            />
+          </label>
+          <span className={styles.countBadge}>
+            {filteredRows.length} /{' '}
+            {tab === 'corrections' ? corrections.length : sheets.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ‹
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
           >
-            ›
+            <i className="fas fa-file-csv" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
+          <div className={styles.pager}>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Предыдущая страница"
+            >
+              <i className="fas fa-chevron-left" aria-hidden />
+            </button>
+            <span className={styles.pagerMeta}>
+              {Math.min(page, pageCount)} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              disabled={page >= pageCount}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Следующая страница"
+            >
+              <i className="fas fa-chevron-right" aria-hidden />
+            </button>
+          </div>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
-      {loading ? <p className={styles.muted}>Загрузка…</p> : null}
+
+      {selected.size > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selected.size}</strong>
+          </span>
+          {postCount > 0 ? (
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={busy}
+              onClick={() => void bulk('post')}
+            >
+              <i className="fas fa-check" aria-hidden />
+              Провести ({postCount})
+            </button>
+          ) : null}
+          {cancelCount > 0 ? (
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={busy}
+              onClick={() => void bulk('cancel')}
+            >
+              <i className="fas fa-rotate-left" aria-hidden />
+              Отменить ({cancelCount})
+            </button>
+          ) : null}
+          {deleteCount > 0 ? (
+            <button
+              type="button"
+              className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+              disabled={busy}
+              onClick={() => void bulk('delete')}
+            >
+              <i className="fas fa-trash" aria-hidden />
+              Удалить ({deleteCount})
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setSelected(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
 
       {tab === 'corrections' ? (
-        <p className={local.listTab}>Корректировки табеля списком</p>
+        <p className={styles.listTab}>Корректировки табеля списком</p>
       ) : null}
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={pageIds.length > 0 && pageIds.every((id) => selected.has(id))}
-                  onChange={(e) => setSelected(togglePage(selected, pageIds, e.target.checked))}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              {tab === 'corrections' ? (
-                <>
-                  <th>Номер</th>
-                  <th>Сотрудники</th>
-                  <th>Подразделение</th>
-                  <th>Дата корректировки</th>
-                  <th>Проведен</th>
-                </>
-              ) : (
-                <>
-                  <th>
-                    Дата
-                    <span className={local.sortMark}>↑</span>
-                  </th>
-                  <th>Номер</th>
-                  <th>Месяц</th>
-                  <th>Подразделение</th>
-                  <th>Проведен</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {paged.length === 0 && !loading ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) =>
+                      setSelected(togglePage(selected, pageIds, e.target.checked))
+                    }
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                {tab === 'corrections' ? (
+                  <>
+                    <th>Номер</th>
+                    <th>Сотрудники</th>
+                    <th>Подразделение</th>
+                    <th>Дата корректировки</th>
+                    <th>Проведен</th>
+                  </>
+                ) : (
+                  <>
+                    <th>
+                      Дата <span className={styles.sortMark}>↑</span>
+                    </th>
+                    <th>Номер</th>
+                    <th>Месяц</th>
+                    <th>Подразделение</th>
+                    <th>Проведен</th>
+                  </>
+                )}
               </tr>
-            ) : null}
-            {tab === 'timesheets'
-              ? (paged as TimesheetSheetRow[]).map((row) => {
-                  const open = focusId === row.id;
-                  return (
-                    <Fragment key={row.id}>
-                      <tr
-                        onClick={() => setFocusId(open ? null : row.id)}
-                        style={{ cursor: 'pointer' }}
-                        className={open || selected.has(row.id) ? styles.rowSelected : undefined}
-                      >
-                        <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(row.id)}
-                            onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                          />
-                        </td>
-                        <td>{fmtDate(row.docDate)}</td>
-                        <td>{padNumber(row.number) || '—'}</td>
-                        <td>{formatMonthRu(row.month)}</td>
-                        <td>{row.division?.name || ''}</td>
-                        <td>
-                          {row.status === 'posted' ? (
-                            <span className={styles.postedYes}>Да</span>
-                          ) : (
-                            <span className={styles.postedNo}>
-                              {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                      {open ? (
-                        <tr className={styles.actionsRow}>
-                          <td colSpan={6}>
-                            <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
-                              <Link href={`${PATH}/${row.id}`}>Просмотреть</Link>
-                              {row.status === 'draft' ? (
-                                <Link href={`${PATH}/${row.id}/edit`}>Изменить</Link>
-                              ) : null}
-                              {row.status === 'posted' ? (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void runSheet(row, 'cancel')}
-                                >
-                                  Отменить
-                                </button>
-                              ) : null}
-                              {row.status === 'draft' ? (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void runSheet(row, 'post')}
-                                >
-                                  Провести
-                                </button>
-                              ) : null}
-                              {row.status !== 'posted' ? (
-                                <button
-                                  type="button"
-                                  className={styles.danger}
-                                  disabled={busy}
-                                  onClick={() => void runSheet(row, 'delete')}
-                                >
-                                  Удалить
-                                </button>
-                              ) : null}
-                            </div>
+            </thead>
+            <tbody>
+              {loading && paged.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && paged.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {tab === 'timesheets'
+                ? (paged as TimesheetSheetRow[]).map((row) => {
+                    const open = focusId === row.id;
+                    const isChecked = selected.has(row.id);
+                    return (
+                      <Fragment key={row.id}>
+                        <tr
+                          onClick={() => setFocusId(open ? null : row.id)}
+                          style={{ cursor: 'pointer' }}
+                          className={open || isChecked ? styles.rowSelected : undefined}
+                        >
+                          <td
+                            className={styles.checkCol}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) =>
+                                setSelected(toggleSelect(selected, row.id, e.target.checked))
+                              }
+                              aria-label={`Выбрать ${padNumber(row.number) || 'табель'}`}
+                            />
+                          </td>
+                          <td className={styles.dateCell}>{fmtDate(row.docDate)}</td>
+                          <td className={styles.docNumber}>{padNumber(row.number) || '—'}</td>
+                          <td className={styles.nameCell}>{formatMonthRu(row.month)}</td>
+                          <td className={styles.noteCell}>{row.division?.name || '—'}</td>
+                          <td>
+                            {row.status === 'posted' ? (
+                              <span className={styles.statusPosted}>Проведен</span>
+                            ) : row.status === 'cancelled' ? (
+                              <span className={styles.statusCancelled}>Отменен</span>
+                            ) : (
+                              <span className={styles.statusDraft}>Черновик</span>
+                            )}
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })
-              : (paged as CorrectionRow[]).map((row) => {
-                  const open = focusId === row.id;
-                  return (
-                    <Fragment key={row.id}>
-                      <tr
-                        onClick={() => setFocusId(open ? null : row.id)}
-                        style={{ cursor: 'pointer' }}
-                        className={open || selected.has(row.id) ? styles.rowSelected : undefined}
-                      >
-                        <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(row.id)}
-                            onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                          />
-                        </td>
-                        <td>{row.number || '—'}</td>
-                        <td>{employeesLabel(row)}</td>
-                        <td>{row.division?.name || ''}</td>
-                        <td>{fmtDate(row.periodFrom)}</td>
-                        <td>
-                          {row.status === 'posted' ? (
-                            <span className={styles.postedYes}>Да</span>
-                          ) : (
-                            <span className={styles.postedNo}>Нет</span>
-                          )}
-                        </td>
-                      </tr>
-                      {open ? (
-                        <tr className={styles.actionsRow}>
-                          <td colSpan={6}>
-                            <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
-                              <Link href={`/catalog/timesheet-adjustments/${row.id}`}>
-                                {row.status === 'draft' ? 'Изменить' : 'Просмотреть'}
-                              </Link>
-                              {row.status === 'draft' ? (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void runCorrection(row, 'post')}
-                                >
-                                  Провести
-                                </button>
-                              ) : null}
-                              {row.status === 'posted' ? (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void runCorrection(row, 'cancel')}
-                                >
-                                  Отменить
-                                </button>
-                              ) : null}
-                              {row.status !== 'posted' ? (
-                                <button
-                                  type="button"
-                                  className={styles.danger}
-                                  disabled={busy}
-                                  onClick={() => void runCorrection(row, 'delete')}
-                                >
-                                  Удалить
-                                </button>
-                              ) : null}
-                            </div>
+                        {open ? (
+                          <tr className={styles.actionsRow}>
+                            <td colSpan={COL_COUNT}>
+                              <div className={styles.rowActions}>
+                                <Link href={`${PATH}/${row.id}`}>
+                                  <i className="fas fa-eye" aria-hidden />
+                                  Просмотреть
+                                </Link>
+                                {row.status === 'draft' ? (
+                                  <Link href={`${PATH}/${row.id}/edit`}>
+                                    <i className="fas fa-pen" aria-hidden />
+                                    Изменить
+                                  </Link>
+                                ) : null}
+                                {row.status === 'draft' ? (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void runSheet(row, 'post')}
+                                  >
+                                    <i className="fas fa-check" aria-hidden />
+                                    Провести
+                                  </button>
+                                ) : null}
+                                {row.status === 'posted' ? (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void runSheet(row, 'cancel')}
+                                  >
+                                    <i className="fas fa-rotate-left" aria-hidden />
+                                    Отменить
+                                  </button>
+                                ) : null}
+                                {row.status !== 'posted' ? (
+                                  <button
+                                    type="button"
+                                    className={styles.danger}
+                                    disabled={busy}
+                                    onClick={() => void runSheet(row, 'delete')}
+                                  >
+                                    <i className="fas fa-trash" aria-hidden />
+                                    Удалить
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })
+                : (paged as CorrectionRow[]).map((row) => {
+                    const open = focusId === row.id;
+                    const isChecked = selected.has(row.id);
+                    return (
+                      <Fragment key={row.id}>
+                        <tr
+                          onClick={() => setFocusId(open ? null : row.id)}
+                          style={{ cursor: 'pointer' }}
+                          className={open || isChecked ? styles.rowSelected : undefined}
+                        >
+                          <td
+                            className={styles.checkCol}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) =>
+                                setSelected(toggleSelect(selected, row.id, e.target.checked))
+                              }
+                              aria-label={`Выбрать ${row.number || 'корректировку'}`}
+                            />
+                          </td>
+                          <td className={styles.docNumber}>{row.number || '—'}</td>
+                          <td className={styles.nameCell}>{employeesLabel(row)}</td>
+                          <td className={styles.noteCell}>{row.division?.name || '—'}</td>
+                          <td className={styles.dateCell}>{fmtDate(row.periodFrom)}</td>
+                          <td>
+                            {row.status === 'posted' ? (
+                              <span className={styles.statusPosted}>Проведен</span>
+                            ) : (
+                              <span className={styles.statusDraft}>Черновик</span>
+                            )}
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-          </tbody>
-        </table>
+                        {open ? (
+                          <tr className={styles.actionsRow}>
+                            <td colSpan={COL_COUNT}>
+                              <div className={styles.rowActions}>
+                                <Link href={`/catalog/timesheet-adjustments/${row.id}`}>
+                                  <i
+                                    className={
+                                      row.status === 'draft' ? 'fas fa-pen' : 'fas fa-eye'
+                                    }
+                                    aria-hidden
+                                  />
+                                  {row.status === 'draft' ? 'Изменить' : 'Просмотреть'}
+                                </Link>
+                                {row.status === 'draft' ? (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void runCorrection(row, 'post')}
+                                  >
+                                    <i className="fas fa-check" aria-hidden />
+                                    Провести
+                                  </button>
+                                ) : null}
+                                {row.status === 'posted' ? (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void runCorrection(row, 'cancel')}
+                                  >
+                                    <i className="fas fa-rotate-left" aria-hidden />
+                                    Отменить
+                                  </button>
+                                ) : null}
+                                {row.status !== 'posted' ? (
+                                  <button
+                                    type="button"
+                                    className={styles.danger}
+                                    disabled={busy}
+                                    onClick={() => void runCorrection(row, 'delete')}
+                                  >
+                                    <i className="fas fa-trash" aria-hidden />
+                                    Удалить
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{paged.length}</strong> из <strong>{filteredRows.length}</strong>
+          </p>
+        </div>
       </div>
 
-      {settingsOpen ? (
-        <div className={styles.modalBackdrop} onClick={() => setSettingsOpen(false)}>
-          <div className={local.settingsModal} onClick={(e) => e.stopPropagation()}>
-            <div className={local.settingsHead}>
-              <h2>Настройки табеля</h2>
-              <button type="button" className={local.settingsClose} onClick={() => setSettingsOpen(false)}>
-                ×
-              </button>
-            </div>
-            <div className={local.settingsBody}>
-              <div>
-                <div className={local.settingsSection}>Выберите виды рабочего времени *</div>
-                <div className={local.settingsBox}>
-                  <label className={local.settingsCheck}>
-                    <input
-                      type="checkbox"
-                      checked={settings.allTimeTypes}
-                      onChange={(e) =>
-                        setSettings((s) => ({ ...s, allTimeTypes: e.target.checked }))
-                      }
-                    />
-                    Все виды рабочего времени
-                  </label>
-                </div>
-              </div>
-              <div>
-                <div className={local.settingsSection}>Настройки по детали</div>
-                <div className={local.settingsGrid}>
-                  <label className={local.settingsCheck}>
-                    <input
-                      type="checkbox"
-                      checked={settings.showPlannedDays}
-                      onChange={(e) =>
-                        setSettings((s) => ({ ...s, showPlannedDays: e.target.checked }))
-                      }
-                    />
-                    По плану (дней)
-                  </label>
-                  <label className={local.settingsCheck}>
-                    <input
-                      type="checkbox"
-                      checked={settings.showWorkedHours}
-                      onChange={(e) =>
-                        setSettings((s) => ({ ...s, showWorkedHours: e.target.checked }))
-                      }
-                    />
-                    Отработано часов
-                  </label>
-                  <label className={local.settingsCheck}>
-                    <input
-                      type="checkbox"
-                      checked={settings.showPlannedHours}
-                      onChange={(e) =>
-                        setSettings((s) => ({ ...s, showPlannedHours: e.target.checked }))
-                      }
-                    />
-                    По плану (часы)
-                  </label>
-                  <label className={local.settingsCheck}>
-                    <input
-                      type="checkbox"
-                      checked={settings.showWorkedDays}
-                      onChange={(e) =>
-                        setSettings((s) => ({ ...s, showWorkedDays: e.target.checked }))
-                      }
-                    />
-                    Отработано дней
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div className={local.settingsFoot}>
-              <button type="button" className={local.btnPost} onClick={() => void saveSettings()}>
-                Сохранить
-              </button>
-              <button type="button" className={local.btnSettings} onClick={() => setSettingsOpen(false)}>
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TimesheetFormModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSaved={(id, openAfter) => {
+          closeModal();
+          if (openAfter && id) router.push(`${PATH}/${id}/edit`);
+          else void load();
+        }}
+      />
+
+      <TimesheetSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => undefined}
+      />
     </div>
   );
 }
 
 export function TimesheetsPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <TimesheetsInner />
     </Suspense>
   );

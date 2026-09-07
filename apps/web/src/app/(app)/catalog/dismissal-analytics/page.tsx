@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
 type NamedCount = { label: string; count: number; id?: string | null };
@@ -25,20 +26,20 @@ type Dashboard = {
   tenure: NamedCount[];
 };
 
-const SKY = '#8ecae6';
+const SKY = '#cbe6fa';
 const FLOW_COLORS = [
-  '#7dcea0',
-  '#76d7c4',
-  '#85c1e9',
-  '#a569bd',
-  '#f1948a',
-  '#f5b041',
-  '#5dade2',
-  '#58d68d',
-  '#bb8fce',
-  '#f7dc6f',
-  '#7fb3d5',
-  '#e59866',
+  '#0a85e2',
+  '#0e9f6e',
+  '#6366f1',
+  '#7c3aed',
+  '#e11d48',
+  '#d97706',
+  '#0ea5e9',
+  '#14b8a6',
+  '#a855f7',
+  '#f59e0b',
+  '#3b82f6',
+  '#ec4899',
 ];
 
 function fmtMoney(n: number) {
@@ -314,10 +315,30 @@ function DismissalDashboardInner() {
   const kpis = useMemo(() => {
     if (!data) return [];
     return [
-      { label: 'Увольнений', value: fmtNum(data.kpis.dismissals) },
-      { label: 'Стаж работы', value: fmtNum(data.kpis.avgTenureYears) },
-      { label: 'Средний возраст', value: fmtNum(data.kpis.avgAge) },
-      { label: 'Средний оклад', value: fmtMoney(data.kpis.avgSalary) },
+      {
+        label: 'Увольнений',
+        value: fmtNum(data.kpis.dismissals),
+        icon: 'fa-user-minus',
+        tone: styles.kpiDanger,
+      },
+      {
+        label: 'Стаж работы, лет',
+        value: fmtNum(data.kpis.avgTenureYears),
+        icon: 'fa-hourglass-half',
+        tone: styles.kpiAccent,
+      },
+      {
+        label: 'Средний возраст',
+        value: fmtNum(data.kpis.avgAge),
+        icon: 'fa-user-clock',
+        tone: styles.kpiViolet,
+      },
+      {
+        label: 'Средний оклад',
+        value: fmtMoney(data.kpis.avgSalary),
+        icon: 'fa-wallet',
+        tone: styles.kpiOk,
+      },
     ];
   }, [data]);
 
@@ -325,35 +346,40 @@ function DismissalDashboardInner() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.head}>
-        <PageSubnav groupKey="dismissal-analytics" />
-        <button
-          type="button"
-          className={styles.filterIcon}
-          title="Фильтр"
-          aria-label="Фильтр"
-          onClick={() => setFiltersOpen((v) => !v)}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-              d="M4 6h16M7 12h10M10 18h4"
-              stroke="#f1c40f"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-            />
-            <path d="M4 6l5 6v5l6 3v-8l5-6H4z" fill="#f1c40f" opacity="0.35" />
-          </svg>
-        </button>
+      <PageSubnav groupKey="dismissal-analytics" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeIncident}`}>
+          <i className="fas fa-user-minus" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Причины увольнений</h1>
+          <p className={shared.pageSubtitle}>
+            Аналитика выбытия персонала: подразделения, должности, стаж и направления ухода
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <button
+            type="button"
+            className={`${styles.filterBtn} ${filtersOpen ? styles.filterBtnActive : ''}`}
+            title="Фильтр по периоду"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            <i className="fas fa-sliders-h" aria-hidden />
+            Фильтр
+          </button>
+        </div>
       </div>
 
       {filtersOpen ? (
         <div className={styles.filterPanel}>
           <label>
-            С
+            Период с
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </label>
           <label>
-            По
+            Период по
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </label>
           <button type="button" className={styles.applyBtn} onClick={() => void load()}>
@@ -379,20 +405,36 @@ function DismissalDashboardInner() {
         <>
           <div className={styles.kpiRow}>
             {kpis.map((k) => (
-              <div key={k.label} className={styles.kpi}>
-                <div className={styles.kpiValue}>{k.value}</div>
-                <div className={styles.kpiLabel}>{k.label}</div>
+              <div key={k.label} className={`${styles.kpi} ${k.tone}`}>
+                <div className={styles.kpiIcon}>
+                  <i className={`fas ${k.icon}`} aria-hidden />
+                </div>
+                <div className={styles.kpiText}>
+                  <div className={styles.kpiValue}>{k.value}</div>
+                  <div className={styles.kpiLabel}>{k.label}</div>
+                </div>
               </div>
             ))}
           </div>
 
           <div className={styles.gridTop}>
             <section className={styles.card}>
-              <h2>Число увольнений</h2>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Увольнения по подразделениям</h2>
+                  <p className={styles.cardSub}>Топ подразделений по числу увольнений</p>
+                </div>
+                <span className={styles.cardCount}>{data.byDivision.length}</span>
+              </div>
               <HBarChart items={data.byDivision} />
             </section>
             <section className={styles.card}>
-              <h2>Откуда пришёл</h2>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Источник найма</h2>
+                  <p className={styles.cardSub}>Откуда пришёл сотрудник</p>
+                </div>
+              </div>
               {sourceItems.length ? (
                 <HBarChart items={sourceItems} maxItems={8} />
               ) : (
@@ -400,25 +442,52 @@ function DismissalDashboardInner() {
               )}
             </section>
             <section className={`${styles.card} ${styles.cardFlow}`}>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Причина → направление ухода</h2>
+                  <p className={styles.cardSub}>Потоки увольнений по причинам</p>
+                </div>
+              </div>
               <FlowChart flows={data.flows} />
             </section>
           </div>
 
           <div className={styles.gridBottom}>
             <section className={styles.card}>
-              <h2>Число увольнений</h2>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Увольнения по должностям</h2>
+                  <p className={styles.cardSub}>Топ должностей за период</p>
+                </div>
+                <span className={styles.cardCount}>{data.byPosition.length}</span>
+              </div>
               <HBarChart items={data.byPosition} maxItems={16} />
             </section>
             <section className={styles.card}>
-              <h2>Ценность</h2>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Ценность сотрудника</h2>
+                  <p className={styles.cardSub}>Распределение по оценке</p>
+                </div>
+              </div>
               <VBarChart items={data.value} />
             </section>
             <section className={styles.card}>
-              <h2>Уровень зарплаты</h2>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Уровень зарплаты</h2>
+                  <p className={styles.cardSub}>Распределение по диапазонам</p>
+                </div>
+              </div>
               <VBarChart items={data.salaryLevel} />
             </section>
             <section className={styles.card}>
-              <h2>Стаж работы</h2>
+              <div className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.cardTitle}>Стаж работы</h2>
+                  <p className={styles.cardSub}>Сколько отработали до ухода</p>
+                </div>
+              </div>
               <VBarChart items={data.tenure} />
             </section>
           </div>

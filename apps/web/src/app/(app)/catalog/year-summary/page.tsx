@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
 type MonthPoint = { month: number; label: string; count: number };
@@ -84,11 +85,13 @@ type WidgetId =
   | 'accrued'
   | 'withheld';
 
-const TEAL = '#57c7af';
-const RED = '#e8534a';
-const ORANGE = '#f0c674';
-const BLUE = '#4a90e2';
-const PINK = '#f06292';
+const TEAL = '#0e9f6e';
+const RED = '#e11d48';
+const ORANGE = '#d97706';
+const BLUE = '#0a85e2';
+const PINK = '#ec4899';
+const GRID = '#eef3f9';
+const AXIS_INK = '#64788f';
 
 function fmt(n: number, digits = 0) {
   if (!Number.isFinite(n)) return '0';
@@ -149,8 +152,8 @@ function LineChart({ points }: { points: MonthPoint[] }) {
         const y = yAt(v);
         return (
           <g key={i}>
-            <line x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke="#eef0f4" />
-            <text x={pad.l - 6} y={y + 3} textAnchor="end" fontSize="10" fill="#95a5a6">
+            <line x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke={GRID} />
+            <text x={pad.l - 6} y={y + 3} textAnchor="end" fontSize="10" fill={AXIS_INK}>
               {Math.round(v)}
             </text>
           </g>
@@ -167,7 +170,7 @@ function LineChart({ points }: { points: MonthPoint[] }) {
           y={H - 10}
           textAnchor="middle"
           fontSize="10"
-          fill="#95a5a6"
+          fill={AXIS_INK}
         >
           {p.label}
         </text>
@@ -203,7 +206,7 @@ function TurnoverChart({ points }: { points: TurnoverPoint[] }) {
         {[0, 0.25, 0.5, 0.75, 1].map((f) => {
           const y = pad.t + ch * (1 - f);
           return (
-            <line key={f} x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke="#eef0f4" />
+            <line key={f} x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke={GRID} />
           );
         })}
         {points.map((p, i) => {
@@ -233,7 +236,7 @@ function TurnoverChart({ points }: { points: TurnoverPoint[] }) {
                 y={H - 10}
                 textAnchor="middle"
                 fontSize="10"
-                fill="#95a5a6"
+                fill={AXIS_INK}
               >
                 {p.label}
               </text>
@@ -247,7 +250,7 @@ function TurnoverChart({ points }: { points: TurnoverPoint[] }) {
             <circle key={`t-${p.month}`} cx={x} cy={tY(p.turnoverPct)} r={3} fill={ORANGE} />
           );
         })}
-        <text x={W - pad.r + 4} y={pad.t + 8} fontSize="9" fill="#95a5a6">
+        <text x={W - pad.r + 4} y={pad.t + 8} fontSize="9" fill={AXIS_INK}>
           %
         </text>
       </svg>
@@ -299,15 +302,15 @@ function AreaChart({ points }: { points: ViolationPoint[] }) {
           const v = Math.round(max * f);
           return (
             <g key={f}>
-              <line x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke="#eef0f4" />
-              <text x={pad.l - 6} y={y + 3} textAnchor="end" fontSize="10" fill="#95a5a6">
+              <line x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke={GRID} />
+              <text x={pad.l - 6} y={y + 3} textAnchor="end" fontSize="10" fill={AXIS_INK}>
                 {v}
               </text>
             </g>
           );
         })}
-        <path d={areaPath('earlyLeaveMinutes')} fill="rgba(240,198,116,0.45)" />
-        <path d={areaPath('lateMinutes')} fill="rgba(87,199,175,0.4)" />
+        <path d={areaPath('earlyLeaveMinutes')} fill="rgba(217,119,6,0.18)" />
+        <path d={areaPath('lateMinutes')} fill="rgba(14,159,110,0.2)" />
         <path
           d={points
             .map(
@@ -334,7 +337,7 @@ function AreaChart({ points }: { points: ViolationPoint[] }) {
             y={H - 10}
             textAnchor="middle"
             fontSize="10"
-            fill="#95a5a6"
+            fill={AXIS_INK}
           >
             {p.label}
           </text>
@@ -371,7 +374,7 @@ function GenderDonut({
   return (
     <div className={styles.donutWrap}>
       <svg viewBox="0 0 140 140" className={styles.donut}>
-        <circle cx="70" cy="70" r={r} fill="none" stroke="#f0f2f5" strokeWidth="22" />
+        <circle cx="70" cy="70" r={r} fill="none" stroke="#eef3f9" strokeWidth="22" />
         <circle
           cx="70"
           cy="70"
@@ -419,11 +422,11 @@ function EmptyState({ message }: { message?: string }) {
         viewBox="0 0 72 56"
         aria-hidden
       >
-        <rect x="4" y="28" width="10" height="24" rx="2" fill="#d5d8dc" />
-        <rect x="18" y="16" width="10" height="36" rx="2" fill="#d5d8dc" />
-        <rect x="32" y="8" width="10" height="44" rx="2" fill="#d5d8dc" />
-        <rect x="46" y="20" width="10" height="32" rx="2" fill="#d5d8dc" />
-        <rect x="60" y="12" width="10" height="40" rx="2" fill="#d5d8dc" />
+        <rect x="4" y="28" width="10" height="24" rx="2" fill="#cbd8e6" />
+        <rect x="18" y="16" width="10" height="36" rx="2" fill="#cbd8e6" />
+        <rect x="32" y="8" width="10" height="44" rx="2" fill="#cbd8e6" />
+        <rect x="46" y="20" width="10" height="32" rx="2" fill="#cbd8e6" />
+        <rect x="60" y="12" width="10" height="40" rx="2" fill="#cbd8e6" />
       </svg>
       <span>{message || 'Не было получено данных по этому запросу'}</span>
     </div>
@@ -782,8 +785,17 @@ function YearSummaryInner() {
   if (loading && !data) {
     return (
       <div className={styles.wrap}>
-        <div className={styles.head}>
-          <PageSubnav groupKey="year-summary" />
+        <PageSubnav groupKey="year-summary" />
+        <div className={shared.pageHeader}>
+          <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+            <i className="fas fa-chart-pie" aria-hidden />
+          </div>
+          <div className={shared.pageHeaderText}>
+            <h1 className={shared.pageTitle}>Итоги года</h1>
+            <p className={shared.pageSubtitle}>
+              Численность, текучесть, посещаемость и ФОТ в одном дашборде
+            </p>
+          </div>
         </div>
         <div className={styles.loading}>Загрузка итогов года…</div>
       </div>
@@ -792,55 +804,63 @@ function YearSummaryInner() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.head}>
-        <PageSubnav groupKey="year-summary" />
-        <div className={styles.headTools}>
-          <button
-            type="button"
-            className={styles.filterIcon}
-            title="Фильтр"
-            aria-label="Фильтр"
-            onClick={() => setFiltersOpen((v) => !v)}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-              <path
-                d="M4 6h16M7 12h10M10 18h4"
-                stroke="#f1c40f"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                fill="none"
-              />
-              <path d="M4 6l5 6v5l6 3v-8l5-6H4z" fill="#f1c40f" opacity="0.35" />
-            </svg>
-          </button>
+      <PageSubnav groupKey="year-summary" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-chart-pie" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Итоги года</h1>
+          <p className={shared.pageSubtitle}>
+            Численность, текучесть, посещаемость и ФОТ в одном дашборде
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.headTools}>
+            <span className={styles.yearPill}>
+              <i className="fas fa-calendar-alt" aria-hidden />
+              {data ? data.year : year}
+            </span>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${filtersOpen ? styles.filterBtnActive : ''}`}
+              title="Фильтр"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              <i className="fas fa-sliders-h" aria-hidden />
+              Фильтр
+            </button>
+
+            {filtersOpen ? (
+              <aside className={styles.filterPanel}>
+                <h3>Фильтр</h3>
+                <label>
+                  Год
+                  <input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={draftYear}
+                    onChange={(e) => setDraftYear(Number(e.target.value) || draftYear)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={styles.applyBtn}
+                  onClick={() => {
+                    setYear(draftYear);
+                    setFiltersOpen(false);
+                  }}
+                >
+                  Применить
+                </button>
+              </aside>
+            ) : null}
+          </div>
         </div>
       </div>
-
-      {filtersOpen ? (
-        <aside className={styles.filterPanel}>
-          <h3>Фильтр</h3>
-          <label>
-            Год
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={draftYear}
-              onChange={(e) => setDraftYear(Number(e.target.value) || draftYear)}
-            />
-          </label>
-          <button
-            type="button"
-            className={styles.applyBtn}
-            onClick={() => {
-              setYear(draftYear);
-              setFiltersOpen(false);
-            }}
-          >
-            Применить
-          </button>
-        </aside>
-      ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
@@ -1054,7 +1074,7 @@ function YearSummaryInner() {
                           className={styles.hFill}
                           style={{
                             width: `${Math.max(2, (r.count / max) * 100)}%`,
-                            background: '#8eacd4',
+                            background: 'linear-gradient(90deg, #6366f1 0%, #93a5fd 100%)',
                           }}
                         />
                         <span className={styles.hCount}>{r.count}</span>
@@ -1121,7 +1141,7 @@ function YearSummaryInner() {
                 <div className={styles.kpiSub}>Сумма начислений</div>
               </div>
             ) : (
-              <EmptyKpi color="#2ecc71" />
+              <EmptyKpi color="#0e9f6e" />
             )}
           </WidgetCard>
 
@@ -1151,7 +1171,7 @@ function YearSummaryInner() {
                 <div className={styles.kpiSub}>Сумма удержаний</div>
               </div>
             ) : (
-              <EmptyKpi color="#d4a017" />
+              <EmptyKpi color="#d97706" />
             )}
           </WidgetCard>
         </div>

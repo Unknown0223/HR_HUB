@@ -1,10 +1,9 @@
 'use client';
 
 import { confirm } from '@/lib/dialogs';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -15,8 +14,9 @@ import {
   type AllowancePolicyRow,
   type AllowanceScope,
 } from '@/lib/allowance-policies';
-import styles from '../../catalog/absence-types/page.module.css';
-import local from './page.module.css';
+import { AllowancePolicyFormModal } from './AllowancePolicyFormModal';
+import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const PATH = '/payroll/allowance-policies';
 const PAGE_SIZE = 50;
@@ -40,6 +40,7 @@ function AllowancePoliciesInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searchDraft, setSearchDraft] = useState(q);
   const [page, setPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(
       filters.name ||
@@ -49,6 +50,8 @@ function AllowancePoliciesInner() {
         filters.scheduleId,
     ),
   );
+
+  const colCount = scope === 'company' ? 4 : 5;
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -82,14 +85,39 @@ function AllowancePoliciesInner() {
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const ids = paged.map((r) => r.id);
-  const colSpan = scope === 'company' ? 3 : 4;
+  const pageIds = paged.map((r) => r.id);
+
+  const allPageChecked = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageChecked = pageIds.some((id) => selected.has(id)) && !allPageChecked;
+
+  const selectedRows = useMemo(
+    () => rows.filter((r) => selected.has(r.id)),
+    [rows, selected],
+  );
+  const activateCount = selectedRows.filter((r) => r.isActive === false).length;
+  const deactivateCount = selectedRows.filter((r) => r.isActive !== false).length;
 
   useEffect(() => {
     setPage(1);
     setSelected(new Set());
     setFocusId(null);
-  }, [q, scope, filters.name, filters.month, filters.isActive, filters.divisionId, filters.scheduleId]);
+  }, [
+    q,
+    scope,
+    filters.name,
+    filters.month,
+    filters.isActive,
+    filters.divisionId,
+    filters.scheduleId,
+  ]);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setModalOpen(true);
+  }, [searchParams]);
 
   async function load() {
     setLoading(true);
@@ -109,6 +137,7 @@ function AllowancePoliciesInner() {
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
 
   useEffect(() => {
@@ -131,9 +160,40 @@ function AllowancePoliciesInner() {
     patchUrl({ tab: next === 'company' ? null : next });
   }
 
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllPage(on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of pageIds) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1') patchUrl({ create: null });
+  }
+
+  function editHref(id: string) {
+    return `${PATH}/${id}/edit${scope === 'company' ? '' : `?tab=${scope}`}`;
+  }
+
   async function deleteIds(ids: string[], message?: string) {
     if (!ids.length) return;
-    if (!(await confirm(message || `Удалить ${ids.length}?`))) return;
+    if (!(await confirm(message || `Удалить выбранные политики (${ids.length} шт.)?`))) {
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -151,15 +211,48 @@ function AllowancePoliciesInner() {
     }
   }
 
-  async function copyRow(row: AllowancePolicyRow) {
+  async function setActive(targets: AllowancePolicyRow[], value: boolean) {
+    const list = targets.filter((r) => (r.isActive !== false) !== value);
+    if (!list.length) return;
     setBusy(true);
     setError('');
+    let failed = 0;
     try {
-      await apiFetch(`/api/payroll/allowance-policies/${row.id}/copy`, { method: 'POST' });
+      for (const row of list) {
+        try {
+          await apiFetch(`/api/payroll/allowance-policies/${row.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isActive: value }),
+          });
+        } catch {
+          failed += 1;
+        }
+      }
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyRows(targets: AllowancePolicyRow[]) {
+    if (!targets.length) return;
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          await apiFetch(`/api/payroll/allowance-policies/${row.id}/copy`, {
+            method: 'POST',
+          });
+        } catch {
+          failed += 1;
+        }
+      }
       setFocusId(null);
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка копирования');
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
     } finally {
       setBusy(false);
     }
@@ -200,29 +293,56 @@ function AllowancePoliciesInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="allowance-policies" />
-      <div className={local.tabs}>
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-hand-holding-usd" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Политики выплат</h1>
+          <p className={shared.pageSubtitle}>
+            Правила доплат по времени суток, подразделениям и графикам
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.tabs}>
         {ALLOWANCE_SCOPE_TABS.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={scope === t.id ? local.tabOn : local.tab}
+            className={scope === t.id ? styles.tabOn : styles.tab}
             onClick={() => setScope(t.id)}
           >
             {t.label}
           </button>
         ))}
       </div>
-      {error ? <p className={styles.error}>{error}</p> : null}
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button
             type="button"
             className={styles.createBtn}
-            onClick={() =>
-              router.push(`${PATH}/new${scope === 'company' ? '' : `?tab=${scope}`}`)
-            }
+            onClick={() => setModalOpen(true)}
           >
-            Добавить
+            <i className="fas fa-plus" aria-hidden />
+            Создать
           </button>
           <FilterPanel
             inline
@@ -231,158 +351,272 @@ function AllowancePoliciesInner() {
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={filterFields}
           />
-          <ListBulkBar
-            count={selected.size}
-            busy={busy}
-            onClear={() => setSelected(new Set())}
-            actions={[
-              {
-                key: 'delete',
-                label: 'Удалить',
-                count: selected.size,
-                variant: 'danger',
-                onClick: () => void deleteIds(Array.from(selected)),
-              },
-            ]}
-          />
         </div>
+
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <span className={styles.pagerMeta}>
-            {paged.length}/{filtered.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ‹
-          </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
-          <button
-            type="button"
-            className={styles.toolBtn}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            ›
+            <i className="fas fa-filter" aria-hidden />
           </button>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
             onClick={() => void load()}
+            title="Обновить"
             aria-label="Обновить"
           >
-            ↻
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
+
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      {selected.size > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selected.size}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy || activateCount === 0}
+            onClick={() => void setActive(selectedRows, true)}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активировать{activateCount ? ` (${activateCount})` : ''}
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy || deactivateCount === 0}
+            onClick={() => void setActive(selectedRows, false)}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Деактивировать{deactivateCount ? ` (${deactivateCount})` : ''}
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void copyRows(selectedRows)}
+          >
+            <i className="fas fa-copy" aria-hidden />
+            Скопировать
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void deleteIds(Array.from(selected))}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setSelected(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={ids.length > 0 && ids.every((id) => selected.has(id))}
-                  onChange={(e) => setSelected(togglePage(selected, ids, e.target.checked))}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>
-                Месяц
-                <span className={local.sortMark}>↑</span>
-              </th>
-              <th>Название</th>
-              {scope === 'division' ? <th>Подразделение</th> : null}
-              {scope === 'schedule' ? <th>График работы</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={colSpan} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>
+                  Месяц
+                  <span className={styles.sortMark}>↑</span>
+                </th>
+                <th>Название</th>
+                {scope === 'division' ? <th>Подразделение</th> : null}
+                {scope === 'schedule' ? <th>График работы</th> : null}
+                <th>Статус</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={colSpan} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              paged.map((row) => {
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {paged.map((row) => {
                 const open = focusId === row.id;
+                const isChecked = selected.has(row.id);
+                const active = row.isActive !== false;
                 return (
-                  <tr
-                    key={row.id}
-                    className={open || selected.has(row.id) ? styles.rowSelected : undefined}
-                    onClick={() => setFocusId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                      />
-                    </td>
-                    <td className={styles.nameCell}>
-                      <span className={styles.nameText}>{formatMonthRu(row.month)}</span>
-                      {open ? (
-                        <div
-                          className={`${styles.inlineActions} ${styles.rowActions}`}
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setFocusId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleRow(row.id)}
                           onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `${PATH}/${row.id}/edit${scope === 'company' ? '' : `?tab=${scope}`}`,
-                              )
-                            }
-                          >
-                            Изменить
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.danger}
-                            disabled={busy}
-                            onClick={() =>
-                              void deleteIds([row.id], `Удалить «${formatMonthRu(row.month)}»?`)
-                            }
-                          >
-                            Удалить
-                          </button>
-                          <button type="button" disabled={busy} onClick={() => void copyRow(row)}>
-                            Скопировать
-                          </button>
-                        </div>
+                          aria-label={`Выбрать ${formatMonthRu(row.month)}`}
+                        />
+                      </td>
+                      <td className={styles.nameCell}>{formatMonthRu(row.month)}</td>
+                      <td className={styles.textCell}>{row.name || '—'}</td>
+                      {scope === 'division' ? (
+                        <td className={styles.mutedCell}>{row.division?.name || '—'}</td>
                       ) : null}
-                    </td>
-                    <td>{row.name || ''}</td>
-                    {scope === 'division' ? <td>{row.division?.name || ''}</td> : null}
-                    {scope === 'schedule' ? <td>{row.schedule?.name || ''}</td> : null}
-                  </tr>
+                      {scope === 'schedule' ? (
+                        <td className={styles.mutedCell}>{row.schedule?.name || '—'}</td>
+                      ) : null}
+                      <td>
+                        {active ? (
+                          <span className={styles.statusActive}>Активный</span>
+                        ) : (
+                          <span className={styles.statusMuted}>Неактивный</span>
+                        )}
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={colCount}>
+                          <div className={styles.rowActions}>
+                            <button
+                              type="button"
+                              onClick={() => router.push(editHref(row.id))}
+                            >
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void setActive([row], !active)}
+                            >
+                              <i
+                                className={active ? 'fas fa-ban' : 'fas fa-check'}
+                                aria-hidden
+                              />
+                              {active ? 'Деактивировать' : 'Активировать'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void copyRows([row])}
+                            >
+                              <i className="fas fa-copy" aria-hidden />
+                              Скопировать
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() =>
+                                void deleteIds(
+                                  [row.id],
+                                  `Удалить «${formatMonthRu(row.month)}»?`,
+                                )
+                              }
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{paged.length}</strong> из <strong>{filtered.length}</strong>
+          </p>
+          <div className={styles.pager}>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Назад"
+            >
+              <i className="fas fa-chevron-left" aria-hidden />
+            </button>
+            <span className={styles.pagerMeta}>
+              {Math.min(page, pageCount)} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page >= pageCount}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Вперёд"
+            >
+              <i className="fas fa-chevron-right" aria-hidden />
+            </button>
+          </div>
+        </div>
       </div>
+
+      <AllowancePolicyFormModal
+        open={modalOpen}
+        scope={scope}
+        onClose={closeModal}
+        onSaved={(id, openAfter) => {
+          closeModal();
+          if (openAfter && id) {
+            router.push(editHref(id));
+            return;
+          }
+          void load();
+        }}
+      />
     </div>
   );
 }

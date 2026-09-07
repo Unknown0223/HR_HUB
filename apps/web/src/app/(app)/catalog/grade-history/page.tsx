@@ -1,14 +1,20 @@
 'use client';
-import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { confirm } from '@/lib/dialogs';
+import { GradePromotionFormModal } from './GradePromotionFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['number', 'divisionId', 'status', 'from', 'to'] as const;
+const COL_COUNT = 6;
+const MAX_NAMES = 3;
 
 type Emp = {
   id: string;
@@ -32,13 +38,17 @@ type Promotion = {
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('ru-RU');
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  return d.toLocaleDateString('ru-RU', { timeZone: 'UTC' });
 }
 
 function empName(e?: Emp | null) {
   if (!e) return '';
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
+}
+
+function empNames(row: Promotion) {
+  return (row.lines || []).map((l) => empName(l.employee)).filter(Boolean);
 }
 
 function statusLabel(s: string) {
@@ -47,16 +57,31 @@ function statusLabel(s: string) {
   return 'Черновик';
 }
 
+function statusClass(s: string) {
+  if (s === 'posted') return styles.statusPosted;
+  if (s === 'cancelled') return styles.statusCancelled;
+  return styles.statusDraft;
+}
+
 function GradeHistoryInner() {
-  const filters = useFilterFromUrl(FILTER_KEYS);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+
   const [rows, setRows] = useState<Promotion[]>([]);
   const [divisions, setDivisions] = useState<{ id: string; label: string }[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [filtersOpen, setFiltersOpen] = useState(
+    Boolean(
+      filters.number || filters.divisionId || filters.status || filters.from || filters.to,
+    ),
+  );
+  const [modalOpen, setModalOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
   async function load() {
@@ -65,7 +90,9 @@ function GradeHistoryInner() {
     try {
       const [data, lookups, recs] = await Promise.all([
         apiFetch<Promotion[]>('/api/catalog/grade-history'),
-        apiFetch<{ divisions?: { id: string; label: string }[] }>('/api/catalog/lookups'),
+        apiFetch<{ divisions?: { id: string; label: string }[] }>(
+          '/api/catalog/lookups',
+        ),
         apiFetch<unknown[]>('/api/catalog/grade-history/recommendations').catch(() => []),
       ]);
       setRows(Array.isArray(data) ? data : []);
@@ -82,6 +109,10 @@ function GradeHistoryInner() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setModalOpen(true);
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -102,32 +133,69 @@ function GradeHistoryInner() {
         if (to && d > to) return false;
       }
       if (!q) return true;
-      const names = (r.lines || []).map((l) => empName(l.employee)).join(' ');
-      return [r.documentNumber, r.division?.name, names, statusLabel(r.status), r.note]
+      return [
+        r.documentNumber,
+        r.division?.name,
+        empNames(r).join(' '),
+        statusLabel(r.status),
+        r.note,
+      ]
         .join(' ')
         .toLowerCase()
         .includes(q);
     });
   }, [rows, search, filters]);
 
-  async function remove(row: Promotion) {
-    if (!(await confirm('Удалить документ?'))) return;
-    setBusy(true);
-    try {
-      await apiFetch(`/api/catalog/grade-history/${row.id}`, { method: 'DELETE' });
-      setSelectedId(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка удаления');
-    } finally {
-      setBusy(false);
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      const qs = params.toString();
+      router.replace(
+        qs ? `/catalog/grade-history?${qs}` : '/catalog/grade-history',
+        { scroll: false },
+      );
     }
   }
 
-  async function post(row: Promotion) {
+  function dropChecked(id: string) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  async function runPost(row: Promotion) {
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/grade-history/${row.id}/post`, { method: 'POST' });
+      dropChecked(row.id);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка проведения');
@@ -136,18 +204,165 @@ function GradeHistoryInner() {
     }
   }
 
+  async function runCancel(row: Promotion) {
+    if (!(await confirm(`Отменить документ № ${row.documentNumber || '—'}?`))) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/catalog/grade-history/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      dropChecked(row.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка отмены');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runDelete(row: Promotion) {
+    if (!(await confirm('Удалить документ?'))) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/catalog/grade-history/${row.id}`, { method: 'DELETE' });
+      setSelectedId(null);
+      dropChecked(row.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'post' | 'cancel' | 'delete') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (!targets.length) return;
+
+    if (action === 'post') {
+      const drafts = targets.filter((r) => r.status === 'draft');
+      if (!drafts.length) {
+        setError('Нет черновиков среди выбранных');
+        return;
+      }
+    } else if (action === 'cancel') {
+      const cancellable = targets.filter((r) => r.status === 'draft');
+      if (!cancellable.length) {
+        setError('Отменить можно только черновики');
+        return;
+      }
+      if (!(await confirm(`Отменить выбранные документы (${cancellable.length} шт.)?`)))
+        return;
+    } else {
+      const removable = targets.filter((r) => r.status !== 'posted');
+      if (!removable.length) {
+        setError('Проведённые документы нельзя удалить');
+        return;
+      }
+      if (!(await confirm(`Удалить выбранные документы (${removable.length} шт.)?`)))
+        return;
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'post') {
+            if (row.status !== 'draft') continue;
+            await apiFetch(`/api/catalog/grade-history/${row.id}/post`, {
+              method: 'POST',
+            });
+          } else if (action === 'cancel') {
+            if (row.status !== 'draft') continue;
+            await apiFetch(`/api/catalog/grade-history/${row.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ status: 'cancelled' }),
+            });
+          } else {
+            if (row.status === 'posted') continue;
+            await apiFetch(`/api/catalog/grade-history/${row.id}`, {
+              method: 'DELETE',
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `grade-history-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered.map((r) => ({
+        Дата: fmtDate(r.documentDate),
+        Номер: r.documentNumber || '',
+        Подразделение: r.division?.name || '',
+        Сотрудники: empNames(r).join(', '),
+        Состояние: statusLabel(r.status),
+        Примечание: r.note || '',
+      })),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="grade-history" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-level-up-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Повышение разрядов</h1>
+          <p className={shared.pageSubtitle}>
+            Документы повышения тарифных разрядов сотрудников
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/grade-history/new" className={styles.createBtn}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => {
+              setError('');
+              setModalOpen(true);
+            }}
+          >
+            <i className="fas fa-plus" aria-hidden />
             Создать
-          </Link>
+          </button>
           <Link href="/catalog/grade-history/recommendations" className={styles.toolBtn}>
+            <i className="fas fa-clock" aria-hidden />
             Рекомендации в ожидании
-            {pendingCount > 0 ? ` (${pendingCount})` : ''}
+            {pendingCount > 0 ? (
+              <span className={styles.pendingCount}>{pendingCount}</span>
+            ) : null}
           </Link>
           <FilterPanel
             inline
@@ -181,114 +396,249 @@ function GradeHistoryInner() {
             ]}
           />
         </div>
+
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('post')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Провести
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('cancel')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Отменить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Дата</th>
-              <th>Номер</th>
-              <th>Подразделение</th>
-              <th>Сотрудники</th>
-              <th>Состояние</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !filtered.length ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата</th>
+                <th>Номер</th>
+                <th>Подразделение</th>
+                <th>Сотрудники</th>
+                <th>Состояние</th>
               </tr>
-            ) : null}
-            {!loading && !filtered.length ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const canPost = row.status === 'draft';
-              const canDelete = row.status !== 'posted';
-              const employees = (row.lines || [])
-                .map((l) => empName(l.employee))
-                .filter(Boolean)
-                .join(', ');
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{fmtDate(row.documentDate)}</td>
-                    <td>{row.documentNumber || '—'}</td>
-                    <td>{row.division?.name || '—'}</td>
-                    <td>{employees || '—'}</td>
-                    <td>
-                      <span className={styles.postedYes}>{statusLabel(row.status)}</span>
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={6}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/grade-history/${row.id}`}>Просмотреть</Link>
-                          {canPost ? (
-                            <Link href={`/catalog/grade-history/${row.id}?edit=1`}>Изменить</Link>
-                          ) : null}
-                          {canPost ? (
-                            <button type="button" disabled={busy} onClick={() => void post(row)}>
-                              Провести
-                            </button>
-                          ) : null}
-                          {canDelete ? (
-                            <button type="button" disabled={busy} onClick={() => void remove(row)}>
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const names = empNames(row);
+                const canEdit = row.status === 'draft';
+                const canDelete = row.status !== 'posted';
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.documentNumber || row.id}`}
+                        />
+                      </td>
+                      <td className={styles.numCell}>{fmtDate(row.documentDate)}</td>
+                      <td className={styles.docNumber}>{row.documentNumber || '—'}</td>
+                      <td>{row.division?.name || '—'}</td>
+                      <td className={styles.empNames}>
+                        {names.length ? (
+                          <>
+                            {names.slice(0, MAX_NAMES).join(', ')}
+                            {names.length > MAX_NAMES ? (
+                              <span className={styles.empMore}>
+                                {' '}
+                                +{names.length - MAX_NAMES}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        <span className={statusClass(row.status)}>
+                          {statusLabel(row.status)}
+                        </span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/grade-history/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотреть
+                            </Link>
+                            {canEdit ? (
+                              <Link href={`/catalog/grade-history/${row.id}?edit=1`}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                            ) : null}
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runPost(row)}
+                              >
+                                <i className="fas fa-check" aria-hidden />
+                                Провести
+                              </button>
+                            ) : null}
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runCancel(row)}
+                              >
+                                <i className="fas fa-ban" aria-hidden />
+                                Отменить
+                              </button>
+                            ) : null}
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runDelete(row)}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <GradePromotionFormModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function GradeHistoryPage() {
   return (
-    <Suspense fallback={<p className={styles.empty}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <GradeHistoryInner />
     </Suspense>
   );

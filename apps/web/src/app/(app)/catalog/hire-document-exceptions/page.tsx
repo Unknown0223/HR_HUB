@@ -3,10 +3,13 @@
 import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Division = { id: string; name: string; code?: string };
 type Position = { id: string; name: string; code?: string };
@@ -176,125 +179,6 @@ function HireDocExceptionsInner() {
     );
   }
 
-  if (mode === 'create' || mode === 'edit') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title:
-              mode === 'edit'
-                ? 'Исключение по документам при приеме (изменение)'
-                : 'Исключение по документам при приеме (создание)',
-            siblings: [
-              {
-                label: 'Исключения по документам при приеме',
-                href: '/catalog/hire-document-exceptions',
-              },
-            ],
-          }}
-        />
-        <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-          <button
-            type="button"
-            className={formStyles.btnSave}
-            disabled={saving}
-            onClick={() => void save()}
-          >
-            Сохранить
-          </button>
-          <button
-            type="button"
-            className={formStyles.btnClose}
-            onClick={() => setMode('list')}
-          >
-            Закрыть
-          </button>
-        </div>
-        {error ? <p className={styles.error}>{error}</p> : null}
-        <div className={formStyles.card} style={{ maxWidth: 720 }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.75rem',
-            }}
-          >
-            <div className={formStyles.field}>
-              <label>
-                Подразделение <span className={formStyles.req}>*</span>
-              </label>
-              <select
-                value={divisionId}
-                onChange={(e) => setDivisionId(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={formStyles.field}>
-              <label>
-                Должность <span className={formStyles.req}>*</span>
-              </label>
-              <select
-                value={positionId}
-                onChange={(e) => setPositionId(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {positions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <h3 style={{ margin: '0.75rem 0 0.35rem', fontSize: '0.95rem' }}>
-            Типы документов при приеме
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {hireDocs.length === 0 ? (
-              <p className={styles.empty} style={{ padding: '0.5rem 0' }}>
-                Нет типов с флагом «Документ при приеме». Отметьте их в «Типы
-                документов».
-              </p>
-            ) : (
-              hireDocs.map((d) => (
-                <label
-                  key={d.id}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={docIds.has(d.id)}
-                    onChange={(e) => {
-                      setDocIds((prev) => {
-                        const next = new Set(prev);
-                        if (e.target.checked) next.add(d.id);
-                        else next.delete(d.id);
-                        return next;
-                      });
-                    }}
-                  />
-                  {d.name}
-                </label>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.wrap}>
       <PageSubnav
@@ -306,9 +190,22 @@ function HireDocExceptionsInner() {
         }}
       />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-file-signature" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Исключения по документам при приеме</h1>
+          <p className={shared.pageSubtitle}>
+            Исключения обязательных документов по подразделению и должности
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
         </div>
@@ -321,11 +218,19 @@ function HireDocExceptionsInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') applySearch();
             }}
+            aria-label="Поиск"
           />
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
         </div>
@@ -422,13 +327,114 @@ function HireDocExceptionsInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={
+          mode === 'edit'
+            ? 'Исключение по документам при приеме (изменение)'
+            : 'Исключение по документам при приеме (создание)'
+        }
+        width="lg"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.row2}>
+          <div className={modal.field}>
+            <label>
+              Подразделение <span className={modal.req}>*</span>
+            </label>
+            <select
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+            >
+              <option value="">Поиск...</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={modal.field}>
+            <label>
+              Должность <span className={modal.req}>*</span>
+            </label>
+            <select
+              value={positionId}
+              onChange={(e) => setPositionId(e.target.value)}
+            >
+              <option value="">Поиск...</option>
+              {positions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className={modal.field}>
+          <span>Типы документов при приеме</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {hireDocs.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#6b7280' }}>
+                Нет типов с флагом «Документ при приеме». Отметьте их в «Типы
+                документов».
+              </p>
+            ) : (
+              hireDocs.map((d) => (
+                <label key={d.id} className={modal.radio}>
+                  <input
+                    type="checkbox"
+                    checked={docIds.has(d.id)}
+                    onChange={(e) => {
+                      setDocIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(d.id);
+                        else next.delete(d.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  {d.name}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      </FormModal>
     </div>
   );
 }
 
 export default function HireDocumentExceptionsPage() {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <HireDocExceptionsInner />
     </Suspense>
   );

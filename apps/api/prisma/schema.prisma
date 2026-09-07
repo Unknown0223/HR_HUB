@@ -289,6 +289,9 @@ model Tenant {
   accrualTypes       AccrualType[]
   deductionTypes     DeductionType[]
   hireDocumentExceptions HireDocumentException[]
+  deviceProvisionSessions DeviceProvisionSession[]
+  deviceCredentialVault   DeviceCredentialVault[]
+  deviceCredentialAudits  DeviceCredentialAudit[]
 
   @@map("tenants")
 }
@@ -742,10 +745,70 @@ model Device {
   location  Location?        @relation(fields: [locationId], references: [id])
   marks     AttendanceMark[]
   faceSyncs DeviceFaceSync[]
+  credentialVault DeviceCredentialVault?
+  credentialAudits DeviceCredentialAudit[]
 
   @@unique([tenantId, serialNumber])
   @@index([tenantId])
   @@map("devices")
+}
+
+model DeviceProvisionSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  createdById      String?   @map("created_by_id") @db.Uuid
+  status           String // scanning | configuring | linked | failed
+  step             String?
+  percent          Int       @default(0)
+  host             String?
+  serial           String?
+  deviceId         String?   @map("device_id") @db.Uuid
+  pairingTokenHash String?   @map("pairing_token_hash")
+  expiresAt        DateTime? @map("expires_at")
+  meta             Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([pairingTokenHash])
+  @@map("device_provision_sessions")
+}
+
+model DeviceCredentialVault {
+  deviceId    String   @id @map("device_id") @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  ciphertext  String
+  keyVersion  Int      @default(1) @map("key_version")
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("device_credential_vault")
+}
+
+/// Who viewed / changed / synced device admin password (or vault write).
+model DeviceCredentialAudit {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  deviceId  String   @map("device_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  /// view | change | sync | vault_write
+  action    String
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, deviceId, createdAt])
+  @@index([deviceId, createdAt])
+  @@map("device_credential_audits")
 }
 
 model FaceProfile {

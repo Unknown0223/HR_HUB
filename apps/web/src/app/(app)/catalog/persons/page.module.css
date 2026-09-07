@@ -79,7 +79,7 @@
 }
 
 .check input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .photoCol {
@@ -137,7 +137,7 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;

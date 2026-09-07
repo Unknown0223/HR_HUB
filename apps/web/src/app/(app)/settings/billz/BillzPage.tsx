@@ -25,6 +25,7 @@ import {
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import danger from '../../catalog/document-types/page.module.css';
+import shared from '../../../page-shared.module.css';
 import extra from '../artix/page.module.css';
 import iikoLocal from '../iiko/page.module.css';
 import salesCss from '../iiko-sales/page.module.css';
@@ -349,6 +350,17 @@ function BillzInner({ section }: { section: BillzSection }) {
             siblings: [{ label: 'Продажи Billz 1.0', href: '/settings/billz-sales' }],
           }}
         />
+        <div className={shared.pageHeader}>
+          <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+            <i className="fas fa-shopping-bag" aria-hidden />
+          </div>
+          <div className={shared.pageHeaderText}>
+            <h1 className={shared.pageTitle}>Настройки Billz 2.0</h1>
+            <p className={shared.pageSubtitle}>
+              Интеграция Billz 2.0: пользователи, подразделения и продажи по сотрудникам
+            </p>
+          </div>
+        </div>
         <div className={iikoLocal.topActions}>
           <button
             type="button"

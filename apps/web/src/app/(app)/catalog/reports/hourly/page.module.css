@@ -1,11 +1,14 @@
+/* Hourly attendance report — filters / settings / table (shell in report-arena) */
+
 .card {
   max-width: none;
 }
 
 .times {
   display: grid;
-  grid-template-columns: 220px 220px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 640px) {
@@ -16,54 +19,31 @@
 
 .req::after {
   content: ' *';
-  color: #f64e60;
+  color: #e11d48;
 }
 
 .timeInput {
+  width: 100%;
   height: 36px;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1.5px solid #e3e9f1;
+  border-radius: 9px;
   padding: 0 0.65rem;
   font: inherit;
-  font-size: 0.88rem;
-  color: #3f4254;
+  font-size: 0.8125rem;
+  color: #0a1322;
   background: #fff;
 }
 
 .timeInput:focus {
   outline: none;
-  border-color: #3699ff;
-  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+  border-color: #0a85e2;
+  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
 }
 
 .timeBad {
-  border-color: #f64e60;
-  box-shadow: 0 0 0 3px rgba(246, 78, 96, 0.12);
-}
-
-.meta {
-  margin: 0 0 0.4rem;
-  font-size: 0.88rem;
-  color: #3f4254;
-  line-height: 1.45;
-  text-align: center;
-}
-
-.back {
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0 0 0.65rem;
-  color: #3699ff;
-  font: inherit;
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.back:hover {
-  text-decoration: underline;
+  border-color: #e11d48;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
 }
 
 .nameBtn {
@@ -72,52 +52,80 @@
   background: none;
   padding: 0;
   margin: 0;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
+  font-weight: 650;
   text-align: left;
   cursor: pointer;
-}
-
-.dateLink {
-  color: #3699ff;
-  text-decoration: none;
-  font: inherit;
-}
-
-.dateLink:hover {
-  text-decoration: underline;
 }
 
 .nameBtn:hover {
   text-decoration: underline;
 }
 
+.dateLink {
+  color: #0a85e2;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 650;
+}
+
+.dateLink:hover {
+  text-decoration: underline;
+}
+
 .tableWrap {
-  overflow: visible;
+  overflow: auto;
+  border: 1px solid var(--line, #e3e9f1);
+  border-radius: 12px;
   background: #fff;
-  border: 1px solid #e4e6ef;
+  max-height: min(70vh, 820px);
 }
 
 .table {
-  border-collapse: collapse;
-  font-size: 0.74rem;
-  background: #fff;
   width: max-content;
   min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.74rem;
 }
 
 .table th,
 .table td {
-  border: 1px solid #d8dbe0;
-  padding: 0.26rem 0.38rem;
-  color: #181c32;
+  border-bottom: 1px solid #e8eef5;
+  border-right: 1px solid #eef2f7;
+  padding: 0.35rem 0.42rem;
+  color: #0a1322;
   text-align: center;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
-.table th {
-  background: #eef0f4;
+.table th:last-child,
+.table td:last-child {
+  border-right: none;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f2f5f9;
+  font-weight: 700;
+  color: #354862;
+  box-shadow: 0 1px 0 #e3e9f1;
+}
+
+.table thead tr:nth-child(2) th {
+  top: 2.1rem;
   font-weight: 600;
+  font-size: 0.68rem;
+  color: #64788f;
+  background: #f7f9fc;
+}
+
+.table tbody tr:hover td {
+  background: #f5f9fd;
 }
 
 .name {
@@ -128,30 +136,29 @@
 
 .num {
   text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .weekend {
-  background: #e7f3ff;
+  background: #edf6fe;
 }
 
 .off {
-  background: #e7f3ff;
-  color: #5e6278;
+  background: #edf6fe;
+  color: #64788f;
 }
 
-.total {
+.total td {
   font-weight: 700;
-  background: #f5f8fa;
+  background: #edf6fe;
 }
 
 .settings {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
-  gap: 1.4rem 4rem;
-  background: #fff;
-  border: 1px solid #e4e6ef;
-  border-radius: 8px;
-  padding: 1.15rem 1.4rem 1.35rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.4rem 3rem;
+  overflow: visible;
 }
 
 .col {
@@ -160,11 +167,12 @@
   gap: 0.62rem;
 }
 
+.col h3,
 .settings h3 {
   margin: 0 0 0.15rem;
   font-size: 0.95rem;
-  font-weight: 600;
-  color: #181c32;
+  font-weight: 700;
+  color: #0a1322;
 }
 
 .check {
@@ -174,13 +182,13 @@
   margin: 0;
   font-size: 0.86rem;
   line-height: 1.35;
-  color: #3f4254;
+  color: #354862;
   cursor: pointer;
   user-select: none;
 }
 
 .checkOff {
-  color: #b5b5c3;
+  color: #8ca0b8;
   cursor: default;
 }
 
@@ -205,8 +213,8 @@
 }
 
 .check input:checked + .box {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
 }
 
 .check input:checked + .box::after {
@@ -222,12 +230,25 @@
 }
 
 .check input:disabled + .box {
-  background: #f3f6f9;
-  border-color: #e4e6ef;
+  background: #f2f5f9;
+  border-color: #e8eef5;
 }
 
 @media (max-width: 860px) {
   .settings {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .tableWrap {
+    overflow: visible;
+    border: 0;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .table thead th {
+    position: static;
   }
 }

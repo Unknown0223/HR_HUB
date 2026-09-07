@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
 type FieldDef = { key: string; label: string };
@@ -101,16 +102,30 @@ export default function AccountSettingsPage() {
         }}
       />
 
-      <div className={styles.topBar}>
-        <button
-          type="button"
-          className={styles.btnSave}
-          disabled={saving || loading}
-          onClick={() => void onSave()}
+      <header className={shared.pageHeader}>
+        <div
+          className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}
+          aria-hidden="true"
         >
-          Сохранить
-        </button>
-      </div>
+          <i className="fas fa-file-invoice-dollar" />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Настройки счетов</h1>
+          <p className={shared.pageSubtitle}>
+            Привязка счетов бухгалтерского учёта к операциям
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <button
+            type="button"
+            className={shared.btn}
+            disabled={saving || loading}
+            onClick={() => void onSave()}
+          >
+            {saving ? '…' : 'Сохранить'}
+          </button>
+        </div>
+      </header>
 
       {error ? <p className={styles.error}>{error}</p> : null}
       {ok ? <p className={styles.ok}>{ok}</p> : null}

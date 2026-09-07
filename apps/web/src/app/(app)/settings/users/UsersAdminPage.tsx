@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { SearchLookup } from '@/app/(app)/catalog/avg-salaries/SearchLookup';
 import { MultiLookup } from '@/app/(app)/catalog/cashboxes/MultiLookup';
@@ -25,6 +27,7 @@ import formStyles from '../../catalog/report-templates/form.module.css';
 import local from '../../catalog/document-types/page.module.css';
 import extra from '../../catalog/cashboxes/page.module.css';
 import ui from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Opt = { id: string; label: string };
 type Dict = { id: string; code: string; name: string; items?: { id: string; name: string; isActive?: boolean }[] };
@@ -333,7 +336,7 @@ function UsersInner() {
           ? 'Пользователь (просмотр)'
           : 'Пользователи';
 
-  if (mode !== 'list') {
+  if (mode === 'view') {
     return (
       <>
       <div className={styles.wrap}>
@@ -469,15 +472,13 @@ function UsersInner() {
                     </div>
                   </div>
                   <div className={formStyles.field}>
-                    <label>
-                      Пароль {mode === 'create' ? <span className={formStyles.req}>*</span> : null}
-                    </label>
+                    <label>Пароль</label>
                     <div className={ui.pwdWrap}>
                       <input
                         type={showPwd ? 'text' : 'password'}
                         value={password}
                         disabled={locked}
-                        placeholder={mode === 'edit' ? 'Оставьте пустым, чтобы не менять' : ''}
+                        placeholder=""
                         onChange={(e) => setPassword(e.target.value)}
                       />
                       <button
@@ -590,16 +591,40 @@ function UsersInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={SIBLINGS} />
+      <PageSubnav groupKey="settings-admin" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-users-cog" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Пользователи</h1>
+          <p className={shared.pageSubtitle}>
+            Учётные записи и доступ к системе
+          </p>
+        </div>
+      </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <button type="button" className={formStyles.btnSave} onClick={openCreate}>
+          <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
-          </button>
+          <FilterPanel
+            inline
+            urlSync
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'text', key: 'name', label: 'Ф.И.О.', placeholder: 'Поиск...' },
+              { type: 'text', key: 'login', label: 'Логин', placeholder: 'Поиск...' },
+              { type: 'text', key: 'org', label: 'Организации', placeholder: 'Поиск...' },
+              { type: 'text', key: 'role', label: 'Роль', placeholder: 'Поиск...' },
+              { type: 'isActive', key: 'isActive', label: 'Статус' },
+            ]}
+          />
           {selected.size > 0 ? (
             <>
               <div className={extra.statusWrap}>
@@ -609,6 +634,7 @@ function UsersInner() {
                   disabled={busy}
                   onClick={() => setStatusOpen((v) => !v)}
                 >
+                  <i className="fas fa-toggle-on" aria-hidden />
                   Изменить статус
                 </button>
                 {statusOpen ? (
@@ -628,6 +654,7 @@ function UsersInner() {
                 disabled={busy}
                 onClick={() => void deleteIds(Array.from(selected))}
               >
+                <i className="fas fa-trash-alt" aria-hidden />
                 Удалить {selected.size}
               </button>
             </>
@@ -642,19 +669,7 @@ function UsersInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
             }}
-          />
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'name', label: 'Ф.И.О.', placeholder: 'Поиск...' },
-              { type: 'text', key: 'login', label: 'Логин', placeholder: 'Поиск...' },
-              { type: 'text', key: 'org', label: 'Организации', placeholder: 'Поиск...' },
-              { type: 'text', key: 'role', label: 'Роль', placeholder: 'Поиск...' },
-              { type: 'isActive', key: 'isActive', label: 'Статус' },
-            ]}
+            aria-label="Поиск"
           />
           <button
             type="button"
@@ -676,13 +691,21 @@ function UsersInner() {
                 }),
               )
             }
+            title="Экспорт Excel"
           >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
+          >
             ‹
           </button>
           <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
@@ -691,11 +714,19 @@ function UsersInner() {
             className={styles.toolBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
             ›
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            ↻
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+            Обновить
           </button>
         </div>
       </div>
@@ -837,6 +868,171 @@ function UsersInner() {
         </table>
       </div>
       {photos.node}
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={
+          mode === 'edit'
+            ? 'Пользователь (изменение)'
+            : 'Пользователь (создание)'
+        }
+        width="lg"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.row2}>
+          <div className={modal.field}>
+            <label>
+              ФИО <span className={modal.req}>*</span>
+            </label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>
+              Логин <span className={modal.req}>*</span>
+            </label>
+            <input value={login} onChange={(e) => setLogin(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>
+              Пароль{' '}
+              {mode === 'create' ? <span className={modal.req}>*</span> : null}
+            </label>
+            <input
+              type="password"
+              value={password}
+              placeholder={
+                mode === 'edit' ? 'Оставьте пустым, чтобы не менять' : ''
+              }
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Роли</label>
+            <MultiLookup value={roleIds} options={roles} onChange={setRoleIds} />
+          </div>
+          <div className={modal.field}>
+            <label>Организации</label>
+            <MultiLookup value={orgIds} options={orgs} onChange={setOrgIds} />
+          </div>
+          <div className={modal.field}>
+            <label>Руководитель</label>
+            <SearchLookup
+              value={managerId}
+              options={managerOpts.filter((m) => m.id !== editId)}
+              allowClear
+              onChange={setManagerId}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Часовой пояс</label>
+            <SearchLookup
+              value={timezone}
+              options={TZ_OPTS}
+              allowClear
+              onChange={setTimezone}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Код</label>
+            <input value={code} onChange={(e) => setCode(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>Телефон</label>
+            <input
+              value={phone}
+              placeholder="91 234 56 78"
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Email</label>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <span>Пол</span>
+            <div className={modal.radioRow}>
+              <label className={modal.radio}>
+                <input
+                  type="radio"
+                  checked={gender === 'male'}
+                  onChange={() => setGender('male')}
+                />
+                Мужской
+              </label>
+              <label className={modal.radio}>
+                <input
+                  type="radio"
+                  checked={gender === 'female'}
+                  onChange={() => setGender('female')}
+                />
+                Женский
+              </label>
+            </div>
+          </div>
+          <div className={modal.field}>
+            <span>Статус</span>
+            <label className={formStyles.toggleRow}>
+              <button
+                type="button"
+                className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+                onClick={() => setActive((v) => !v)}
+                aria-pressed={active}
+              />
+              <span>{active ? 'Активный' : 'Неактивный'}</span>
+            </label>
+          </div>
+          <div className={modal.field}>
+            <label>Фото</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => onPhoto(e.target.files?.[0])}
+            />
+            {photoUrl ? (
+              <img
+                src={mediaSrc(photoUrl) || photoUrl}
+                alt=""
+                style={{
+                  marginTop: 8,
+                  width: 72,
+                  height: 72,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                }}
+              />
+            ) : null}
+          </div>
+        </div>
+      </FormModal>
     </div>
   );
 }

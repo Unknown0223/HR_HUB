@@ -1,7 +1,12 @@
 'use client';
 
-import { SettlementForm } from '../SettlementForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function NewSettlementPage() {
-  return <SettlementForm />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/settlements?create=1');
+  }, [router]);
+  return null;
 }

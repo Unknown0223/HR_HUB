@@ -1,16 +1,38 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  createParamDecorator,
+  ExecutionContext,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators';
 import { SkipTenant } from '../tenant/decorators';
 import { AttendanceService } from './attendance.service';
-import { DeviceLinkGuard } from './device-link.guard';
+import {
+  OfficeLinkAuthContext,
+  OfficeLinkAuthGuard,
+} from './office-link-auth.guard';
 import { OfficeLinkAnnounceDto, OfficeLinkDeviceDto } from './dto';
+
+const CurrentOfficeLinkAuth = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): OfficeLinkAuthContext | undefined => {
+    const req = ctx.switchToHttp().getRequest<{
+      officeLinkAuth?: OfficeLinkAuthContext;
+    }>();
+    return req.officeLinkAuth;
+  },
+);
 
 @ApiTags('office-link')
 @Public()
 @SkipTenant()
-@UseGuards(DeviceLinkGuard)
-@ApiHeader({ name: 'X-Device-Link-Key', required: true })
+@UseGuards(OfficeLinkAuthGuard)
+@ApiHeader({ name: 'X-Device-Link-Key', required: false })
+@ApiHeader({ name: 'X-Pairing-Token', required: false })
 @Controller('attendance/office-link')
 export class OfficeLinkController {
   constructor(private readonly attendance: AttendanceService) {}
@@ -29,7 +51,18 @@ export class OfficeLinkController {
   }
 
   @Post('device')
-  device(@Body() dto: OfficeLinkDeviceDto) {
-    return this.attendance.officeLinkDevice(dto.tenantCode || 'demo', dto);
+  device(
+    @Body() dto: OfficeLinkDeviceDto,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    return this.attendance.officeLinkDevice(dto.tenantCode || 'demo', dto, {
+      provisionSessionId: auth?.pairing?.sessionId,
+    });
+  }
+
+  /** Locations for office-link GUI (tenantCode query). */
+  @Get('locations')
+  locations(@Query('tenantCode') tenantCode?: string) {
+    return this.attendance.officeLinkLocations(tenantCode || 'demo');
   }
 }

@@ -1,27 +1,34 @@
+/* Dismissals-by-reason extras + table (shell in report-arena) */
+
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
 .radios {
   display: flex;
   flex-wrap: wrap;
   gap: 0.7rem 1.15rem;
+  padding-top: 2px;
 }
 
 .radio {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.88rem;
-  color: #3f4254;
+  font-size: 0.8125rem;
+  color: #354862;
   cursor: pointer;
 }
 
 .radio input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .selectAll {
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;
@@ -41,37 +48,57 @@
 
 .tableWrap {
   overflow: auto;
+  border: 1px solid var(--line, #e3e9f1);
+  border-radius: 12px;
   background: #fff;
-  border: 1px solid #e4e6ef;
+  max-height: min(70vh, 820px);
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
   min-width: 640px;
 }
 
 .table th,
 .table td {
-  border: 1px solid #d8dbe0;
-  padding: 0.4rem 0.55rem;
-  color: #181c32;
+  border-bottom: 1px solid #e8eef5;
+  border-right: 1px solid #eef2f7;
+  padding: 0.45rem 0.55rem;
+  color: #0a1322;
+  vertical-align: middle;
 }
 
-.table th {
-  background: #f5f8fa;
-  font-weight: 600;
+.table th:last-child,
+.table td:last-child {
+  border-right: none;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f2f5f9;
+  font-weight: 700;
   text-align: center;
+  color: #354862;
+  box-shadow: 0 1px 0 #e3e9f1;
 }
 
 .zebra td {
-  background: #f9fafb;
+  background: #f7f9fc;
+}
+
+.table tbody tr:hover td {
+  background: #f5f9fd;
 }
 
 .link {
-  color: #3699ff;
+  color: #0a85e2;
   text-decoration: none;
+  font-weight: 650;
 }
 
 .link:hover {
@@ -82,8 +109,22 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  font-weight: 600;
 }
 
 .reason {
   text-align: left;
+}
+
+@media print {
+  .tableWrap {
+    overflow: visible;
+    border: 0;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .table thead th {
+    position: static;
+  }
 }

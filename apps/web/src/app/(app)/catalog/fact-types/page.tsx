@@ -1,13 +1,17 @@
 'use client';
 
 import { confirm } from '@/lib/dialogs';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
-import styles from '../absence-types/page.module.css';
+import { downloadCsv } from '@/lib/csv';
+import { FactTypeFormModal } from './FactTypeFormModal';
+import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
-import formStyles from '../report-templates/form.module.css';
 
 type FactTypeRow = {
   id: string;
@@ -29,6 +33,9 @@ type RegistryLine = {
   price?: string;
 };
 
+const FILTER_KEYS = ['q', 'status'] as const;
+const COL_COUNT = 5;
+
 function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
 }
@@ -36,42 +43,65 @@ function uid() {
 function FactTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const q = searchParams?.get('q') || '';
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const q = filters.q;
+  const statusFilter = filters.status;
 
   const [rows, setRows] = useState<FactTypeRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(Boolean(q || statusFilter));
   const [searchDraft, setSearchDraft] = useState(q);
-
-  // form
-  const [mode, setMode] = useState<'none' | 'create' | 'edit'>('none');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [unit, setUnit] = useState('Количество');
-  const [parentId, setParentId] = useState('');
-  const [accrualName, setAccrualName] = useState('');
-  const [active, setActive] = useState(true);
-  const [saving, setSaving] = useState(false);
 
-  // registry modal
   const [registryFor, setRegistryFor] = useState<FactTypeRow | null>(null);
   const [registryLines, setRegistryLines] = useState<RegistryLine[]>([]);
   const [regSaving, setRegSaving] = useState(false);
+  const [regError, setRegError] = useState('');
 
   const filtered = useMemo(() => {
+    let list = rows;
     const qq = q.trim().toLowerCase();
-    if (!qq) return rows;
-    return rows.filter((r) => {
-      const blob = [r.name, r.code, r.unit, r.parent?.name]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return blob.includes(qq);
+    if (qq) {
+      list = list.filter((r) => {
+        const blob = [r.name, r.code, r.unit, r.parent?.name, r.accrualName]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return blob.includes(qq);
+      });
+    }
+    if (statusFilter === 'active') list = list.filter((r) => r.isActive !== false);
+    else if (statusFilter === 'inactive') list = list.filter((r) => r.isActive === false);
+    return list;
+  }, [rows, q, statusFilter]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
     });
-  }, [rows, q]);
+  }
 
   async function load() {
     setLoading(true);
@@ -82,7 +112,7 @@ function FactTypesPageInner() {
       );
       setRows(Array.isArray(data) ? data : data.items || []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
       setRows([]);
     } finally {
       setLoading(false);
@@ -93,82 +123,107 @@ function FactTypesPageInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    const create = searchParams.get('create') === '1';
+    const edit = searchParams.get('edit');
+    if (create || edit) {
+      setEditId(edit || null);
+      setModalOpen(true);
+    }
+  }, [searchParams]);
+
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `/catalog/fact-types?${qs}` : '/catalog/fact-types', {
+      scroll: false,
+    });
+  }
+
   function openCreate() {
     setEditId(null);
-    setName('');
-    setCode('');
-    setUnit('Количество');
-    setParentId('');
-    setAccrualName('');
-    setActive(true);
-    setMode('create');
+    setModalOpen(true);
   }
 
-  function openEdit(row: FactTypeRow) {
-    setEditId(row.id);
-    setName(row.name);
-    setCode(row.code);
-    setUnit(row.unit || 'Количество');
-    setParentId(row.parentId || '');
-    setAccrualName(row.accrualName || '');
-    setActive(row.isActive !== false);
-    setMode('edit');
+  function openEdit(id: string) {
+    setEditId(id);
+    setModalOpen(true);
   }
 
-  async function save() {
-    if (!name.trim()) {
-      setError('Укажите название');
-      return;
-    }
-    if (!unit.trim()) {
-      setError('Укажите единицу измерения');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      const body = {
-        name: name.trim(),
-        code:
-          code.trim() ||
-          name
-            .trim()
-            .toUpperCase()
-            .replace(/[^A-Z0-9А-ЯЁ]+/gi, '_')
-            .slice(0, 32),
-        unit: unit.trim(),
-        parentId: parentId || null,
-        accrualName: accrualName.trim() || null,
-        isActive: active,
-      };
-      if (editId) {
-        await apiFetch(`/api/catalog/fact-types/${editId}`, {
-          method: 'PATCH',
-          body: JSON.stringify(body),
-        });
-      } else {
-        await apiFetch('/api/catalog/fact-types', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-      }
-      setMode('none');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setSaving(false);
+  function closeModal() {
+    setModalOpen(false);
+    setEditId(null);
+    if (searchParams.get('create') === '1' || searchParams.get('edit')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      params.delete('edit');
+      const qs = params.toString();
+      router.replace(qs ? `/catalog/fact-types?${qs}` : '/catalog/fact-types', {
+        scroll: false,
+      });
     }
   }
 
   async function runDelete(row: FactTypeRow) {
     if (!(await confirm(`Удалить тип «${row.name}»?`))) return;
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/fact-types/${row.id}`, { method: 'DELETE' });
+      setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'delete') {
+      if (!(await confirm(`Удалить выбранные типы фактов (${targets.length} шт.)?`))) {
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/catalog/fact-types/${row.id}`, { method: 'DELETE' });
+          } else {
+            const isActive = action === 'activate';
+            if ((row.isActive !== false) === isActive) continue;
+            await apiFetch(`/api/catalog/fact-types/${row.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
     } finally {
       setBusy(false);
     }
@@ -176,6 +231,7 @@ function FactTypesPageInner() {
 
   function openRegistry(row: FactTypeRow) {
     const lines = Array.isArray(row.registry) ? row.registry : [];
+    setRegError('');
     setRegistryFor(row);
     setRegistryLines(
       lines.length
@@ -187,7 +243,7 @@ function FactTypesPageInner() {
   async function saveRegistry() {
     if (!registryFor) return;
     setRegSaving(true);
-    setError('');
+    setRegError('');
     try {
       const registry = registryLines
         .filter((l) => l.startDate || l.endDate || l.cycleTime || l.price)
@@ -204,391 +260,405 @@ function FactTypesPageInner() {
       setRegistryFor(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      setRegError(e instanceof Error ? e.message : 'Ошибка');
     } finally {
       setRegSaving(false);
     }
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `fact-types-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered.map((r) => ({
+        Название: r.name,
+        Код: r.code || '',
+        Родитель: r.parent?.name || '',
+        'Единица измерения': r.unit || 'Количество',
+        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
+      })),
+    );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="fact-types" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-cubes" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Типы фактов</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник типов фактов, единиц измерения и реестра цен
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-        </div>
-        <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const params = new URLSearchParams();
-                if (searchDraft.trim()) params.set('q', searchDraft.trim());
-                const qs = params.toString();
-                router.replace(
-                  qs ? `/catalog/fact-types?${qs}` : '/catalog/fact-types',
-                  { scroll: false },
-                );
-              }
-            }}
+          <FilterPanel
+            inline
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
+              {
+                type: 'select',
+                key: 'status',
+                label: 'Статус',
+                options: [
+                  { value: 'active', label: 'Активный' },
+                  { value: 'inactive', label: 'Неактивный' },
+                ],
+              },
+            ]}
           />
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            Обновить
-          </button>
-          <span className={styles.pagerMeta}>
+        </div>
+
+        <div className={styles.rightTools}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      {mode !== 'none' ? (
-        <div className={formStyles.page}>
-          <div className={formStyles.topBar}>
-            <h1 className={formStyles.title}>
-              {mode === 'edit' ? 'Тип факта (изменение)' : 'Тип факта (создание)'}
-            </h1>
-            <div className={formStyles.actions}>
-              <button
-                type="button"
-                className={formStyles.btnSave}
-                disabled={saving}
-                onClick={() => void save()}
-              >
-                Сохранить
-              </button>
-              <button
-                type="button"
-                className={formStyles.btnClose}
-                onClick={() => setMode('none')}
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-          <div className={formStyles.card} style={{ maxWidth: 900 }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: '0.75rem',
-              }}
-            >
-              <div className={formStyles.field}>
-                <label>
-                  Название <span className={formStyles.req}>*</span>
-                </label>
-                <input value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className={formStyles.field}>
-                <label>Код</label>
-                <input value={code} onChange={(e) => setCode(e.target.value)} />
-              </div>
-              <div className={formStyles.field}>
-                <label>
-                  Единица измерения <span className={formStyles.req}>*</span>
-                </label>
-                <input
-                  list="units"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder="Поиск..."
-                />
-                <datalist id="units">
-                  <option value="Количество" />
-                  <option value="Сумма" />
-                  <option value="Часы" />
-                  <option value="%" />
-                </datalist>
-              </div>
-              <div className={formStyles.field}>
-                <label>Родитель</label>
-                <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
-                  <option value="">Поиск...</option>
-                  {rows
-                    .filter((r) => r.id !== editId)
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className={formStyles.field}>
-                <label>Начисление</label>
-                <input
-                  value={accrualName}
-                  onChange={(e) => setAccrualName(e.target.value)}
-                  placeholder="Поиск..."
-                />
-              </div>
-              <div className={formStyles.statusBlock}>
-                <span className={formStyles.fieldLabel}>Статус</span>
-                <label className={formStyles.toggleRow}>
-                  <button
-                    type="button"
-                    className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                    onClick={() => setActive((v) => !v)}
-                  />
-                  <span>Активный</span>
-                </label>
-              </div>
-            </div>
-          </div>
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активировать
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('deactivate')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Деактивировать
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
         </div>
       ) : null}
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>Название типа родителя</th>
-              <th>Единица измерения</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={4} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Название</th>
+                <th>Название типа родителя</th>
+                <th>Единица измерения</th>
+                <th>Статус</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={4} className={styles.empty}>
-                  нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = focusId === row.id;
-              return (
-                <tr
-                  key={row.id}
-                  className={open ? styles.rowSelected : undefined}
-                  onClick={() => setFocusId(open ? null : row.id)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <td className={styles.nameCell}>
-                    <span className={styles.nameText}>{row.name}</span>
-                    {open ? (
-                      <div
-                        className={`${styles.inlineActions} ${styles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button type="button" onClick={() => openRegistry(row)}>
-                          Реестр
-                        </button>
-                        <button type="button" onClick={() => openEdit(row)}>
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.danger}
-                          disabled={busy}
-                          onClick={() => void runDelete(row)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{row.parent?.name || ''}</td>
-                  <td>{row.unit || 'Количество'}</td>
-                  <td>
-                    <span
-                      className={
-                        row.isActive === false ? styles.statusMuted : styles.statusActive
-                      }
-                    >
-                      {row.isActive === false ? 'Неактивный' : 'Активный'}
-                    </span>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.name}`}
+                        />
+                      </td>
+                      <td className={styles.nameCell}>{row.name}</td>
+                      <td>{row.parent?.name || '—'}</td>
+                      <td>{row.unit || 'Количество'}</td>
+                      <td>
+                        {row.isActive === false ? (
+                          <span className={styles.statusMuted}>Неактивный</span>
+                        ) : (
+                          <span className={styles.statusActive}>Активный</span>
+                        )}
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <button type="button" onClick={() => openRegistry(row)}>
+                              <i className="fas fa-list" aria-hidden />
+                              Реестр
+                            </button>
+                            <button type="button" onClick={() => openEdit(row.id)}>
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
 
-      {registryFor ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 60,
-            padding: '1rem',
-          }}
-          onClick={() => setRegistryFor(null)}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 8,
-              width: 'min(720px,100%)',
-              padding: '1rem 1.1rem',
-              boxShadow: '0 16px 48px rgba(15,23,42,.18)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ margin: '0 0 0.75rem', fontSize: '1rem' }}>
-              Реестр — {registryFor.name}
-            </h2>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Дата начала</th>
-                  <th>Дата окончания</th>
-                  <th>Время цикла</th>
-                  <th>Цена</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {registryLines.map((line) => (
-                  <tr key={line.id}>
-                    <td>
-                      <input
-                        type="date"
-                        value={line.startDate || ''}
-                        onChange={(e) =>
-                          setRegistryLines((prev) =>
-                            prev.map((x) =>
-                              x.id === line.id
-                                ? { ...x, startDate: e.target.value }
-                                : x,
-                            ),
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="date"
-                        value={line.endDate || ''}
-                        onChange={(e) =>
-                          setRegistryLines((prev) =>
-                            prev.map((x) =>
-                              x.id === line.id
-                                ? { ...x, endDate: e.target.value }
-                                : x,
-                            ),
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        value={line.cycleTime || ''}
-                        onChange={(e) =>
-                          setRegistryLines((prev) =>
-                            prev.map((x) =>
-                              x.id === line.id
-                                ? { ...x, cycleTime: e.target.value }
-                                : x,
-                            ),
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        value={line.price || ''}
-                        onChange={(e) =>
-                          setRegistryLines((prev) =>
-                            prev.map((x) =>
-                              x.id === line.id
-                                ? { ...x, price: e.target.value }
-                                : x,
-                            ),
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.danger}
-                        onClick={() =>
-                          setRegistryLines((prev) =>
-                            prev.filter((x) => x.id !== line.id),
-                          )
-                        }
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <FactTypeFormModal
+        open={modalOpen}
+        editId={editId}
+        parents={rows}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
+
+      <FormModal
+        open={Boolean(registryFor)}
+        title={registryFor ? `Реестр — ${registryFor.name}` : 'Реестр'}
+        onClose={() => setRegistryFor(null)}
+        width="lg"
+        footer={
+          <>
             <button
               type="button"
-              style={{
-                marginTop: 8,
-                border: 'none',
-                background: 'transparent',
-                color: '#3699ff',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-              onClick={() =>
-                setRegistryLines((prev) => [
-                  ...prev,
-                  { id: uid(), startDate: '', endDate: '', cycleTime: '', price: '' },
-                ])
-              }
+              className={modal.btnPrimary}
+              disabled={regSaving}
+              onClick={() => void saveRegistry()}
             >
-              +
+              {regSaving ? '…' : 'Сохранить'}
             </button>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-              <button
-                type="button"
-                className={styles.createBtn}
-                style={{ background: '#3699ff' }}
-                disabled={regSaving}
-                onClick={() => void saveRegistry()}
-              >
-                Сохранить
-              </button>
-              <button
-                type="button"
-                className={styles.exportBtn}
-                onClick={() => setRegistryFor(null)}
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => setRegistryFor(null)}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {regError ? <p className={modal.error}>{regError}</p> : null}
+        <div className={styles.tableScroll}>
+          <table className={styles.table} style={{ minWidth: 0 }}>
+            <thead>
+              <tr>
+                <th>Дата начала</th>
+                <th>Дата окончания</th>
+                <th>Время цикла</th>
+                <th>Цена</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {registryLines.map((line) => (
+                <tr key={line.id}>
+                  <td>
+                    <input
+                      type="date"
+                      value={line.startDate || ''}
+                      onChange={(e) =>
+                        setRegistryLines((prev) =>
+                          prev.map((x) =>
+                            x.id === line.id ? { ...x, startDate: e.target.value } : x,
+                          ),
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="date"
+                      value={line.endDate || ''}
+                      onChange={(e) =>
+                        setRegistryLines((prev) =>
+                          prev.map((x) =>
+                            x.id === line.id ? { ...x, endDate: e.target.value } : x,
+                          ),
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={line.cycleTime || ''}
+                      onChange={(e) =>
+                        setRegistryLines((prev) =>
+                          prev.map((x) =>
+                            x.id === line.id ? { ...x, cycleTime: e.target.value } : x,
+                          ),
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={line.price || ''}
+                      onChange={(e) =>
+                        setRegistryLines((prev) =>
+                          prev.map((x) =>
+                            x.id === line.id ? { ...x, price: e.target.value } : x,
+                          ),
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={styles.danger}
+                      onClick={() =>
+                        setRegistryLines((prev) => prev.filter((x) => x.id !== line.id))
+                      }
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ) : null}
+        <button
+          type="button"
+          className={styles.bulkGhost}
+          style={{ marginLeft: 0, marginTop: 8 }}
+          onClick={() =>
+            setRegistryLines((prev) => [
+              ...prev,
+              { id: uid(), startDate: '', endDate: '', cycleTime: '', price: '' },
+            ])
+          }
+        >
+          + Добавить строку
+        </button>
+      </FormModal>
     </div>
   );
 }
 
 export default function FactTypesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <FactTypesPageInner />
     </Suspense>
   );

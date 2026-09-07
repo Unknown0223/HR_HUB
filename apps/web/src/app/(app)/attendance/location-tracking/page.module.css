@@ -46,7 +46,7 @@
 }
 
 .btnLoad {
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   width: 100%;
 }
@@ -131,7 +131,7 @@
   display: flex;
   gap: 0.75rem;
   font-size: 0.75rem;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .switch {
@@ -161,7 +161,7 @@
 
 .tabActive {
   background: #e1f0ff;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   color: #187de4;
   font-weight: 600;
 }

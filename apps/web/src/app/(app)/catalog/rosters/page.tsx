@@ -3,9 +3,17 @@ import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { RosterFormModal } from './RosterFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
+
+const FILTER_KEYS = ['q', 'status', 'from', 'to'] as const;
+const COL_COUNT = 7;
 
 type DocRow = {
   id: string;
@@ -33,13 +41,30 @@ function fmtMonth(iso?: string | null) {
   return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+function statusLabel(row: DocRow) {
+  if (row.status === 'posted' || row.verified) {
+    return { text: 'Проведён', cls: styles.badgePosted };
+  }
+  if (row.status === 'cancelled') return { text: 'Отменён', cls: styles.badgeCancelled };
+  return { text: 'Черновик', cls: styles.badgeDraft };
+}
+
 function RostersInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const q = filters.q;
+
   const [rows, setRows] = useState<DocRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(q);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -59,17 +84,98 @@ function RostersInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    const create = searchParams.get('create') === '1';
+    const edit = searchParams.get('edit');
+    if (create || edit) {
+      setEditId(edit || null);
+      setModalOpen(true);
+    }
+  }, [searchParams]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      [r.name, r.number, r.schedule?.name, r.schedule?.code, r.status, fmtMonth(r.month)]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [rows, search]);
+    let list = rows;
+    const qq = q.trim().toLowerCase();
+    if (qq) {
+      list = list.filter((r) =>
+        [r.name, r.number, r.schedule?.name, r.schedule?.code, fmtMonth(r.month), r.status]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(qq),
+      );
+    }
+    if (filters.status === 'posted') {
+      list = list.filter((r) => r.status === 'posted' || r.verified);
+    } else if (filters.status === 'draft') {
+      list = list.filter((r) => r.status === 'draft' && !r.verified);
+    } else if (filters.status) {
+      list = list.filter((r) => r.status === filters.status);
+    }
+    if (filters.from) {
+      list = list.filter((r) => String(r.documentDate).slice(0, 10) >= filters.from);
+    }
+    if (filters.to) {
+      list = list.filter((r) => String(r.documentDate).slice(0, 10) <= filters.to);
+    }
+    return list;
+  }, [rows, q, filters.status, filters.from, filters.to]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `/catalog/rosters?${qs}` : '/catalog/rosters', { scroll: false });
+  }
+
+  function openCreate() {
+    setEditId(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(id: string) {
+    setEditId(id);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditId(null);
+    if (searchParams.get('create') === '1' || searchParams.get('edit')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      params.delete('edit');
+      const qs = params.toString();
+      router.replace(qs ? `/catalog/rosters?${qs}` : '/catalog/rosters', { scroll: false });
+    }
+  }
 
   async function remove(row: DocRow) {
     if (row.status === 'posted') {
@@ -78,9 +184,15 @@ function RostersInner() {
     }
     if (!(await confirm(`Удалить «${row.name}»?`))) return;
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/rosters/${row.id}`, { method: 'DELETE' });
       setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка удаления');
@@ -89,123 +201,300 @@ function RostersInner() {
     }
   }
 
+  async function runBulk(action: 'delete') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (!targets.length) return;
+    if (!(await confirm(`Удалить выбранные расписания (${targets.length} шт.)?`))) return;
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (row.status === 'posted') {
+            failed += 1;
+            continue;
+          }
+          await apiFetch(`/api/catalog/rosters/${row.id}`, { method: 'DELETE' });
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `rosters-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered.map((r) => ({
+        Название: r.name,
+        Дата: fmtDate(r.documentDate),
+        Номер: r.number || '',
+        Месяц: fmtMonth(r.month),
+        'График работы': r.schedule?.name || '',
+        Статус: statusLabel(r).text,
+      })),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="rosters" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-calendar-week" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Расписания</h1>
+          <p className={shared.pageSubtitle}>
+            Месячные расписания смен по графику работы
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/rosters/new" className={styles.createBtn}>
+          <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
-          </Link>
+          </button>
+          <FilterPanel
+            inline
+            urlSync
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'dateRange', fromKey: 'from', toKey: 'to', label: 'Дата документа' },
+              {
+                type: 'select',
+                key: 'status',
+                label: 'Статус',
+                options: [
+                  { value: 'draft', label: 'Черновик' },
+                  { value: 'posted', label: 'Проведён' },
+                  { value: 'cancelled', label: 'Отменён' },
+                ],
+              },
+              { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
+            ]}
+          />
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            ↻
-          </button>
-          <span className={styles.pagerMeta}>
-            {filtered.length}/{rows.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={loading}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
+
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Название</th>
-              <th>Дата</th>
-              <th>Номер</th>
-              <th>Месяц</th>
-              <th>График работы</th>
-              <th>Проверен</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !filtered.length ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    disabled={!filtered.length}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Название</th>
+                <th>Дата</th>
+                <th>Номер</th>
+                <th>Месяц</th>
+                <th>График работы</th>
+                <th>Статус</th>
               </tr>
-            ) : null}
-            {!loading && !filtered.length ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const posted = row.status === 'posted' || row.verified;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.selected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{row.name}</td>
-                    <td>{fmtDate(row.documentDate)}</td>
-                    <td>{row.number || '—'}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{fmtMonth(row.month)}</td>
-                    <td>{row.schedule?.name || '—'}</td>
-                    <td>
-                      <span
-                        className={`${styles.badge} ${posted ? styles.badgePosted : styles.badgeDraft}`}
-                      >
-                        {posted ? 'Да' : '—'}
-                      </span>
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: 0 }}>
-                        <div className={styles.rowDetail}>
-                          <Link className={styles.linkBtn} href={`/catalog/rosters/${row.id}`}>
-                            Открыть
-                          </Link>
-                          {row.status === 'draft' ? (
-                            <button
-                              type="button"
-                              className={styles.dangerBtn}
-                              disabled={busy}
-                              onClick={() => void remove(row)}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+            </thead>
+            <tbody>
+              {loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const st = statusLabel(row);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.name}`}
+                        />
+                      </td>
+                      <td className={styles.nameCell}>{row.name}</td>
+                      <td className={styles.codeCell}>{fmtDate(row.documentDate)}</td>
+                      <td>{row.number || '—'}</td>
+                      <td className={styles.monthCell}>{fmtMonth(row.month)}</td>
+                      <td>{row.schedule?.name || '—'}</td>
+                      <td>
+                        <span className={st.cls}>{st.text}</span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/rosters/${row.id}`}>
+                              <i className="fas fa-table" aria-hidden />
+                              Открыть
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => openEdit(row.id)}
+                            >
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            {row.status !== 'posted' ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void remove(row)}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <RosterFormModal
+        open={modalOpen}
+        editId={editId}
+        onClose={closeModal}
+        onSaved={(id, openDoc) => {
+          closeModal();
+          if (openDoc && id) router.push(`/catalog/rosters/${id}`);
+          else void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function RostersPage() {
   return (
-    <Suspense fallback={<p style={{ padding: '1rem', color: '#94a3b8' }}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <RostersInner />
     </Suspense>
   );

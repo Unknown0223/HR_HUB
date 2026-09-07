@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -11,6 +13,7 @@ import { displayCode, storeCode } from '@/lib/nationality';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = { id: string; code: string; name: string; items?: DictItem[] };
 type DictItem = {
@@ -214,76 +217,26 @@ function NationalityInner() {
     );
   }
 
-  if (mode === 'create' || mode === 'edit') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title:
-              mode === 'edit'
-                ? 'Национальность (изменение)'
-                : 'Национальность (создание)',
-            siblings: [],
-          }}
-        />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button
-              type="button"
-              className={formStyles.btnSave}
-              disabled={saving}
-              onClick={() => void save()}
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              className={formStyles.btnClose}
-              onClick={() => setMode('list')}
-            >
-              Закрыть
-            </button>
-          </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${formStyles.cardForm}`}>
-            <div className={formStyles.field}>
-              <label>Код</label>
-              <input value={code} onChange={(e) => setCode(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>
-                Название <span className={formStyles.req}>*</span>
-              </label>
-              <input
-                value={name}
-                autoFocus
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div className={formStyles.statusBlock}>
-              <span className={formStyles.fieldLabel}>Статус</span>
-              <label className={formStyles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                  onClick={() => setActive((v) => !v)}
-                  aria-pressed={active}
-                />
-                <span>Активный</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.wrap}>
       <PageSubnav group={{ title: 'Национальность', siblings: [] }} />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-flag" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Национальность</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник национальностей
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <FilterPanel
@@ -322,8 +275,15 @@ function NationalityInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') applySearch();
             }}
+            aria-label="Поиск"
           />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
+          <button
+            type="button"
+            className={styles.exportBtn}
+            onClick={exportCsv}
+            title="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
@@ -334,6 +294,7 @@ function NationalityInner() {
             className={styles.toolBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
           >
             ‹
           </button>
@@ -343,6 +304,7 @@ function NationalityInner() {
             className={styles.toolBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
             ›
           </button>
@@ -350,9 +312,11 @@ function NationalityInner() {
             type="button"
             className={styles.toolBtn}
             onClick={() => void load()}
+            title="Обновить"
             aria-label="Обновить"
           >
-            ↻
+            <i className="fas fa-sync-alt" aria-hidden />
+            Обновить
           </button>
         </div>
       </div>
@@ -452,13 +416,77 @@ function NationalityInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={
+          mode === 'edit'
+            ? 'Национальность (изменение)'
+            : 'Национальность (создание)'
+        }
+        width="md"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>Код</label>
+          <input value={code} onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>
+            Название <span className={modal.req}>*</span>
+          </label>
+          <input
+            value={name}
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div className={modal.field}>
+          <span>Статус</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+              onClick={() => setActive((v) => !v)}
+              aria-pressed={active}
+            />
+            <span>{active ? 'Активный' : 'Неактивный'}</span>
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }
 
 export default function NationalityPage() {
   return (
-    <Suspense fallback={<p className={styles.empty}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <NationalityInner />
     </Suspense>
   );

@@ -31,7 +31,9 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const role = dto.role ?? Role.tenant_admin;
+    // Public signup always creates the new company's own admin.
+    // Client-supplied roles (including platform_admin) are ignored/rejected by DTO.
+    const role = Role.tenant_admin;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({

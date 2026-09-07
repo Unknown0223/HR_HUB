@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
-import { ModalPortal } from '@/components/ModalPortal';
-import styles from './page.module.css';
+import styles from './form.module.css';
 
 export type LocationFormValues = {
   code: string;
@@ -69,8 +70,6 @@ export function LocationFormModal({ open, title, initial, busy, onClose, onSave 
       .catch(() => setTypes([]));
   }, [open, initial]);
 
-  if (!open) return null;
-
   async function submit() {
     setErr('');
     if (!values.code.trim() || !values.name.trim()) {
@@ -85,33 +84,61 @@ export function LocationFormModal({ open, title, initial, busy, onClose, onSave 
   }
 
   return (
-    <ModalPortal>
-      <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
-      <div className={styles.modal}>
-        <div className={styles.modalHead}>
-          <h2>{title}</h2>
-          <button type="button" className={styles.btnGhost} onClick={onClose} disabled={busy}>
+    <FormModal
+      open={open}
+      title={title}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      width="lg"
+      footer={
+        <>
+          <button
+            type="button"
+            className={modal.btnPrimary}
+            disabled={busy}
+            onClick={() => void submit()}
+          >
+            {busy ? '…' : 'Сохранить'}
+          </button>
+          <button
+            type="button"
+            className={modal.btnGhost}
+            disabled={busy}
+            onClick={onClose}
+          >
             Закрыть
           </button>
-        </div>
-        <div className={styles.modalBody}>
-          <label>
-            Локация (название)
-            <input
-              value={values.name}
-              onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-            />
-          </label>
-          <label>
-            Код
+        </>
+      }
+    >
+      {err ? <p className={modal.error}>{err}</p> : null}
+
+      <div className={modal.fields}>
+        <label className={modal.field}>
+          <span>
+            Локация (название) <em className={modal.req}>*</em>
+          </span>
+          <input
+            value={values.name}
+            onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+          />
+        </label>
+
+        <div className={styles.row2}>
+          <label className={modal.field}>
+            <span>
+              Код <em className={modal.req}>*</em>
+            </span>
             <input
               value={values.code}
               onChange={(e) => setValues((v) => ({ ...v, code: e.target.value }))}
               placeholder="AND1"
             />
           </label>
-          <label>
-            Тип локации
+
+          <label className={modal.field}>
+            <span>Тип локации</span>
             <select
               value={values.locationTypeId}
               onChange={(e) => setValues((v) => ({ ...v, locationTypeId: e.target.value }))}
@@ -124,107 +151,121 @@ export function LocationFormModal({ open, title, initial, busy, onClose, onSave 
               ))}
             </select>
           </label>
-          <label>
-            Регион
+        </div>
+
+        <label className={modal.field}>
+          <span>Адрес</span>
+          <input
+            value={values.address}
+            onChange={(e) => setValues((v) => ({ ...v, address: e.target.value }))}
+          />
+        </label>
+
+        <div className={styles.row2}>
+          <label className={modal.field}>
+            <span>Регион</span>
             <input
               value={values.region}
               onChange={(e) => setValues((v) => ({ ...v, region: e.target.value }))}
               placeholder="Andijon"
             />
           </label>
-          <label className={styles.full}>
-            Адрес
-            <input
-              value={values.address}
-              onChange={(e) => setValues((v) => ({ ...v, address: e.target.value }))}
-            />
-          </label>
-          <label>
-            Временная зона
+
+          <label className={modal.field}>
+            <span>Временная зона</span>
             <input
               value={values.timezone}
               onChange={(e) => setValues((v) => ({ ...v, timezone: e.target.value }))}
               placeholder="Asia/Tashkent"
             />
           </label>
-          <label>
-            BSSID
-            <input
-              value={values.bssid}
-              onChange={(e) => setValues((v) => ({ ...v, bssid: e.target.value }))}
-            />
-          </label>
-          <label>
-            Широта
+        </div>
+
+        <div className={styles.row2}>
+          <label className={modal.field}>
+            <span>Широта</span>
             <input
               value={values.latitude}
               onChange={(e) => setValues((v) => ({ ...v, latitude: e.target.value }))}
               placeholder="40.790345"
             />
           </label>
-          <label>
-            Долгота
+
+          <label className={modal.field}>
+            <span>Долгота</span>
             <input
               value={values.longitude}
               onChange={(e) => setValues((v) => ({ ...v, longitude: e.target.value }))}
               placeholder="72.331761"
             />
           </label>
-          <label>
-            Погрешность (м)
+        </div>
+
+        <div className={styles.row2}>
+          <label className={modal.field}>
+            <span>Погрешность (м)</span>
             <input
               value={values.geoRadiusM}
               onChange={(e) => setValues((v) => ({ ...v, geoRadiusM: e.target.value }))}
+              inputMode="numeric"
             />
           </label>
-          <label>
-            Полигональный анализ
+
+          <label className={modal.field}>
+            <span>BSSID</span>
             <input
-              value={values.polygonalAnalysis}
-              onChange={(e) => setValues((v) => ({ ...v, polygonalAnalysis: e.target.value }))}
+              value={values.bssid}
+              onChange={(e) => setValues((v) => ({ ...v, bssid: e.target.value }))}
             />
           </label>
-          <div className={styles.toggleRow}>
-            <span>Ограничение отметок</span>
+        </div>
+
+        <label className={modal.field}>
+          <span>Полигональный анализ</span>
+          <input
+            value={values.polygonalAnalysis}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, polygonalAnalysis: e.target.value }))
+            }
+          />
+        </label>
+
+        <div className={styles.checkGroup}>
+          <label className={styles.check}>
             <input
               type="checkbox"
               checked={values.restrictMarks}
-              onChange={(e) => setValues((v) => ({ ...v, restrictMarks: e.target.checked }))}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, restrictMarks: e.target.checked }))
+              }
             />
-          </div>
-          <div className={`${styles.toggleRow} ${styles.full}`}>
-            <span>
-              Глобальная локация
-              <small style={{ display: 'block', color: '#6b7280', fontWeight: 400, marginTop: 2 }}>
-                Сотрудники этой локации загружаются на все устройства республики
-              </small>
-            </span>
+            Ограничение отметок
+          </label>
+
+          <label className={styles.check}>
             <input
               type="checkbox"
               checked={values.isGlobal}
               onChange={(e) => setValues((v) => ({ ...v, isGlobal: e.target.checked }))}
             />
-          </div>
-          <div className={styles.toggleRow}>
-            <span>Статус: {values.isActive ? 'Активный' : 'Неактивный'}</span>
+            <span className={styles.checkText}>
+              Глобальная локация
+              <small>
+                Сотрудники этой локации загружаются на все устройства республики
+              </small>
+            </span>
+          </label>
+
+          <label className={styles.check}>
             <input
               type="checkbox"
               checked={values.isActive}
               onChange={(e) => setValues((v) => ({ ...v, isActive: e.target.checked }))}
             />
-          </div>
-        </div>
-        {err ? <p className={styles.error} style={{ padding: '0 1.1rem' }}>{err}</p> : null}
-        <div className={styles.modalFoot}>
-          <button type="button" className={styles.btnGhost} onClick={onClose} disabled={busy}>
-            Закрыть
-          </button>
-          <button type="button" className={styles.btnPrimary} disabled={busy} onClick={() => void submit()}>
-            Сохранить
-          </button>
+            Активная
+          </label>
         </div>
       </div>
-    </div>
-    </ModalPortal>
+    </FormModal>
   );
 }

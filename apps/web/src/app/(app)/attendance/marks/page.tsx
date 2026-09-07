@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ModalPortal } from '@/components/ModalPortal';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch, type PageResult } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = [
   'q',
@@ -21,6 +23,8 @@ const FILTER_KEYS = [
   'dateFrom',
   'dateTo',
 ] as const;
+
+const COL_COUNT = 8;
 
 type Emp = {
   id: string;
@@ -93,9 +97,9 @@ function MarksInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
-  const [search, setSearch] = useState(filters.q || '');
-  const [checked, setChecked] = useState<Set<string>>(() => new Set());
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [searchDraft, setSearchDraft] = useState(filters.q || '');
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
@@ -133,15 +137,18 @@ function MarksInner() {
     return [emp, date].filter(Boolean).join(' · ');
   }, [employees, filters.dateFrom, filters.dateTo, filters.employeeId, searchParams]);
 
-  const selectedIds = useMemo(() => [...checked], [checked]);
-  const selectedValid = selectedIds.filter((id) => {
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+  const selectedValid = checkedIds.filter((id) => {
     const r = rows.find((x) => x.id === id);
     return r && r.isValid !== false;
   }).length;
-  const selectedInvalid = selectedIds.length - selectedValid;
-  const allSelected = rows.length > 0 && rows.every((r) => checked.has(r.id));
+  const selectedInvalid = checkedIds.length - selectedValid;
+  const allPageChecked = rows.length > 0 && rows.every((r) => checked[r.id]);
+  const somePageChecked = rows.some((r) => checked[r.id]) && !allPageChecked;
   const totalPages = Math.max(1, Math.ceil(total / 50));
-  const focus = rows.find((r) => r.id === focusId) || null;
 
   function urlFilter(key: string) {
     return (searchParams?.get(key) || filters[key] || '').trim();
@@ -157,7 +164,7 @@ function MarksInner() {
       const qs = new URLSearchParams();
       qs.set('page', String(p));
       qs.set('limit', '50');
-      const q = (urlFilter('q') || search).trim();
+      const q = (urlFilter('q') || searchDraft).trim();
       if (q) qs.set('q', q);
       if (urlFilter('divisionId')) qs.set('divisionId', urlFilter('divisionId'));
       if (urlFilter('locationId')) qs.set('locationId', urlFilter('locationId'));
@@ -177,7 +184,13 @@ function MarksInner() {
         return true;
       });
       setRows(scoped);
-      setTotal(Array.isArray(data) ? scoped.length : employeeId || dateFrom || dateTo ? scoped.length : data.total || scoped.length);
+      setTotal(
+        Array.isArray(data)
+          ? scoped.length
+          : employeeId || dateFrom || dateTo
+            ? scoped.length
+            : data.total || scoped.length,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
       setRows([]);
@@ -199,6 +212,10 @@ function MarksInner() {
     filters.dateFrom,
     filters.dateTo,
   ]);
+
+  useEffect(() => {
+    setSearchDraft(filters.q || '');
+  }, [filters.q]);
 
   useEffect(() => {
     void (async () => {
@@ -245,36 +262,41 @@ function MarksInner() {
     })();
   }, [searchParams]);
 
-  function toggleOne(id: string) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setFocusId(id);
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function toggleAll() {
-    if (allSelected) {
-      setChecked(new Set());
-      return;
-    }
-    setChecked(new Set(rows.map((r) => r.id)));
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of rows) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `/attendance/marks?${qs}` : '/attendance/marks', { scroll: false });
   }
 
   async function runBulk(action: string, markType?: string) {
-    if (!selectedIds.length) return;
+    if (!checkedIds.length) return;
     setBusy(true);
     setError('');
     setInfo('');
     try {
       const res = await apiFetch<{ affected: number }>('/api/attendance/marks/bulk', {
         method: 'POST',
-        body: JSON.stringify({ ids: selectedIds, action, markType }),
+        body: JSON.stringify({ ids: checkedIds, action, markType }),
       });
       setInfo(`Готово: ${res.affected}`);
-      setChecked(new Set());
+      setChecked({});
       setConfirm(null);
       setTypeOpen(false);
       await load(page);
@@ -312,14 +334,43 @@ function MarksInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="marks" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-fingerprint" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отметки</h1>
+          <p className={shared.pageSubtitle}>
+            Журнал отметок посещаемости: приход, уход, перерывы
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <div className={styles.dropdown}>
             <button
               type="button"
-              className={styles.btnMenu}
+              className={styles.createBtn}
               onClick={() => setCreateOpen((v) => !v)}
             >
+              <i className="fas fa-plus" aria-hidden />
               Создать ▾
             </button>
             {createOpen ? (
@@ -333,113 +384,6 @@ function MarksInner() {
               </div>
             ) : null}
           </div>
-
-          <div className={styles.dropdown}>
-            <button
-              type="button"
-              className={styles.btnBlue}
-              disabled={!selectedIds.length || busy}
-              onClick={() => setTypeOpen((v) => !v)}
-            >
-              Изменить тип отметки
-            </button>
-            {typeOpen && selectedIds.length ? (
-              <div className={styles.menu}>
-                {MARK_TYPE_OPTS.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() =>
-                      setConfirm({
-                        title: `Изменить тип на «${t.label}» для ${selectedIds.length}?`,
-                        action: 'set_type',
-                        markType: t.key,
-                      })
-                    }
-                  >
-                    {t.label} {selectedIds.length}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          {selectedInvalid > 0 ? (
-            <button
-              type="button"
-              className={styles.btnBlue}
-              disabled={busy}
-              onClick={() =>
-                setConfirm({
-                  title: `Сделать действительными отметки в количестве ${selectedInvalid}?`,
-                  action: 'set_valid',
-                })
-              }
-            >
-              Сделать действ. {selectedInvalid}
-            </button>
-          ) : null}
-
-          {selectedValid > 0 ? (
-            <button
-              type="button"
-              className={styles.btnDanger}
-              disabled={busy}
-              onClick={() =>
-                setConfirm({
-                  title: `Сделать недействительными отметки в количестве ${selectedValid}?`,
-                  action: 'set_invalid',
-                })
-              }
-            >
-              Сделать недейств. {selectedValid}
-            </button>
-          ) : null}
-
-          {selectedIds.length > 0 ? (
-            <button
-              type="button"
-              className={styles.btnPink}
-              disabled={busy}
-              onClick={() =>
-                setConfirm({
-                  title: `Удалить отметки в количестве ${selectedIds.length}?`,
-                  action: 'delete',
-                })
-              }
-            >
-              Удалить {selectedIds.length}
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            className={styles.btnGhost}
-            onClick={() => {
-              const now = new Date();
-              const start = new Date(now.getFullYear(), now.getMonth(), 1);
-              setApplyFrom(start.toISOString().slice(0, 10));
-              setApplyTo(now.toISOString().slice(0, 10));
-              setApplyOpen(true);
-            }}
-          >
-            Применение настроек для отметок
-          </button>
-        </div>
-
-        <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setPage(1);
-                void load(1);
-              }
-            }}
-          />
           <FilterPanel
             inline
             urlSync
@@ -475,7 +419,9 @@ function MarksInner() {
               { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
             ]}
           />
-          <span className={styles.pagerMeta}>
+        </div>
+        <div className={styles.rightTools}>
+          <span className={styles.countBadge}>
             {rows.length} / {total}
           </span>
           <div className={styles.pager}>
@@ -505,8 +451,25 @@ function MarksInner() {
               ›
             </button>
           </div>
-          <button type="button" className={styles.btnGhost} onClick={() => void load(page)}>
-            Обновить
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load(page)}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
@@ -515,42 +478,153 @@ function MarksInner() {
       {info ? <p className={styles.info}>{info}</p> : null}
       {scopeLabel ? <p className={styles.scope}>{scopeLabel}</p> : null}
 
-      <div className={styles.panel}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Фото</th>
-              <th>Физическое лицо</th>
-              <th>Локация</th>
-              <th>Тип устройства</th>
-              <th>Тип отметки</th>
-              <th>Тип идентификации</th>
-              <th>Время</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <div className={styles.dropdown}>
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={busy}
+              onClick={() => setTypeOpen((v) => !v)}
+            >
+              <i className="fas fa-exchange-alt" aria-hidden />
+              Изменить тип
+            </button>
+            {typeOpen ? (
+              <div className={styles.menu}>
+                {MARK_TYPE_OPTS.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() =>
+                      setConfirm({
+                        title: `Изменить тип на «${t.label}» для ${checkedIds.length}?`,
+                        action: 'set_type',
+                        markType: t.key,
+                      })
+                    }
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {selectedInvalid > 0 ? (
+            <button
+              type="button"
+              className={`${styles.bulkBtn} ${styles.bulkOk}`}
+              disabled={busy}
+              onClick={() =>
+                setConfirm({
+                  title: `Сделать действительными отметки в количестве ${selectedInvalid}?`,
+                  action: 'set_valid',
+                })
+              }
+            >
+              <i className="fas fa-check" aria-hidden />
+              Действ. {selectedInvalid}
+            </button>
+          ) : null}
+          {selectedValid > 0 ? (
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={busy}
+              onClick={() =>
+                setConfirm({
+                  title: `Сделать недействительными отметки в количестве ${selectedValid}?`,
+                  action: 'set_invalid',
+                })
+              }
+            >
+              <i className="fas fa-ban" aria-hidden />
+              Недейств. {selectedValid}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() =>
+              setConfirm({
+                title: `Удалить отметки в количестве ${checkedIds.length}?`,
+                action: 'delete',
+              })
+            }
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            onClick={() => {
+              const now = new Date();
+              const start = new Date(now.getFullYear(), now.getMonth(), 1);
+              setApplyFrom(start.toISOString().slice(0, 10));
+              setApplyTo(now.toISOString().slice(0, 10));
+              setApplyOpen(true);
+            }}
+          >
+            <i className="fas fa-sliders-h" aria-hidden />
+            Настройки
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <div className={styles.tableWrap}>
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Фото</th>
+                <th>Физическое лицо</th>
+                <th>Локация</th>
+                <th>Тип устройства</th>
+                <th>Тип отметки</th>
+                <th>Тип идентификации</th>
+                <th>Время</th>
               </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              rows.map((m) => {
+            </thead>
+            <tbody>
+              {loading && !rows.length ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && !rows.length ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных
+                  </td>
+                </tr>
+              ) : null}
+              {rows.map((m) => {
                 const photo = mediaSrc(m.photoUrl);
                 const slides = rows
                   .map((x) => ({
@@ -559,20 +633,20 @@ function MarksInner() {
                   }))
                   .filter((s) => s.src);
                 const idx = photo ? slides.findIndex((s) => s.src === photo) : -1;
+                const open = selectedId === m.id;
+                const isChecked = Boolean(checked[m.id]);
                 return (
                   <Fragment key={m.id}>
                     <tr
-                      className={
-                        checked.has(m.id) || focusId === m.id ? styles.selected : undefined
-                      }
-                      onClick={() => setFocusId((id) => (id === m.id ? null : m.id))}
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : m.id)}
                       style={{ cursor: 'pointer' }}
                     >
                       <td className={styles.checkCol}>
                         <input
                           type="checkbox"
-                          checked={checked.has(m.id)}
-                          onChange={() => toggleOne(m.id)}
+                          checked={isChecked}
+                          onChange={() => toggleCheck(m.id)}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
@@ -590,7 +664,11 @@ function MarksInner() {
                           <span className={styles.photoEmpty} />
                         )}
                       </td>
-                      <td className={m.isValid === false ? styles.invalid : undefined}>
+                      <td
+                        className={`${styles.nameCell} ${
+                          m.isValid === false ? styles.invalid : ''
+                        }`}
+                      >
                         {empName(m.employee)}
                       </td>
                       <td>{m.locationName || m.device?.location?.name || '—'}</td>
@@ -602,17 +680,25 @@ function MarksInner() {
                       </td>
                       <td>{m.identificationType || '—'}</td>
                       <td
-                        title={m.clockTamper ? m.note || 'Время терминала скорректировано' : undefined}
+                        className={styles.codeCell}
+                        title={
+                          m.clockTamper
+                            ? m.note || 'Время терминала скорректировано'
+                            : undefined
+                        }
                       >
                         {fmtDt(m.occurredAt)}
                         {m.clockTamper ? ' ⚠' : ''}
                       </td>
                     </tr>
-                    {focus?.id === m.id ? (
-                      <tr>
-                        <td colSpan={8} style={{ padding: 0 }}>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
                           <div className={styles.rowActions}>
-                            <Link href={`/attendance/marks/${m.id}`}>Просмотреть</Link>
+                            <Link href={`/attendance/marks/${m.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотреть
+                            </Link>
                             <button
                               type="button"
                               onClick={() =>
@@ -622,6 +708,12 @@ function MarksInner() {
                                 )
                               }
                             >
+                              <i
+                                className={
+                                  m.isValid === false ? 'fas fa-check' : 'fas fa-ban'
+                                }
+                                aria-hidden
+                              />
                               {m.isValid === false
                                 ? 'Сделать действ.'
                                 : 'Сделать недейств.'}
@@ -629,19 +721,22 @@ function MarksInner() {
                             <button
                               type="button"
                               onClick={() => {
-                                setChecked(new Set([m.id]));
+                                setChecked({ [m.id]: true });
                                 setTypeOpen(true);
                               }}
                             >
-                              Изменить тип на…
+                              <i className="fas fa-exchange-alt" aria-hidden />
+                              Изменить тип
                             </button>
                             <button
                               type="button"
+                              className={styles.danger}
                               onClick={async () => {
                                 if (await confirmDialog('Удалить отметку?'))
                                   void runOne(m.id, 'delete');
                               }}
                             >
+                              <i className="fas fa-trash" aria-hidden />
                               Удалить
                             </button>
                           </div>
@@ -650,87 +745,95 @@ function MarksInner() {
                     ) : null}
                   </Fragment>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{rows.length}</strong> из <strong>{total}</strong>
+          </p>
+        </div>
       </div>
 
-      {confirm ? (
-        <ModalPortal>
-          <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
-            <div className={styles.modal}>
-              <div className={styles.modalBody}>
-                <h3>{confirm.title}</h3>
-              </div>
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.btnBlue}
-                  disabled={busy}
-                  onClick={() => void runBulk(confirm.action, confirm.markType)}
-                >
-                  Да
-                </button>
-                <button
-                  type="button"
-                  className={styles.btnGhost}
-                  onClick={() => setConfirm(null)}
-                >
-                  Нет
-                </button>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      ) : null}
+      <FormModal
+        open={Boolean(confirm)}
+        title={confirm?.title || 'Подтверждение'}
+        onClose={() => setConfirm(null)}
+        width="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={busy}
+              onClick={() =>
+                confirm && void runBulk(confirm.action, confirm.markType)
+              }
+            >
+              Да
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => setConfirm(null)}
+            >
+              Нет
+            </button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, color: '#64788f', fontSize: 13 }}>
+          Подтвердите выполнение операции для выбранных отметок.
+        </p>
+      </FormModal>
 
-      {applyOpen ? (
-        <ModalPortal>
-          <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
-            <div className={styles.modal}>
-              <div className={styles.modalBody}>
-                <h3>Применение настроек для отметок</h3>
-                <label>
-                  Дата начала
-                  <input
-                    type="date"
-                    value={applyFrom}
-                    onChange={(e) => setApplyFrom(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Дата окончания
-                  <input
-                    type="date"
-                    value={applyTo}
-                    onChange={(e) => setApplyTo(e.target.value)}
-                  />
-                </label>
-              </div>
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.btnBlue}
-                  onClick={() => {
-                    setApplyOpen(false);
-                    router.push('/catalog/devices');
-                  }}
-                >
-                  Применить
-                </button>
-                <button
-                  type="button"
-                  className={styles.btnGhost}
-                  onClick={() => setApplyOpen(false)}
-                >
-                  Отменить
-                </button>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      ) : null}
+      <FormModal
+        open={applyOpen}
+        title="Применение настроек для отметок"
+        onClose={() => setApplyOpen(false)}
+        width="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              onClick={() => {
+                setApplyOpen(false);
+                router.push('/catalog/devices');
+              }}
+            >
+              Применить
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => setApplyOpen(false)}
+            >
+              Отменить
+            </button>
+          </>
+        }
+      >
+        <div className={modal.fields}>
+          <label className={modal.field}>
+            <span>Дата начала</span>
+            <input
+              type="date"
+              value={applyFrom}
+              onChange={(e) => setApplyFrom(e.target.value)}
+            />
+          </label>
+          <label className={modal.field}>
+            <span>Дата окончания</span>
+            <input
+              type="date"
+              value={applyTo}
+              onChange={(e) => setApplyTo(e.target.value)}
+            />
+          </label>
+        </div>
+      </FormModal>
       {photos.node}
     </div>
   );
@@ -738,7 +841,7 @@ function MarksInner() {
 
 export default function MarksPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <MarksInner />
     </Suspense>
   );

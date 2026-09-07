@@ -1,7 +1,13 @@
 'use client';
 
-import { ClearanceTemplateForm } from '../ClearanceTemplateForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewClearanceTemplatePage() {
-  return <ClearanceTemplateForm mode="create" />;
+/** Legacy /new → list with create modal */
+export default function NewClearanceTemplateRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/clearance-templates?create=1');
+  }, [router]);
+  return null;
 }

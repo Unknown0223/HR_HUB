@@ -1,9 +1,18 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { AbsenceTypeForm } from '../../AbsenceTypeForm';
+import { use, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function EditAbsenceTypePage() {
-  const { id } = useParams<{ id: string }>();
-  return <AbsenceTypeForm typeId={id} mode="edit" />;
+/** Legacy /[id]/edit → list with edit modal */
+export default function EditAbsenceTypeRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(`/catalog/absence-types?edit=${encodeURIComponent(id)}`);
+  }, [router, id]);
+  return null;
 }

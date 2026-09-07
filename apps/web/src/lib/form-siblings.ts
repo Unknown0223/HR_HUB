@@ -109,6 +109,10 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
       { label: 'Позиции', href: '/catalog/staff-positions' },
     ],
   },
+  'report-templates': {
+    title: 'Шаблоны отчетов',
+    siblings: [],
+  },
   'dynamic-fields': {
     title: 'Динамические поля',
     siblings: [
@@ -410,6 +414,28 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     title: 'Организации',
     siblings: [],
   },
+  'settings-admin': {
+    title: 'Администрирование',
+    siblings: [
+      { label: 'Организации', href: '/settings/organizations' },
+      { label: 'Пользователи', href: '/settings/users' },
+      { label: 'Регионы', href: '/settings/countries' },
+      { label: 'Банки', href: '/settings/banks' },
+      { label: 'Быстрый запуск', href: '/settings/quickstart' },
+      { label: 'Фотографии', href: '/settings/photos' },
+      { label: 'Импорт документов', href: '/settings/person-docs' },
+      { label: 'Аудит', href: '/settings/audit' },
+    ],
+  },
+  'settings-main': {
+    title: '',
+    siblings: [
+      { label: 'Настройки системы', href: '/settings?tab=main' },
+      { label: 'Кадровый учет', href: '/settings?tab=org' },
+      { label: 'Расчет зарплаты', href: '/settings/payroll-calc' },
+      { label: 'Новостная лента', href: '/news' },
+    ],
+  },
   countries: {
     title: 'Страны',
     siblings: [],
@@ -465,19 +491,20 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
   locations: {
     title: 'Локации',
     siblings: [
-      { label: 'Типы локаций', href: '/catalog/location-types' },
       { label: 'Устройства', href: '/catalog/devices' },
-      { label: 'Сгенерированные QR-коды', href: '/attendance?tab=qr' },
       { label: 'Новые устройства', href: '/catalog/devices?filter=new' },
+      { label: 'Локации', href: '/catalog/locations' },
+      { label: 'Удалённое управление', href: '/catalog/device-control' },
+      { label: 'Типы локаций', href: '/catalog/location-types' },
     ],
   },
   devices: {
     title: 'Устройства',
     siblings: [
-      { label: 'Локации', href: '/catalog/locations' },
-      { label: 'Типы локаций', href: '/catalog/location-types' },
-      { label: 'Сгенерированные QR-коды', href: '/attendance?tab=qr' },
+      { label: 'Устройства', href: '/catalog/devices' },
       { label: 'Новые устройства', href: '/catalog/devices?filter=new' },
+      { label: 'Связь с офисом', href: '/catalog/devices/link' },
+      { label: 'Локации', href: '/catalog/locations' },
       { label: 'Удалённое управление', href: '/catalog/device-control' },
     ],
   },
@@ -486,7 +513,9 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     siblings: [
       { label: 'Устройства', href: '/catalog/devices' },
       { label: 'Новые устройства', href: '/catalog/devices?filter=new' },
+      { label: 'Связь с офисом', href: '/catalog/devices/link' },
       { label: 'Локации', href: '/catalog/locations' },
+      { label: 'Удалённое управление', href: '/catalog/device-control' },
     ],
   },
   marks: {

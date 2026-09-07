@@ -3,12 +3,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadAttendanceLikeXlsx, type XlsxCell } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
-import treeS from '../dismissals-by-reason/page.module.css';
 import posS from '../positions/page.module.css';
-import empS from '../employees/page.module.css';
-import att from '../attendance-overview/page.module.css';
 import local from './page.module.css';
 
 type Tab = 'filter' | 'view' | 'settings';
@@ -108,6 +106,19 @@ function fileStamp(iso?: string) {
   const ss = String(d.getSeconds()).padStart(2, '0');
   return `${dd}.${mm}.${yyyy}+${hh}_${mi}_${ss}`;
 }
+function fmtGen(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
 function escapeHtml(v: string) {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -201,7 +212,7 @@ function DatePicker({ value, onChange }: { value: string; onChange: (ymd: string
   }, [open]);
   return (
     <div className={extra.periodWrap} ref={wrapRef}>
-      <button type="button" className={local.periodBtn} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={arena.periodBtn} onClick={() => setOpen((v) => !v)}>
         {fmtRu(value)}
       </button>
       {open ? (
@@ -288,11 +299,11 @@ function DivisionPick({
     const expanded = open.has(node.id) || !!q || depth === 0;
     return (
       <>
-        <div className={`${extra.treeRow} ${selected.has(node.id) ? att.treeOn : ''}`} style={{ paddingLeft: depth * 14 }}>
+        <div className={`${arena.treeRow} ${selected.has(node.id) ? arena.treeOn : ''}`} style={{ paddingLeft: depth * 14 }}>
           {kids.length ? (
             <button
               type="button"
-              className={extra.exp}
+              className={arena.exp}
               onClick={() =>
                 setOpen((prev) => {
                   const next = new Set(prev);
@@ -305,14 +316,14 @@ function DivisionPick({
               {expanded ? '−' : '+'}
             </button>
           ) : (
-            <span className={extra.exp} />
+            <span className={arena.exp} />
           )}
-          <input type="checkbox" className={att.box} checked={selected.has(node.id)} onChange={() => toggleOne(node.id)} />
-          <button type="button" className={selected.has(node.id) ? `${att.treeName} ${att.treeNameOn}` : att.treeName} onClick={() => toggleOne(node.id)}>
+          <input type="checkbox" className={arena.box} checked={selected.has(node.id)} onChange={() => toggleOne(node.id)} />
+          <button type="button" className={selected.has(node.id) ? `${arena.treeName} ${arena.treeNameOn}` : arena.treeName} onClick={() => toggleOne(node.id)}>
             {node.name}
           </button>
           {kids.length ? (
-            <button type="button" className={treeS.selectAll} onClick={() => selectBranch(node)}>
+            <button type="button" className={arena.selectAll} onClick={() => selectBranch(node)}>
               выбрать все
             </button>
           ) : null}
@@ -322,10 +333,10 @@ function DivisionPick({
     );
   }
   return (
-    <div className={`${att.dropWrap}${menuOpen ? ` ${att.dropOpen}` : ''}`} ref={wrapRef}>
+    <div className={`${arena.dropWrap}${menuOpen ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className={`${att.dropField}${selected.size ? '' : ` ${att.dropEmpty}`}`}
+        className={`${arena.dropField}${selected.size ? '' : ` ${arena.dropEmpty}`}`}
         onClick={() =>
           setMenuOpen((v) => {
             if (v) setQ('');
@@ -335,11 +346,11 @@ function DivisionPick({
       >
         {selected.size ? `${selected.size} выбранных` : 'Поиск...'}
       </button>
-      <div className={att.dropPanel} hidden={!menuOpen}>
+      <div className={arena.dropPanel} hidden={!menuOpen}>
         {menuOpen ? (
           <>
-            <input className={att.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            {visible.length === 0 ? <div className={empS.pickEmpty}>Нет данных</div> : null}
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {visible.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {visible.map((n) => (
               <Row key={n.id} node={n} depth={0} />
             ))}
@@ -384,10 +395,10 @@ function FilterPick({
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   }
   return (
-    <div className={`${att.dropWrap}${open ? ` ${att.dropOpen}` : ''}`} ref={wrapRef}>
+    <div className={`${arena.dropWrap}${open ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className={`${att.dropField}${selected.length ? '' : ` ${att.dropEmpty}`}`}
+        className={`${arena.dropField}${selected.length ? '' : ` ${arena.dropEmpty}`}`}
         onClick={() =>
           setOpen((v) => {
             if (v) setQ('');
@@ -397,22 +408,22 @@ function FilterPick({
       >
         {selected.length ? `Выбрано: ${selected.length}` : 'Поиск...'}
       </button>
-      <div className={att.dropPanel} hidden={!open}>
+      <div className={arena.dropPanel} hidden={!open}>
         {open ? (
           <>
-            <input className={att.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            {filtered.length === 0 ? <div className={empS.pickEmpty}>Нет данных</div> : null}
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {filtered.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {filtered.map((o) => {
               const on = selected.includes(o.id);
               return (
-                <button type="button" key={o.id} className={on ? `${att.listRow} ${att.listOn}` : att.listRow} onClick={() => toggle(o.id)}>
-                  <input type="checkbox" className={att.box} readOnly checked={on} tabIndex={-1} />
+                <button type="button" key={o.id} className={on ? `${arena.listRow} ${arena.listOn}` : arena.listRow} onClick={() => toggle(o.id)}>
+                  <input type="checkbox" className={arena.box} readOnly checked={on} tabIndex={-1} />
                   <span>{o.label}</span>
                 </button>
               );
             })}
             {!showAll && !q.trim() && options.length > 8 ? (
-              <button type="button" className={att.showAll} onClick={() => setShowAll(true)}>
+              <button type="button" className={arena.showAll} onClick={() => setShowAll(true)}>
                 Показать все
               </button>
             ) : null}
@@ -459,10 +470,10 @@ function EmpPick({
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   }
   return (
-    <div className={`${att.dropWrap}${open ? ` ${att.dropOpen}` : ''}`} ref={wrapRef}>
+    <div className={`${arena.dropWrap}${open ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className={`${att.dropField}${selected.length ? '' : ` ${att.dropEmpty}`}`}
+        className={`${arena.dropField}${selected.length ? '' : ` ${arena.dropEmpty}`}`}
         onClick={() =>
           setOpen((v) => {
             if (v) setQ('');
@@ -472,34 +483,34 @@ function EmpPick({
       >
         {selected.length ? `Выбрано: ${selected.length}` : 'Поиск...'}
       </button>
-      <div className={`${att.dropPanel} ${att.empWide}`} hidden={!open}>
+      <div className={`${arena.dropPanel} ${arena.empWide}`} hidden={!open}>
         {open ? (
           <>
-            <input className={att.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            <div className={att.empHead} style={{ gridTemplateColumns: '28px 140px 1fr' }}>
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className={arena.empHead} style={{ gridTemplateColumns: '28px 140px 1fr' }}>
               <span />
               <span>Табельный номер</span>
               <span>Сотрудник</span>
             </div>
-            {filtered.length === 0 ? <div className={empS.pickEmpty}>Нет данных</div> : null}
+            {filtered.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {filtered.map((o) => {
               const on = selected.includes(o.id);
               return (
                 <button
                   type="button"
                   key={o.id}
-                  className={on ? `${att.empRow} ${att.empOn}` : att.empRow}
+                  className={on ? `${arena.empRow} ${arena.empOn}` : arena.empRow}
                   style={{ gridTemplateColumns: '28px 140px 1fr' }}
                   onClick={() => toggle(o.id)}
                 >
-                  <input type="checkbox" className={att.box} readOnly checked={on} tabIndex={-1} />
+                  <input type="checkbox" className={arena.box} readOnly checked={on} tabIndex={-1} />
                   <span>{o.tabNumber || '—'}</span>
                   <span>{empName(o)}</span>
                 </button>
               );
             })}
             {!showAll && !q.trim() && options.length > 8 ? (
-              <button type="button" className={att.showAll} onClick={() => setShowAll(true)}>
+              <button type="button" className={arena.showAll} onClick={() => setShowAll(true)}>
                 Показать все
               </button>
             ) : null}
@@ -507,11 +518,11 @@ function EmpPick({
         ) : null}
       </div>
       {selected.length ? (
-        <div className={empS.chips}>
+        <div className={arena.chips}>
           {selected.map((id) => {
             const o = options.find((x) => x.id === id);
             return (
-              <button key={id} type="button" className={empS.chip} onClick={() => toggle(id)}>
+              <button key={id} type="button" className={arena.chip} onClick={() => toggle(id)}>
                 {o ? empName(o) : id} ×
               </button>
             );
@@ -700,10 +711,11 @@ export default function MarksDetailPage() {
   );
 
   function rowCells(r: Row): XlsxCell[] {
+    const extraCells: XlsxCell[] = extras.map((c) => String(r[c.key] ?? ''));
     return [
       r.n,
       r.employee,
-      ...extras.map((c) => r[c.key] ?? ''),
+      ...extraCells,
       r.planIn,
       r.planOut,
       hours(r.planNorm),
@@ -770,7 +782,7 @@ export default function MarksDetailPage() {
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .wrap{padding:16px}
@@ -810,17 +822,17 @@ th{background:#eef0f4}
     w.document.getElementById('btnExcel')?.addEventListener('click', () => void exportExcel(data));
   }
 
-  const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : extra.exportLinks}>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void openHtml()}>
+  const exportBtns = (
+    <div className={arena.exportBtns}>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void openHtml()}>
         HTML
       </button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void exportExcel()}>
         Excel
       </button>
       <button
         type="button"
-        className={ghost ? layout.exportBtnGhost : undefined}
+        className={arena.exportBtn}
         disabled={busy}
         onClick={() => void ensureReport().then((d) => d && downloadBlob(`${FILE_BASE}(${fileStamp(d.generatedAt)}).csv`, new Blob([csvText(d)], { type: 'text/csv;charset=utf-8' })))}
       >
@@ -828,7 +840,7 @@ th{background:#eef0f4}
       </button>
       <button
         type="button"
-        className={ghost ? layout.exportBtnGhost : undefined}
+        className={arena.exportBtn}
         disabled={busy}
         onClick={() => void ensureReport().then((d) => d && downloadBlob(`${FILE_BASE}(${fileStamp(d.generatedAt)}).xml`, new Blob([xmlText(d)], { type: 'application/xml;charset=utf-8' })))}
       >
@@ -838,87 +850,141 @@ th{background:#eef0f4}
   );
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>{TITLE}</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>
-          Фильтр
-        </button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report || loadedQs !== queryQs) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
-        <button type="button" className={tab === 'settings' ? layout.tabOn : layout.tab} onClick={() => setTab('settings')}>
-          Настройки
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void generate();
+            }}
+          >
+            Просмотр
+          </button>
+          <button
+            type="button"
+            className={tab === 'settings' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('settings')}
+          >
+            Настройки
+          </button>
+        </div>
         {tab === 'settings' ? (
           <>
-            <button type="button" className={layout.tab} onClick={saveSettings}>
+            <button
+              type="button"
+              className={arena.ghostBtn}
+              onClick={saveSettings}
+            >
               Сохранить
             </button>
-            <button type="button" className={layout.tab} onClick={resetSettings}>
+            <button
+              type="button"
+              className={arena.ghostBtn}
+              onClick={resetSettings}
+            >
               Сбросить
             </button>
           </>
         ) : null}
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns(true)}
+            {exportBtns}
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`} aria-hidden>
+          <i className="fas fa-fingerprint" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>{TITLE}</h1>
+          <p className={shared.pageSubtitle}>Детализация отметок посещений за выбранную дату: сотрудники, время и место отметки.</p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${local.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Дата</label>
             <DatePicker value={date} onChange={setDate} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Подразделение</label>
             <DivisionPick nodes={tree} selected={new Set(divisionIds)} onChange={(next) => setDivisionIds([...next])} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Должности</label>
             <FilterPick options={positions} selected={positionIds} onChange={setPositionIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Локации</label>
             <FilterPick options={locations} selected={locationIds} onChange={setLocationIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Сотрудники</label>
             <EmpPick options={employees} selected={employeeIds} onChange={setEmployeeIds} />
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            {exportBtns(false)}
+            {exportBtns}
           </div>
         </form>
       ) : null}
 
       {tab === 'view' ? (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              {report.divisionLine ? <p className={local.meta}>{report.divisionLine}</p> : null}
-              <p className={local.meta}>{report.periodLine}</p>
+              <div className={arena.viewMeta}>
+                {report.divisionLine ? (
+                  <span className={arena.metaPill}>
+                    <i className="fas fa-building" aria-hidden />
+                    {report.divisionLine}
+                  </span>
+                ) : null}
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {report.periodLine}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-users" aria-hidden />
+                  Строк: {report.rows.length}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <div className={local.tableWrap}>
                 <table className={local.table}>
                   <thead>
@@ -952,7 +1018,7 @@ th{background:#eef0f4}
                   <tbody>
                     {report.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={14 + extras.length}>Нет данных</td>
+                        <td className={local.empty} colSpan={14 + extras.length}>Нет данных</td>
                       </tr>
                     ) : (
                       report.rows.map((r) => (

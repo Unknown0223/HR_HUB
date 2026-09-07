@@ -40,6 +40,12 @@ for (const p of procs) {
   p.on("exit", (code, signal) => {
     if (exiting) return;
     if (signal || (code && code !== 0)) {
+      if (p === procs[2]) {
+        console.warn(
+          `[device-gw] to‘xtadi (code=${code ?? signal}). API va Web ishlashda davom etadi.`,
+        );
+        return;
+      }
       console.error(`Bir servis to‘xtadi (code=${code}). Qolganlari yopilmoqda...`);
       shutdown(code || 1);
     }

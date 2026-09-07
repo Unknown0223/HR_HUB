@@ -1,23 +1,84 @@
-HR HUB — ofis qurilma ulash
+HR HUB Link — oddiy qo‘llanma (Faza 1 + Faza 2)
+===============================================
 
-1) ADMIN (o‘z kompyuterida, qurilma oldida EMAS):
-   ADMIN-PAROL.bat
-   Chiqqan parolni Railway API Variables ga yozing:
-     DEVICE_LINK_KEY
-     PUNCH_INGEST_API_KEY
-   (ikkalasi ham bir xil)
-   Keyin SHU papkani USB yoki AnyDesk bilan ofis PCga to‘liq nusxalang.
-   Joyidagi odam bu parolni KO‘RMAYDI.
+ADMIN (5 qadam)
+---------------
+1) Web: Настройки → Устройства → Связь с офисом
+2) «Создать токен» → tokenni nusxalang (≈15 daqiqa)
+3) Ofis PCga dasturni bering:
+     • tayyor paket: tools/office-link/release/HRHUB-Link/
+       (yoki release/HRHUB-Link-portable.zip)
+     • qayta yig‘ish: BUILD-EXE.bat → pack-release.bat
+     • agar «Скачать .exe» bor → yuklab oling
+     • Python bilan: BOSHLASH.bat (manba papkada)
+     • eski ZIP: pack-installer.bat / Setup: INSTALL.iss
+4) Env (Railway): DEVICE_LINK_KEY = PUNCH_INGEST_API_KEY
+   (ixtiyoriy: DEVICE_CREDENTIAL_VAULT_KEY, OFFICE_LINK_DOWNLOAD_URL)
+5) Sessiyalar jadvalida progressni kuzating (har 2 s)
 
-2) OFIS PC (qurilma bilan bir tarmoq):
-   BOSHLASH.bat  (yoki dist\HRHUB-Qurilma\HRHUB-Qurilma.exe)
-   So‘raladigan narsa: faqat qurilma (Hikvision) paroli.
-   Oyna ochiq tursin.
+OPERATOR (7 qadam)
+------------------
+1) PC va Face ID terminal BIR tarmoqda (WiFi yoki LAN)
+2) BOSHLASH.bat yoki HRHUB-Qurilma.exe ni oching
+3) Pairing tokenni yozing → «Saqlash»
+4) Lokatsiyani tanlang (majburiy)
+5) Qurilma topilmasa IP yozing → «Qidirish»
+6) «Admin bor»: HOZIRGI admin parolini bir marta yozing → «Ulash»
+   (tizim yangi parol o‘ylab o‘rnatadi va serverga yuboradi)
+7) «Ulandi» → install-service.bat (ADMIN), keyin oynani yopish mumkin
 
-   Holat: Qidirilmoqda / Online / Parol noto‘g‘ri / Qulflangan / Ulandi
-   1-noto‘g‘ri parol: qayta kiriting (avtomatik qayta urinish yo‘q).
-   2-noto‘g‘ri parol: 30 daqiqa qulflanadi (Hikvision uslubi).
-   Tarmoq kutish vaqti parol xatosi EMAS.
+Holatlar
+--------
+• Admin bor  — joriy parolni BIR MARTA yozing → tizim YANGI parol o‘ylab
+               qurilmaga o‘rnatadi → server vault ga yozadi → boshqaruv Webda.
+               Yangi parol operator/guvohga KO‘RSATILMAYDI.
+• Yangi      — Ulash: platforma o‘zi parol o‘ylab aktivatsiya (best-effort).
+               Muvaffaqiyatsiz bo‘lsa: terminalda admin o‘rnating, keyin «Admin bor».
+• Noma'lum   — IP / tarmoqni tekshiring
 
-Qurilma internetdagi ochiq IP orqali ULANMAYDI.
-U lokal tarmoqda qoladi. Ofis PC gateway + tunnel orqali HR HUB (Railway) ga chiqadi.
+Windows Service (Faza 2)
+------------------------
+• «Ulash» dan keyin data\service.json avtomatik yoziladi
+• install-service.bat (ADMIN) — NSSM yoki sc.exe
+• Muqobil: Task Scheduler (SERVICE.txt)
+• Holat: data\service_status.json
+• O‘chirish: uninstall-service.bat
+
+Named tunnel (barqaror URL)
+---------------------------
+config.json:
+  "cloudflareTunnelToken": "..."   yoki namedTunnelToken
+  "namedTunnelUrl": "https://gw.example.com"
+Env: CLOUDFLARE_TUNNEL_TOKEN
+Token bo‘lsa → cloudflared tunnel run --token
+Bo‘lmasa → trycloudflare (default)
+URL saqlanadi: data\tunnel_url.txt
+
+Bulk provision (lite)
+---------------------
+python bulk_provision.py --hosts 1.2.3.4,1.2.3.5 --location ID --password ...
+(--password = HOZIRGI admin parol; keyin platforma o‘zgartiradi)
+(maks. 5 ta host, ketma-ket)
+
+Tez-tez uchraydigan xatolar
+---------------------------
+• Token muddati o‘tgan     → Web dan yangi token oling
+• Lokatsiya tanlanmagan    → ro‘yxatdan lokatsiya tanlang
+• Parol noto‘g‘ri (1)      → qayta kiriting
+• Parol noto‘g‘ri (2)      → 30 daqiqa qulf
+• Tarmoq timeout           → parol urinishi HISOBLANMAYDI
+• Platformaga ulanmadi     → internet / token / API URL
+• Yangi qurilma stub       → avval terminalda aktivatsiya/admin
+• Named URL yo‘q           → namedTunnelUrl qo‘shing
+• Parol almashtirish xato  → terminal ISAPI / loginPassword talabi
+
+Muhim (parol / guvoh)
+---------------------
+• Ulashdan keyin guvohlar qurilmani QAYTA sozlamasin
+• Keyingi parol o‘zgartirish / sync — faqat Web (tenant admin)
+• Eski (joriy) parol faqat birinchi kirish uchun; keyin yaroqsiz bo‘ladi
+• Yangi parol GUI da KO‘RSATILMAYDI
+• link.key / DEVICE_LINK_KEY ni operatorga KO‘RSATMAY
+• Service o‘rnatilgach GUI yopilsa ham punch ishlaydi
+• Qurilma ochiq internet IP orqali ULANMAYDI
+• Lokatsiyasiz face sync ishlamaydi

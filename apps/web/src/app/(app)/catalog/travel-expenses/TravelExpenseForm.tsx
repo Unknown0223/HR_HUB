@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { FormModal } from '@/components/FormModal';
+import modalCss from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { EmployeeLookup } from '@/components/EmployeeLookup';
 import { toPickItems } from '@/components/employee-pick';
@@ -17,6 +19,26 @@ import form from '../../payroll/accruals/form.module.css';
 import extra from '../settlements/extra.module.css';
 
 const PATH = '/catalog/travel-expenses';
+
+/** Create modal for Arena list */
+export function TravelExpenseFormModal({
+  open,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+}) {
+  return (
+    <TravelExpenseForm
+      asModal
+      modalOpen={open}
+      onModalClose={onClose}
+      onModalSaved={onSaved}
+    />
+  );
+}
 
 type Emp = {
   id: string;
@@ -114,8 +136,23 @@ function SearchLookup({
   );
 }
 
-export function TravelExpenseForm({ docId, viewOnly }: { docId?: string; viewOnly?: boolean }) {
+export function TravelExpenseForm({
+  docId,
+  viewOnly,
+  asModal,
+  modalOpen,
+  onModalClose,
+  onModalSaved,
+}: {
+  docId?: string;
+  viewOnly?: boolean;
+  asModal?: boolean;
+  modalOpen?: boolean;
+  onModalClose?: () => void;
+  onModalSaved?: (id: string) => void;
+}) {
   const router = useRouter();
+  const isModal = Boolean(asModal);
   const isNew = !docId;
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -161,7 +198,24 @@ export function TravelExpenseForm({ docId, viewOnly }: { docId?: string; viewOnl
   }, [q]);
 
   useEffect(() => {
+    if (isModal && !modalOpen) return;
     void (async () => {
+      setLoading(true);
+      setError('');
+      if (isModal && isNew) {
+        setStatus('draft');
+        setNumber('');
+        setDocDate(today());
+        setEmployeeId('');
+        setDivisionName('');
+        setTripId('');
+        setTripDays(0);
+        setCurrency('UZS');
+        setAdvance(0);
+        setCalcForSalary(false);
+        setLines([]);
+        setQ('');
+      }
       try {
         const [emps, accRaw] = await Promise.all([
           apiFetch<
@@ -218,7 +272,7 @@ export function TravelExpenseForm({ docId, viewOnly }: { docId?: string; viewOnl
         setLoading(false);
       }
     })();
-  }, [docId]);
+  }, [docId, isModal, modalOpen, isNew]);
 
   useEffect(() => {
     if (!employeeId) {
@@ -319,7 +373,8 @@ export function TravelExpenseForm({ docId, viewOnly }: { docId?: string; viewOnl
       if (andComplete && id) {
         await apiFetch(`/api/payroll/travel-expenses/${id}/complete`, { method: 'POST' });
       }
-      router.push(PATH);
+      if (isModal) onModalSaved?.(id || '');
+      else router.push(PATH);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -327,32 +382,13 @@ export function TravelExpenseForm({ docId, viewOnly }: { docId?: string; viewOnl
     }
   }
 
-  if (loading) return <p>Загрузка…</p>;
+  if (isModal && !modalOpen) return null;
+  if (loading && !isModal) return <p>Загрузка…</p>;
 
-  return (
-    <div className={form.page}>
-      <PageSubnav groupKey="travel-expenses" titleOverride={pageTitle} />
-      <div className={form.topBar}>
-        <h1 className={form.title}>{pageTitle}</h1>
-        <div className={form.actions}>
-          {!readOnly ? (
-            <>
-              <button type="button" className={form.btnSave} disabled={saving} onClick={() => void save(false)}>
-                Сохранить
-              </button>
-              {status !== 'approved' ? (
-                <button type="button" className={form.btnPost} disabled={saving} onClick={() => void save(true)}>
-                  Завершить
-                </button>
-              ) : null}
-            </>
-          ) : null}
-          <button type="button" className={form.btnClose} onClick={() => router.push(PATH)}>
-            Закрыть
-          </button>
-        </div>
-      </div>
-      {error ? <p className={form.error}>{error}</p> : null}
+  const body = (
+    <>
+      {error ? <p className={isModal ? modalCss.error : form.error}>{error}</p> : null}
+      {loading && isModal ? <p className={extra.muted}>Загрузка…</p> : null}
 
       <div className={form.head}>
         <div className={form.card}>
@@ -554,6 +590,75 @@ export function TravelExpenseForm({ docId, viewOnly }: { docId?: string; viewOnl
           </table>
         </div>
       </div>
+    </>
+  );
+
+  if (isModal) {
+    return (
+      <FormModal
+        open={Boolean(modalOpen)}
+        title={pageTitle}
+        onClose={() => onModalClose?.()}
+        width="xl"
+        footer={
+          <>
+            {!readOnly ? (
+              <>
+                <button
+                  type="button"
+                  className={modalCss.btnPrimary}
+                  disabled={saving || loading}
+                  onClick={() => void save(false)}
+                >
+                  {saving ? '…' : 'Сохранить'}
+                </button>
+                {status !== 'approved' ? (
+                  <button
+                    type="button"
+                    className={modalCss.btnGhost}
+                    disabled={saving || loading}
+                    onClick={() => void save(true)}
+                  >
+                    Завершить
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+            <button type="button" className={modalCss.btnGhost} onClick={() => onModalClose?.()}>
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {body}
+      </FormModal>
+    );
+  }
+
+  return (
+    <div className={form.page}>
+      <PageSubnav groupKey="travel-expenses" titleOverride={pageTitle} />
+      <div className={form.topBar}>
+        <h1 className={form.title}>{pageTitle}</h1>
+        <div className={form.actions}>
+          {!readOnly ? (
+            <>
+              <button type="button" className={form.btnSave} disabled={saving} onClick={() => void save(false)}>
+                Сохранить
+              </button>
+              {status !== 'approved' ? (
+                <button type="button" className={form.btnPost} disabled={saving} onClick={() => void save(true)}>
+                  Завершить
+                </button>
+              ) : null}
+            </>
+          ) : null}
+          <button type="button" className={form.btnClose} onClick={() => router.push(PATH)}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+      {body}
     </div>
   );
 }

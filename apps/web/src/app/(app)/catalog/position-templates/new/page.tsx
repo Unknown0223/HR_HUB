@@ -1,7 +1,13 @@
 'use client';
 
-import { PositionTemplateForm } from '../PositionTemplateForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewPositionTemplatePage() {
-  return <PositionTemplateForm />;
+/** Legacy /new → list with create modal */
+export default function NewPositionTemplateRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/position-templates?create=1');
+  }, [router]);
+  return null;
 }

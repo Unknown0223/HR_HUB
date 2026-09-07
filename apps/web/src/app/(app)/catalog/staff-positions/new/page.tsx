@@ -1,7 +1,13 @@
 'use client';
 
-import { StaffPositionForm } from '../StaffPositionForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewStaffPositionPage() {
-  return <StaffPositionForm mode="create" />;
+/** Legacy /new → list with create modal */
+export default function NewStaffPositionRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/staff-positions?create=1');
+  }, [router]);
+  return null;
 }

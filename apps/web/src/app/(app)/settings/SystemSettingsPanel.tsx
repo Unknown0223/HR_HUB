@@ -123,23 +123,7 @@ export function SystemSettingsPanel() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.pageHead}>
-        <h2 className={styles.pageTitle}>Настройки системы</h2>
-        <div className={styles.toolbar}>
-          <button
-            type="button"
-            className={styles.saveBtn}
-            disabled={busy}
-            onClick={() => void save()}
-          >
-            {busy ? '…' : 'Сохранить'}
-          </button>
-          {info ? <p className={styles.msg}>{info}</p> : null}
-          {error ? <p className={styles.err}>{error}</p> : null}
-        </div>
-      </div>
-
-      <div className={styles.subTabs}>
+      <div className={styles.subTabs} role="tablist" aria-label="Разделы настроек">
         {(
           [
             ['general', 'Основные настройки'],
@@ -152,12 +136,38 @@ export function SystemSettingsPanel() {
           <button
             key={id}
             type="button"
+            role="tab"
+            aria-selected={panel === id}
             className={panel === id ? styles.subTabActive : styles.subTab}
             onClick={() => setPanel(id)}
           >
             {label}
           </button>
         ))}
+      </div>
+
+      <div className={styles.pageHead}>
+        <div className={styles.pageHeadLeft}>
+          <span className={styles.iconBadge} aria-hidden="true">
+            <i className="fas fa-cog" />
+          </span>
+          <div>
+            <h1 className={styles.pageTitle}>Настройки системы</h1>
+            <p className={styles.pageSub}>Основные параметры HR HUB и кадрового учёта</p>
+          </div>
+        </div>
+        <div className={styles.toolbar}>
+          {info ? <p className={styles.msg}>{info}</p> : null}
+          {error ? <p className={styles.err}>{error}</p> : null}
+          <button
+            type="button"
+            className={styles.saveBtn}
+            disabled={busy}
+            onClick={() => void save()}
+          >
+            {busy ? '…' : 'Сохранить'}
+          </button>
+        </div>
       </div>
 
       {panel === 'general' ? (

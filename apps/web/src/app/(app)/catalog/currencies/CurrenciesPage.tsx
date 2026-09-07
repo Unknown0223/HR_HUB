@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -33,6 +35,7 @@ import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
 import extra from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = { id: string; code: string; name: string; items?: DictItem[] };
 type DictItem = {
@@ -63,7 +66,7 @@ const HIST_FILTER_KEYS = ['q', 'from', 'to', 'user', 'event'] as const;
 
 export function CurrenciesPage({ historyMode }: { historyMode?: boolean }) {
   return (
-    <Suspense fallback={<p className={styles.empty}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <CurrenciesInner historyMode={historyMode} />
     </Suspense>
   );
@@ -176,7 +179,7 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
         apiFetch<Dict[]>('/api/settings/dictionaries?kind=extra'),
         apiFetch<{ tenant?: { name?: string }; settings?: { orgName?: string } }>(
           '/api/settings/org',
-        ).catch(() => ({})),
+        ).catch((): { tenant?: { name?: string }; settings?: { orgName?: string } } => ({})),
       ]);
       const dict = (list || []).find((d) => d.code === DICT_CODE);
       if (!dict) {
@@ -208,6 +211,10 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
 
   useEffect(() => {
     setPage(1);
@@ -605,161 +612,158 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
     });
   }, [viewRow, filters.from, filters.to, q]);
 
-  function renderForm(title: string) {
+  function renderCurrencyModal() {
+    const open = mode === 'create' || mode === 'edit';
+    const title = mode === 'edit' ? 'Валюта (изменение)' : 'Валюта (создание)';
     return (
-      <div className={styles.wrap}>
-        <PageSubnav group={{ title, siblings: [] }} />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
+      <FormModal
+        open={open}
+        title={title}
+        width="lg"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
             <button
               type="button"
-              className={formStyles.btnSave}
+              className={modal.btnPrimary}
               disabled={saving}
               onClick={() => void save()}
             >
-              Сохранить
+              {saving ? '…' : 'Сохранить'}
             </button>
             <button
               type="button"
-              className={formStyles.btnClose}
-              onClick={() => setMode('list')}
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
             >
               Закрыть
             </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.row2}>
+          <div className={modal.field}>
+            <label>
+              Код <span className={modal.req}>*</span>
+            </label>
+            <input value={code} onChange={(e) => setCode(e.target.value)} />
+            <p className={extra.hint}>
+              Для автоматического обновления курса введите код валюты (три латинских
+              символа, например USD). Справочник:{' '}
+              <a
+                className={extra.isoWiki}
+                href="https://en.wikipedia.org/wiki/ISO_4217"
+                target="_blank"
+                rel="noreferrer"
+              >
+                ISO 4217
+              </a>
+            </p>
           </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${extra.cardWide}`}>
-            <div className={formStyles.layout}>
-              <div>
-                <div className={formStyles.field}>
-                  <label>
-                    Код <span className={formStyles.req}>*</span>
-                  </label>
-                  <input value={code} onChange={(e) => setCode(e.target.value)} />
-                  <p className={extra.hint}>
-                    Для автоматического обновления курса введите код валюты (три
-                    латинских символа, например USD). Справочник:{' '}
-                    <a
-                      className={extra.isoWiki}
-                      href="https://en.wikipedia.org/wiki/ISO_4217"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      ISO 4217
-                    </a>
-                  </p>
-                </div>
-                <div className={formStyles.field}>
-                  <label>
-                    Название <span className={formStyles.req}>*</span>
-                  </label>
-                  <input
-                    value={name}
-                    placeholder="Поиск"
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div className={formStyles.field}>
-                  <label>Базовая денежная единица</label>
-                  <input value={unit} onChange={(e) => setUnit(e.target.value)} />
-                </div>
-                <div className={formStyles.field}>
-                  <div className={formStyles.radioRow}>
-                    <label className={formStyles.radio}>
-                      <input
-                        type="radio"
-                        checked={affixKind === 'prefix'}
-                        onChange={() => setAffixKind('prefix')}
-                      />
-                      Префикс
-                    </label>
-                    <label className={formStyles.radio}>
-                      <input
-                        type="radio"
-                        checked={affixKind === 'postfix'}
-                        onChange={() => setAffixKind('postfix')}
-                      />
-                      Постфикс
-                    </label>
-                  </div>
-                  <input
-                    value={affix}
-                    placeholder={affixKind === 'prefix' ? 'Префикс' : 'Постфикс'}
-                    onChange={(e) => setAffix(e.target.value)}
-                    style={{ marginTop: '0.4rem' }}
-                  />
-                </div>
-                <div className={formStyles.field}>
-                  <label>
-                    Тип округления <span className={formStyles.req}>*</span>
-                  </label>
-                  <select
-                    value={roundingType}
-                    onChange={(e) => setRoundingType(e.target.value)}
-                  >
-                    {ROUNDING_TYPES.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={`${formStyles.field} ${formStyles.sortField}`}>
-                  <label>Порядковый номер</label>
-                  <input
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className={formStyles.field}>
-                  <label>Разменная денежная единица</label>
-                  <input
-                    value={subunit}
-                    onChange={(e) => setSubunit(e.target.value)}
-                  />
-                </div>
-                <div className={formStyles.field}>
-                  <label>
-                    Округление <span className={formStyles.req}>*</span>
-                  </label>
-                  <select
-                    value={rounding}
-                    onChange={(e) => setRounding(e.target.value)}
-                  >
-                    {ROUNDING_FORMATS.map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={formStyles.field}>
-                  <label>ISO</label>
-                  <input
-                    value={iso}
-                    placeholder="USD"
-                    onChange={(e) => setIso(e.target.value)}
-                  />
-                </div>
-                <div className={formStyles.statusBlock}>
-                  <span className={formStyles.fieldLabel}>Статус</span>
-                  <label className={formStyles.toggleRow}>
-                    <button
-                      type="button"
-                      className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                      onClick={() => setActive((v) => !v)}
-                      aria-pressed={active}
-                    />
-                    <span>{active ? 'Активный' : 'Неактивный'}</span>
-                  </label>
-                </div>
-              </div>
+          <div className={modal.field}>
+            <label>
+              Название <span className={modal.req}>*</span>
+            </label>
+            <input
+              value={name}
+              placeholder="Поиск"
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Базовая денежная единица</label>
+            <input value={unit} onChange={(e) => setUnit(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>Разменная денежная единица</label>
+            <input value={subunit} onChange={(e) => setSubunit(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>Префикс / постфикс</label>
+            <div className={modal.radioRow}>
+              <label className={modal.radio}>
+                <input
+                  type="radio"
+                  checked={affixKind === 'prefix'}
+                  onChange={() => setAffixKind('prefix')}
+                />
+                Префикс
+              </label>
+              <label className={modal.radio}>
+                <input
+                  type="radio"
+                  checked={affixKind === 'postfix'}
+                  onChange={() => setAffixKind('postfix')}
+                />
+                Постфикс
+              </label>
             </div>
+            <input
+              value={affix}
+              placeholder={affixKind === 'prefix' ? 'Префикс' : 'Постфикс'}
+              onChange={(e) => setAffix(e.target.value)}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>
+              Округление <span className={modal.req}>*</span>
+            </label>
+            <select value={rounding} onChange={(e) => setRounding(e.target.value)}>
+              {ROUNDING_FORMATS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={modal.field}>
+            <label>
+              Тип округления <span className={modal.req}>*</span>
+            </label>
+            <select
+              value={roundingType}
+              onChange={(e) => setRoundingType(e.target.value)}
+            >
+              {ROUNDING_TYPES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={modal.field}>
+            <label>ISO</label>
+            <input
+              value={iso}
+              placeholder="USD"
+              onChange={(e) => setIso(e.target.value)}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Порядковый номер</label>
+            <input value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <span>Статус</span>
+            <label className={formStyles.toggleRow}>
+              <button
+                type="button"
+                className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+                onClick={() => setActive((v) => !v)}
+                aria-pressed={active}
+              />
+              <span>{active ? 'Активный' : 'Неактивный'}</span>
+            </label>
           </div>
         </div>
-      </div>
+      </FormModal>
     );
   }
 
@@ -796,32 +800,35 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
   function rightSearch(countShown: number, countTotal: number, onExcel?: () => void) {
     return (
       <div className={styles.rightTools}>
-        <input
-          className={styles.search}
-          placeholder="Поиск..."
-          value={searchDraft}
-          onChange={(e) => setSearchDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') applySearch();
-          }}
-        />
-        <button type="button" className={styles.toolBtn} onClick={applySearch}>
-          Найти
-        </button>
+        <div className={styles.searchWrap}>
+          <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+          <input
+            className={styles.search}
+            placeholder="Поиск…"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applySearch();
+            }}
+            aria-label="Поиск"
+          />
+        </div>
         {onExcel ? (
-          <button type="button" className={styles.exportBtn} onClick={onExcel}>
-            Excel
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={onExcel}
+            title="Excel"
+            aria-label="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
           </button>
         ) : null}
-        <span className={styles.pagerMeta}>
+        <span className={styles.countBadge}>
           {countShown} / {countTotal}
         </span>
       </div>
     );
-  }
-
-  if (mode === 'create' || mode === 'edit') {
-    return renderForm(mode === 'edit' ? 'Валюта (изменение)' : 'Валюта (создание)');
   }
 
   if (mode === 'view' && viewRow) {
@@ -1354,25 +1361,64 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
           ],
         }}
       />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-coins" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Валюты</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник валют, курсов и настроек округления
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <label className={extra.dateField}>
+            <span>Дата курса</span>
+            <input
+              type="date"
+              value={rateDate}
+              onChange={(e) => setRateDate(e.target.value)}
+            />
+          </label>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <button
             type="button"
-            className={styles.createBtn}
+            className={styles.toolBtn}
             onClick={() => setSettingsOpen(true)}
           >
+            <i className="fas fa-cog" aria-hidden />
             Настройки
           </button>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
             title="История изменений"
+            aria-label="История изменений"
             onClick={() => router.push('/catalog/currencies/history')}
           >
-            ◷
+            <i className="fas fa-history" aria-hidden />
           </button>
           <FilterPanel
             inline
@@ -1436,53 +1482,58 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
           ) : null}
         </div>
         <div className={styles.rightTools}>
-          <label className={extra.dateField}>
-            <span>Дата курса</span>
-            <input
-              type="date"
-              value={rateDate}
-              onChange={(e) => setRateDate(e.target.value)}
-            />
-          </label>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            Excel
-          </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {visibleRows.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="Excel"
+            aria-label="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
           >
-            ‹
+            <i className="fas fa-chevron-left" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
+          <span className={styles.pagerMeta}>
+            {Math.min(page, pageCount)} / {pageCount}
+          </span>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
-            ›
+            <i className="fas fa-chevron-right" aria-hidden />
           </button>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
             onClick={() => void load()}
+            title="Обновить"
             aria-label="Обновить"
           >
-            ↻
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
@@ -1576,6 +1627,7 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
           </div>
         </div>
       ) : null}
+      {renderCurrencyModal()}
     </div>
   );
 }

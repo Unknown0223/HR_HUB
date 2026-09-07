@@ -1,14 +1,17 @@
 'use client';
-import { confirm } from '@/lib/dialogs';
 
+import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { IncidentFormModal } from './IncidentFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type EmpRef = {
   id: string;
@@ -24,16 +27,33 @@ type IncidentRow = {
   title: string;
   occurredAt: string;
   action: string;
+  status?: string | null;
   damageAmount?: string | number | null;
   employee?: EmpRef | null;
   incidentType?: { id: string; name: string } | null;
 };
+
+const FILTER_KEYS = ['q', 'status', 'from', 'to'] as const;
+const PAGE_SIZES = [25, 50, 100] as const;
+const COL_COUNT = 8;
 
 const ACTION_LABEL: Record<string, string> = {
   verbal_warning: 'Устное предупреждение',
   written_warning: 'Письменное предупреждение',
   fine: 'Штраф',
 };
+
+const STATUS_LABEL: Record<string, string> = {
+  open: 'Открыт',
+  investigating: 'В работе',
+  resolved: 'Решён',
+  closed: 'Закрыт',
+};
+
+const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -54,42 +74,122 @@ function money(v?: string | number | null) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function statusBadge(status?: string | null) {
+  const key = status || 'open';
+  const text = STATUS_LABEL[key] || key;
+  if (key === 'resolved') return { text, cls: styles.badgeOk };
+  if (key === 'closed') return { text, cls: styles.badgeMuted };
+  if (key === 'investigating') return { text, cls: styles.badgeWarn };
+  return { text, cls: styles.badgeOpen };
+}
+
+/** Statuses that still allow «Завершить». */
+function isOpenish(row: IncidentRow) {
+  const s = row.status || 'open';
+  return s === 'open' || s === 'investigating';
+}
+
 function IncidentsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const q = searchParams.get('q') || '';
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const q = filters.q;
+  const status = filters.status;
+  const from = filters.from;
+  const to = filters.to;
 
   const [rows, setRows] = useState<IncidentRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchDraft, setSearchDraft] = useState(q);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(Boolean(status || from || to));
+  const [createOpen, setCreateOpen] = useState(searchParams.get('create') === '1');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return rows;
+    const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : null;
+    const toTs = to ? new Date(`${to}T23:59:59`).getTime() : null;
     return rows.filter((r) => {
+      if (fromTs != null || toTs != null) {
+        const ts = new Date(r.occurredAt).getTime();
+        if (!Number.isNaN(ts)) {
+          if (fromTs != null && ts < fromTs) return false;
+          if (toTs != null && ts > toTs) return false;
+        }
+      }
+      if (!qq) return true;
       const blob = [
         r.number,
         r.title,
         empName(r.employee),
         r.incidentType?.name,
         ACTION_LABEL[r.action] || r.action,
+        STATUS_LABEL[r.status || 'open'],
       ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return blob.includes(qq);
     });
-  }, [rows, q]);
+  }, [rows, q, from, to]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+  const checkedRows = useMemo(
+    () => filtered.filter((r) => checked[r.id]),
+    [filtered, checked],
+  );
+
+  const allPageChecked = pageRows.length > 0 && pageRows.every((r) => checked[r.id]);
+  const somePageChecked = pageRows.some((r) => checked[r.id]) && !allPageChecked;
+
+  const rangeFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, filtered.length);
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      if (next[id]) delete next[id];
+      else next[id] = true;
+      return next;
+    });
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of pageRows) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const data = await apiFetch<IncidentRow[]>('/api/catalog/incidents');
+      const p = new URLSearchParams();
+      if (status) p.set('status', status);
+      const qs = p.toString();
+      const data = await apiFetch<IncidentRow[]>(
+        `/api/catalog/incidents${qs ? `?${qs}` : ''}`,
+      );
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -101,24 +201,147 @@ function IncidentsInner() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, status, from, to, pageSize]);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setCreateOpen(true);
+  }, [searchParams]);
 
   function applySearch() {
-    const params = new URLSearchParams();
-    if (searchDraft.trim()) params.set('q', searchDraft.trim());
-    const qs = params.toString();
-    router.replace(qs ? `/catalog/incidents?${qs}` : '/catalog/incidents', { scroll: false });
+    const p = new URLSearchParams(searchParams.toString());
+    if (searchDraft.trim()) p.set('q', searchDraft.trim());
+    else p.delete('q');
+    const qs = p.toString();
+    router.replace(qs ? `/catalog/incidents?${qs}` : '/catalog/incidents', {
+      scroll: false,
+    });
+  }
+
+  function closeCreate() {
+    setCreateOpen(false);
+    if (searchParams.get('create') === '1') {
+      const p = new URLSearchParams(searchParams.toString());
+      p.delete('create');
+      const qs = p.toString();
+      router.replace(qs ? `/catalog/incidents?${qs}` : '/catalog/incidents', {
+        scroll: false,
+      });
+    }
+  }
+
+  async function onCreated(id: string, openAfter: boolean) {
+    closeCreate();
+    if (openAfter && id) {
+      router.push(`/catalog/incidents/${id}`);
+      return;
+    }
+    await load();
+  }
+
+  function forget(ids: string[]) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const id of ids) delete next[id];
+      return next;
+    });
+    setExpandedId((cur) => (cur && ids.includes(cur) ? null : cur));
   }
 
   async function remove(row: IncidentRow) {
     if (!(await confirm('Удалить инцидент?'))) return;
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/incidents/${row.id}`, { method: 'DELETE' });
-      setSelectedId(null);
+      forget([row.id]);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка удаления');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setStatus(row: IncidentRow, next: 'resolved' | 'closed') {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/catalog/incidents/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: next,
+          ...(next === 'resolved'
+            ? { resolvedAt: new Date().toISOString().slice(0, 10) }
+            : {}),
+        }),
+      });
+      forget([row.id]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка изменения статуса');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'resolve' | 'close' | 'delete') {
+    if (checkedRows.length === 0) return;
+
+    let targets = checkedRows;
+    if (action === 'resolve') {
+      targets = checkedRows.filter(isOpenish);
+      if (targets.length === 0) {
+        setError('Нет незавершённых инцидентов среди выбранных');
+        return;
+      }
+    } else if (action === 'close') {
+      targets = checkedRows.filter((r) => (r.status || 'open') !== 'closed');
+      if (targets.length === 0) {
+        setError('Все выбранные инциденты уже закрыты');
+        return;
+      }
+    } else if (
+      !(await confirm(`Удалить выбранные инциденты (${targets.length} шт.)?`))
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/catalog/incidents/${row.id}`, { method: 'DELETE' });
+          } else {
+            await apiFetch(`/api/catalog/incidents/${row.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                status: action === 'resolve' ? 'resolved' : 'closed',
+                ...(action === 'resolve'
+                  ? { resolvedAt: new Date().toISOString().slice(0, 10) }
+                  : {}),
+              }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setExpandedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
     } finally {
       setBusy(false);
     }
@@ -134,15 +357,20 @@ function IncidentsInner() {
         'Тип инцидента': r.incidentType?.name || '',
         'Сумма ущерба': money(r.damageAmount),
         Действие: ACTION_LABEL[r.action] || r.action,
+        Статус: STATUS_LABEL[r.status || 'open'] || r.status || '',
       })),
     );
   }
 
   async function exportExcel() {
     setExportBusy(true);
+    setError('');
     try {
+      const p = new URLSearchParams();
+      if (status) p.set('status', status);
+      const qs = p.toString();
       await downloadXlsxViaApi(
-        '/api/catalog/incidents/export.xlsx',
+        `/api/catalog/incidents/export.xlsx${qs ? `?${qs}` : ''}`,
         `incidents-${new Date().toISOString().slice(0, 10)}.xlsx`,
       );
     } catch (e) {
@@ -156,116 +384,314 @@ function IncidentsInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="incidents" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeIncident}`}>
+          <i className="fas fa-exclamation-triangle" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Инциденты</h1>
+          <p className={shared.pageSubtitle}>Регистрация и учёт дисциплинарных инцидентов</p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/incidents/new" className={styles.createBtn}>
-            Создать
-          </Link>
-        </div>
-        <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => {
+              setError('');
+              setCreateOpen(true);
             }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
+          >
+            <i className="fas fa-plus" aria-hidden />
+            Создать инцидент
           </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
+          <FilterPanel
+            inline
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'dateRange', label: 'Дата инцидента', fromKey: 'from', toKey: 'to' },
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
+              { type: 'status', label: 'Статус', options: STATUS_OPTIONS },
+            ]}
+          />
+        </div>
+
+        <div className={styles.rightTools}>
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
+          </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
           </button>
           <button
             type="button"
-            className={styles.exportBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
+            title="Excel"
+            aria-label="Экспорт Excel"
           >
-            {exportBusy ? 'Excel…' : 'Excel'}
+            <i className="fas fa-file-excel" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()}>
-            Обновить
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>
-            {filtered.length} / {rows.length}
-          </span>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('resolve')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Завершить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('close')}
+          >
+            <i className="fas fa-lock" aria-hidden />
+            Закрыть
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <IncidentFormModal
+        open={createOpen}
+        onClose={closeCreate}
+        onSaved={(id, openAfter) => void onCreated(id, openAfter)}
+      />
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Номер инцидента</th>
-              <th>Дата инцидента</th>
-              <th>Физическое лицо</th>
-              <th>Тип инцидента</th>
-              <th>Сумма ущерба</th>
-              <th>Действие</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Номер инцидента</th>
+                <th>Дата инцидента</th>
+                <th>Физическое лицо</th>
+                <th>Тип инцидента</th>
+                <th>Сумма ущерба</th>
+                <th>Действие</th>
+                <th>Статус</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{row.number || row.title}</td>
-                    <td>{fmtDate(row.occurredAt)}</td>
-                    <td className={styles.empName}>{empName(row.employee)}</td>
-                    <td>{row.incidentType?.name || '—'}</td>
-                    <td>{money(row.damageAmount)}</td>
-                    <td>{ACTION_LABEL[row.action] || row.action}</td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={7}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/incidents/${row.id}`}>Изменить</Link>
-                          <button type="button" disabled={busy} onClick={() => remove(row)}>
-                            Удалить
-                          </button>
-                        </div>
+            </thead>
+            <tbody>
+              {loading && pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать инцидент»
+                  </td>
+                </tr>
+              ) : null}
+              {pageRows.map((row) => {
+                const open = expandedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const badge = statusBadge(row.status);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setExpandedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.number || row.title}`}
+                        />
+                      </td>
+                      <td>{row.number || row.title}</td>
+                      <td>{fmtDate(row.occurredAt)}</td>
+                      <td className={styles.empName}>{empName(row.employee)}</td>
+                      <td>{row.incidentType?.name || '—'}</td>
+                      <td className={styles.num}>{money(row.damageAmount)}</td>
+                      <td>{ACTION_LABEL[row.action] || row.action}</td>
+                      <td>
+                        <span className={badge.cls}>{badge.text}</span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/incidents/${row.id}`}>
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </Link>
+                            {isOpenish(row) ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void setStatus(row, 'resolved')}
+                              >
+                                <i className="fas fa-check" aria-hidden />
+                                Завершить
+                              </button>
+                            ) : null}
+                            {(row.status || 'open') !== 'closed' ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void setStatus(row, 'closed')}
+                              >
+                                <i className="fas fa-lock" aria-hidden />
+                                Закрыть
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void remove(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано{' '}
+            <strong>
+              {rangeFrom}–{rangeTo}
+            </strong>{' '}
+            из <strong>{filtered.length}</strong>
+          </p>
+          <div className={styles.footerPager}>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Предыдущая страница"
+            >
+              ‹
+            </button>
+            <span className={styles.countBadge}>
+              {page}/{totalPages}
+            </span>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Следующая страница"
+            >
+              ›
+            </button>
+            <select
+              aria-label="Размер страницы"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className={styles.pageSize}
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -273,7 +699,7 @@ function IncidentsInner() {
 
 export default function IncidentsPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <IncidentsInner />
     </Suspense>
   );

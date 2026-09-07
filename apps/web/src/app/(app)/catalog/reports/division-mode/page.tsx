@@ -4,10 +4,9 @@ import { FormEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState,
 import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { downloadAttendanceLikeXlsx, XLSX_COLORS } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
-import treeS from '../dismissals-by-reason/page.module.css';
-import s from '../relatives/page.module.css';
 import local from './page.module.css';
 
 type PageTab = 'filter' | 'view' | 'settings';
@@ -109,6 +108,19 @@ function fileStamp(iso?: string) {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}+${pad(d.getHours())}_${pad(d.getMinutes())}_${pad(d.getSeconds())}`;
 }
+function fmtGen(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
 function escapeHtml(v: string) {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -135,7 +147,11 @@ function flattenTree(nodes: TreeNode[], q: string): TreeNode[] {
 function collectIds(node: TreeNode): string[] {
   return [node.id, ...(node.children || []).flatMap(collectIds)];
 }
-function fmtHours(n: number, settings: Settings, blankZeroWorked = false) {
+function fmtHours(
+  n: number,
+  settings: { showMinutes: boolean; showHhMm: boolean },
+  blankZeroWorked = false,
+) {
   if (blankZeroWorked && n === 0) return '';
   const sign = n < 0 ? '-' : '';
   const abs = Math.abs(n);
@@ -291,7 +307,7 @@ function PeriodRangePicker({
 
   return (
     <div className={extra.periodWrap} ref={wrapRef}>
-      <button type="button" className={extra.periodBtn} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={arena.periodBtn} onClick={() => setOpen((v) => !v)}>
         {fmtLongRange(from, to)}
       </button>
       {open ? (
@@ -359,11 +375,11 @@ function DivisionPick({
     const expanded = open.has(node.id) || !!q || depth === 0;
     return (
       <>
-        <div className={`${extra.treeRow} ${selected.has(node.id) ? local.treeOn : ''}`} style={{ paddingLeft: depth * 14 }}>
+        <div className={`${arena.treeRow} ${selected.has(node.id) ? arena.treeOn : ''}`} style={{ paddingLeft: depth * 14 }}>
           {kids.length ? (
             <button
               type="button"
-              className={extra.exp}
+              className={arena.exp}
               onClick={() =>
                 setOpen((prev) => {
                   const next = new Set(prev);
@@ -376,14 +392,14 @@ function DivisionPick({
               {expanded ? '−' : '+'}
             </button>
           ) : (
-            <span className={extra.exp} />
+            <span className={arena.exp} />
           )}
-          <input type="checkbox" className={local.box} checked={selected.has(node.id)} onChange={() => toggleOne(node.id)} />
-          <button type="button" className={selected.has(node.id) ? `${local.treeName} ${local.treeNameOn}` : local.treeName} onClick={() => toggleOne(node.id)}>
+          <input type="checkbox" className={arena.box} checked={selected.has(node.id)} onChange={() => toggleOne(node.id)} />
+          <button type="button" className={selected.has(node.id) ? `${arena.treeName} ${arena.treeNameOn}` : arena.treeName} onClick={() => toggleOne(node.id)}>
             {node.name}
           </button>
           {kids.length ? (
-            <button type="button" className={treeS.selectAll} onClick={() => selectBranch(node)}>
+            <button type="button" className={arena.selectAll} onClick={() => selectBranch(node)}>
               выбрать все
             </button>
           ) : null}
@@ -393,10 +409,10 @@ function DivisionPick({
     );
   }
   return (
-    <div className={`${local.dropWrap}${menuOpen ? ` ${local.dropOpen}` : ''}`} ref={wrapRef}>
+    <div className={`${arena.dropWrap}${menuOpen ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className={`${local.dropField}${selected.size ? '' : ` ${local.dropEmpty}`}`}
+        className={`${arena.dropField}${selected.size ? '' : ` ${arena.dropEmpty}`}`}
         onClick={() =>
           setMenuOpen((v) => {
             if (v) setQ('');
@@ -406,11 +422,11 @@ function DivisionPick({
       >
         {selected.size ? `Выбрано: ${selected.size}` : 'Поиск...'}
       </button>
-      <div className={local.dropPanel} hidden={!menuOpen}>
+      <div className={arena.dropPanel} hidden={!menuOpen}>
         {menuOpen ? (
           <>
-            <input className={local.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            {visible.length === 0 ? <div className={s.pickEmpty}>Нет данных</div> : null}
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {visible.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {visible.map((n) => (
               <Row key={n.id} node={n} depth={0} />
             ))}
@@ -428,20 +444,20 @@ function GroupPick({ options, value, onChange }: { options: Opt[]; value: string
   const chosen = options.find((o) => o.id === value);
   const visible = options.filter((o) => !q.trim() || o.label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
-    <div className={`${local.dropWrap}${open ? ` ${local.dropOpen}` : ''}`} ref={wrapRef}>
-      <button type="button" className={`${local.dropField}${chosen ? '' : ` ${local.dropEmpty}`}`} onClick={() => setOpen((v) => !v)}>
+    <div className={`${arena.dropWrap}${open ? ` ${arena.dropOpen}` : ''}`} ref={wrapRef}>
+      <button type="button" className={`${arena.dropField}${chosen ? '' : ` ${arena.dropEmpty}`}`} onClick={() => setOpen((v) => !v)}>
         {chosen?.label || 'Поиск...'}
       </button>
-      <div className={local.dropPanel} hidden={!open}>
+      <div className={arena.dropPanel} hidden={!open}>
         {open ? (
           <>
-            <input className={local.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
-            {visible.length === 0 ? <div className={s.pickEmpty}>Нет данных</div> : null}
+            <input className={arena.dropSearch} placeholder="Поиск..." value={q} onChange={(e) => setQ(e.target.value)} />
+            {visible.length === 0 ? <div className={arena.pickEmpty}>Нет данных</div> : null}
             {visible.map((o) => (
               <button
                 key={o.id}
                 type="button"
-                className={`${local.listRow}${o.id === value ? ` ${local.listOn}` : ''}`}
+                className={`${arena.listRow}${o.id === value ? ` ${arena.listOn}` : ''}`}
                 onClick={() => {
                   onChange(o.id === value ? '' : o.id);
                   setOpen(false);
@@ -617,16 +633,16 @@ function Inner() {
         rows: [
           ...payload.rows.map((r) => ({
             cells: [
-              { v: r.division, s: { align: 'left' } },
+              { v: r.division, s: { align: 'left' as const } },
               ...extras.map((c) => extraVal(r, c.key)),
-              { v: r.schedule, s: { align: 'left' } },
+              { v: r.schedule, s: { align: 'left' as const } },
               ...r.cells.map((c) => calCellText(c as CalCell, calSettings)),
               absentText(r.absentTotal || 0),
             ],
           })),
           {
             cells: [
-              { v: 'Всего', s: { align: 'left' } },
+              { v: 'Всего', s: { align: 'left' as const } },
               ...extras.map(() => ''),
               '',
               ...(payload.totals?.cells || []).map((c) => c.text || ''),
@@ -641,7 +657,7 @@ function Inner() {
       { label: '№', span: 1 },
       { label: 'Подразделение', span: 1 },
       { label: 'График работы', span: 1 },
-      ...payload.days.map((d) => ({ label: d.label, span: 3, fill: d.sunday ? XLSX_COLORS.weekendBg : undefined })),
+      ...payload.days.map((d) => ({ label: d.label || d.day || '', span: 3, fill: d.sunday ? XLSX_COLORS.weekendBg : undefined })),
       { label: 'Итого', span: 3 },
     ];
     const subHeader = [
@@ -668,8 +684,8 @@ function Inner() {
         return {
           cells: [
             r.n,
-            { v: r.division, s: { align: 'left' } },
-            { v: r.schedule, s: { align: 'left' } },
+            { v: r.division, s: { align: 'left' as const } },
+            { v: r.schedule, s: { align: 'left' as const } },
             ...r.cells.flatMap((c) => [cellText(c, 'planned'), cellText(c, 'worked'), cellText(c, 'diff')]),
             cellText(t, 'planned', false),
             cellText(t, 'worked', false),
@@ -838,78 +854,119 @@ ${body || '<tr><td colspan="6">Нет данных</td></tr>'}
     w.document.getElementById('btnExcel')?.addEventListener('click', () => void exportExcel(data));
   }
 
-  const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : extra.exportLinks}>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${fileBase}(${fileStamp(d.generatedAt)}).csv`, new Blob([csvText(d)], { type: 'text/csv;charset=utf-8' })))}>CSV</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${fileBase}(${fileStamp(d.generatedAt)}).xml`, new Blob([xmlText(d)], { type: 'application/xml;charset=utf-8' })))}>XML</button>
+  const exportBtns = (
+    <div className={arena.exportBtns}>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void openHtml()}>HTML</button>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${fileBase}(${fileStamp(d.generatedAt)}).csv`, new Blob([csvText(d)], { type: 'text/csv;charset=utf-8' })))}>CSV</button>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void ensureReport().then((d) => d && downloadBlob(`${fileBase}(${fileStamp(d.generatedAt)}).xml`, new Blob([xmlText(d)], { type: 'application/xml;charset=utf-8' })))}>XML</button>
     </div>
   );
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>{title}</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>Фильтр</button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report || loadedQs !== queryQs) void generate();
-          }}
-        >
-          Просмотр
-        </button>
-        <button type="button" className={tab === 'settings' ? layout.tabOn : layout.tab} onClick={() => setTab('settings')}>
-          Настройки
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button type="button" className={tab === 'filter' ? arena.tabOn : arena.tab} onClick={() => setTab('filter')}>Фильтр</button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void generate();
+            }}
+          >
+            Просмотр
+          </button>
+          <button
+            type="button"
+            className={tab === 'settings' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('settings')}
+          >
+            Настройки
+          </button>
+        </div>
         {tab === 'settings' ? (
           <>
-            <button type="button" className={layout.tab} onClick={saveSettings}>Сохранить</button>
-            <button type="button" className={layout.tab} onClick={resetSettings}>Сбросить</button>
+            <button type="button" className={arena.ghostBtn} onClick={saveSettings}>Сохранить</button>
+            <button type="button" className={arena.ghostBtn} onClick={resetSettings}>Сбросить</button>
           </>
         ) : null}
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns(true)}
+            {exportBtns}
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`} aria-hidden>
+          <i className="fas fa-sitemap" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>{title}</h1>
+          <p className={shared.pageSubtitle}>Режим работы подразделений: плановые и фактические часы, отсутствия по дням.</p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${local.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Дата</label>
             <PeriodRangePicker from={from} to={to} onChange={(a, b) => { setFrom(a); setTo(b); }} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>{periodTitle ? 'Подразделения' : 'Подразделение'}</label>
             <DivisionPick nodes={tree} selected={new Set(divisionIds)} onChange={(next) => setDivisionIds([...next])} />
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            {exportBtns(false)}
+            {exportBtns}
           </div>
         </form>
       ) : null}
 
       {tab === 'view' ? (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <p className={local.periodLine}>{periodLine(report)}</p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {periodLine(report)}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-building" aria-hidden />
+                  Подразделений: {report.rows.length}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-week" aria-hidden />
+                  Дней: {report.days.length}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <div className={local.tableWrap}>
                 {!periodTitle ? (
                   <table className={local.table}>

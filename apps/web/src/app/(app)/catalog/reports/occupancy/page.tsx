@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
 import treeS from '../dismissals-by-reason/page.module.css';
 import posS from '../positions/page.module.css';
@@ -425,7 +426,7 @@ function printHtml(report: Payload) {
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .meta{padding:10px 16px;font-size:13px}
@@ -568,77 +569,138 @@ export default function OccupancyReportPage() {
     setTimeout(() => setSavedNote(''), 2000);
   }
 
-  const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : extra.exportLinks}>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportCsv(d))}>CSV</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportXml(d))}>XML</button>
-    </div>
+  const exportBtns = (
+    <>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void openHtml()}>
+        HTML
+      </button>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void exportExcel()}>
+        Excel
+      </button>
+      <button
+        type="button"
+        className={arena.exportBtn}
+        disabled={busy}
+        onClick={() => void ensureReport().then((d) => d && exportCsv(d))}
+      >
+        CSV
+      </button>
+      <button
+        type="button"
+        className={arena.exportBtn}
+        disabled={busy}
+        onClick={() => void ensureReport().then((d) => d && exportXml(d))}
+      >
+        XML
+      </button>
+    </>
   );
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>Отчет по занятости</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>Фильтр</button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
-        <button type="button" className={tab === 'settings' ? layout.tabOn : layout.tab} onClick={() => setTab('settings')}>Настройки</button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+          <button
+            type="button"
+            className={tab === 'settings' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('settings')}
+          >
+            Настройки
+          </button>
+        </div>
         {tab === 'settings' ? (
           <>
-            <button type="button" className={layout.tab} onClick={saveSettings}>Сохранить</button>
-            <button type="button" className={layout.tab} onClick={resetSettings}>Сбросить</button>
+            <button
+              type="button"
+              className={arena.ghostBtn}
+              onClick={saveSettings}
+            >
+              Сохранить
+            </button>
+            <button
+              type="button"
+              className={arena.ghostBtn}
+              onClick={resetSettings}
+            >
+              Сбросить
+            </button>
           </>
         ) : null}
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns(true)}
+            <div className={arena.exportBtns}>{exportBtns}</div>
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-chart-pie" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет по занятости</h1>
+          <p className={shared.pageSubtitle}>Занятость позиций с группировкой на выбранную дату</p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
       {savedNote ? <p className={s.saved}>{savedNote}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${s.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Период</label>
             <DatePicker value={date} onChange={setDate} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Группы должностей</label>
             <FilterPick options={positionGroups} selected={positionGroupIds} onChange={setPositionGroupIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Должности</label>
             <FilterPick options={positions} selected={positionIds} onChange={setPositionIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Группа позиций</label>
             <FilterPick options={cities} selected={staffGroups} onChange={setStaffGroups} />
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>{busy ? 'Формирование…' : 'Составить отчет'}</button>
-            {exportBtns(false)}
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
+              {busy ? 'Формирование…' : 'Составить отчет'}
+            </button>
+            {exportBtns}
           </div>
         </form>
       ) : null}
 
       {tab === 'settings' ? (
-        <div className={`${layout.card} ${s.card}`}>
-          <div className={layout.field}>
+        <div className={arena.card}>
+          <div className={arena.field}>
             <label>Подразделения</label>
             <DivisionTree
               nodes={tree}
@@ -646,31 +708,45 @@ export default function OccupancyReportPage() {
               onChange={(next) => setSettings((p) => ({ ...p, divisionIds: [...next] }))}
             />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Группировать по</label>
             <div className={s.radios}>
-              {([
-                ['staffGroup', 'Группа позиций'],
-                ['jobGroup', 'Группа должностей'],
-                ['none', 'Не группировать'],
-              ] as const).map(([id, label]) => (
+              {(
+                [
+                  ['staffGroup', 'Группа позиций'],
+                  ['jobGroup', 'Группа должностей'],
+                  ['none', 'Не группировать'],
+                ] as const
+              ).map(([id, label]) => (
                 <label key={id} className={s.radio}>
-                  <input type="radio" name="groupBy" checked={settings.groupBy === id} onChange={() => setSettings((p) => ({ ...p, groupBy: id }))} />
+                  <input
+                    type="radio"
+                    name="groupBy"
+                    checked={settings.groupBy === id}
+                    onChange={() => setSettings((p) => ({ ...p, groupBy: id }))}
+                  />
                   {label}
                 </label>
               ))}
             </div>
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Тип позиции</label>
             <div className={s.radios}>
-              {([
-                ['all', 'Все позиции'],
-                ['occupied', 'Занятые позиции'],
-                ['vacant', 'Вакантные позиции'],
-              ] as const).map(([id, label]) => (
+              {(
+                [
+                  ['all', 'Все позиции'],
+                  ['occupied', 'Занятые позиции'],
+                  ['vacant', 'Вакантные позиции'],
+                ] as const
+              ).map(([id, label]) => (
                 <label key={id} className={s.radio}>
-                  <input type="radio" name="posType" checked={settings.positionType === id} onChange={() => setSettings((p) => ({ ...p, positionType: id }))} />
+                  <input
+                    type="radio"
+                    name="posType"
+                    checked={settings.positionType === id}
+                    onChange={() => setSettings((p) => ({ ...p, positionType: id }))}
+                  />
                   {label}
                 </label>
               ))}
@@ -680,14 +756,27 @@ export default function OccupancyReportPage() {
       ) : null}
 
       {tab === 'view' ? (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <p className={s.periodLine}>{report.dateLabel}</p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {report.dateLabel}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-list" aria-hidden />
+                  Строк: {report.rows.length}
+                </span>
+              </div>
               <div className={s.tableWrap}>
                 <table className={s.table}>
                   <thead>
@@ -701,7 +790,9 @@ export default function OccupancyReportPage() {
                   <tbody>
                     {report.rows.length === 0 ? (
                       <tr>
-                        <td className={s.empty} colSpan={1 + report.columns.length}>Нет данных</td>
+                        <td className={s.empty} colSpan={1 + report.columns.length}>
+                          Нет данных
+                        </td>
                       </tr>
                     ) : (
                       report.rows.map((r, i) => (

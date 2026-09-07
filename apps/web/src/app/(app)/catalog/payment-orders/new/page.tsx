@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense } from 'react';
-import { PaymentOrderForm } from '../PaymentOrderForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewPaymentOrderPage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <PaymentOrderForm />
-    </Suspense>
-  );
+/** Legacy /new → list with create modal */
+export default function NewPaymentOrderRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/payment-orders?create=1');
+  }, [router]);
+  return null;
 }

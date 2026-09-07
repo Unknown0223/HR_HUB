@@ -51,7 +51,7 @@
 
 .statusMenu button:hover {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .badge {
@@ -112,7 +112,7 @@
 }
 
 .hint a {
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .dateField {
@@ -198,7 +198,7 @@
   background: transparent;
   font: inherit;
   font-size: 0.82rem;
-  color: #3699ff;
+  color: #0a85e2;
   cursor: pointer;
   padding: 0;
 }

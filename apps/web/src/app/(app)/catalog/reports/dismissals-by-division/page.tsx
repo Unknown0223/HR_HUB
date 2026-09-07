@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadMatrixXlsx } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
 import matrix from './page.module.css';
 
@@ -503,64 +504,85 @@ export default function DismissalsByDivisionPage() {
     w.document.getElementById('btnExcel')?.addEventListener('click', () => void exportExcel(data));
   }
 
-  const exportBtns = (ghost = false) => (
-    <div className={ghost ? undefined : extra.exportLinks} style={ghost ? { display: 'flex', gap: 8 } : undefined}>
-      <button type="button" className={ghost ? extra.exportGhost : undefined} disabled={busy} onClick={() => void openHtml()}>
-        HTML
-      </button>
-      <button type="button" className={ghost ? extra.exportGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>
-        Excel
-      </button>
-      <button
-        type="button"
-        className={ghost ? extra.exportGhost : undefined}
-        disabled={busy}
-        onClick={() => void ensureReport().then((d) => d && exportCsv(d))}
-      >
-        CSV
-      </button>
-      <button
-        type="button"
-        className={ghost ? extra.exportGhost : undefined}
-        disabled={busy}
-        onClick={() => void ensureReport().then((d) => d && exportXml(d))}
-      >
-        XML
-      </button>
-    </div>
-  );
+  const exportDisabled = busy;
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>Отчет увольнений по подразделениям</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>
-          Фильтр
-        </button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+        </div>
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns(true)}
+            <div className={arena.exportBtns}>
+                                    <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+                                      HTML
+                                    </button>
+                                    <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+                                      Excel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={arena.exportBtn}
+                                      disabled={exportDisabled}
+                                      onClick={() => void ensureReport().then((d) => d && exportCsv(d))}
+                                    >
+                                      CSV
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={arena.exportBtn}
+                                      disabled={exportDisabled}
+                                      onClick={() => void ensureReport().then((d) => d && exportXml(d))}
+                                    >
+                                      XML
+                                    </button>
+                                  </div>
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeIncident}`} aria-hidden>
+          <i className="fas fa-building" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет увольнений по подразделениям</h1>
+          <p className={shared.pageSubtitle}>
+            Матрица увольнений: должности × подразделения за выбранный период
+          </p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={layout.card} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Период</label>
             <PeriodRangePicker
               from={from}
@@ -571,26 +593,66 @@ export default function DismissalsByDivisionPage() {
               }}
             />
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            {exportBtns(false)}
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+              HTML
+            </button>
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+              Excel
+            </button>
+            <button
+              type="button"
+              className={arena.exportBtn}
+              disabled={exportDisabled}
+              onClick={() => void ensureReport().then((d) => d && exportCsv(d))}
+            >
+              CSV
+            </button>
+            <button
+              type="button"
+              className={arena.exportBtn}
+              disabled={exportDisabled}
+              onClick={() => void ensureReport().then((d) => d && exportXml(d))}
+            >
+              XML
+            </button>
           </div>
         </form>
       ) : (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <div className={matrix.meta}>
-                <span>Дата начала</span>
-                <span>{fmtRu(report.from)}</span>
-                <span>Дата окончания</span>
-                <span>{fmtRu(report.to)}</span>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {fmtRu(report.from)} — {fmtRu(report.to)}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-briefcase" aria-hidden />
+                  Должностей: {report.rows.length}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-building" aria-hidden />
+                  Подразделений: {report.divisions.length}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calculator" aria-hidden />
+                  Итого: {report.grandTotal}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
               </div>
               <div className={matrix.tableWrap}>
                 <table className={matrix.table}>

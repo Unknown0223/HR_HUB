@@ -1,13 +1,14 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { PageSubnav } from '@/components/PageSubnav';
+import { useEffect, useMemo, useState } from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import styles from './form.module.css';
 
 type TypeRow = {
   id: string;
+  code: string;
   name: string;
   accrualName?: string | null;
   isActive: boolean;
@@ -20,24 +21,27 @@ const DEFAULT_ACCRUALS = [
   'Без начисления',
 ];
 
-export function IncidentTypeForm({
-  mode,
-  typeId,
+export function IncidentTypeFormModal({
+  open,
+  onClose,
+  onSaved,
+  editId,
 }: {
-  mode: 'create' | 'edit';
-  typeId?: string;
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  editId?: string | null;
 }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(mode === 'edit');
-  const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(editId);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [accrualName, setAccrualName] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [knownAccruals, setKnownAccruals] = useState<string[]>(DEFAULT_ACCRUALS);
-
-  const pageTitle =
-    mode === 'edit' ? 'Тип инцидента (изменение)' : 'Тип инцидента (создание)';
 
   const accrualOptions = useMemo(() => {
     const set = new Set([...DEFAULT_ACCRUALS, ...knownAccruals]);
@@ -46,40 +50,44 @@ export function IncidentTypeForm({
   }, [knownAccruals, accrualName]);
 
   useEffect(() => {
+    if (!open) return;
     apiFetch<TypeRow[]>('/api/catalog/incident-types')
       .then((rows) => {
         const names = (Array.isArray(rows) ? rows : [])
           .map((r) => r.accrualName)
           .filter((x): x is string => Boolean(x));
-        if (names.length) setKnownAccruals((prev) => Array.from(new Set([...prev, ...names])));
+        if (names.length) {
+          setKnownAccruals((prev) => Array.from(new Set([...prev, ...names])));
+        }
       })
       .catch(() => undefined);
-  }, []);
+  }, [open]);
 
   useEffect(() => {
-    if (mode !== 'edit' || !typeId) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const row = await apiFetch<TypeRow>(`/api/catalog/incident-types/${typeId}`);
-        if (cancelled) return;
+    if (!open) return;
+    setError('');
+    setBusy(false);
+    if (!editId) {
+      setName('');
+      setCode('');
+      setAccrualName('');
+      setIsActive(true);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    apiFetch<TypeRow>(`/api/catalog/incident-types/${editId}`)
+      .then((row) => {
         setName(row.name || '');
+        setCode(row.code || '');
         setAccrualName(row.accrualName || '');
         setIsActive(row.isActive !== false);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, typeId]);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false));
+  }, [open, editId]);
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
+  async function save() {
     if (!name.trim()) {
       setError('Название обязательно');
       return;
@@ -88,72 +96,84 @@ export function IncidentTypeForm({
       setError('Начисление обязательно');
       return;
     }
-    setSaving(true);
+    setBusy(true);
     setError('');
     try {
-      const body = { name: name.trim(), accrualName: accrualName.trim(), isActive };
-      if (mode === 'edit' && typeId) {
-        await apiFetch(`/api/catalog/incident-types/${typeId}`, {
+      const body = {
+        name: name.trim(),
+        code: code.trim() || undefined,
+        accrualName: accrualName.trim(),
+        isActive,
+      };
+      if (isEdit && editId) {
+        await apiFetch(`/api/catalog/incident-types/${editId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
+        onSaved(editId);
       } else {
-        await apiFetch('/api/catalog/incident-types', {
+        const created = await apiFetch<TypeRow>('/api/catalog/incident-types', {
           method: 'POST',
           body: JSON.stringify(body),
         });
+        onSaved(created?.id || '');
       }
-      router.push('/catalog/incident-types');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav groupKey="incident-types" />
-        <p>Загрузка…</p>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="incident-types" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave}>
-        <div className={styles.docHead}>
-          <h2 className={styles.docTitle}>{pageTitle}</h2>
-          <div className={styles.docActions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => router.push('/catalog/incident-types')}
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.card} style={{ maxWidth: 520 }}>
-          <label className={styles.full}>
-            Название *
-            <input required value={name} onChange={(e) => setName(e.target.value)} />
+    <FormModal
+      open={open}
+      title={isEdit ? 'Тип инцидента (изменение)' : 'Тип инцидента (создание)'}
+      onClose={onClose}
+      width="md"
+      footer={
+        <>
+          <button
+            type="button"
+            className={modal.btnPrimary}
+            disabled={busy || loading}
+            onClick={() => void save()}
+          >
+            {busy ? '…' : 'Сохранить'}
+          </button>
+          <button type="button" className={modal.btnGhost} onClick={onClose}>
+            Закрыть
+          </button>
+        </>
+      }
+    >
+      {error ? <p className={modal.error}>{error}</p> : null}
+      {loading ? (
+        <p className={styles.muted}>Загрузка…</p>
+      ) : (
+        <div className={modal.fields}>
+          <label className={modal.field}>
+            <span>
+              Название <em className={modal.req}>*</em>
+            </span>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
 
-          <label className={styles.full}>
-            Начисление *
+          <label className={modal.field}>
+            <span>Код</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={isEdit ? '' : 'авто'}
+            />
+          </label>
+
+          <label className={modal.field}>
+            <span>
+              Начисление <em className={modal.req}>*</em>
+            </span>
             <input
               list="incident-accrual-options"
-              required
               placeholder="Поиск"
               value={accrualName}
               onChange={(e) => setAccrualName(e.target.value)}
@@ -165,19 +185,18 @@ export function IncidentTypeForm({
             </datalist>
           </label>
 
-          <label className={styles.switchLabel}>
-            Статус
-            <span className={styles.switchRight}>
+          <div className={styles.checkGroup}>
+            <label className={styles.check}>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
               Активный
-            </span>
-          </label>
+            </label>
+          </div>
         </div>
-      </form>
-    </div>
+      )}
+    </FormModal>
   );
 }

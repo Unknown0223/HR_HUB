@@ -1,9 +1,18 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { PositionTemplateForm } from '../../PositionTemplateForm';
+import { use, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function EditPositionTemplatePage() {
-  const { id } = useParams<{ id: string }>();
-  return <PositionTemplateForm templateId={id} />;
+/** Legacy /[id]/edit → list with edit modal */
+export default function EditPositionTemplateRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(`/catalog/position-templates?edit=${encodeURIComponent(id)}`);
+  }, [router, id]);
+  return null;
 }

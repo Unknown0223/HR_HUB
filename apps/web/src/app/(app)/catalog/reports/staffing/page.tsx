@@ -5,6 +5,8 @@ import { SearchLookup } from '@/app/(app)/catalog/avg-salaries/SearchLookup';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import styles from './page.module.css';
 
 type LookupOpt = { id: string; label: string };
@@ -371,48 +373,52 @@ export default function StaffingReportPage() {
   }
 
   const exportDisabled = busy;
+  const lineCount = report?.rows?.length ?? report?.groups.reduce((n, g) => n + g.lines.length, 0) ?? 0;
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.h1}>Отчет по штатному расписанию</h1>
-
-      <div className={styles.toolbar}>
-        <button
-          type="button"
-          className={tab === 'filter' ? styles.tabOn : styles.tab}
-          onClick={() => setTab('filter')}
-        >
-          Фильтр
-        </button>
-        <button
-          type="button"
-          className={tab === 'view' ? styles.tabOn : styles.tab}
-          onClick={() => setTab('view')}
-        >
-          Просмотр
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+        </div>
         {tab === 'view' ? (
           <>
             <button
               type="button"
-              className={styles.iconBtn}
+              className={arena.iconBtn}
               disabled={busy}
               aria-label="Обновить"
               onClick={() => void load()}
             >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            <div className={styles.exportBtns}>
-              <button type="button" className={styles.exportBtnGhost} disabled={exportDisabled} onClick={() => void openHtml()}>
+            <div className={arena.exportBtns}>
+              <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
                 HTML
               </button>
-              <button type="button" className={styles.exportBtnGhost} disabled={exportDisabled} onClick={() => void exportExcel()}>
+              <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
                 Excel
               </button>
-              <button type="button" className={styles.exportBtnGhost} disabled={exportDisabled || !report} onClick={exportCsv}>
+              <button type="button" className={arena.exportBtn} disabled={exportDisabled || !report} onClick={exportCsv}>
                 CSV
               </button>
-              <button type="button" className={styles.exportBtnGhost} disabled={exportDisabled || !report} onClick={exportXml}>
+              <button type="button" className={arena.exportBtn} disabled={exportDisabled || !report} onClick={exportXml}>
                 XML
               </button>
             </div>
@@ -420,58 +426,68 @@ export default function StaffingReportPage() {
         ) : null}
       </div>
 
-      {error ? <p className={styles.error}>{error}</p> : null}
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-sitemap" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет по штатному расписанию</h1>
+          <p className={shared.pageSubtitle}>
+            Штатные единицы, ставки, вакансии и фонд оплаты по подразделениям и должностям
+          </p>
+        </div>
+      </div>
+
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={styles.card} onSubmit={(e) => void generate(e)}>
-          <div className={styles.fields}>
-            <div className={styles.field}>
-              <label htmlFor="staffing-date">Дата</label>
-              <input
-                id="staffing-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
+            <label htmlFor="staffing-date">Дата</label>
+            <input
+              id="staffing-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className={arena.field}>
+            <label>Подразделение</label>
+            <div className={styles.lookup}>
+              <SearchLookup
+                value={divisionId}
+                options={divisions}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setDivisionId}
               />
             </div>
-            <div className={styles.field}>
-              <label>Подразделение</label>
-              <div className={styles.lookup}>
-                <SearchLookup
-                  value={divisionId}
-                  options={divisions}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setDivisionId}
-                />
-              </div>
-            </div>
-            <div className={styles.field}>
-              <label>Должности</label>
-              <div className={styles.lookup}>
-                <SearchLookup
-                  value={positionId}
-                  options={positions}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setPositionId}
-                />
-              </div>
+          </div>
+          <div className={arena.field}>
+            <label>Должности</label>
+            <div className={styles.lookup}>
+              <SearchLookup
+                value={positionId}
+                options={positions}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setPositionId}
+              />
             </div>
           </div>
-          <div className={styles.actions}>
-            <button type="submit" className={styles.primary} disabled={busy}>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            <button type="button" className={styles.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
               HTML
             </button>
-            <button type="button" className={styles.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
               Excel
             </button>
             <button
               type="button"
-              className={styles.exportBtn}
+              className={arena.exportBtn}
               disabled={exportDisabled}
               onClick={() => void ensureReport().then((d) => d && downloadCsv('Отчет-по-штатному-расписанию', csvRows(d)))}
             >
@@ -479,7 +495,7 @@ export default function StaffingReportPage() {
             </button>
             <button
               type="button"
-              className={styles.exportBtn}
+              className={arena.exportBtn}
               disabled={exportDisabled}
               onClick={() =>
                 void ensureReport().then((d) => {
@@ -496,14 +512,34 @@ export default function StaffingReportPage() {
           </div>
         </form>
       ) : (
-        <div className={styles.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={styles.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={styles.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <p className={styles.dateLine}>Дата: {fmtRu(report.date)}</p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  Дата: {fmtRu(report.date)}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-building" aria-hidden />
+                  Подразделений: {report.groups.length}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-briefcase" aria-hidden />
+                  Строк: {lineCount}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <StaffingTable groups={report.groups} />
             </>
           )}

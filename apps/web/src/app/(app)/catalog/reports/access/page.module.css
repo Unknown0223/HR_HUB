@@ -1,13 +1,17 @@
+/* Access report — yes/no cells, pick extras, table (shell in report-arena) */
+
 .yes {
   background: #e3f2fd;
   color: #1565c0;
   text-align: center;
+  font-weight: 650;
 }
 
 .no {
   background: #fccdd2;
   color: #c62828;
   text-align: center;
+  font-weight: 650;
 }
 
 .box {
@@ -15,23 +19,29 @@
   height: 16px;
   margin: 0;
   flex: 0 0 16px;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
 .treeMenu {
-  min-width: min(560px, 90vw);
+  left: 0;
+  right: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(180px, 28vh);
 }
 
 .treeInner {
-  max-height: none;
-  overflow: visible;
-  padding: 0.2rem 0.3rem 0.45rem;
+  max-height: min(180px, 28vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0.15rem 0.25rem 0.35rem;
 }
 
 .treeOn {
-  background: #e8f4ff;
-  border-radius: 3px;
+  background: rgba(10, 133, 226, 0.08);
+  border-radius: 7px;
 }
 
 .treeName {
@@ -40,19 +50,21 @@
   background: transparent;
   padding: 0;
   font: inherit;
-  font-size: 0.86rem;
-  color: #3f4254;
+  font-size: 0.8125rem;
+  color: #354862;
   cursor: pointer;
   text-align: left;
 }
 
 .treeNameOn {
-  color: #181c32;
-  font-weight: 600;
+  color: #0a1322;
+  font-weight: 650;
 }
 
 .listMenu {
-  max-height: none;
+  max-height: min(180px, 28vh);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .listRow {
@@ -62,33 +74,40 @@
   gap: 0.55rem;
   width: 100%;
   border: none;
-  border-bottom: 1px solid #f1f3f6;
+  border-bottom: 1px solid #f1f5fa;
   background: #fff;
   text-align: left;
-  padding: 0.42rem 0.65rem;
+  padding: 0.35rem 0.65rem;
   font: inherit;
-  font-size: 0.84rem;
-  color: #181c32;
+  font-size: 0.8125rem;
+  color: #354862;
   cursor: pointer;
 }
 
 .listRow:hover {
-  background: #f4f7fb;
+  background: #f2f5f9;
+  color: #0a1322;
 }
 
 .listOn {
-  background: #e1f0ff;
-  color: #181c32;
-  font-weight: 600;
+  background: rgba(10, 133, 226, 0.08);
+  color: #0a1322;
+  font-weight: 650;
 }
 
 .listOn:hover {
-  background: #d4e9ff;
+  background: rgba(10, 133, 226, 0.12);
 }
 
 .empMenu {
-  min-width: min(640px, 92vw);
-  max-height: none;
+  left: 0;
+  right: auto;
+  width: min(100%, 520px);
+  min-width: min(100%, 320px);
+  max-width: min(520px, 92vw);
+  max-height: min(200px, 30vh);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .empTable {
@@ -102,29 +121,32 @@
   grid-template-columns: 28px 150px 1fr;
   gap: 0.4rem;
   align-items: center;
-  padding: 0.38rem 0.65rem;
+  padding: 0.32rem 0.65rem;
   font-size: 0.8rem;
 }
 
 .empHead {
-  background: #eef3f7;
-  color: #5e6278;
+  background: #fbfcfe;
+  color: #64788f;
   font-weight: 700;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   position: sticky;
-  top: 32px;
+  top: 36px;
   z-index: 1;
-  border-bottom: 1px solid #d8dee6;
+  border-bottom: 1px solid #e8eef5;
 }
 
 .empRow {
   appearance: none;
   width: 100%;
   border: none;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid #f1f5fa;
   background: #fff;
   text-align: left;
   cursor: pointer;
-  color: #181c32;
+  color: #0a1322;
 }
 
 .empRow:nth-child(even) {
@@ -132,27 +154,27 @@
 }
 
 .empRow:hover {
-  background: #f1f7fd;
+  background: #f2f5f9;
 }
 
 .empOn,
 .empOn:nth-child(even) {
-  background: #dceeff;
-  font-weight: 600;
+  background: rgba(10, 133, 226, 0.08);
+  font-weight: 650;
 }
 
 .empOn:hover {
-  background: #cce5ff;
+  background: rgba(10, 133, 226, 0.12);
 }
 
 .empTab {
   font-variant-numeric: tabular-nums;
-  color: #5e6278;
+  color: #64788f;
 }
 
 .empOn .empTab,
 .empOn .empName {
-  color: #181c32;
+  color: #0a1322;
 }
 
 .empName {
@@ -160,7 +182,80 @@
 }
 
 .chipCount {
-  font-size: 11px;
-  color: #3699ff;
-  font-weight: 600;
+  font-size: 0.7rem;
+  color: #0a85e2;
+  font-weight: 650;
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--line, #e3e9f1);
+  border-radius: 12px;
+  background: #fff;
+  max-height: min(70vh, 820px);
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.78rem;
+  min-width: 860px;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid #e8eef5;
+  border-right: 1px solid #eef2f7;
+  padding: 0.45rem 0.55rem;
+  color: #0a1322;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table th:last-child,
+.table td:last-child {
+  border-right: none;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f2f5f9;
+  font-weight: 700;
+  color: #354862;
+  box-shadow: 0 1px 0 #e3e9f1;
+}
+
+.rowName {
+  text-align: left;
+}
+
+.zebra td {
+  background: #f9fafb;
+}
+
+.table tbody tr:hover td {
+  background: #f5f9fd;
+}
+
+.empty {
+  text-align: center;
+  color: #8ca0b8;
+  padding: 1.5rem;
+}
+
+@media print {
+  .tableWrap {
+    overflow: visible;
+    border: 0;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .table thead th {
+    position: static;
+  }
 }

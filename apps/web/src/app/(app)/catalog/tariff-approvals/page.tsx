@@ -1,15 +1,20 @@
 'use client';
+
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { TariffApprovalFormModal } from './TariffApprovalFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
-const FILTER_KEYS = ['number', 'groupId', 'status', 'from', 'to'] as const;
+const FILTER_KEYS = ['q', 'number', 'groupId', 'status', 'from', 'to'] as const;
+const COL_COUNT = 8;
 
 type Approval = {
   id: string;
@@ -45,18 +50,28 @@ function statusLabel(s: string) {
   return 'Черновик';
 }
 
+function statusClass(s: string) {
+  if (s === 'approved') return styles.statusApproved;
+  if (s === 'rejected') return styles.statusRejected;
+  if (s === 'pending') return styles.statusPending;
+  return styles.statusDraft;
+}
+
 function ApprovalsInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
+  const q = filters.q;
   const [rows, setRows] = useState<Approval[]>([]);
   const [groups, setGroups] = useState<{ id: string; label: string }[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [searchDraft, setSearchDraft] = useState(q);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -80,8 +95,40 @@ function ApprovalsInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setModalOpen(true);
+  }, [searchParams]);
+
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(
+      qs ? `/catalog/tariff-approvals?${qs}` : '/catalog/tariff-approvals',
+      { scroll: false },
+    );
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      const qs = params.toString();
+      router.replace(
+        qs ? `/catalog/tariff-approvals?${qs}` : '/catalog/tariff-approvals',
+        { scroll: false },
+      );
+    }
+  }
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const qq = (q || '').trim().toLowerCase();
     const numF = (filters.number || '').trim().toLowerCase();
     const groupF = (filters.groupId || '').trim();
     const statusF = (filters.status || '').trim();
@@ -100,7 +147,7 @@ function ApprovalsInner() {
         if (from && d < from) return false;
         if (to && d > to) return false;
       }
-      if (!q) return true;
+      if (!qq) return true;
       return [
         r.documentNumber,
         r.tariffGroup?.name,
@@ -110,51 +157,49 @@ function ApprovalsInner() {
       ]
         .join(' ')
         .toLowerCase()
-        .includes(q);
+        .includes(qq);
     });
-  }, [rows, search, filters]);
+  }, [rows, q, filters]);
 
-  const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
 
-  function toggleAll() {
-    if (allFilteredChecked) {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
-        return next;
-      });
-    } else {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
-        return next;
-      });
-    }
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function toggleOne(id: string) {
+  function toggleAllPage(on: boolean) {
     setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
       return next;
     });
   }
 
-  const selectedIds = useMemo(() => [...checked], [checked]);
+  function dropChecked(id: string) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
 
   async function remove(row: Approval) {
     if (!(await confirm('Удалить утверждение?'))) return;
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/tariff-approvals/${row.id}`, { method: 'DELETE' });
       setSelectedId(null);
-      setChecked((prev) => {
-        const next = new Set(prev);
-        next.delete(row.id);
-        return next;
-      });
+      dropChecked(row.id);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка удаления');
@@ -165,6 +210,7 @@ function ApprovalsInner() {
 
   async function post(row: Approval) {
     setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/tariff-approvals/${row.id}/post`, { method: 'POST' });
       await load();
@@ -175,13 +221,23 @@ function ApprovalsInner() {
     }
   }
 
+  async function reject(row: Approval) {
+    if (!(await confirm('Отклонить утверждение?'))) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/catalog/tariff-approvals/${row.id}/reject`, { method: 'POST' });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка отклонения');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function bulkPost() {
-    if (!selectedIds.length) return;
-    if (
-      !(await confirm(
-        `Провести выбранные утверждения (${selectedIds.length})?`,
-      ))
-    ) {
+    if (!checkedIds.length) return;
+    if (!(await confirm(`Провести выбранные утверждения (${checkedIds.length} шт.)?`))) {
       return;
     }
     setBusy(true);
@@ -193,9 +249,9 @@ function ApprovalsInner() {
         errors?: { id: string; message: string }[];
       }>('/api/catalog/tariff-approvals/bulk-post', {
         method: 'POST',
-        body: JSON.stringify({ ids: selectedIds }),
+        body: JSON.stringify({ ids: checkedIds }),
       });
-      setChecked(new Set());
+      setChecked({});
       setSelectedId(null);
       await load();
       if (result.skipped > 0) {
@@ -217,9 +273,42 @@ function ApprovalsInner() {
     }
   }
 
+  async function bulkReject() {
+    const targets = rows.filter(
+      (r) => checked[r.id] && r.status !== 'approved' && r.status !== 'rejected',
+    );
+    if (!targets.length) {
+      setError('Среди выбранных нет документов, которые можно отклонить');
+      return;
+    }
+    if (!(await confirm(`Отклонить выбранные утверждения (${targets.length} шт.)?`))) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          await apiFetch(`/api/catalog/tariff-approvals/${row.id}/reject`, {
+            method: 'POST',
+          });
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function bulkDelete() {
-    if (!selectedIds.length) return;
-    if (!(await confirm(`Удалить выбранные утверждения (${selectedIds.length})?`))) {
+    if (!checkedIds.length) return;
+    if (!(await confirm(`Удалить выбранные утверждения (${checkedIds.length} шт.)?`))) {
       return;
     }
     setBusy(true);
@@ -227,9 +316,9 @@ function ApprovalsInner() {
     try {
       await apiFetch('/api/catalog/tariff-approvals/bulk-delete', {
         method: 'POST',
-        body: JSON.stringify({ ids: selectedIds }),
+        body: JSON.stringify({ ids: checkedIds }),
       });
-      setChecked(new Set());
+      setChecked({});
       setSelectedId(null);
       await load();
     } catch (e) {
@@ -239,44 +328,63 @@ function ApprovalsInner() {
     }
   }
 
-  const baseRateOf = (r: Approval) =>
-    r.baseRate ?? r.tariffGroup?.baseRate ?? null;
+  const baseRateOf = (r: Approval) => r.baseRate ?? r.tariffGroup?.baseRate ?? null;
+
+  function exportCsv() {
+    downloadCsv(
+      `tariff-approvals-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered.map((r) => ({
+        Дата: fmtDate(r.documentDate || r.createdAt),
+        Номер: r.documentNumber || '',
+        'Тарифная группа': r.tariffGroup?.name || '',
+        'Базовый тариф': fmtMoney(baseRateOf(r)),
+        'Вступает в силу с': fmtDate(r.effectiveAt),
+        Статус: statusLabel(r.status),
+        Примечание: r.note || '',
+      })),
+    );
+  }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="tariff-approvals" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-file-signature" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Утверждения тарифных групп</h1>
+          <p className={shared.pageSubtitle}>
+            Документы изменения базового тарифа и окладов по разрядам
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/tariff-approvals/new" className={styles.createBtn}>
-            Создать
-          </Link>
-          {selectedIds.length > 0 ? (
-            <>
-              <button
-                type="button"
-                className={styles.bulkPost}
-                disabled={busy}
-                onClick={() => void bulkPost()}
-              >
-                Провести: {selectedIds.length}
-              </button>
-              <button
-                type="button"
-                className={styles.bulkDanger}
-                disabled={busy}
-                onClick={() => void bulkDelete()}
-              >
-                Удалить: {selectedIds.length}
-              </button>
-            </>
-          ) : null}
           <button
             type="button"
-            className={styles.toolBtn}
-            onClick={() => router.push('/catalog/tariff-groups')}
+            className={styles.createBtn}
+            onClick={() => setModalOpen(true)}
           >
-            Закрыть
+            <i className="fas fa-plus" aria-hidden />
+            Создать
           </button>
           <FilterPanel
             inline
@@ -284,6 +392,7 @@ function ApprovalsInner() {
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
               { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
               {
                 type: 'select',
@@ -311,131 +420,241 @@ function ApprovalsInner() {
             ]}
           />
         </div>
+
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void bulkPost()}
+          >
+            <i className="fas fa-check-double" aria-hidden />
+            Провести
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void bulkReject()}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Отклонить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void bulkDelete()}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredChecked}
-                  onChange={toggleAll}
-                  title="Выбрать все"
-                />
-              </th>
-              <th>Дата</th>
-              <th>Номер</th>
-              <th>Тарифная группа</th>
-              <th>Базовый тариф</th>
-              <th>Вступает в силу с</th>
-              <th>Примечание</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !filtered.length ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата</th>
+                <th>Номер</th>
+                <th>Тарифная группа</th>
+                <th>Базовый тариф</th>
+                <th>Вступает в силу с</th>
+                <th>Статус</th>
+                <th>Примечание</th>
               </tr>
-            ) : null}
-            {!loading && !filtered.length ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const isChecked = checked.has(row.id);
-              const canPost = row.status === 'draft' || row.status === 'pending';
-              const canDelete = row.status !== 'approved';
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open || isChecked ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleOne(row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{fmtDate(row.documentDate || row.createdAt)}</td>
-                    <td>{row.documentNumber || '—'}</td>
-                    <td>{row.tariffGroup?.name || '—'}</td>
-                    <td>{fmtMoney(baseRateOf(row))}</td>
-                    <td>{fmtDate(row.effectiveAt)}</td>
-                    <td>{row.note || '—'}</td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={7}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/tariff-approvals/${row.id}`}>
-                            Просмотреть
-                          </Link>
-                          {canPost || row.status === 'draft' ? (
-                            <Link href={`/catalog/tariff-approvals/${row.id}?edit=1`}>
-                              Изменить
-                            </Link>
-                          ) : null}
-                          {canPost ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void post(row)}
-                            >
-                              Провести
-                            </button>
-                          ) : null}
-                          <span className={styles.postedYes}>{statusLabel(row.status)}</span>
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void remove(row)}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const canPost = row.status === 'draft' || row.status === 'pending';
+                const canReject = canPost;
+                const canDelete = row.status !== 'approved';
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Выбрать документ"
+                        />
                       </td>
+                      <td className={styles.numCell}>
+                        {fmtDate(row.documentDate || row.createdAt)}
+                      </td>
+                      <td className={styles.numCell}>{row.documentNumber || '—'}</td>
+                      <td className={styles.nameCell}>{row.tariffGroup?.name || '—'}</td>
+                      <td className={styles.moneyCell}>{fmtMoney(baseRateOf(row))}</td>
+                      <td className={styles.numCell}>{fmtDate(row.effectiveAt)}</td>
+                      <td>
+                        <span className={statusClass(row.status)}>
+                          {statusLabel(row.status)}
+                        </span>
+                      </td>
+                      <td className={styles.noteCell}>{row.note || '—'}</td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/tariff-approvals/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотреть
+                            </Link>
+                            {canPost ? (
+                              <Link href={`/catalog/tariff-approvals/${row.id}?edit=1`}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                            ) : null}
+                            {canPost ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void post(row)}
+                              >
+                                <i className="fas fa-check-double" aria-hidden />
+                                Провести
+                              </button>
+                            ) : null}
+                            {canReject ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void reject(row)}
+                              >
+                                <i className="fas fa-ban" aria-hidden />
+                                Отклонить
+                              </button>
+                            ) : null}
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void remove(row)}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <TariffApprovalFormModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function TariffApprovalsPage() {
   return (
-    <Suspense fallback={<p className={styles.empty}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <ApprovalsInner />
     </Suspense>
   );

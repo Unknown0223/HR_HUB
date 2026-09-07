@@ -18,6 +18,7 @@ import {
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import local from '../../catalog/document-types/page.module.css';
+import shared from '../../../page-shared.module.css';
 import extra from './page.module.css';
 
 type Integration = {
@@ -221,6 +222,17 @@ function IikoSalesInner() {
           siblings: [{ label: 'Настройки IIKO', href: '/settings/iiko' }],
         }}
       />
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-chart-line" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Продажи IIKO</h1>
+          <p className={shared.pageSubtitle}>
+            Загрузка OLAP-отчётов и просмотр продаж по пользователям iiko
+          </p>
+        </div>
+      </div>
       {error ? <p className={styles.error}>{error}</p> : null}
       {ok ? <p className={formStyles.ok}>{ok}</p> : null}
       <div className={styles.toolbar}>
@@ -307,7 +319,9 @@ function IikoSalesInner() {
                 })),
               )
             }
+            title="Экспорт Excel"
           >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
@@ -318,6 +332,7 @@ function IikoSalesInner() {
             className={styles.toolBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
           >
             ‹
           </button>
@@ -327,6 +342,7 @@ function IikoSalesInner() {
             className={styles.toolBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
             ›
           </button>
@@ -334,9 +350,11 @@ function IikoSalesInner() {
             type="button"
             className={styles.toolBtn}
             onClick={() => void load()}
+            title="Обновить"
             aria-label="Обновить"
           >
-            ↻
+            <i className="fas fa-sync-alt" aria-hidden />
+            Обновить
           </button>
         </div>
       </div>

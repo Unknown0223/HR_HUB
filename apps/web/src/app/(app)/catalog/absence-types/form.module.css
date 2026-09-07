@@ -27,7 +27,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -43,7 +43,7 @@
 .btnClose {
   border: 1px solid #d1d5db;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -141,7 +141,7 @@
   height: 1rem;
   margin: 0.12rem 0 0;
   flex-shrink: 0;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   cursor: pointer;
 }
 
@@ -171,7 +171,7 @@
 
 .radio input {
   margin: 0;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   flex-shrink: 0;
 }
 
@@ -212,7 +212,7 @@
 }
 
 .toggleOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .toggle::after {
@@ -273,13 +273,13 @@
 }
 
 a.sideLink:hover {
-  color: #3699ff;
+  color: #0a85e2;
   background: #f8fafc;
 }
 
 .sideLinkActive {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
   font-weight: 600;
 }
 

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
 type PeriodRow = {
@@ -54,9 +55,9 @@ type Dashboard = {
   tenure: DualCount[];
 };
 
-const BLUE = '#5b7fb7';
-const BLUE_LIGHT = '#8eacd4';
-const ORANGE = '#e08a5d';
+const BLUE = '#0a85e2';
+const BLUE_LIGHT = '#9dc9f2';
+const ORANGE = '#d97706';
 
 function fmt(n: number, digits = 0) {
   if (!Number.isFinite(n)) return '0';
@@ -106,7 +107,7 @@ function PeriodChart({ rows }: { rows: PeriodRow[] }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={styles.chartSvg}>
-      <line x1={pad.l} y1={midY} x2={W - pad.r} y2={midY} stroke="#e4e6ef" strokeWidth={1} />
+      <line x1={pad.l} y1={midY} x2={W - pad.r} y2={midY} stroke="#e8eef5" strokeWidth={1} />
       {rows.map((r, i) => {
         const cx = pad.l + slot * i + slot / 2;
         const hHire = upH(r.hired);
@@ -199,7 +200,7 @@ function GroupChart({ rows }: { rows: GroupRow[] }) {
   return (
     <div className={styles.scrollChart}>
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className={styles.chartSvgFixed}>
-        <line x1={pad.l} y1={midY} x2={W - pad.r} y2={midY} stroke="#e4e6ef" />
+        <line x1={pad.l} y1={midY} x2={W - pad.r} y2={midY} stroke="#e8eef5" />
         {rows.map((r, i) => {
           const cx = pad.l + slot * i + slot / 2;
           const hHire = (r.hired / maxUp) * (midY - pad.t - 8);
@@ -392,120 +393,152 @@ function PersonnelChangesInner() {
       {
         label: 'Текущая численность на сегодняшний день',
         value: `${fmt(k.currentHeadcount)} чел.`,
+        icon: 'fa-users',
+        tone: styles.kpiAccent,
       },
       {
         label: 'Общая численность (начало периода)',
         value: `${fmt(k.headStart)} чел.`,
         change: k.headStartChange,
+        icon: 'fa-calendar-day',
+        tone: styles.kpiViolet,
       },
       {
         label: 'Общая численность (конец периода)',
         value: `${fmt(k.headEnd)} чел.`,
         change: k.headEndChange,
+        icon: 'fa-calendar-check',
+        tone: styles.kpiViolet,
       },
       {
         label: 'Принято',
         value: `${fmt(k.hired)} чел.`,
         change: k.hiredChange,
+        icon: 'fa-user-plus',
+        tone: styles.kpiOk,
       },
       {
         label: 'Уволено',
         value: `${fmt(k.dismissed)} чел.`,
         change: k.dismissedChange,
+        icon: 'fa-user-minus',
+        tone: styles.kpiDanger,
       },
       {
         label: 'Текучесть',
         value: `${fmt(k.turnover, 2)}%`,
         change: k.turnoverChange,
+        icon: 'fa-sync-alt',
+        tone: styles.kpiWarn,
       },
       {
         label: 'ССЧ',
         value: `${fmt(k.ssch, 2)} чел.`,
         change: k.sschChange,
+        icon: 'fa-chart-bar',
+        tone: styles.kpiAccent,
       },
     ];
   }, [data]);
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.head}>
-        <PageSubnav groupKey="personnel-changes" />
-        <div className={styles.headTools}>
-          <button
-            type="button"
-            className={styles.filterIcon}
-            title="Фильтр"
-            aria-label="Фильтр"
-            onClick={() => setFiltersOpen((v) => !v)}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-              <path d="M4 6h16M7 12h10M10 18h4" stroke="#f1c40f" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-              <path d="M4 6l5 6v5l6 3v-8l5-6H4z" fill="#f1c40f" opacity="0.35" />
-            </svg>
-          </button>
+      <PageSubnav groupKey="personnel-changes" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}>
+          <i className="fas fa-exchange-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Кадровые изменения</h1>
+          <p className={shared.pageSubtitle}>
+            Приём, выбытие, текучесть и ССЧ по периодам и подразделениям
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.headTools}>
+            <span className={styles.yearPill}>
+              <i className="fas fa-calendar-alt" aria-hidden />
+              {data ? data.year : year}
+            </span>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${filtersOpen ? styles.filterBtnActive : ''}`}
+              title="Фильтр"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              <i className="fas fa-sliders-h" aria-hidden />
+              Фильтр
+            </button>
+
+            {filtersOpen ? (
+              <aside className={styles.filterPanel}>
+                <h3>Фильтр</h3>
+                <label>
+                  Тип периода
+                  <div className={styles.radioRow}>
+                    {(
+                      [
+                        ['year', 'Год'],
+                        ['quarter', 'Квартал'],
+                        ['month', 'Месяц'],
+                      ] as const
+                    ).map(([v, l]) => (
+                      <label key={v} className={styles.radio}>
+                        <input
+                          type="radio"
+                          checked={periodType === v}
+                          onChange={() => setPeriodType(v)}
+                        />
+                        {l}
+                      </label>
+                    ))}
+                  </div>
+                </label>
+                <label>
+                  Год
+                  <input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value) || year)}
+                  />
+                </label>
+                <label>
+                  Группировка
+                  <div className={styles.radioRow}>
+                    <label className={styles.radio}>
+                      <input
+                        type="radio"
+                        checked={groupBy === 'division'}
+                        onChange={() => setGroupBy('division')}
+                      />
+                      По подразделениям
+                    </label>
+                    <label className={styles.radio}>
+                      <input
+                        type="radio"
+                        checked={groupBy === 'position'}
+                        onChange={() => setGroupBy('position')}
+                      />
+                      По должностям
+                    </label>
+                  </div>
+                </label>
+                <button
+                  type="button"
+                  className={styles.applyBtn}
+                  onClick={() => void load()}
+                >
+                  Обновить
+                </button>
+              </aside>
+            ) : null}
+          </div>
         </div>
       </div>
-
-      {filtersOpen ? (
-        <aside className={styles.filterPanel}>
-          <h3>Фильтр</h3>
-          <label>
-            Тип периода
-            <div className={styles.radioRow}>
-              {(
-                [
-                  ['year', 'Год'],
-                  ['quarter', 'Квартал'],
-                  ['month', 'Месяц'],
-                ] as const
-              ).map(([v, l]) => (
-                <label key={v} className={styles.radio}>
-                  <input
-                    type="radio"
-                    checked={periodType === v}
-                    onChange={() => setPeriodType(v)}
-                  />
-                  {l}
-                </label>
-              ))}
-            </div>
-          </label>
-          <label>
-            Год
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value) || year)}
-            />
-          </label>
-          <label>
-            Группировка
-            <div className={styles.radioRow}>
-              <label className={styles.radio}>
-                <input
-                  type="radio"
-                  checked={groupBy === 'division'}
-                  onChange={() => setGroupBy('division')}
-                />
-                По подразделениям
-              </label>
-              <label className={styles.radio}>
-                <input
-                  type="radio"
-                  checked={groupBy === 'position'}
-                  onChange={() => setGroupBy('position')}
-                />
-                По должностям
-              </label>
-            </div>
-          </label>
-          <button type="button" className={styles.applyBtn} onClick={() => void load()}>
-            Обновить
-          </button>
-        </aside>
-      ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
       {loading && !data ? <p className={styles.loading}>Загрузка…</p> : null}
@@ -514,10 +547,15 @@ function PersonnelChangesInner() {
         <>
           <div className={styles.kpiRow}>
             {kpiCards.map((c) => (
-              <div key={c.label} className={styles.kpi}>
+              <div key={c.label} className={`${styles.kpi} ${c.tone}`}>
+                <div className={styles.kpiTop}>
+                  <span className={styles.kpiIcon}>
+                    <i className={`fas ${c.icon}`} aria-hidden />
+                  </span>
+                  {'change' in c && c.change != null ? <Change value={c.change} /> : null}
+                </div>
                 <div className={styles.kpiLabel}>{c.label}</div>
                 <div className={styles.kpiValue}>{c.value}</div>
-                {'change' in c && c.change != null ? <Change value={c.change} /> : null}
               </div>
             ))}
           </div>
@@ -525,7 +563,12 @@ function PersonnelChangesInner() {
           <div className={styles.grid}>
             <section className={styles.card}>
               <div className={styles.cardHead}>
-                <h2>Численность по периодам</h2>
+                <div>
+                  <h2>Численность по периодам</h2>
+                  <p className={styles.cardSub}>
+                    Приём, выбытие и текучесть по годам
+                  </p>
+                </div>
               </div>
               <div className={styles.legend}>
                 <span>
@@ -546,10 +589,15 @@ function PersonnelChangesInner() {
 
             <section className={styles.card}>
               <div className={styles.cardHead}>
-                <h2>
-                  Численность по{' '}
-                  {data.groupBy === 'position' ? 'должностям' : 'подразделениям'}
-                </h2>
+                <div>
+                  <h2>
+                    Численность по{' '}
+                    {data.groupBy === 'position' ? 'должностям' : 'подразделениям'}
+                  </h2>
+                  <p className={styles.cardSub}>
+                    Принято и уволено, текучесть в процентах
+                  </p>
+                </div>
               </div>
               <div className={styles.legend}>
                 <span>
@@ -565,7 +613,12 @@ function PersonnelChangesInner() {
             <div className={styles.rightCol}>
               <section className={styles.card}>
                 <div className={styles.cardHead}>
-                  <h2>Причины увольнений</h2>
+                  <div>
+                    <h2>Причины увольнений</h2>
+                    <p className={styles.cardSub}>
+                      Сравнение {data.prevYear} и {data.year}
+                    </p>
+                  </div>
                 </div>
                 <ReasonBars
                   rows={data.dismissalReasons}
@@ -575,7 +628,12 @@ function PersonnelChangesInner() {
               </section>
               <section className={styles.card}>
                 <div className={styles.cardHead}>
-                  <h2>Стаж работы по годам</h2>
+                  <div>
+                    <h2>Стаж работы по годам</h2>
+                    <p className={styles.cardSub}>
+                      Распределение уволенных по стажу
+                    </p>
+                  </div>
                 </div>
                 <TenureBars
                   rows={data.tenure}

@@ -21,6 +21,10 @@ function linkActive(pathname: string, search: string, href: string) {
       const tab = current.get('tab');
       return !tab || tab === 'divisions';
     }
+    // Bare /catalog/devices must not look active when ?filter=new is set
+    if (path === '/catalog/devices') {
+      return current.get('filter') !== 'new';
+    }
     return true;
   }
   const want = new URLSearchParams(qs);
@@ -45,26 +49,30 @@ function PageSubnavInner({
   const resolved = group ?? (groupKey ? FORM_SIBLINGS[groupKey] : undefined);
   if (!resolved) return null;
 
-  const title = titleOverride ?? resolved.title;
+  const title = (titleOverride ?? resolved.title)?.trim() ?? '';
 
-  // Avoid "Title | Title | Other" when siblings accidentally include self
-  const siblings = resolved.siblings.filter((s) => {
+  // Keep current page in sibling pills (active state). Hide bar title when empty
+  // or when a sibling already represents this page (avoid "Устройства | Устройства").
+  const siblings = resolved.siblings;
+  const titleCoveredBySibling = Boolean(title) && siblings.some((s) => {
     const path = s.href.split('?')[0];
-    if (path === pathname && s.label === title) return false;
-    return true;
+    return path === pathname && s.label === title;
   });
+  const showTitle = Boolean(title) && !titleCoveredBySibling;
 
   return (
     <div className={styles.bar} data-no-print>
       <div className={styles.inner}>
         <div className={styles.left}>
-          <h1 className={styles.title}>
-            <i className={`fas fa-bars ${styles.bars}`} aria-hidden />
-            <span>{title}</span>
-          </h1>
+          {showTitle ? (
+            <h1 className={styles.title}>
+              <i className={`fas fa-bars ${styles.bars}`} aria-hidden />
+              <span>{title}</span>
+            </h1>
+          ) : null}
           {siblings.length > 0 ? (
             <>
-              <span className={styles.sep} aria-hidden />
+              {showTitle ? <span className={styles.sep} aria-hidden /> : null}
               <nav className={styles.links} aria-label="Связанные разделы">
                 {siblings.map((s) => {
                   const active = linkActive(pathname, search, s.href);

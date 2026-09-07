@@ -1,9 +1,18 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { DynamicFieldForm } from '../../DynamicFieldForm';
+import { use, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function EditDynamicFieldPage() {
-  const { id } = useParams<{ id: string }>();
-  return <DynamicFieldForm fieldId={id} />;
+/** Legacy /[id]/edit → list with edit modal */
+export default function EditDynamicFieldRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(`/catalog/dynamic-fields?edit=${encodeURIComponent(id)}`);
+  }, [router, id]);
+  return null;
 }

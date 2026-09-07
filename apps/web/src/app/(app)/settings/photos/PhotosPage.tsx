@@ -14,6 +14,7 @@ import {
 } from '@/lib/photo-upload';
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
+import shared from '../../../page-shared.module.css';
 import ui from './page.module.css';
 
 const PAGE_SIZE = 50;
@@ -106,7 +107,18 @@ export function PhotosPage() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={{ title: 'Загрузка фотографий сотрудников', siblings: [] }} />
+      <PageSubnav groupKey="settings-admin" />
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-camera" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Загрузка фотографий сотрудников</h1>
+          <p className={shared.pageSubtitle}>
+            Массовая загрузка фотографий по шаблону имени файла
+          </p>
+        </div>
+      </div>
       <div className={formStyles.actions} style={{ marginBottom: '0.65rem' }}>
         <button type="button" className={formStyles.btnClose} onClick={() => router.push('/settings?tab=admin')}>
           Закрыть

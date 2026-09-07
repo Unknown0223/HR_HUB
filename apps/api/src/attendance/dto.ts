@@ -202,7 +202,7 @@ export class ApplyMarkSettingsDto {
 }
 
 export class IngestPunchDto {
-  @ApiProperty() @IsString() tenantId!: string;
+  @ApiProperty() @IsUUID() tenantId!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() deviceId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() gatewayRef?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() serialNumber?: string;
@@ -218,7 +218,7 @@ export class IngestPunchDto {
 
 /** Device-gw online pulse (~8s). Same auth as punches/ingest. */
 export class IngestHeartbeatDto {
-  @ApiProperty() @IsString() tenantId!: string;
+  @ApiProperty() @IsUUID() tenantId!: string;
   @ApiProperty() @IsString() deviceId!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() deviceNow?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() clockDriftSeconds?: number;
@@ -358,4 +358,57 @@ export class OfficeLinkDeviceDto {
   @ApiPropertyOptional() @IsOptional() @IsString() serialNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
+  @ApiPropertyOptional({ description: 'Required when creating a new device' })
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+}
+
+export class CreatePairingTokenDto {
+  @ApiPropertyOptional({ description: 'TTL override in seconds (default from PAIRING_TOKEN_TTL_SEC)' })
+  @IsOptional()
+  @IsInt()
+  ttlSec?: number;
+}
+
+export class CreateProvisionSessionDto {
+  /** Client may echo tenantCode; auth is pairing token (tenant from session). */
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() host?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() serial?: string;
+  @ApiPropertyOptional() @IsOptional() meta?: Record<string, unknown>;
+}
+
+export class PatchProvisionProgressDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
+  @ApiPropertyOptional({ description: 'scanning | configuring | linked | failed' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() step?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() percent?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() message?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() host?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() serial?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() deviceId?: string;
+}
+
+export class DetectDeviceStateDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() host?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() port?: number;
+  @ApiPropertyOptional({ description: 'new | configured' })
+  @IsOptional()
+  @IsIn(['new', 'configured'])
+  state?: 'new' | 'configured';
+  @ApiPropertyOptional() @IsOptional() meta?: Record<string, unknown>;
+}
+
+export class OfficeLinkDevicePasswordDto {
+  @ApiProperty() @IsUUID() deviceId!: string;
+  @ApiProperty() @IsString() @MinLength(1) password!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() serial?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() host?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() username?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() provisionSessionId?: string;
 }

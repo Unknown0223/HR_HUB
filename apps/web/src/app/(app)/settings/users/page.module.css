@@ -52,7 +52,7 @@
   height: 26px;
   border-radius: 50%;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   cursor: pointer;
   font-size: 0.85rem;
@@ -242,7 +242,7 @@
 
 .dropMenu button:hover {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .sideName {

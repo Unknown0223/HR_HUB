@@ -1,0 +1,90 @@
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #0a85e2;
+  margin: 0;
+}
+
+.pickRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pickMeta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64788f;
+  font-variant-numeric: tabular-nums;
+}
+
+.clearBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #64788f;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.clearBtn:hover {
+  color: #b91c1c;
+}
+
+.chips {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 148px;
+  overflow: auto;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid #e3e9f1;
+  border-radius: 999px;
+  background: #f2f5f9;
+  color: #14213a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.35rem 0.2rem 0.6rem;
+}
+
+.chip button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #8ca0b8;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.15rem;
+}
+
+.chip button:hover {
+  color: #b91c1c;
+}
+
+.hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: #8ca0b8;
+}

@@ -1,17 +1,21 @@
 'use client';
+
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
 import {
   blankLocationForm,
   LocationFormModal,
   type LocationFormValues,
 } from './LocationFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Location = {
   id: string;
@@ -34,6 +38,9 @@ type Location = {
   _count?: { devices?: number; qrCodes?: number; divisions?: number };
 };
 
+const FILTER_KEYS = ['q', 'name', 'geo', 'accuracy', 'status', 'typeId'] as const;
+const COL_COUNT = 8;
+
 function toForm(row: Location): LocationFormValues {
   const meta = (row as Location & { meta?: Record<string, unknown> }).meta || {};
   return {
@@ -50,7 +57,8 @@ function toForm(row: Location): LocationFormValues {
     region: typeof meta.region === 'string' ? meta.region : '',
     bssid: typeof meta.bssid === 'string' ? meta.bssid : '',
     restrictMarks: meta.restrictMarks === true,
-    polygonalAnalysis: typeof meta.polygonalAnalysis === 'string' ? meta.polygonalAnalysis : '',
+    polygonalAnalysis:
+      typeof meta.polygonalAnalysis === 'string' ? meta.polygonalAnalysis : '',
   };
 }
 
@@ -85,21 +93,33 @@ function geoText(row: Location) {
   return '';
 }
 
+function deviceCountOf(row: Location) {
+  return row.deviceCount ?? row._count?.devices ?? 0;
+}
+
 function LocationsInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const q = filters.q;
+  const nameFilter = filters.name;
+  const geoFilter = filters.geo;
+  const accuracyFilter = filters.accuracy;
+  const statusFilter = filters.status;
+  const typeFilter = filters.typeId;
 
   const [rows, setRows] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [filterName, setFilterName] = useState('');
-  const [filterGeo, setFilterGeo] = useState('');
-  const [filterAccuracy, setFilterAccuracy] = useState('');
-  const [checked, setChecked] = useState<Set<string>>(() => new Set());
-  const [focusId, setFocusId] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Location | null>(null);
   const [busy, setBusy] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(
+    Boolean(nameFilter || geoFilter || accuracyFilter || statusFilter || typeFilter),
+  );
+  const [searchDraft, setSearchDraft] = useState(q);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -119,109 +139,159 @@ function LocationsInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    const create = searchParams.get('create') === '1';
+    const edit = searchParams.get('edit');
+    if (create || edit) {
+      setEditId(edit || null);
+      setModalOpen(true);
+    }
+  }, [searchParams]);
+
+  const typeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) {
+      const t = r.locationType;
+      if (t?.id) map.set(t.id, t.name);
+    }
+    return [...map.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+  }, [rows]);
+
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      const q = search.trim().toLowerCase();
-      if (q) {
+      const qq = q.trim().toLowerCase();
+      if (qq) {
         const hit = [r.name, r.code, r.address, r.locationType?.name, geoText(r)]
           .filter(Boolean)
-          .some((x) => String(x).toLowerCase().includes(q));
+          .some((x) => String(x).toLowerCase().includes(qq));
         if (!hit) return false;
       }
-      const nameQ = filterName.trim().toLowerCase();
+      const nameQ = nameFilter.trim().toLowerCase();
       if (nameQ && !`${r.name} ${r.code}`.toLowerCase().includes(nameQ)) return false;
-      const geoQ = filterGeo.trim().toLowerCase();
+      const geoQ = geoFilter.trim().toLowerCase();
       if (geoQ && !geoText(r).toLowerCase().includes(geoQ)) return false;
-      if (filterAccuracy.trim()) {
-        const acc = Number(filterAccuracy);
+      if (accuracyFilter.trim()) {
+        const acc = Number(accuracyFilter);
         if (!Number.isNaN(acc) && (r.geoRadiusM ?? 150) !== acc) return false;
+      }
+      if (statusFilter === 'active' && !r.isActive) return false;
+      if (statusFilter === 'inactive' && r.isActive) return false;
+      if (typeFilter && (r.locationType?.id || r.locationTypeId || '') !== typeFilter) {
+        return false;
       }
       return true;
     });
-  }, [rows, search, filterName, filterGeo, filterAccuracy]);
+  }, [rows, q, nameFilter, geoFilter, accuracyFilter, statusFilter, typeFilter]);
 
-  const selectedIds = useMemo(() => [...checked], [checked]);
-  const allFilteredSelected =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
-  const focus = filtered.find((r) => r.id === focusId) || null;
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
 
-  function toggleOne(id: string) {
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
     setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
       return next;
     });
-    setFocusId(id);
   }
 
-  function toggleAll() {
-    if (allFilteredSelected) {
-      setChecked(new Set());
-      setFocusId(null);
-      return;
-    }
-    setChecked(new Set(filtered.map((r) => r.id)));
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `/catalog/locations?${qs}` : '/catalog/locations', {
+      scroll: false,
+    });
   }
+
+  function openCreate() {
+    setEditId(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(id: string) {
+    setEditId(id);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditId(null);
+    if (searchParams.get('create') === '1' || searchParams.get('edit')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      params.delete('edit');
+      const qs = params.toString();
+      router.replace(qs ? `/catalog/locations?${qs}` : '/catalog/locations', {
+        scroll: false,
+      });
+    }
+  }
+
+  const editing = editId ? rows.find((r) => r.id === editId) || null : null;
+  const initialValues = useMemo(
+    () => (editing ? toForm(editing) : blankLocationForm()),
+    [editing],
+  );
 
   async function save(values: LocationFormValues) {
     setBusy(true);
     try {
       const body = bodyFromForm(values);
-      let id = editing?.id;
       if (editing) {
         await apiFetch(`/api/attendance/locations/${editing.id}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
       } else {
-        const created = await apiFetch<Location>('/api/attendance/locations', {
+        await apiFetch<Location>('/api/attendance/locations', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        id = created.id;
       }
-      setModalOpen(false);
-      setEditing(null);
+      closeModal();
       await load();
-      if (id) router.push(`/catalog/locations/${id}`);
     } finally {
       setBusy(false);
     }
   }
 
-  async function remove(id: string) {
-    if (!(await confirm('Удалить локацию? Если есть связанные устройства — она будет деактивирована.'))) {
-      return;
-    }
-    await apiFetch(`/api/attendance/locations/${id}`, { method: 'DELETE' });
-    setChecked((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    if (focusId === id) setFocusId(null);
-    await load();
-  }
-
-  async function bulkRemove() {
-    if (!selectedIds.length) return;
+  async function runDelete(row: Location) {
     if (
       !(await confirm(
-        `Удалить локации (${selectedIds.length})? Если есть связанные устройства — они будут деактивированы.`,
+        `Удалить локацию «${row.name}»? Если есть связанные устройства — она будет деактивирована.`,
       ))
     ) {
       return;
     }
     setBusy(true);
+    setError('');
     try {
-      await Promise.all(
-        selectedIds.map((id) =>
-          apiFetch(`/api/attendance/locations/${id}`, { method: 'DELETE' }),
-        ),
-      );
-      setChecked(new Set());
-      setFocusId(null);
+      await apiFetch(`/api/attendance/locations/${row.id}`, { method: 'DELETE' });
+      setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка удаления');
@@ -230,182 +300,436 @@ function LocationsInner() {
     }
   }
 
+  async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'delete') {
+      if (
+        !(await confirm(
+          `Удалить выбранные локации (${targets.length} шт.)? Локации со связанными устройствами будут деактивированы.`,
+        ))
+      ) {
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/attendance/locations/${row.id}`, { method: 'DELETE' });
+          } else {
+            const isActive = action === 'activate';
+            if (row.isActive === isActive) continue;
+            await apiFetch(`/api/attendance/locations/${row.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleActive(row: Location, value: boolean) {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/attendance/locations/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: value }),
+      });
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, isActive: value } : r)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `locations-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered.map((r) => ({
+        Код: r.code || '',
+        Локация: r.name,
+        Адрес: r.address || '',
+        Тип: r.locationType?.name || '',
+        Геолокация: geoText(r),
+        'Погрешность (м)': r.geoRadiusM != null ? String(r.geoRadiusM) : '',
+        Устройства: String(deviceCountOf(r)),
+        Сотрудники: String(r.employeeCount ?? 0),
+        Статус: r.isActive ? 'Активная' : 'Неактивная',
+      })),
+    );
+  }
+
+  const metrics = useMemo(() => {
+    let active = 0;
+    let withDevices = 0;
+    let offline = 0;
+    for (const r of rows) {
+      if (r.isActive) active += 1;
+      if (deviceCountOf(r) > 0) withDevices += 1;
+      if (r.devicesOffline) offline += 1;
+    }
+    return [
+      { label: 'Всего', value: rows.length },
+      { label: 'Активные', value: active, accent: 'ok' as const },
+      { label: 'С устройствами', value: withDevices, accent: 'accent' as const },
+      { label: 'Офлайн-устройства', value: offline, accent: 'danger' as const },
+    ];
+  }, [rows]);
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="locations" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}>
+          <i className="fas fa-map-marker-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Локации</h1>
+          <p className={shared.pageSubtitle}>
+            Офисы, склады, геозоны и привязка терминалов
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.metrics}>
+        {metrics.map((m) => (
+          <div key={m.label} className={styles.metricCard}>
+            <p className={styles.metricLabel}>{m.label}</p>
+            <p
+              className={`${styles.metricValue} ${
+                m.accent === 'ok'
+                  ? styles.mOk
+                  : m.accent === 'danger'
+                    ? styles.mDanger
+                    : m.accent === 'accent'
+                      ? styles.mAccent
+                      : ''
+              }`}
+            >
+              {m.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            onClick={() => {
-              setEditing(null);
-              setModalOpen(true);
-            }}
-          >
+          <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          {selectedIds.length > 0 ? (
-            <button
-              type="button"
-              className={styles.btnBulkDanger}
-              disabled={busy}
-              onClick={() => void bulkRemove()}
-            >
-              Удалить {selectedIds.length}
-            </button>
-          ) : null}
-          <button type="button" className={styles.btnGhost} onClick={() => router.push('/attendance')}>
-            Закрыть
-          </button>
-          <label className={styles.filterField}>
-            <span>Локация</span>
-            <input
-              value={filterName}
-              onChange={(e) => setFilterName(e.target.value)}
-              placeholder="Название / код"
-            />
-          </label>
-          <label className={styles.filterField}>
-            <span>Геолокация</span>
-            <input
-              value={filterGeo}
-              onChange={(e) => setFilterGeo(e.target.value)}
-              placeholder="lat, lon"
-            />
-          </label>
-          <label className={styles.filterField}>
-            <span>Точность (м)</span>
-            <input
-              value={filterAccuracy}
-              onChange={(e) => setFilterAccuracy(e.target.value)}
-              placeholder="150"
-              inputMode="numeric"
-            />
-          </label>
-        </div>
-        <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <FilterPanel
+            inline
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
+              {
+                type: 'text',
+                key: 'name',
+                label: 'Локация',
+                placeholder: 'Название / код',
+              },
+              { type: 'text', key: 'geo', label: 'Геолокация', placeholder: 'lat, lon' },
+              {
+                type: 'text',
+                key: 'accuracy',
+                label: 'Точность (м)',
+                placeholder: '150',
+              },
+              {
+                type: 'select',
+                key: 'typeId',
+                label: 'Тип локации',
+                options: typeOptions,
+              },
+              {
+                type: 'select',
+                key: 'status',
+                label: 'Статус',
+                options: [
+                  { value: 'active', label: 'Активная' },
+                  { value: 'inactive', label: 'Неактивная' },
+                ],
+              },
+            ]}
           />
-          <span className={styles.pagerMeta}>
-            {filtered.length}/{rows.length}
+        </div>
+
+        <div className={styles.rightTools}>
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.btnGhost} onClick={() => void load()}>
-            Обновить
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      <div className={styles.panel}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredSelected}
-                  disabled={!filtered.length || loading}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Название</th>
-              <th>Адрес</th>
-              <th>Тип локации</th>
-              <th>Кол-во устройств</th>
-              <th>Устройства не в сети</th>
-              <th>Кол-во сотрудников</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активировать
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('deactivate')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Деактивировать
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <div className={styles.tableWrap}>
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Локация</th>
+                <th>Адрес</th>
+                <th>Тип</th>
+                <th>Устройства</th>
+                <th>Офлайн</th>
+                <th>Сотрудники</th>
+                <th>Статус</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r) => (
-                <Fragment key={r.id}>
-                  <tr
-                    className={
-                      checked.has(r.id) || focusId === r.id ? styles.selected : undefined
-                    }
-                    onClick={() => setFocusId((id) => (id === r.id ? null : r.id))}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td className={styles.checkCol}>
-                      <input
-                        type="checkbox"
-                        checked={checked.has(r.id)}
-                        onChange={() => toggleOne(r.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>
-                      {r.name}
-                      {r.isGlobal ? (
-                        <span className={styles.badgeOk} style={{ marginLeft: 6 }}>
-                          Глобальная
-                        </span>
-                      ) : null}
-                    </td>
-                    <td>{r.address || '—'}</td>
-                    <td>{r.locationType?.name || '—'}</td>
-                    <td>{r.deviceCount ?? r._count?.devices ?? 0}</td>
-                    <td>{r.devicesOfflineLabel ?? (r.devicesOffline ? 'Да' : 'Нет')}</td>
-                    <td>{r.employeeCount ?? 0}</td>
-                  </tr>
-                  {focus?.id === r.id ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/locations/${r.id}`}>Просмотр</Link>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditing(r);
-                              setModalOpen(true);
-                            }}
-                          >
-                            Изменить
-                          </button>
-                          <button type="button" onClick={() => void remove(r.id)}>
-                            Удалить
-                          </button>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const offlineLabel =
+                  row.devicesOfflineLabel ?? (row.devicesOffline ? 'Да' : 'Нет');
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.name}`}
+                        />
+                      </td>
+                      <td>
+                        <div className={styles.locCell}>
+                          <span className={styles.locIcon} aria-hidden>
+                            <i className="fas fa-map-marker-alt" />
+                          </span>
+                          <div>
+                            <div className={styles.nameCell}>
+                              {row.name}
+                              {row.isGlobal ? (
+                                <span className={styles.badgeOk}>Глобальная</span>
+                              ) : null}
+                            </div>
+                            <div className={styles.codeCell}>{row.code}</div>
+                          </div>
                         </div>
                       </td>
+                      <td>{row.address || '—'}</td>
+                      <td>{row.locationType?.name || '—'}</td>
+                      <td>
+                        <span className={styles.countPill}>{deviceCountOf(row)}</span>
+                      </td>
+                      <td>
+                        <span
+                          className={
+                            row.devicesOffline || offlineLabel === 'Да'
+                              ? styles.offlineYes
+                              : styles.offlineNo
+                          }
+                        >
+                          {offlineLabel}
+                        </span>
+                      </td>
+                      <td>{row.employeeCount ?? 0}</td>
+                      <td>
+                        {row.isActive ? (
+                          <span className={styles.statusActive}>Активная</span>
+                        ) : (
+                          <span className={styles.statusMuted}>Неактивная</span>
+                        )}
+                      </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/locations/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотр
+                            </Link>
+                            <button type="button" onClick={() => openEdit(row.id)}>
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void toggleActive(row, !row.isActive)}
+                            >
+                              <i
+                                className={row.isActive ? 'fas fa-ban' : 'fas fa-check'}
+                                aria-hidden
+                              />
+                              {row.isActive ? 'Деактивировать' : 'Активировать'}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
 
       <LocationFormModal
         open={modalOpen}
         title={editing ? 'Локация (изменение)' : 'Локация (создание)'}
-        initial={editing ? toForm(editing) : blankLocationForm()}
+        initial={initialValues}
         busy={busy}
         onClose={() => {
-          if (!busy) {
-            setModalOpen(false);
-            setEditing(null);
-          }
+          if (!busy) closeModal();
         }}
         onSave={save}
       />
@@ -415,7 +739,7 @@ function LocationsInner() {
 
 export default function LocationsPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <LocationsInner />
     </Suspense>
   );

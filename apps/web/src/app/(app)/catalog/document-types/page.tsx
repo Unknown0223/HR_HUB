@@ -3,12 +3,15 @@
 import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = {
   id: string;
@@ -378,83 +381,26 @@ function DocumentTypesPageInner() {
     );
   }
 
-  if (mode === 'create' || mode === 'edit') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title:
-              mode === 'edit'
-                ? 'Тип документа (изменение)'
-                : 'Тип документа (создание)',
-            siblings: [
-              { label: 'Типы документов', href: '/catalog/document-types' },
-            ],
-          }}
-        />
-        <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-          <button
-            type="button"
-            className={formStyles.btnSave}
-            disabled={saving}
-            onClick={() => void save()}
-          >
-            Сохранить
-          </button>
-          <button
-            type="button"
-            className={formStyles.btnClose}
-            onClick={() => setMode('list')}
-          >
-            Закрыть
-          </button>
-        </div>
-        {error ? <p className={styles.error}>{error}</p> : null}
-        <div className={formStyles.card} style={{ maxWidth: 640 }}>
-          <div className={formStyles.field}>
-            <label>Код</label>
-            <input value={code} onChange={(e) => setCode(e.target.value)} />
-          </div>
-          <div className={formStyles.field}>
-            <label>
-              Название <span className={formStyles.req}>*</span>
-            </label>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className={formStyles.statusBlock}>
-            <span className={formStyles.fieldLabel}>Документ при приеме</span>
-            <label className={formStyles.toggleRow}>
-              <button
-                type="button"
-                className={`${formStyles.toggle} ${isHireDocument ? formStyles.toggleOn : ''}`}
-                onClick={() => setIsHireDocument((v) => !v)}
-              />
-              <span>{isHireDocument ? 'Да' : 'Нет'}</span>
-            </label>
-          </div>
-          <div className={formStyles.statusBlock}>
-            <span className={formStyles.fieldLabel}>Статус</span>
-            <label className={formStyles.toggleRow}>
-              <button
-                type="button"
-                className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                onClick={() => setActive((v) => !v)}
-              />
-              <span>Активный</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.wrap}>
       <PageSubnav group={{ title: 'Типы документов', siblings }} />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-file-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Типы документов</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник типов кадровых документов
+          </p>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <button
@@ -463,8 +409,9 @@ function DocumentTypesPageInner() {
             disabled={!selected.size || busy}
             onClick={() => void setHireSelected()}
           >
+            <i className="fas fa-file-signature" aria-hidden />
             Установить как документ при приеме
-            {selected.size ? ` ${selected.size}` : ''}
+            {selected.size ? ` (${selected.size})` : ''}
           </button>
           <button
             type="button"
@@ -472,7 +419,8 @@ function DocumentTypesPageInner() {
             disabled={!selected.size || busy}
             onClick={() => void deleteSelected()}
           >
-            Удалить{selected.size ? ` ${selected.size}` : ''}
+            <i className="fas fa-trash-alt" aria-hidden />
+            Удалить{selected.size ? ` (${selected.size})` : ''}
           </button>
         </div>
         <div className={styles.rightTools}>
@@ -484,14 +432,23 @@ function DocumentTypesPageInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') applySearch();
             }}
+            aria-label="Поиск"
           />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
+          <button type="button" className={styles.exportBtn} onClick={exportCsv} title="Экспорт Excel">
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.pagerMeta} title="Показано / всего">
             {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
         </div>
@@ -598,13 +555,83 @@ function DocumentTypesPageInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={
+          mode === 'edit'
+            ? 'Тип документа (изменение)'
+            : 'Тип документа (создание)'
+        }
+        width="md"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>Код</label>
+          <input value={code} onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>
+            Название <span className={modal.req}>*</span>
+          </label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <span>Документ при приеме</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${isHireDocument ? formStyles.toggleOn : ''}`}
+              onClick={() => setIsHireDocument((v) => !v)}
+            />
+            <span>{isHireDocument ? 'Да' : 'Нет'}</span>
+          </label>
+        </div>
+        <div className={modal.field}>
+          <span>Статус</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+              onClick={() => setActive((v) => !v)}
+            />
+            <span>{active ? 'Активный' : 'Неактивный'}</span>
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }
 
 export default function DocumentTypesPage() {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <DocumentTypesPageInner />
     </Suspense>
   );

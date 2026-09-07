@@ -6,20 +6,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 .container {
-  --bg-page: #f8fafc;
+  --bg-page: #f3f6fb;
   --login-header: #070e18;
   --login-surface: #ffffff;
-  --login-surface-subtle: #f1f5f9;
-  --login-ink: #0f172a;
-  --login-ink-secondary: #334155;
-  --login-ink-muted: #64748b;
-  --login-ink-subtle: #94a3b8;
-  --login-ink-inverted: #f8fafc;
-  --login-accent: #0284c7;
-  --login-accent-hover: #0369a1;
-  --login-accent-tint: #e0f2fe;
-  --login-border: #e2e8f0;
-  --login-border-focus: #0284c7;
+  --login-surface-subtle: #f2f5f9;
+  --login-ink: #0a1322;
+  --login-ink-secondary: #354862;
+  --login-ink-muted: #64788f;
+  --login-ink-subtle: #8ca0b8;
+  --login-ink-inverted: #f3f6fb;
+  --login-accent: #0a85e2;
+  --login-accent-hover: #0770c2;
+  --login-accent-tint: #edf6fe;
+  --login-border: #e3e9f1;
+  --login-border-focus: #0a85e2;
   --login-error: #e11d48;
   --login-error-bg: #fff1f2;
   --login-error-border: #fecdd3;
@@ -28,7 +28,7 @@
   --login-radius-lg: 14px;
   --login-radius-xl: 20px;
   --login-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
-  --login-shadow-focus: 0 0 0 3px rgba(2, 132, 199, 0.2);
+  --login-shadow-focus: 0 0 0 3px rgba(10, 133, 226, 0.2);
   --login-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --login-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -50,8 +50,8 @@
   padding: clamp(32px, 4.5vw, 64px);
   background-color: var(--login-header);
   background-image:
-    radial-gradient(ellipse at 25% 15%, rgba(2, 132, 199, 0.28) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 90%, rgba(2, 132, 199, 0.14) 0%, transparent 45%),
+    radial-gradient(ellipse at 25% 15%, rgba(10, 133, 226, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(10, 133, 226, 0.14) 0%, transparent 45%),
     linear-gradient(165deg, #070e18 0%, #0c1a2e 45%, #070e18 100%);
   color: var(--login-ink-inverted);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -89,9 +89,9 @@
   width: 52px;
   height: 52px;
   border-radius: var(--login-radius-lg);
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(2, 132, 199, 0.08) 100%);
-  border: 1px solid rgba(2, 132, 199, 0.45);
-  box-shadow: 0 0 24px rgba(2, 132, 199, 0.35);
+  background: linear-gradient(135deg, rgba(10, 133, 226, 0.25) 0%, rgba(10, 133, 226, 0.08) 100%);
+  border: 1px solid rgba(10, 133, 226, 0.45);
+  box-shadow: 0 0 24px rgba(10, 133, 226, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,7 +121,7 @@
   margin-top: 6px;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #94a3b8;
+  color: #8ca0b8;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -137,8 +137,8 @@
   gap: 8px;
   padding: 6px 14px;
   border-radius: 9999px;
-  background: rgba(2, 132, 199, 0.16);
-  border: 1px solid rgba(2, 132, 199, 0.36);
+  background: rgba(10, 133, 226, 0.16);
+  border: 1px solid rgba(10, 133, 226, 0.36);
   color: #7dd3fc;
   font-size: 0.75rem;
   font-weight: 600;
@@ -161,7 +161,7 @@
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.025em;
-  color: #f8fafc;
+  color: #f3f6fb;
   margin: 0 0 18px;
 }
 
@@ -186,7 +186,7 @@
   align-items: center;
   gap: 10px;
   font-size: 0.8125rem;
-  color: #94a3b8;
+  color: #8ca0b8;
   font-weight: 500;
 }
 
@@ -200,7 +200,7 @@
 
 .legalNotice {
   font-size: 0.75rem;
-  color: #64748b;
+  color: #64788f;
   line-height: 1.5;
 }
 
@@ -426,7 +426,7 @@
   font-family: inherit;
   letter-spacing: -0.01em;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 4px 14px rgba(10, 133, 226, 0.35);
   transition:
     background-color 0.18s ease,
     transform 0.1s ease,
@@ -436,7 +436,7 @@
 
 .submitBtn:hover:not(:disabled) {
   background-color: var(--login-accent-hover);
-  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.42);
+  box-shadow: 0 6px 18px rgba(10, 133, 226, 0.42);
 }
 
 .submitBtn:active:not(:disabled) {

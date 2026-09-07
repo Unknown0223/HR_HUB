@@ -1,7 +1,13 @@
 'use client';
 
-import { AccrualTypeForm } from '../AccrualTypeForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewAccrualTypePage() {
-  return <AccrualTypeForm mode="create" />;
+/** Legacy /new → list with create modal */
+export default function NewAccrualTypeRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/accrual-types?create=1');
+  }, [router]);
+  return null;
 }

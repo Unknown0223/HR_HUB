@@ -5,7 +5,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ListBulkBar, runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
+import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -17,11 +17,13 @@ import {
   kindLabel,
   money,
 } from '@/lib/accruals';
-import styles from '../../catalog/absence-types/page.module.css';
-import local from '../timesheets/page.module.css';
+import { AccrualFormModal } from './AccrualFormModal';
+import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const PATH = '/payroll/accruals';
 const PAGE_SIZE = 50;
+const COL_COUNT = 9;
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'kind', 'month'] as const;
 
 function AccrualsInner() {
@@ -40,8 +42,10 @@ function AccrualsInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searchDraft, setSearchDraft] = useState(q);
   const [page, setPage] = useState(1);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(Boolean(filters.number || filters.posted || filters.kind));
+  const [modalOpen, setModalOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(
+    Boolean(filters.number || filters.posted || filters.kind || filters.from || filters.to),
+  );
 
   async function load() {
     setError('');
@@ -67,6 +71,14 @@ function AccrualsInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setModalOpen(true);
+  }, [searchParams]);
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const month = filters.month;
@@ -88,7 +100,9 @@ function AccrualsInner() {
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const filteredIds = paged.map((r) => r.id);
+  const pageIds = paged.map((r) => r.id);
+  const allPageChecked = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageChecked = pageIds.some((id) => selected.has(id)) && !allPageChecked;
   const selectedRows = rows.filter((r) => selected.has(r.id));
   const postCount = selectedRows.filter((r) => r.status === 'draft').length;
   const cancelCount = selectedRows.filter((r) => r.status === 'posted').length;
@@ -100,7 +114,19 @@ function AccrualsInner() {
       if (!v) sp.delete(k);
       else sp.set(k, v);
     }
-    router.replace(`${PATH}?${sp.toString()}`);
+    const qs = sp.toString();
+    router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
+  }
+
+  function openCreate() {
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1' || searchParams.get('createKind')) {
+      patchUrl({ create: null, createKind: null });
+    }
   }
 
   async function bulk(kind: 'post' | 'cancel' | 'delete') {
@@ -114,7 +140,7 @@ function AccrualsInner() {
     setError('');
     try {
       const ok = await runListBulk({
-        path: `/api/payroll/accruals/bulk-${kind === 'cancel' ? 'cancel' : kind === 'post' ? 'post' : 'delete'}`,
+        path: `/api/payroll/accruals/bulk-${kind}`,
         ids,
         message:
           kind === 'delete'
@@ -170,11 +196,44 @@ function AccrualsInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="accruals" />
-      <div className={local.tabs}>
-        <Link href={PATH} className={tab === 'accruals' ? local.tabOn : local.tab}>
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-coins" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Все начисления</h1>
+          <p className={shared.pageSubtitle}>
+            Документы начислений и удержаний по сотрудникам, проведение и проводки
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.tabs}>
+        <Link href={PATH} className={tab === 'accruals' ? styles.tabOn : styles.tab}>
+          <i className="fas fa-file-invoice-dollar" aria-hidden />
           Все начисления
         </Link>
-        <Link href={`${PATH}?tab=orders`} className={tab === 'orders' ? local.tabOn : local.tab}>
+        <Link
+          href={`${PATH}?tab=orders`}
+          className={tab === 'orders' ? styles.tabOn : styles.tab}
+        >
+          <i className="fas fa-paper-plane" aria-hidden />
           Поручения
         </Link>
       </div>
@@ -182,246 +241,376 @@ function AccrualsInner() {
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           {tab === 'accruals' ? (
-            <div className={styles.createWrap}>
-              <button type="button" className={styles.createBtn} onClick={() => setCreateOpen((v) => !v)}>
-                Создать +
-              </button>
-              {createOpen ? (
-                <div className={styles.createMenu}>
-                  {ACCRUAL_KINDS.map((k) => (
-                    <button
-                      key={k.value}
-                      type="button"
-                      onClick={() => {
-                        setCreateOpen(false);
-                        router.push(`${PATH}/new?kind=${k.value}`);
-                      }}
-                    >
-                      {k.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <button type="button" className={styles.createBtn} onClick={openCreate}>
+              <i className="fas fa-plus" aria-hidden />
+              Создать
+            </button>
           ) : (
             <Link href="/catalog/payment-orders" className={styles.createBtn}>
+              <i className="fas fa-plus" aria-hidden />
               Создать
             </Link>
           )}
           {tab === 'accruals' ? (
-            <ListBulkBar
-              count={selected.size}
-              busy={busy}
-              onClear={() => setSelected(new Set())}
-              actions={[
-                { key: 'post', label: 'Провести', count: postCount, onClick: () => void bulk('post') },
-                { key: 'cancel', label: 'Отменить', count: cancelCount, variant: 'danger', onClick: () => void bulk('cancel') },
-                { key: 'delete', label: 'Удалить', count: deleteCount, variant: 'danger', onClick: () => void bulk('delete') },
+            <FilterPanel
+              inline
+              urlSync
+              open={filtersOpen}
+              onToggle={() => setFiltersOpen((v) => !v)}
+              fields={[
+                { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
+                { type: 'dateRange', label: 'Дата' },
+                {
+                  type: 'select',
+                  key: 'kind',
+                  label: 'Тип документа',
+                  options: ACCRUAL_KINDS.map((k) => ({ value: k.value, label: k.label })),
+                },
+                { type: 'postedChecks', key: 'posted', label: 'Проведен' },
               ]}
             />
           ) : null}
         </div>
+
         <div className={styles.rightTools}>
-          <label className={local.monthFilter}>
-            месяц
-            <input
-              type="month"
-              value={filters.month ? filters.month.slice(0, 7) : ''}
-              onChange={(e) => patchUrl({ month: e.target.value ? `${e.target.value}-01` : null })}
-            />
-          </label>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
-            }}
-          />
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
-              { type: 'dateRange', label: 'Дата' },
-              {
-                type: 'select',
-                key: 'kind',
-                label: 'Тип документа',
-                options: ACCRUAL_KINDS.map((k) => ({ value: k.value, label: k.label })),
-              },
-              { type: 'postedChecks', key: 'posted', label: 'Проведен' },
-            ]}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <span className={styles.pagerMeta}>
-            {paged.length}/{filtered.length}
+          {tab === 'accruals' ? (
+            <label className={styles.monthFilter}>
+              месяц
+              <input
+                type="month"
+                value={filters.month ? filters.month.slice(0, 7) : ''}
+                onChange={(e) =>
+                  patchUrl({ month: e.target.value ? `${e.target.value}-01` : null })
+                }
+              />
+            </label>
+          ) : null}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            ‹
-          </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
+          {tab === 'accruals' ? (
+            <button
+              type="button"
+              className={
+                filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+              }
+              onClick={() => setFiltersOpen((v) => !v)}
+              title="Фильтр"
+              aria-label="Фильтр"
+            >
+              <i className="fas fa-filter" aria-hidden />
+            </button>
+          ) : null}
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
           >
-            ›
+            <i className="fas fa-file-csv" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
+          <div className={styles.pager}>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Предыдущая страница"
+            >
+              <i className="fas fa-chevron-left" aria-hidden />
+            </button>
+            <span className={styles.pagerMeta}>
+              {Math.min(page, pageCount)} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              disabled={page >= pageCount}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Следующая страница"
+            >
+              <i className="fas fa-chevron-right" aria-hidden />
+            </button>
+          </div>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
-      {loading ? <p className={styles.muted}>Загрузка…</p> : null}
+
+      {tab === 'accruals' && selected.size > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selected.size}</strong>
+          </span>
+          {postCount > 0 ? (
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={busy}
+              onClick={() => void bulk('post')}
+            >
+              <i className="fas fa-check" aria-hidden />
+              Провести ({postCount})
+            </button>
+          ) : null}
+          {cancelCount > 0 ? (
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={busy}
+              onClick={() => void bulk('cancel')}
+            >
+              <i className="fas fa-rotate-left" aria-hidden />
+              Отменить ({cancelCount})
+            </button>
+          ) : null}
+          {deleteCount > 0 ? (
+            <button
+              type="button"
+              className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+              disabled={busy}
+              onClick={() => void bulk('delete')}
+            >
+              <i className="fas fa-trash" aria-hidden />
+              Удалить ({deleteCount})
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setSelected(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
 
       {tab === 'orders' ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Номер</th>
-                <th>Дата</th>
-                <th>Наименование</th>
-                <th>Сумма</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.length === 0 && !loading ? (
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
                 <tr>
-                  <td colSpan={5} className={styles.empty}>
-                    Нет данных
-                  </td>
+                  <th>Номер</th>
+                  <th>Дата</th>
+                  <th>Наименование</th>
+                  <th>Сумма</th>
+                  <th>Статус</th>
                 </tr>
-              ) : null}
-              {orders.map((o) => (
-                <tr key={String(o.id)}>
-                  <td>{String(o.number || '—')}</td>
-                  <td>{fmtDate(String(o.createdAt || o.dueDate || ''))}</td>
-                  <td>{String(o.title || '—')}</td>
-                  <td>{money(o.amount)}</td>
-                  <td>{String(o.status || '—')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loading && orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className={styles.empty}>
+                      Загрузка…
+                    </td>
+                  </tr>
+                ) : null}
+                {!loading && orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className={styles.empty}>
+                      Нет данных
+                    </td>
+                  </tr>
+                ) : null}
+                {orders.map((o) => (
+                  <tr key={String(o.id)}>
+                    <td className={styles.docNumber}>{String(o.number || '—')}</td>
+                    <td className={styles.dateCell}>
+                      {fmtDate(String(o.createdAt || o.dueDate || ''))}
+                    </td>
+                    <td className={styles.nameCell}>{String(o.title || '—')}</td>
+                    <td className={styles.numCell}>{money(o.amount)}</td>
+                    <td>
+                      <span className={styles.statusDraft}>{String(o.status || '—')}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.checkCol}>
-                  <input
-                    type="checkbox"
-                    checked={filteredIds.length > 0 && filteredIds.every((id) => selected.has(id))}
-                    onChange={(e) => setSelected(togglePage(selected, filteredIds, e.target.checked))}
-                    aria-label="Выбрать все"
-                  />
-                </th>
-                <th>Месяц начисления</th>
-                <th>
-                  Дата <span className={local.sortMark}>↑</span>
-                </th>
-                <th>Номер</th>
-                <th>Тип документа</th>
-                <th>Начислено в базовой валюте</th>
-                <th>Удержано в базовой валюте</th>
-                <th>Проведен</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.length === 0 && !loading ? (
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
                 <tr>
-                  <td colSpan={8} className={styles.empty}>
-                    Нет данных
-                  </td>
+                  <th className={styles.checkCol}>
+                    <input
+                      type="checkbox"
+                      checked={allPageChecked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageChecked;
+                      }}
+                      onChange={(e) =>
+                        setSelected(togglePage(selected, pageIds, e.target.checked))
+                      }
+                      aria-label="Выбрать все"
+                    />
+                  </th>
+                  <th>Месяц начисления</th>
+                  <th>
+                    Дата <span className={styles.sortMark}>↑</span>
+                  </th>
+                  <th>Номер</th>
+                  <th>Тип документа</th>
+                  <th>Начислено</th>
+                  <th>Удержано</th>
+                  <th>Подразделение</th>
+                  <th>Проведен</th>
                 </tr>
-              ) : null}
-              {paged.map((row) => {
-                const open = focusId === row.id;
-                return (
-                  <Fragment key={row.id}>
-                    <tr
-                      onClick={() => setFocusId(open ? null : row.id)}
-                      style={{ cursor: 'pointer' }}
-                      className={open || selected.has(row.id) ? styles.rowSelected : undefined}
-                    >
-                      <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(row.id)}
-                          onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                        />
-                      </td>
-                      <td>{formatMonthRu(row.month)}</td>
-                      <td>{fmtDate(row.docDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td>{kindLabel(row.kind)}</td>
-                      <td>{money(row.accruedTotal)}</td>
-                      <td>{money(row.deductedTotal)}</td>
-                      <td>
-                        {row.status === 'posted' ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>{row.status === 'cancelled' ? 'Отм.' : 'Нет'}</span>
-                        )}
-                      </td>
-                    </tr>
-                    {open ? (
-                      <tr className={styles.actionsRow}>
-                        <td colSpan={8}>
-                          <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
-                            <Link href={`${PATH}/${row.id}`}>Просмотреть</Link>
-                            {row.status === 'draft' ? <Link href={`${PATH}/${row.id}/edit`}>Изменить</Link> : null}
-                            {row.status === 'posted' ? (
-                              <button type="button" disabled={busy} onClick={() => void run(row, 'cancel')}>
-                                Отменить
-                              </button>
-                            ) : null}
-                            {row.status === 'draft' ? (
-                              <button type="button" disabled={busy} onClick={() => void run(row, 'post')}>
-                                Провести
-                              </button>
-                            ) : null}
-                            <Link href={`${PATH}/${row.id}/entries`}>Проводки</Link>
-                            {row.status !== 'posted' ? (
-                              <button
-                                type="button"
-                                className={styles.danger}
-                                disabled={busy}
-                                onClick={() => void run(row, 'delete')}
-                              >
-                                Удалить
-                              </button>
-                            ) : null}
-                          </div>
+              </thead>
+              <tbody>
+                {loading && paged.length === 0 ? (
+                  <tr>
+                    <td colSpan={COL_COUNT} className={styles.empty}>
+                      Загрузка…
+                    </td>
+                  </tr>
+                ) : null}
+                {!loading && paged.length === 0 ? (
+                  <tr>
+                    <td colSpan={COL_COUNT} className={styles.empty}>
+                      Нет данных — нажмите «Создать»
+                    </td>
+                  </tr>
+                ) : null}
+                {paged.map((row) => {
+                  const open = focusId === row.id;
+                  const isChecked = selected.has(row.id);
+                  return (
+                    <Fragment key={row.id}>
+                      <tr
+                        onClick={() => setFocusId(open ? null : row.id)}
+                        style={{ cursor: 'pointer' }}
+                        className={open || isChecked ? styles.rowSelected : undefined}
+                      >
+                        <td
+                          className={styles.checkCol}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) =>
+                              setSelected(toggleSelect(selected, row.id, e.target.checked))
+                            }
+                            aria-label={`Выбрать ${row.number || 'документ'}`}
+                          />
+                        </td>
+                        <td className={styles.nameCell}>{formatMonthRu(row.month)}</td>
+                        <td className={styles.dateCell}>{fmtDate(row.docDate)}</td>
+                        <td className={styles.docNumber}>{row.number || '—'}</td>
+                        <td>{kindLabel(row.kind)}</td>
+                        <td className={styles.numCell}>{money(row.accruedTotal)}</td>
+                        <td className={styles.numCell}>{money(row.deductedTotal)}</td>
+                        <td className={styles.noteCell}>{row.division?.name || '—'}</td>
+                        <td>
+                          {row.status === 'posted' ? (
+                            <span className={styles.statusPosted}>Проведен</span>
+                          ) : row.status === 'cancelled' ? (
+                            <span className={styles.statusCancelled}>Отменен</span>
+                          ) : (
+                            <span className={styles.statusDraft}>Черновик</span>
+                          )}
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                      {open ? (
+                        <tr className={styles.actionsRow}>
+                          <td colSpan={COL_COUNT}>
+                            <div className={styles.rowActions}>
+                              <Link href={`${PATH}/${row.id}`}>
+                                <i className="fas fa-eye" aria-hidden />
+                                Просмотреть
+                              </Link>
+                              {row.status === 'draft' ? (
+                                <Link href={`${PATH}/${row.id}/edit`}>
+                                  <i className="fas fa-pen" aria-hidden />
+                                  Изменить
+                                </Link>
+                              ) : null}
+                              {row.status === 'draft' ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void run(row, 'post')}
+                                >
+                                  <i className="fas fa-check" aria-hidden />
+                                  Провести
+                                </button>
+                              ) : null}
+                              {row.status === 'posted' ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void run(row, 'cancel')}
+                                >
+                                  <i className="fas fa-rotate-left" aria-hidden />
+                                  Отменить
+                                </button>
+                              ) : null}
+                              <Link href={`${PATH}/${row.id}/entries`}>
+                                <i className="fas fa-list" aria-hidden />
+                                Проводки
+                              </Link>
+                              {row.status !== 'posted' ? (
+                                <button
+                                  type="button"
+                                  className={styles.danger}
+                                  disabled={busy}
+                                  onClick={() => void run(row, 'delete')}
+                                >
+                                  <i className="fas fa-trash" aria-hidden />
+                                  Удалить
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className={styles.footer}>
+            <p>
+              Показано <strong>{paged.length}</strong> из <strong>{filtered.length}</strong>
+            </p>
+          </div>
         </div>
       )}
+
+      <AccrualFormModal
+        open={modalOpen}
+        initialKind={searchParams.get('createKind')}
+        onClose={closeModal}
+        onSaved={(id, openAfter) => {
+          closeModal();
+          if (openAfter && id) router.push(`${PATH}/${id}/edit`);
+          else void load();
+        }}
+      />
     </div>
   );
 }
 
 export function AccrualsPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <AccrualsInner />
     </Suspense>
   );

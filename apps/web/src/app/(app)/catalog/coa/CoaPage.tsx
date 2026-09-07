@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -31,6 +33,7 @@ import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
 import extra from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = {
   id: string;
@@ -176,6 +179,10 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
 
   useEffect(() => {
     setPage(1);
@@ -401,47 +408,6 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
         ]
       : allForParent;
 
-  if (mode === 'create' || mode === 'edit') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title:
-              mode === 'edit'
-                ? 'План счетов (изменение)'
-                : 'План счетов (создание)',
-            siblings: [],
-          }}
-        />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button
-              type="button"
-              className={formStyles.btnSave}
-              disabled={saving}
-              onClick={() => void save()}
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              className={formStyles.btnClose}
-              onClick={() => setMode('list')}
-            >
-              Закрыть
-            </button>
-          </div>
-          <CoaForm
-            draft={draft}
-            setDraft={setDraft}
-            parentOptions={parentOptions}
-            error={error}
-          />
-        </div>
-      </div>
-    );
-  }
-
   function renderRow(row: DictItem) {
     const open = focusId === row.id;
     const meta = asCoaMeta(row.meta);
@@ -538,9 +504,41 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
         }}
       />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-sitemap" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>
+            {mainOnly ? 'План главных счетов' : 'План счетов'}
+          </h1>
+          <p className={shared.pageSubtitle}>
+            {mainOnly
+              ? 'Справочник главных счетов бухгалтерского учёта'
+              : 'Справочник счетов бухгалтерского учёта и субсчетов'}
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <FilterPanel
@@ -630,40 +628,58 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
           ) : null}
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            Excel
-          </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ‹
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="Excel"
+            aria-label="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
+          >
+            <i className="fas fa-chevron-left" aria-hidden />
+          </button>
+          <span className={styles.pagerMeta}>
+            {Math.min(page, pageCount)} / {pageCount}
+          </span>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
-            ›
+            <i className="fas fa-chevron-right" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            Обновить
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
@@ -716,13 +732,56 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={
+          mode === 'edit'
+            ? 'План счетов (изменение)'
+            : 'План счетов (создание)'
+        }
+        width="lg"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        <CoaForm
+          draft={draft}
+          setDraft={setDraft}
+          parentOptions={parentOptions}
+          error={error}
+        />
+      </FormModal>
     </div>
   );
 }
 
 export function CoaPage({ mainOnly }: { mainOnly?: boolean }) {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <CoaPageInner mainOnly={mainOnly} />
     </Suspense>
   );

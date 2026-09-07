@@ -1,7 +1,13 @@
 'use client';
 
-import { ProductionCalendarForm } from '../ProductionCalendarForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewProductionCalendarPage() {
-  return <ProductionCalendarForm />;
+/** Legacy /new → list with create modal */
+export default function NewProductionCalendarRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/production-calendars?create=1');
+  }, [router]);
+  return null;
 }

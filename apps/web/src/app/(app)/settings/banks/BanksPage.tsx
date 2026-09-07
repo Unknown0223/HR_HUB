@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -12,6 +14,7 @@ import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import local from '../../catalog/document-types/page.module.css';
 import extra from '../../catalog/cashboxes/page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = { id: string; code: string; name: string; items?: BankItem[] };
 
@@ -239,75 +242,38 @@ function BanksInner() {
     router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
   }
 
-  const title = mode === 'create' ? 'Банк (создание)' : mode === 'edit' ? 'Банк (изменение)' : 'Банки';
-
-  if (mode !== 'list') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav group={{ title, siblings: [] }} />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button type="button" className={formStyles.btnSave} disabled={saving} onClick={() => void save()}>
-              Сохранить
-            </button>
-            <button type="button" className={formStyles.btnClose} onClick={() => setMode('list')}>
-              Закрыть
-            </button>
-          </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${formStyles.cardForm}`}>
-            <div className={formStyles.field}>
-              <label>
-                МФО <span className={formStyles.req}>*</span>
-              </label>
-              <input value={mfo} onChange={(e) => setMfo(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>
-                Название <span className={formStyles.req}>*</span>
-              </label>
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>
-                Swift <span className={formStyles.req}>*</span>
-              </label>
-              <input value={swift} onChange={(e) => setSwift(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>Адрес</label>
-              <textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>Статус</label>
-              <label className={formStyles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                  onClick={() => setActive((v) => !v)}
-                  aria-pressed={active}
-                />
-                <span>Активный</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={{ title: 'Банки', siblings: [] }} />
+      <PageSubnav groupKey="settings-admin" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-university" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Банки</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник банков и МФО
+          </p>
+        </div>
+      </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <div className={styles.createWrap} ref={menuRef}>
-            <button type="button" className={styles.createBtn} onClick={() => setCreateOpen((v) => !v)}>
-              Создать ▾
+          <div className={extra.statusWrap} ref={menuRef}>
+            <button
+              type="button"
+              className={styles.createBtn}
+              onClick={() => setCreateOpen((v) => !v)}
+              aria-expanded={createOpen}
+            >
+              <i className="fas fa-plus" aria-hidden />
+              Создать
+              <i className="fas fa-caret-down" aria-hidden />
             </button>
             {createOpen ? (
-              <div className={styles.createMenu}>
+              <div className={extra.statusMenu}>
                 <button type="button" onClick={openCreate}>
                   Банк
                 </button>
@@ -317,6 +283,18 @@ function BanksInner() {
               </div>
             ) : null}
           </div>
+          <FilterPanel
+            inline
+            urlSync
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'text', key: 'mfo', label: 'МФО', placeholder: 'Поиск...' },
+              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+              { type: 'text', key: 'address', label: 'Адрес', placeholder: 'Поиск...' },
+              { type: 'isActive', key: 'isActive', label: 'Статус' },
+            ]}
+          />
           {selected.size > 0 ? (
             <>
               <div className={extra.statusWrap}>
@@ -326,6 +304,7 @@ function BanksInner() {
                   disabled={busy}
                   onClick={() => setStatusOpen((v) => !v)}
                 >
+                  <i className="fas fa-toggle-on" aria-hidden />
                   Изменить статус
                 </button>
                 {statusOpen ? (
@@ -345,6 +324,7 @@ function BanksInner() {
                 disabled={busy}
                 onClick={() => void deleteIds(Array.from(selected))}
               >
+                <i className="fas fa-trash-alt" aria-hidden />
                 Удалить {selected.size}
               </button>
             </>
@@ -359,18 +339,7 @@ function BanksInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
             }}
-          />
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'mfo', label: 'МФО', placeholder: 'Поиск...' },
-              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
-              { type: 'text', key: 'address', label: 'Адрес', placeholder: 'Поиск...' },
-              { type: 'isActive', key: 'isActive', label: 'Статус' },
-            ]}
+            aria-label="Поиск"
           />
           <button
             type="button"
@@ -390,13 +359,21 @@ function BanksInner() {
                 }),
               )
             }
+            title="Экспорт Excel"
           >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
+          >
             ‹
           </button>
           <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
@@ -405,11 +382,19 @@ function BanksInner() {
             className={styles.toolBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
             ›
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+            Обновить
           </button>
         </div>
       </div>
@@ -509,6 +494,74 @@ function BanksInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={mode === 'edit' ? 'Банк (изменение)' : 'Банк (создание)'}
+        width="md"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>
+            МФО <span className={modal.req}>*</span>
+          </label>
+          <input value={mfo} onChange={(e) => setMfo(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>
+            Название <span className={modal.req}>*</span>
+          </label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>
+            Swift <span className={modal.req}>*</span>
+          </label>
+          <input value={swift} onChange={(e) => setSwift(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>Адрес</label>
+          <textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <span>Статус</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+              onClick={() => setActive((v) => !v)}
+              aria-pressed={active}
+            />
+            <span>{active ? 'Активный' : 'Неактивный'}</span>
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }

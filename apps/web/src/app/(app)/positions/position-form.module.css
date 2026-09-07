@@ -40,6 +40,18 @@
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* The dialog is too narrow for the two-column page layout. */
+.modalForm .twoCol {
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
 .twoCol {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -91,7 +103,7 @@
 .col select:focus,
 .col textarea:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
 }
 
@@ -174,7 +186,7 @@
 
 .primary {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -262,7 +274,7 @@
 .full input:focus,
 .full select:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
 }
 
@@ -320,7 +332,7 @@
 }
 
 .switch input:checked + .switchTrack {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .switch input:checked + .switchTrack::after {

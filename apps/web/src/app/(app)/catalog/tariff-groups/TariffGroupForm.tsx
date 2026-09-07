@@ -1,165 +1,225 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { PageSubnav } from '@/components/PageSubnav';
+import { useEffect, useState } from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import styles from './form.module.css';
 
-type Row = {
+type TariffGroupRow = {
   id: string;
   code: string;
   name: string;
   fullName?: string | null;
+  gradeId?: string | null;
+  baseRate?: string | number | null;
   isActive: boolean;
 };
 
-export function TariffGroupForm({
-  mode,
-  groupId,
+type GradeOption = { id: string; code?: string | null; name: string };
+
+function autoCode(name: string) {
+  return (
+    name
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9А-ЯЁ]+/gi, '-')
+      .slice(0, 24) || `TG-${Date.now().toString(36).toUpperCase()}`
+  );
+}
+
+export function TariffGroupFormModal({
+  open,
+  onClose,
+  onSaved,
+  editId,
 }: {
-  mode: 'create' | 'edit';
-  groupId?: string;
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  editId?: string | null;
 }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(mode === 'edit');
-  const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(editId);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
   const [name, setName] = useState('');
   const [fullName, setFullName] = useState('');
+  const [code, setCode] = useState('');
+  const [gradeId, setGradeId] = useState('');
+  const [baseRate, setBaseRate] = useState('');
   const [isActive, setIsActive] = useState(true);
-  const [touched, setTouched] = useState(false);
-
-  const pageTitle =
-    mode === 'edit' ? 'Тарифная группа (изменение)' : 'Тарифная группа (создание)';
+  const [grades, setGrades] = useState<GradeOption[]>([]);
 
   useEffect(() => {
-    if (mode !== 'edit' || !groupId) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const row = await apiFetch<Row>(`/api/catalog/tariff-groups/${groupId}`);
-        if (cancelled) return;
-        setName(row.name || '');
-        setFullName(row.fullName || row.name || '');
-        setIsActive(row.isActive !== false);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, groupId]);
+    if (!open) return;
+    apiFetch<GradeOption[]>('/api/catalog/grades')
+      .then((rows) => setGrades(Array.isArray(rows) ? rows : []))
+      .catch(() => undefined);
+  }, [open]);
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
-    setTouched(true);
-    if (!name.trim() || !fullName.trim()) {
-      setError('Заполните обязательные поля');
+  useEffect(() => {
+    if (!open) return;
+    setError('');
+    setBusy(false);
+    if (!editId) {
+      setName('');
+      setFullName('');
+      setCode('');
+      setGradeId('');
+      setBaseRate('');
+      setIsActive(true);
+      setLoading(false);
       return;
     }
-    setSaving(true);
+    setLoading(true);
+    apiFetch<TariffGroupRow>(`/api/catalog/tariff-groups/${editId}`)
+      .then((row) => {
+        setName(row.name || '');
+        setFullName(row.fullName || row.name || '');
+        setCode(row.code || '');
+        setGradeId(row.gradeId || '');
+        setBaseRate(row.baseRate != null ? String(row.baseRate) : '');
+        setIsActive(row.isActive !== false);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false));
+  }, [open, editId]);
+
+  async function save() {
+    if (!name.trim()) {
+      setError('Название обязательно');
+      return;
+    }
+    if (!fullName.trim()) {
+      setError('Полное название обязательно');
+      return;
+    }
+    const rate = baseRate.trim() ? Number(baseRate.trim().replace(',', '.')) : 0;
+    if (!Number.isFinite(rate) || rate < 0) {
+      setError('Базовая ставка указана неверно');
+      return;
+    }
+    setBusy(true);
     setError('');
     try {
       const body = {
         name: name.trim(),
         fullName: fullName.trim(),
-        code:
-          name
-            .trim()
-            .toUpperCase()
-            .replace(/[^A-Z0-9А-ЯЁ]+/gi, '-')
-            .slice(0, 24) || `TG-${Date.now().toString(36).toUpperCase()}`,
+        code: code.trim() || autoCode(name),
+        gradeId: gradeId || null,
+        baseRate: rate,
         isActive,
       };
-      if (mode === 'edit' && groupId) {
-        await apiFetch(`/api/catalog/tariff-groups/${groupId}`, {
+      if (isEdit && editId) {
+        await apiFetch(`/api/catalog/tariff-groups/${editId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
+        onSaved(editId);
       } else {
-        await apiFetch('/api/catalog/tariff-groups', {
+        const created = await apiFetch<TariffGroupRow>('/api/catalog/tariff-groups', {
           method: 'POST',
           body: JSON.stringify(body),
         });
+        onSaved(created?.id || '');
       }
-      router.push('/catalog/tariff-groups');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav groupKey="tariff-groups" titleOverride={pageTitle} />
-        <p>Загрузка…</p>
-      </div>
-    );
-  }
-
-  const nameInvalid = touched && !name.trim();
-  const fullInvalid = touched && !fullName.trim();
-
   return (
-    <div className={styles.wrap}>
-      <PageSubnav groupKey="tariff-groups" titleOverride={pageTitle} />
-
-      <form onSubmit={onSave} className={styles.form}>
-        <div className={styles.actions}>
-          <button type="submit" className={styles.primary} disabled={saving}>
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
+    <FormModal
+      open={open}
+      title={isEdit ? 'Тарифная группа (изменение)' : 'Тарифная группа (создание)'}
+      onClose={onClose}
+      width="md"
+      footer={
+        <>
           <button
             type="button"
-            className={styles.secondary}
-            onClick={() => router.push('/catalog/tariff-groups')}
+            className={modal.btnPrimary}
+            disabled={busy || loading}
+            onClick={() => void save()}
           >
+            {busy ? '…' : 'Сохранить'}
+          </button>
+          <button type="button" className={modal.btnGhost} onClick={onClose}>
             Закрыть
           </button>
-        </div>
-
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        <div className={styles.card}>
-          <label>
-            Название <span className={styles.req}>*</span>
-            <input
-              className={nameInvalid ? styles.invalid : undefined}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+        </>
+      }
+    >
+      {error ? <p className={modal.error}>{error}</p> : null}
+      {loading ? (
+        <p className={styles.muted}>Загрузка…</p>
+      ) : (
+        <div className={modal.fields}>
+          <label className={modal.field}>
+            <span>
+              Название <em className={modal.req}>*</em>
+            </span>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
-          <label>
-            Полное название <span className={styles.req}>*</span>
-            <input
-              className={fullInvalid ? styles.invalid : undefined}
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
+
+          <label className={modal.field}>
+            <span>
+              Полное название <em className={modal.req}>*</em>
+            </span>
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </label>
-          <div className={styles.switchRow}>
-            <span className={styles.switchLabel}>Статус</span>
-            <label className={styles.switch}>
+
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Код</span>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder={isEdit ? '' : 'авто'}
+              />
+            </label>
+
+            <label className={modal.field}>
+              <span>Базовая ставка</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={baseRate}
+                onChange={(e) => setBaseRate(e.target.value)}
+                placeholder="0.00"
+              />
+            </label>
+          </div>
+
+          <label className={modal.field}>
+            <span>Разряд</span>
+            <select value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
+              <option value="">—</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.code ? `${g.code} — ${g.name}` : g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className={styles.checkGroup}>
+            <label className={styles.check}>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
-              <span className={styles.switchTrack} />
-              <span className={styles.switchText}>
-                {isActive ? 'Активный' : 'Неактивный'}
-              </span>
+              Активный
             </label>
           </div>
         </div>
-      </form>
-    </div>
+      )}
+    </FormModal>
   );
 }

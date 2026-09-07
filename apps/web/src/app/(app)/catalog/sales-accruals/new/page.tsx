@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense } from 'react';
-import { SalesAccrualForm } from '../SalesAccrualForm';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function NewSalesAccrualPage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <SalesAccrualForm />
-    </Suspense>
-  );
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/sales-accruals?create=1');
+  }, [router]);
+  return null;
 }

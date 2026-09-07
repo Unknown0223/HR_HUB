@@ -1,84 +1,36 @@
-.inlineForm {
-  background: #fff;
-  border: 1px solid #eef0f4;
-  border-radius: 6px;
-  padding: 1rem 1.15rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 520px;
-}
-
-.inlineTitle {
+/* Dynamic object modal — local bits on top of form-modal primitives */
+.muted {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #2c3e50;
+  padding: 1rem 0;
+  color: #8ca0b8;
+  font-size: 0.86rem;
 }
 
-.inlineGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
+.checkGroup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #e3e9f1;
+  border-radius: 10px;
+  background: rgba(242, 245, 249, 0.5);
 }
 
-.inlineGrid label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.22rem;
-  font-size: 0.72rem;
-  color: #95a5a6;
-}
-
-.inlineGrid input {
-  height: 34px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 0 0.55rem;
-  font: inherit;
-  font-size: 0.88rem;
-  color: #3f4254;
-}
-
-.req {
-  color: #e8534a;
-}
-
-.inlineActions {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.btnSave {
-  appearance: none;
-  border: none;
-  background: #3699ff;
-  color: #fff;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.5rem 1.05rem;
-  border-radius: 4px;
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  color: #1f2937;
   cursor: pointer;
+  line-height: 1.3;
 }
 
-.btnSave:disabled {
-  opacity: 0.65;
-}
-
-.btnClose {
-  appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #3699ff;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.5rem 1.05rem;
-  border-radius: 4px;
+.check input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #0a85e2;
   cursor: pointer;
 }

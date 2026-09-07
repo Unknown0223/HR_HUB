@@ -1,19 +1,26 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { TimesheetCorrectionForm } from '../TimesheetCorrectionForm';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-function NewInner() {
+function NewRedirect() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const batch = searchParams.get('batch') === '1';
-  return <TimesheetCorrectionForm mode="create" batchDefault={batch} />;
+  useEffect(() => {
+    router.replace(
+      batch
+        ? '/catalog/timesheet-adjustments?create=1&batch=1'
+        : '/catalog/timesheet-adjustments?create=1',
+    );
+  }, [router, batch]);
+  return null;
 }
 
 export default function NewTimesheetCorrectionPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <NewInner />
+    <Suspense fallback={null}>
+      <NewRedirect />
     </Suspense>
   );
 }

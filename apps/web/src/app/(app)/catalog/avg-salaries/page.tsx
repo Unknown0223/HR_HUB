@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -20,6 +22,7 @@ import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
 import extra from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = {
   id: string;
@@ -169,6 +172,10 @@ function AvgSalariesPageInner() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
 
   useEffect(() => {
     setPage(1);
@@ -360,81 +367,86 @@ function AvgSalariesPageInner() {
     });
   }, [history, historyQ]);
 
-  function renderForm(title: string) {
+  function renderFormModal() {
+    const open = mode === 'create' || mode === 'edit';
+    const title =
+      mode === 'edit'
+        ? 'Средняя зарплата (изменение)'
+        : 'Средняя зарплата (создание)';
     return (
-      <div className={styles.wrap}>
-        <PageSubnav group={{ title, siblings: [] }} />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
+      <FormModal
+        open={open}
+        title={title}
+        width="md"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
             <button
               type="button"
-              className={formStyles.btnSave}
+              className={modal.btnPrimary}
               disabled={saving}
               onClick={() => void save()}
             >
-              Сохранить
+              {saving ? '…' : 'Сохранить'}
             </button>
             <button
               type="button"
-              className={formStyles.btnClose}
-              onClick={() => setMode('list')}
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
             >
               Закрыть
             </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>
+            Должность <span className={modal.req}>*</span>
+          </label>
+          <SearchLookup
+            value={positionId}
+            options={positions}
+            onChange={setPositionId}
+          />
+        </div>
+        <div className={modal.field}>
+          <label>Разряд</label>
+          <SearchLookup
+            value={gradeId}
+            options={grades}
+            placeholder="Поиск"
+            allowClear
+            onChange={setGradeId}
+          />
+        </div>
+        <div className={modal.row2}>
+          <div className={modal.field}>
+            <label>
+              От <span className={modal.req}>*</span>
+            </label>
+            <input
+              value={valueFrom}
+              inputMode="decimal"
+              onChange={(e) => setValueFrom(e.target.value)}
+            />
           </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${formStyles.cardForm}`}>
-            <div className={formStyles.field}>
-              <label>
-                Должность <span className={formStyles.req}>*</span>
-              </label>
-              <SearchLookup
-                value={positionId}
-                options={positions}
-                onChange={setPositionId}
-              />
-            </div>
-            <div className={formStyles.field}>
-              <label>Разряд</label>
-              <SearchLookup
-                value={gradeId}
-                options={grades}
-                placeholder="Поиск"
-                allowClear
-                onChange={setGradeId}
-              />
-            </div>
-            <div className={extra.pair}>
-              <div className={formStyles.field}>
-                <label>
-                  От <span className={formStyles.req}>*</span>
-                </label>
-                <input
-                  value={valueFrom}
-                  inputMode="decimal"
-                  onChange={(e) => setValueFrom(e.target.value)}
-                />
-              </div>
-              <div className={formStyles.field}>
-                <label>До</label>
-                <input
-                  value={valueTo}
-                  inputMode="decimal"
-                  onChange={(e) => setValueTo(e.target.value)}
-                />
-              </div>
-            </div>
+          <div className={modal.field}>
+            <label>До</label>
+            <input
+              value={valueTo}
+              inputMode="decimal"
+              onChange={(e) => setValueTo(e.target.value)}
+            />
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (mode === 'create' || mode === 'edit') {
-    return renderForm(
-      mode === 'edit'
-        ? 'Средняя зарплата (изменение)'
-        : 'Средняя зарплата (создание)',
+      </FormModal>
     );
   }
 
@@ -646,9 +658,37 @@ function AvgSalariesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav group={{ title: 'Средние зарплаты', siblings: [] }} />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-money-bill-wave" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Средние зарплаты</h1>
+          <p className={shared.pageSubtitle}>
+            Диапазоны средних зарплат по должностям и разрядам
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <FilterPanel
@@ -690,40 +730,58 @@ function AvgSalariesPageInner() {
           ) : null}
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            Excel
-          </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ‹
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="Excel"
+            aria-label="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
+          >
+            <i className="fas fa-chevron-left" aria-hidden />
+          </button>
+          <span className={styles.pagerMeta}>
+            {Math.min(page, pageCount)} / {pageCount}
+          </span>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
-            ›
+            <i className="fas fa-chevron-right" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            Обновить
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
@@ -773,13 +831,14 @@ function AvgSalariesPageInner() {
           </tbody>
         </table>
       </div>
+      {renderFormModal()}
     </div>
   );
 }
 
 export default function AvgSalariesPage() {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <AvgSalariesPageInner />
     </Suspense>
   );

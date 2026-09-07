@@ -7,6 +7,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { EmployeePickModal } from '@/components/EmployeePickModal';
 import { toPickItems } from '@/components/employee-pick';
 import { apiDownload, apiFetch } from '@/lib/api';
+import { assertExcelImportFile } from '@/lib/parse-xlsx';
 import type { ScheduleKind } from './page';
 import styles from './form.module.css';
 
@@ -519,6 +520,7 @@ export function IndividualScheduleForm({
     setTplBusy(true);
     setError('');
     try {
+      assertExcelImportFile(file);
       const fd = new FormData();
       fd.append('file', file);
       if (docId) fd.append('documentId', docId);

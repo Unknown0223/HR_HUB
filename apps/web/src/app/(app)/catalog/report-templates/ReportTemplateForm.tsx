@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import styles from './form.module.css';
 
@@ -48,15 +48,23 @@ const DEFAULT_VARS = [
   'period',
 ];
 
-export function ReportTemplateForm({ templateId }: { templateId?: string }) {
-  const router = useRouter();
-  const isNew = !templateId;
+export function ReportTemplateFormModal({
+  open,
+  onClose,
+  onSaved,
+  editId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  editId?: string | null;
+}) {
+  const isEdit = Boolean(editId);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [ok, setOk] = useState('');
   const [dragOver, setDragOver] = useState(false);
 
   const [source, setSource] = useState('');
@@ -76,18 +84,38 @@ export function ReportTemplateForm({ templateId }: { templateId?: string }) {
   const [sourceType, setSourceType] = useState('');
 
   useEffect(() => {
-    if (isNew) return;
+    if (!open) return;
+    setError('');
+    setBusy(false);
+    setDragOver(false);
+    setVarQuery('');
+    setNewVar('');
+    if (!editId) {
+      setSource('');
+      setName('');
+      setCode('');
+      setTemplateGroup('');
+      setTemplateType('excel');
+      setSortOrder('');
+      setUseNameInReport(true);
+      setActive(true);
+      setFileName('');
+      setFileUrl('');
+      setKind('document');
+      setVariables([]);
+      setSourceType('');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    apiFetch<Row>(`/api/catalog/report-templates/${templateId}`)
+    apiFetch<Row>(`/api/catalog/report-templates/${editId}`)
       .then((row) => {
         setName(row.name || '');
         setCode(row.code || '');
         setSource(row.source || '');
         setSourceType(row.sourceType || '');
         setTemplateGroup(row.templateGroup || '');
-        setTemplateType(
-          row.templateType === 'word' ? 'word' : 'excel',
-        );
+        setTemplateType(row.templateType === 'word' ? 'word' : 'excel');
         setSortOrder(
           row.sortOrder != null && row.sortOrder !== 0 ? String(row.sortOrder) : '',
         );
@@ -99,9 +127,9 @@ export function ReportTemplateForm({ templateId }: { templateId?: string }) {
         const vars = row.definition?.variables;
         setVariables(Array.isArray(vars) ? vars.map(String) : []);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [templateId, isNew]);
+  }, [open, editId]);
 
   const filteredVars = useMemo(() => {
     const q = varQuery.trim().toLowerCase();
@@ -122,14 +150,13 @@ export function ReportTemplateForm({ templateId }: { templateId?: string }) {
     const lower = file.name.toLowerCase();
     if (lower.endsWith('.docx') || lower.endsWith('.doc')) setTemplateType('word');
     if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) setTemplateType('excel');
-    // Store name only — binary upload can be wired to object storage later
     setFileUrl('');
   }
 
   function addVariable(v: string) {
-    const name = v.trim();
-    if (!name || variables.includes(name)) return;
-    setVariables((prev) => [...prev, name]);
+    const n = v.trim();
+    if (!n || variables.includes(n)) return;
+    setVariables((prev) => [...prev, n]);
     setNewVar('');
   }
 
@@ -148,7 +175,6 @@ export function ReportTemplateForm({ templateId }: { templateId?: string }) {
     }
     setBusy(true);
     setError('');
-    setOk('');
     try {
       const generatedCode =
         code.trim() ||
@@ -173,252 +199,255 @@ export function ReportTemplateForm({ templateId }: { templateId?: string }) {
         isActive: active,
         fileName: fileName.trim(),
         fileUrl: fileUrl || null,
-        createdBy: isNew ? 'System' : undefined,
-        definition: {
-          variables,
-        },
+        createdBy: isEdit ? undefined : 'System',
+        definition: { variables },
       };
 
-      if (isNew) {
-        await apiFetch('/api/catalog/report-templates', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        router.push('/catalog/report-templates');
-      } else {
-        await apiFetch(`/api/catalog/report-templates/${templateId}`, {
+      if (isEdit && editId) {
+        await apiFetch(`/api/catalog/report-templates/${editId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        setOk('Сохранено');
+        onSaved(editId);
+      } else {
+        const created = await apiFetch<Row>('/api/catalog/report-templates', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        onSaved(created?.id || '');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
       setBusy(false);
     }
   }
 
-  if (loading) return <p className={styles.muted}>Загрузка…</p>;
-
   return (
-    <div className={styles.page}>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>Настройки шаблонов</h1>
-        <div className={styles.actions}>
+    <FormModal
+      open={open}
+      title={isEdit ? 'Шаблон отчета (изменение)' : 'Шаблон отчета (создание)'}
+      onClose={onClose}
+      width="xl"
+      footer={
+        <>
           <button
             type="button"
-            className={styles.btnSave}
-            disabled={busy}
+            className={modal.btnPrimary}
+            disabled={busy || loading}
             onClick={() => void save()}
           >
-            Сохранить
+            {busy ? '…' : 'Сохранить'}
           </button>
-          <Link href="/catalog/report-templates" className={styles.btnClose}>
+          <button type="button" className={modal.btnGhost} onClick={onClose}>
             Закрыть
-          </Link>
-        </div>
-      </div>
-
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {ok ? <p className={styles.ok}>{ok}</p> : null}
-
-      <div className={styles.layout}>
-        <div className={styles.card}>
-          <div className={styles.field}>
-            <label>
-              Источник <span className={styles.req}>*</span>
-            </label>
-            <input
-              list="rt-sources"
-              value={source}
-              placeholder="Поиск..."
-              onChange={(e) => setSource(e.target.value)}
-            />
-            <datalist id="rt-sources">
-              {SOURCE_SUGGESTIONS.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className={styles.field}>
-            <label>
-              Название <span className={styles.req}>*</span>
-            </label>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-
-          <div className={styles.field}>
-            <label>Группа шаблонов</label>
-            <input
-              list="rt-groups"
-              value={templateGroup}
-              placeholder="Поиск..."
-              onChange={(e) => setTemplateGroup(e.target.value)}
-            />
-            <datalist id="rt-groups">
-              {GROUP_SUGGESTIONS.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Тип шаблона</span>
-            <div className={styles.typeRow}>
-              <button
-                type="button"
-                className={templateType === 'excel' ? styles.typeBtnOn : styles.typeBtn}
-                onClick={() => setTemplateType('excel')}
-              >
-                Excel
-              </button>
-              <button
-                type="button"
-                className={templateType === 'word' ? styles.typeBtnOn : styles.typeBtn}
-                onClick={() => setTemplateType('word')}
-              >
-                Word
-              </button>
-            </div>
-          </div>
-
-          <div className={`${styles.field} ${styles.sortField}`}>
-            <label>Порядковый номер</label>
-            <input
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value.replace(/[^\d]/g, ''))}
-              inputMode="numeric"
-            />
-          </div>
-
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={useNameInReport}
-              onChange={(e) => setUseNameInReport(e.target.checked)}
-            />
-            Использовать название шаблона в генерируемом отчете
-          </label>
-
-          <div className={styles.statusBlock}>
-            <span className={styles.fieldLabel}>Статус</span>
-            <label className={styles.toggleRow}>
-              <button
-                type="button"
-                className={`${styles.toggle} ${active ? styles.toggleOn : ''}`}
-                onClick={() => setActive((v) => !v)}
-                aria-pressed={active}
+          </button>
+        </>
+      }
+    >
+      {error ? <p className={modal.error}>{error}</p> : null}
+      {loading ? (
+        <p className={styles.muted}>Загрузка…</p>
+      ) : (
+        <div className={styles.layout}>
+          <div className={styles.card}>
+            <div className={styles.field}>
+              <label>
+                Источник <span className={styles.req}>*</span>
+              </label>
+              <input
+                list="rt-sources"
+                value={source}
+                placeholder="Поиск..."
+                onChange={(e) => setSource(e.target.value)}
               />
-              <span>Активный</span>
+              <datalist id="rt-sources">
+                {SOURCE_SUGGESTIONS.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className={styles.field}>
+              <label>
+                Название <span className={styles.req}>*</span>
+              </label>
+              <input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+
+            <div className={styles.field}>
+              <label>Группа шаблонов</label>
+              <input
+                list="rt-groups"
+                value={templateGroup}
+                placeholder="Поиск..."
+                onChange={(e) => setTemplateGroup(e.target.value)}
+              />
+              <datalist id="rt-groups">
+                {GROUP_SUGGESTIONS.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Тип шаблона</span>
+              <div className={styles.typeRow}>
+                <button
+                  type="button"
+                  className={templateType === 'excel' ? styles.typeBtnOn : styles.typeBtn}
+                  onClick={() => setTemplateType('excel')}
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  className={templateType === 'word' ? styles.typeBtnOn : styles.typeBtn}
+                  onClick={() => setTemplateType('word')}
+                >
+                  Word
+                </button>
+              </div>
+            </div>
+
+            <div className={`${styles.field} ${styles.sortField}`}>
+              <label>Порядковый номер</label>
+              <input
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value.replace(/[^\d]/g, ''))}
+                inputMode="numeric"
+              />
+            </div>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={useNameInReport}
+                onChange={(e) => setUseNameInReport(e.target.checked)}
+              />
+              Использовать название шаблона в генерируемом отчете
             </label>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+              />
+              Активный
+            </label>
+
+            <div className={styles.field}>
+              <label>
+                Файл шаблона <span className={styles.req}>*</span>
+              </label>
+              <input
+                ref={fileRef}
+                className={styles.hiddenFile}
+                type="file"
+                accept=".xlsx,.xls,.docx,.doc"
+                onChange={(e) => applyFile(e.target.files?.[0] || null)}
+              />
+              <div
+                className={`${styles.dropZone} ${dragOver ? styles.dropZoneActive : ''}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => fileRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click();
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  applyFile(e.dataTransfer.files?.[0] || null);
+                }}
+              >
+                {fileName ? (
+                  <>
+                    <span className={styles.fileName}>{fileName}</span>
+                    <span className={styles.dropHint}>
+                      Нажмите или перетащите, чтобы заменить
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>Перетащите файл сюда или кликните для выбора файла</span>
+                    <span className={styles.dropHint}>.xlsx / .xls / .docx / .doc</span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className={styles.field}>
-            <label>
-              Файл шаблона <span className={styles.req}>*</span>
-            </label>
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>Переменные</h2>
             <input
-              ref={fileRef}
-              className={styles.hiddenFile}
-              type="file"
-              accept=".xlsx,.xls,.docx,.doc"
-              onChange={(e) => applyFile(e.target.files?.[0] || null)}
+              className={styles.varSearch}
+              placeholder="Поиск..."
+              value={varQuery}
+              onChange={(e) => setVarQuery(e.target.value)}
             />
-            <div
-              className={`${styles.dropZone} ${dragOver ? styles.dropZoneActive : ''}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => fileRef.current?.click()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click();
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                applyFile(e.dataTransfer.files?.[0] || null);
-              }}
-            >
-              {fileName ? (
-                <>
-                  <span className={styles.fileName}>{fileName}</span>
-                  <span className={styles.dropHint}>Нажмите или перетащите, чтобы заменить</span>
-                </>
-              ) : (
-                <>
-                  <span>Перетащите файл сюда или кликните для выбора файла</span>
-                  <span className={styles.dropHint}>
-                    .xlsx / .xls / .docx / .doc
-                  </span>
-                </>
-              )}
+
+            {filteredVars.length === 0 && catalogVars.length === 0 ? (
+              <p className={styles.varEmpty}>
+                Нет переменных. Добавьте или выберите из списка.
+              </p>
+            ) : (
+              <ul className={styles.varList}>
+                {filteredVars.map((v) => (
+                  <li key={v} className={styles.varItem}>
+                    <span>{`{{${v}}}`}</span>
+                    <button
+                      type="button"
+                      onClick={() => setVariables((prev) => prev.filter((x) => x !== v))}
+                    >
+                      Убрать
+                    </button>
+                  </li>
+                ))}
+                {catalogVars.map((v) => (
+                  <li
+                    key={`c-${v}`}
+                    className={styles.varItem}
+                    style={{ background: '#fff', border: '1px dashed #e5e7eb' }}
+                  >
+                    <span style={{ color: '#7e8299' }}>{`{{${v}}}`}</span>
+                    <button
+                      type="button"
+                      style={{ color: '#0a85e2' }}
+                      onClick={() => addVariable(v)}
+                    >
+                      Добавить
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className={styles.addVar}>
+              <input
+                placeholder="Новая переменная"
+                value={newVar}
+                onChange={(e) => setNewVar(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addVariable(newVar);
+                  }
+                }}
+              />
+              <button type="button" onClick={() => addVariable(newVar)}>
+                +
+              </button>
             </div>
           </div>
         </div>
-
-        <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Переменные</h2>
-          <input
-            className={styles.varSearch}
-            placeholder="Поиск..."
-            value={varQuery}
-            onChange={(e) => setVarQuery(e.target.value)}
-          />
-
-          {filteredVars.length === 0 && catalogVars.length === 0 ? (
-            <p className={styles.varEmpty}>Нет переменных. Добавьте или выберите из списка.</p>
-          ) : (
-            <ul className={styles.varList}>
-              {filteredVars.map((v) => (
-                <li key={v} className={styles.varItem}>
-                  <span>{`{{${v}}}`}</span>
-                  <button
-                    type="button"
-                    onClick={() => setVariables((prev) => prev.filter((x) => x !== v))}
-                  >
-                    Убрать
-                  </button>
-                </li>
-              ))}
-              {catalogVars.map((v) => (
-                <li key={`c-${v}`} className={styles.varItem} style={{ background: '#fff', border: '1px dashed #e5e7eb' }}>
-                  <span style={{ color: '#7e8299' }}>{`{{${v}}}`}</span>
-                  <button
-                    type="button"
-                    style={{ color: '#3699ff' }}
-                    onClick={() => addVariable(v)}
-                  >
-                    Добавить
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className={styles.addVar}>
-            <input
-              placeholder="Новая переменная"
-              value={newVar}
-              onChange={(e) => setNewVar(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addVariable(newVar);
-                }
-              }}
-            />
-            <button type="button" onClick={() => addVariable(newVar)}>
-              +
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      )}
+    </FormModal>
   );
 }

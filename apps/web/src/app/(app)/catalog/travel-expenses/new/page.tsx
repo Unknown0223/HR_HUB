@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense } from 'react';
-import { TravelExpenseForm } from '../TravelExpenseForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewTravelExpensePage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <TravelExpenseForm />
-    </Suspense>
-  );
+/** Legacy /new → list with create modal */
+export default function NewTravelExpenseRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/travel-expenses?create=1');
+  }, [router]);
+  return null;
 }

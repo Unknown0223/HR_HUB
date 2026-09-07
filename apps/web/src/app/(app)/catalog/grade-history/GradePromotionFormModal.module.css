@@ -1,0 +1,216 @@
+.muted {
+  margin: 0;
+  padding: 1rem 0;
+  color: #8ca0b8;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #64788f;
+}
+
+.checkGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.15rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: #0a85e2;
+  width: 15px;
+  height: 15px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #eef0f4;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64788f;
+  margin-right: auto;
+}
+
+.lineBtn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #354862;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  height: 30px;
+  padding: 0 0.6rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lineBtn:hover:not(:disabled) {
+  background: #eef6ff;
+  border-color: rgba(10, 133, 226, 0.4);
+  color: #0a85e2;
+}
+
+.lineBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lineCount {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #8ca0b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid #e3e9f1;
+  border-radius: 10px;
+}
+
+.lineTable {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.lineTable th,
+.lineTable td {
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid #eef0f4;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.lineTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.lineTable th {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8ca0b8;
+  background: rgba(242, 245, 249, 0.7);
+  white-space: nowrap;
+}
+
+.lineTable select,
+.lineTable input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 30px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0 0.35rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #1f2937;
+  background: #fff;
+}
+
+.lineTable select:focus-visible,
+.lineTable input:focus-visible {
+  outline: none;
+  border-color: #0a85e2;
+  box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
+}
+
+.colEmp {
+  min-width: 190px;
+}
+
+.colPos {
+  min-width: 150px;
+}
+
+.colGrade {
+  min-width: 190px;
+}
+
+.colDate {
+  min-width: 130px;
+}
+
+.colNote {
+  min-width: 130px;
+}
+
+.colDel {
+  width: 34px;
+}
+
+.gradePair {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.gradeArrow {
+  color: #9ca3af;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.removeBtn {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.removeBtn:hover {
+  background: #fff1f2;
+  border-color: #fecaca;
+}
+
+.lineEmpty {
+  text-align: center;
+  color: #9ca3af;
+  font-weight: 600;
+  padding: 1.1rem 0.5rem !important;
+}

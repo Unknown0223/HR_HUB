@@ -1,9 +1,18 @@
 'use client';
 
-import { use } from 'react';
-import { IncidentTypeForm } from '../IncidentTypeForm';
+import { use, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function EditIncidentTypePage({ params }: { params: Promise<{ id: string }> }) {
+/** Legacy /[id] → list with edit modal */
+export default function EditIncidentTypeRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
-  return <IncidentTypeForm mode="edit" typeId={id} />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(`/catalog/incident-types?edit=${encodeURIComponent(id)}`);
+  }, [router, id]);
+  return null;
 }

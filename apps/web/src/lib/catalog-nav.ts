@@ -147,7 +147,6 @@ export const CATALOG_NAV: NavGroup[] = [
       { href: '/settings/iiko-sales', label: 'Продажи IIKO' },
       { href: '/settings/billz', label: 'Настройки Billz 2.0' },
       { href: '/settings/billz-sales', label: 'Продажи Billz 1.0' },
-      { href: '/settings?tab=audit', label: 'Аудит' },
       { href: '/tenants', label: 'Tenants', badge: 'platform' },
     ],
   },

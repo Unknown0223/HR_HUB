@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -58,7 +59,7 @@ type ServiceRow = {
 type DivisionOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'contractId', 'divisionId', 'status', 'month'] as const;
-const PAGE_SIZE = 50;
+const COL_COUNT = 6;
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Черновик',
   posted: 'Проведен',
@@ -143,10 +144,9 @@ function GphServicesPageInner() {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [exportBusy, setExportBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
-  const [page, setPage] = useState(1);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const filtered = useMemo(() => {
@@ -211,12 +211,27 @@ function GphServicesPageInner() {
     sortDir,
   ]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
 
-  useEffect(() => {
-    setPage(1);
-  }, [q, numberFilter, contractIdFromUrl, divisionIdFilter, statusFilter, monthFilter, sortDir]);
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
 
   async function load() {
     setLoading(true);
@@ -239,9 +254,20 @@ function GphServicesPageInner() {
   }
 
   useEffect(() => {
-    load();
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when API filters change
   }, [contractIdFromUrl, statusFilter]);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      openCreate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     apiFetch<ContractRef[]>('/api/catalog/gph-contracts')
@@ -306,6 +332,14 @@ function GphServicesPageInner() {
     setPanel('edit');
   }
 
+  function closePanel() {
+    setPanel('none');
+    setEditId(null);
+    if (searchParams.get('create') === '1') {
+      patchUrl({ create: null });
+    }
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
@@ -335,8 +369,7 @@ function GphServicesPageInner() {
         });
       }
       form.reset();
-      setPanel('none');
-      setEditId(null);
+      closePanel();
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения');
@@ -352,9 +385,9 @@ function GphServicesPageInner() {
     try {
       await apiFetch(`/api/catalog/gph-services/${row.id}`, { method: 'DELETE' });
       setSelectedId(null);
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(row.id);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
         return next;
       });
       await load();
@@ -365,21 +398,25 @@ function GphServicesPageInner() {
     }
   }
 
-  async function bulkDelete() {
-    const ids = Array.from(selected);
-    if (!ids.length) return;
-    if (!(await confirm(`Удалить выбранные услуги (${ids.length})?`))) return;
+  async function runBulkDelete() {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (!targets.length) return;
+    if (!(await confirm(`Удалить выбранные услуги (${targets.length})?`))) return;
     setBusy(true);
     setError('');
+    let failed = 0;
     try {
-      for (const id of ids) {
-        await apiFetch(`/api/catalog/gph-services/${id}`, { method: 'DELETE' });
+      for (const row of targets) {
+        try {
+          await apiFetch(`/api/catalog/gph-services/${row.id}`, { method: 'DELETE' });
+        } catch {
+          failed += 1;
+        }
       }
-      setSelected(new Set());
+      setChecked({});
       setSelectedId(null);
       await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка удаления');
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
     } finally {
       setBusy(false);
     }
@@ -420,15 +457,43 @@ function GphServicesPageInner() {
   }
 
   const contractLabel = contracts.find((c) => c.id === contractIdFromUrl);
-  const allOnPageSelected = paged.length > 0 && paged.every((r) => selected.has(r.id));
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="gph-services" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-concierge-bell" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Услуги ГПХ</h1>
+          <p className={shared.pageSubtitle}>
+            Услуги по договорам гражданско-правового характера
+            {contractLabel ? ` · договор ${contractLabel.number}` : ''}
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <FilterPanel
@@ -470,23 +535,6 @@ function GphServicesPageInner() {
               },
             ]}
           />
-          <ListBulkBar
-            count={selected.size}
-            busy={busy}
-            onClear={() => setSelected(new Set())}
-            actions={[
-              {
-                key: 'delete',
-                label: 'Удалить',
-                count: selected.size,
-                variant: 'danger',
-                onClick: () => void bulkDelete(),
-              },
-            ]}
-          />
-          {contractLabel ? (
-            <span className={styles.pagerMeta}>Договор: {contractLabel.number}</span>
-          ) : null}
         </div>
 
         <div className={styles.rightTools}>
@@ -500,84 +548,123 @@ function GphServicesPageInner() {
               }
             />
           </label>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <button
-            type="button"
-            className={styles.exportBtn}
-            disabled={exportBusy}
-            onClick={() => void exportExcel()}
-          >
-            {exportBusy ? 'Excel…' : 'Excel'}
-          </button>
-          <span className={styles.pagerMeta}>
-            {paged.length}/{filtered.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ‹
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
           >
-            ›
+            <i className="fas fa-file-csv" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()} aria-label="Обновить">
-            ↻
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={exportBusy}
+            onClick={() => void exportExcel()}
+            title="Excel"
+            aria-label="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
 
-      {error ? <p className={styles.error}>{error}</p> : null}
+      {error && panel === 'none' ? <p className={styles.error}>{error}</p> : null}
 
-      {panel !== 'none' ? (
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulkDelete()}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <FormModal
+        open={panel !== 'none'}
+        title={panel === 'edit' ? 'Изменить услугу ГПХ' : 'Создать услугу ГПХ'}
+        onClose={closePanel}
+        width="lg"
+        footer={
+          <>
+            <button
+              type="submit"
+              form="gph-service-form"
+              className={modal.btnPrimary}
+              disabled={saving}
+            >
+              {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+            <button type="button" className={modal.btnGhost} onClick={closePanel}>
+              Отмена
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
         <form
-          key={`${panel}-${editId || 'new'}`}
-          className={styles.panel}
+          key={editId || 'create'}
+          id="gph-service-form"
+          className={modal.fields}
           onSubmit={onSubmit}
         >
-          <h2 className={styles.panelTitle}>
-            {panel === 'edit' ? 'Изменить услугу' : 'Создать услугу'}
-          </h2>
-          <div className={styles.formGrid}>
-            <label>
-              Договор
-              <select
-                name="contractId"
-                defaultValue={editDefaults.contractId || ''}
-              >
-                <option value="">— без договора —</option>
-                {contracts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.number}
-                    {c.title ? ` — ${c.title}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Месяц *
+          <label className={modal.field}>
+            <span>Договор</span>
+            <select name="contractId" defaultValue={editDefaults.contractId || ''}>
+              <option value="">— без договора —</option>
+              {contracts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.number}
+                  {c.title ? ` — ${c.title}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>
+                Месяц <em className={modal.req}>*</em>
+              </span>
               <input
                 name="month"
                 type="month"
@@ -585,24 +672,32 @@ function GphServicesPageInner() {
                 defaultValue={editDefaults.month || currentMonth()}
               />
             </label>
-            <label>
-              Состояние
+            <label className={modal.field}>
+              <span>Состояние</span>
               <select name="status" defaultValue={editDefaults.status || 'draft'}>
                 <option value="draft">Черновик</option>
                 <option value="posted">Проведен</option>
                 <option value="cancelled">Отменен</option>
               </select>
             </label>
-            <label>
-              Название
-              <input name="name" defaultValue={editDefaults.name || ''} placeholder="Услуга по договору ГПХ" />
+          </div>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Название</span>
+              <input
+                name="name"
+                defaultValue={editDefaults.name || ''}
+                placeholder="Услуга по договору ГПХ"
+              />
             </label>
-            <label>
-              Код
+            <label className={modal.field}>
+              <span>Код</span>
               <input name="code" defaultValue={editDefaults.code || ''} placeholder="Авто" />
             </label>
-            <label>
-              Цена
+          </div>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Цена</span>
               <input
                 name="unitPrice"
                 type="number"
@@ -610,146 +705,147 @@ function GphServicesPageInner() {
                 defaultValue={editDefaults.unitPrice || '0'}
               />
             </label>
-            <label>
-              Ед.
+            <label className={modal.field}>
+              <span>Ед.</span>
               <input name="unit" defaultValue={editDefaults.unit || 'шт'} />
             </label>
-            <label>
-              Активен
-              <select name="isActive" defaultValue={editDefaults.isActive || '1'}>
-                <option value="1">Да</option>
-                <option value="0">Нет</option>
-              </select>
-            </label>
           </div>
-          <div className={styles.panelActions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={styles.ghost}
-              onClick={() => {
-                setPanel('none');
-                setEditId(null);
-              }}
-            >
-              Закрыть
-            </button>
-          </div>
+          <label className={modal.field}>
+            <span>Активен</span>
+            <select name="isActive" defaultValue={editDefaults.isActive || '1'}>
+              <option value="1">Да</option>
+              <option value="0">Нет</option>
+            </select>
+          </label>
         </form>
-      ) : null}
+      </FormModal>
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allOnPageSelected}
-                  onChange={(e) => setSelected(togglePage(selected, paged.map((r) => r.id), e.target.checked))}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Номер договора</th>
-              <th>
-                <button
-                  type="button"
-                  className={styles.sortBtn}
-                  onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                >
-                  Месяц
-                  <span className={styles.sortMark}>{sortDir === 'asc' ? '↑' : '↓'}</span>
-                </button>
-              </th>
-              <th>Подразделение</th>
-              <th>Физическое лицо</th>
-              <th>Состояние</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
-              </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {paged.map((row) => {
-              const open = selectedId === row.id;
-              const st = rowStatus(row);
-              const monthIso = rowMonthIso(row);
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open || selected.has(row.id) ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Номер договора</th>
+                <th>
+                  <button
+                    type="button"
+                    className={styles.sortBtn}
+                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
                   >
-                    <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                      />
-                    </td>
-                    <td className={styles.empName}>{row.contract?.number || '—'}</td>
-                    <td>{monthIso ? formatMonthRu(monthIso) : '—'}</td>
-                    <td>{rowDivision(row)}</td>
-                    <td>{rowPerson(row)}</td>
-                    <td>
-                      <span
-                        className={
-                          st === 'posted'
-                            ? styles.statusPosted
-                            : st === 'cancelled'
-                              ? styles.statusCancelled
-                              : styles.statusDraft
-                        }
-                      >
-                        {STATUS_LABEL[st] || st}
-                      </span>
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={6}>
-                        <div className={styles.rowActions}>
-                          <button type="button" disabled={busy} onClick={() => openEdit(row)}>
-                            Изменить
-                          </button>
-                          {row.contractId ? (
-                            <Link
-                              href={`/catalog/gph-contracts?q=${encodeURIComponent(row.contract?.number || '')}`}
-                            >
-                              Договор {row.contract?.number || ''}
-                            </Link>
-                          ) : null}
-                          <button
-                            type="button"
-                            className={styles.danger}
-                            disabled={busy}
-                            onClick={() => runDelete(row)}
-                          >
-                            Удалить
-                          </button>
-                        </div>
+                    Месяц
+                    <span className={styles.sortMark}>{sortDir === 'asc' ? '↑' : '↓'}</span>
+                  </button>
+                </th>
+                <th>Подразделение</th>
+                <th>Физическое лицо</th>
+                <th>Состояние</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const st = rowStatus(row);
+                const monthIso = rowMonthIso(row);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.contract?.number || row.code}`}
+                        />
+                      </td>
+                      <td className={styles.numberCell}>{row.contract?.number || '—'}</td>
+                      <td>{monthIso ? formatMonthRu(monthIso) : '—'}</td>
+                      <td>{rowDivision(row)}</td>
+                      <td className={styles.empName}>{rowPerson(row)}</td>
+                      <td>
+                        <span
+                          className={
+                            st === 'posted'
+                              ? styles.statusPosted
+                              : st === 'cancelled'
+                                ? styles.statusCancelled
+                                : styles.statusDraft
+                          }
+                        >
+                          {STATUS_LABEL[st] || st}
+                        </span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <button type="button" disabled={busy} onClick={() => openEdit(row)}>
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            {row.contractId ? (
+                              <Link
+                                href={`/catalog/gph-contracts?q=${encodeURIComponent(row.contract?.number || '')}`}
+                              >
+                                <i className="fas fa-file-signature" aria-hidden />
+                                Договор {row.contract?.number || ''}
+                              </Link>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -757,13 +853,7 @@ function GphServicesPageInner() {
 
 export default function GphServicesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <GphServicesPageInner />
     </Suspense>
   );

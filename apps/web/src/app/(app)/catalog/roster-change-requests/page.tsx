@@ -11,6 +11,7 @@ import {
   type RosterChangeFormValues,
 } from './RosterChangeFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
 
@@ -183,6 +184,7 @@ function RosterChangeRequestsInner() {
 
   const allFilteredChecked =
     filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
   const selectedIds = useMemo(() => [...checked], [checked]);
   const showEmployeeCol = scope === 'available';
   const colCount = showEmployeeCol ? 7 : 6;
@@ -259,6 +261,7 @@ function RosterChangeRequestsInner() {
         },
       );
       setChecked(new Set());
+      setExpandedId(null);
       await load();
       setInfo(
         `Обработано: ${result.ok}${result.skipped ? `, пропущено: ${result.skipped}` : ''}`,
@@ -277,32 +280,44 @@ function RosterChangeRequestsInner() {
     router.push(`/catalog/roster-change-requests?${p}`);
   }
 
+  function closeCreate() {
+    setCreateOpen(false);
+    if (searchParams.get('create') === '1') {
+      const p = new URLSearchParams(searchParams.toString());
+      p.delete('create');
+      const qs = p.toString();
+      router.replace(
+        qs ? `/catalog/roster-change-requests?${qs}` : '/catalog/roster-change-requests',
+      );
+    }
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="roster-change-requests" />
 
-      <div className={styles.scopeTabs}>
-        <button
-          type="button"
-          className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('mine')}
-        >
-          Мои
-        </button>
-        <button
-          type="button"
-          className={scope === 'available' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('available')}
-        >
-          Доступные
-        </button>
-        <button
-          type="button"
-          className={scope === 'my_requests' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('my_requests')}
-        >
-          Мои запросы
-        </button>
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+          <i className="fas fa-exchange-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Запросы на изменение смены</h1>
+          <p className={shared.pageSubtitle}>
+            Согласование заявок на замену и изменение смен в расписании
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
       </div>
 
       <div className={styles.toolbar}>
@@ -313,37 +328,33 @@ function RosterChangeRequestsInner() {
               className={styles.createBtn}
               onClick={() => setCreateOpen(true)}
             >
+              <i className="fas fa-plus" aria-hidden />
               Создать
             </button>
           ) : null}
-          {selectedIds.length > 0 ? (
-            <div className={styles.bulkBar}>
-              <span className={styles.bulkCount}>{selectedIds.length}</span>
-              <button
-                type="button"
-                className={styles.bulkOk}
-                disabled={busy}
-                onClick={() => bulkAction('approve', 'Подтвердить')}
-              >
-                Подтвердить
-              </button>
-              <button
-                type="button"
-                className={styles.bulkDanger}
-                disabled={busy}
-                onClick={() => bulkAction('reject', 'Отклонить')}
-              >
-                Отклонить
-              </button>
-              <button
-                type="button"
-                className={styles.bulkClear}
-                onClick={() => setChecked(new Set())}
-              >
-                Сбросить
-              </button>
-            </div>
-          ) : null}
+          <div className={styles.scopeTabs}>
+            <button
+              type="button"
+              className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('mine')}
+            >
+              Мои
+            </button>
+            <button
+              type="button"
+              className={scope === 'available' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('available')}
+            >
+              Доступные
+            </button>
+            <button
+              type="button"
+              className={scope === 'my_requests' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('my_requests')}
+            >
+              Мои запросы
+            </button>
+          </div>
           <FilterPanel
             inline
             urlSync
@@ -366,77 +377,137 @@ function RosterChangeRequestsInner() {
           />
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            ↻
-          </button>
-          <span className={styles.pagerMeta}>
-            {filtered.length}/{rows.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={loading}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
       {info ? <p className={styles.info}>{info}</p> : null}
 
+      {selectedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selectedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkOk}`}
+            disabled={busy}
+            onClick={() => void bulkAction('approve', 'Подтвердить')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Подтвердить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void bulkAction('reject', 'Отклонить')}
+          >
+            <i className="fas fa-times" aria-hidden />
+            Отклонить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredChecked}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              {showEmployeeCol ? <th>Сотрудник</th> : null}
-              <th>Дата запроса</th>
-              <th>Смена</th>
-              <th>Рекомендуемый сотрудник</th>
-              <th>Примечание</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={colCount} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredChecked}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate = someFilteredChecked && !allFilteredChecked;
+                    }}
+                    onChange={toggleAll}
+                    disabled={!filtered.length}
+                    title="Выбрать все"
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                {showEmployeeCol ? <th>Сотрудник</th> : null}
+                <th>Дата запроса</th>
+                <th>Смена</th>
+                <th>Рекомендуемый сотрудник</th>
+                <th>Примечание</th>
+                <th>Статус</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={colCount} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              filtered.map((row) => {
+            </thead>
+            <tbody>
+              {loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && !filtered.length ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    {showCreate ? 'Нет данных — нажмите «Создать»' : 'Нет данных'}
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
                 const st = statusLabel(row.status);
+                const isChecked = checked.has(row.id);
+                const expanded = expandedId === row.id;
                 return (
                   <Fragment key={row.id}>
                     <tr
-                      className={checked.has(row.id) ? styles.rowSelected : undefined}
-                      onClick={() =>
-                        setExpandedId((id) => (id === row.id ? null : row.id))
+                      className={
+                        expanded || isChecked ? styles.rowSelected : undefined
                       }
+                      onClick={() => setExpandedId(expanded ? null : row.id)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td onClick={(e) => e.stopPropagation()}>
+                      <td className={styles.checkCol}>
                         <input
                           type="checkbox"
-                          checked={checked.has(row.id)}
+                          checked={isChecked}
                           onChange={(e) => toggleOne(row.id, e)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${empName(row.employee)}`}
                         />
                       </td>
-                      {showEmployeeCol ? <td>{empName(row.employee)}</td> : null}
+                      {showEmployeeCol ? (
+                        <td className={styles.empName}>{empName(row.employee)}</td>
+                      ) : null}
                       <td>{requestDateOf(row)}</td>
                       <td>{shiftOf(row)}</td>
                       <td>{recommendedOf(row)}</td>
@@ -445,7 +516,7 @@ function RosterChangeRequestsInner() {
                         <span className={st.cls}>{st.text}</span>
                       </td>
                     </tr>
-                    {expandedId === row.id ? (
+                    {expanded ? (
                       <tr className={styles.actionsRow}>
                         <td colSpan={colCount}>
                           <div className={styles.rowActions}>
@@ -457,6 +528,7 @@ function RosterChangeRequestsInner() {
                                 disabled={busy}
                                 onClick={() => setEditRow(row)}
                               >
+                                <i className="fas fa-pen" aria-hidden />
                                 Изменить
                               </button>
                             )}
@@ -467,6 +539,7 @@ function RosterChangeRequestsInner() {
                                   disabled={busy}
                                   onClick={() => void review(row.id, 'approved')}
                                 >
+                                  <i className="fas fa-check" aria-hidden />
                                   Подтвердить
                                 </button>
                                 <button
@@ -474,15 +547,18 @@ function RosterChangeRequestsInner() {
                                   disabled={busy}
                                   onClick={() => void review(row.id, 'rejected')}
                                 >
+                                  <i className="fas fa-times" aria-hidden />
                                   Отклонить
                                 </button>
                               </>
                             ) : null}
                             <button
                               type="button"
+                              className={styles.danger}
                               disabled={busy}
                               onClick={() => void remove(row.id)}
                             >
+                              <i className="fas fa-trash" aria-hidden />
                               Удалить
                             </button>
                           </div>
@@ -491,29 +567,17 @@ function RosterChangeRequestsInner() {
                     ) : null}
                   </Fragment>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showCreate ? (
         <RosterChangeFormModal
           open={createOpen}
           mode={scope === 'mine' ? 'personal' : 'manager'}
-          onClose={() => {
-            setCreateOpen(false);
-            if (searchParams.get('create') === '1') {
-              const p = new URLSearchParams(searchParams.toString());
-              p.delete('create');
-              const qs = p.toString();
-              router.replace(
-                qs
-                  ? `/catalog/roster-change-requests?${qs}`
-                  : '/catalog/roster-change-requests',
-              );
-            }
-          }}
+          onClose={closeCreate}
           onSaved={() => {
             setCreateOpen(false);
             void load();
@@ -538,7 +602,7 @@ function RosterChangeRequestsInner() {
 
 export default function RosterChangeRequestsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <RosterChangeRequestsInner />
     </Suspense>
   );

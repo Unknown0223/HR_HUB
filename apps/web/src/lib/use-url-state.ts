@@ -26,16 +26,15 @@ export function useUrlParam(
     (next: string) => {
       setValue(next);
       const params = new URLSearchParams(searchParams?.toString() ?? '');
-      if (!next || next === fallback) {
-        // keep explicit tab in URL for deep links even when default
-        params.set(key, next);
+      if (!next) {
+        params.delete(key);
       } else {
         params.set(key, next);
       }
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [fallback, key, pathname, router, searchParams],
+    [key, pathname, router, searchParams],
   );
 
   return [value, set];

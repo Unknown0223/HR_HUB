@@ -144,13 +144,32 @@ def _http_get(
     headers: dict[str, str] | None = None,
     timeout: float = 4.0,
 ) -> tuple[int, dict[str, str], bytes]:
+    return _http_request(host, port, "GET", path, headers=headers, timeout=timeout)
+
+
+def _http_request(
+    host: str,
+    port: int,
+    method: str,
+    path: str,
+    body: bytes | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: float = 4.0,
+) -> tuple[int, dict[str, str], bytes]:
     conn = http.client.HTTPConnection(host, port, timeout=timeout)
     try:
-        conn.request("GET", path, headers=headers or {"Accept": "*/*"})
+        hdrs = {"Accept": "*/*"}
+        if headers:
+            hdrs.update(headers)
+        if body is not None and "Content-Type" not in {k.title(): v for k, v in hdrs.items()}:
+            # preserve caller Content-Type; default XML for activation
+            if "content-type" not in {k.lower() for k in hdrs}:
+                hdrs["Content-Type"] = "application/xml"
+        conn.request(method.upper(), path, body=body, headers=hdrs)
         resp = conn.getresponse()
-        body = resp.read(256_000)
-        hdrs = {k.lower(): v for k, v in resp.getheaders()}
-        return resp.status, hdrs, body
+        resp_body = resp.read(256_000)
+        resp_hdrs = {k.lower(): v for k, v in resp.getheaders()}
+        return resp.status, resp_hdrs, resp_body
     finally:
         conn.close()
 

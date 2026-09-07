@@ -5,8 +5,9 @@ import { SearchLookup } from '@/app/(app)/catalog/avg-salaries/SearchLookup';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
-import layout from '../staffing/page.module.css';
-import extra from './page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
+import styles from './page.module.css';
 
 type LookupOpt = { id: string; label: string };
 type ReportType = 'age' | 'experience' | 'grade' | 'education';
@@ -354,207 +355,261 @@ export default function GenderReportPage() {
     w.document.getElementById('btnXml')?.addEventListener('click', () => exportXmlFrom(data));
   }
 
-  const exportBtns = (
-    <div className={extra.exportLinks}>
-      <button type="button" disabled={busy} onClick={() => void openHtml()}>
-        HTML
-      </button>
-      <button type="button" disabled={busy} onClick={() => void exportExcel()}>
-        Excel
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void ensureReport().then((d) => d && exportCsvFrom(d))}
-      >
-        CSV
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void ensureReport().then((d) => d && exportXmlFrom(d))}
-      >
-        XML
-      </button>
-    </div>
-  );
+  const exportDisabled = busy;
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>Отчет по гендерному разделению сотрудников</h1>
-
-      <div className={layout.toolbar}>
-        <button
-          type="button"
-          className={tab === 'filter' ? layout.tabOn : layout.tab}
-          onClick={() => setTab('filter')}
-        >
-          Фильтр
-        </button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => setTab('view')}
-        >
-          Просмотреть
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+        </div>
         {tab === 'view' ? (
           <>
             <button
               type="button"
-              className={layout.iconBtn}
+              className={arena.iconBtn}
               disabled={busy}
               aria-label="Обновить"
               onClick={() => void load()}
             >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns}
+            <div className={arena.exportBtns}>
+                                    <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+                                      HTML
+                                    </button>
+                                    <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+                                      Excel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={arena.exportBtn}
+                                      disabled={exportDisabled}
+                                      onClick={() => void ensureReport().then((d) => d && exportCsvFrom(d))}
+                                    >
+                                      CSV
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={arena.exportBtn}
+                                      disabled={exportDisabled}
+                                      onClick={() => void ensureReport().then((d) => d && exportXmlFrom(d))}
+                                    >
+                                      XML
+                                    </button>
+                                  </div>
           </>
         ) : null}
       </div>
 
-      {error ? <p className={layout.error}>{error}</p> : null}
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-venus-mars" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет по гендерному разделению сотрудников</h1>
+          <p className={shared.pageSubtitle}>
+            Распределение сотрудников по полу в разрезе возраста, опыта, разряда или образования
+          </p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={layout.card} onSubmit={(e) => void generate(e)}>
-          <div className={extra.stack}>
-            <div className={layout.field}>
-              <label htmlFor="gender-date">Дата</label>
-              <input
-                id="gender-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
+            <label htmlFor="gender-date">Дата</label>
+            <input
+              id="gender-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className={arena.field}>
+            <label>Подразделение</label>
+            <div className={styles.lookup}>
+              <SearchLookup
+                value={divisionId}
+                options={divisions}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setDivisionId}
               />
             </div>
-            <div className={layout.field}>
-              <label>Подразделение</label>
-              <div className={extra.lookup}>
-                <SearchLookup
-                  value={divisionId}
-                  options={divisions}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setDivisionId}
-                />
-              </div>
+          </div>
+          <div className={`${arena.field} ${styles.fieldWide}`}>
+            <label>Тип отчета</label>
+            <div className={styles.radios}>
+              {TYPES.map((t) => (
+                <label key={t.id} className={styles.radio}>
+                  <input
+                    type="radio"
+                    name="gender-report-type"
+                    checked={reportType === t.id}
+                    onChange={() => changeType(t.id)}
+                  />
+                  {t.label}
+                </label>
+              ))}
             </div>
-            <div className={extra.typeBlock}>
-              <div className={extra.typeLabel}>Тип отчета</div>
-              <div className={extra.radios}>
-                {TYPES.map((t) => (
-                  <label key={t.id} className={extra.radio}>
-                    <input
-                      type="radio"
-                      name="gender-report-type"
-                      checked={reportType === t.id}
-                      onChange={() => changeType(t.id)}
-                    />
-                    {t.label}
-                  </label>
+          </div>
+
+          {reportType === 'age' || reportType === 'experience' ? (
+            <div className={`${arena.field} ${styles.fieldWide}`}>
+              <label>Диапазоны</label>
+              <div className={styles.rangeAdd}>
+                <input
+                  inputMode="numeric"
+                  value={draftMin}
+                  placeholder=""
+                  onChange={(e) => setDraftMin(e.target.value.replace(/[^\d]/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addBand();
+                    }
+                  }}
+                />
+                <input
+                  inputMode="numeric"
+                  value={draftMax}
+                  placeholder=""
+                  onChange={(e) => setDraftMax(e.target.value.replace(/[^\d]/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addBand();
+                    }
+                  }}
+                />
+                <button type="button" className={styles.plus} onClick={addBand} aria-label="Добавить">
+                  +
+                </button>
+              </div>
+              <div className={styles.rangeList}>
+                {bands.map((b, i) => (
+                  <div key={`${b.min}-${b.max}-${i}`} className={styles.rangeRow}>
+                    <span>{bandLabel(b)}</span>
+                    <button
+                      type="button"
+                      className={styles.trash}
+                      aria-label="Удалить"
+                      onClick={() => setBands((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      <i className="fas fa-trash-alt" aria-hidden />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
+          ) : null}
 
-            {reportType === 'age' || reportType === 'experience' ? (
-              <>
-                <div className={extra.rangeAdd}>
-                  <input
-                    inputMode="numeric"
-                    value={draftMin}
-                    placeholder=""
-                    onChange={(e) => setDraftMin(e.target.value.replace(/[^\d]/g, ''))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addBand();
-                      }
-                    }}
-                  />
-                  <input
-                    inputMode="numeric"
-                    value={draftMax}
-                    placeholder=""
-                    onChange={(e) => setDraftMax(e.target.value.replace(/[^\d]/g, ''))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addBand();
-                      }
-                    }}
-                  />
-                  <button type="button" className={extra.plus} onClick={addBand} aria-label="Добавить">
-                    +
-                  </button>
-                </div>
-                <div className={extra.rangeList}>
-                  {bands.map((b, i) => (
-                    <div key={`${b.min}-${b.max}-${i}`} className={extra.rangeRow}>
-                      <span>{bandLabel(b)}</span>
-                      <button
-                        type="button"
-                        className={extra.trash}
-                        aria-label="Удалить"
-                        onClick={() => setBands((prev) => prev.filter((_, idx) => idx !== i))}
-                      >
-                        <i className="fas fa-trash-alt" aria-hidden />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {reportType === 'grade' ? (
-              <div className={layout.field}>
-                <label>Разряды</label>
-                <div className={extra.lookup}>
-                  <SearchLookup
-                    value={gradeId}
-                    options={grades}
-                    placeholder="Поиск..."
-                    allowClear
-                    onChange={setGradeId}
-                  />
-                </div>
+          {reportType === 'grade' ? (
+            <div className={arena.field}>
+              <label>Разряды</label>
+              <div className={styles.lookup}>
+                <SearchLookup
+                  value={gradeId}
+                  options={grades}
+                  placeholder="Поиск..."
+                  allowClear
+                  onChange={setGradeId}
+                />
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {reportType === 'education' ? (
-              <div className={layout.field}>
-                <label>Виды образования</label>
-                <div className={extra.lookup}>
-                  <SearchLookup
-                    value={educationType}
-                    options={eduTypes}
-                    placeholder="Поиск..."
-                    allowClear
-                    onChange={setEducationType}
-                  />
-                </div>
+          {reportType === 'education' ? (
+            <div className={arena.field}>
+              <label>Виды образования</label>
+              <div className={styles.lookup}>
+                <SearchLookup
+                  value={educationType}
+                  options={eduTypes}
+                  placeholder="Поиск..."
+                  allowClear
+                  onChange={setEducationType}
+                />
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            {exportBtns}
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+              HTML
+            </button>
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+              Excel
+            </button>
+            <button
+              type="button"
+              className={arena.exportBtn}
+              disabled={exportDisabled}
+              onClick={() => void ensureReport().then((d) => d && exportCsvFrom(d))}
+            >
+              CSV
+            </button>
+            <button
+              type="button"
+              className={arena.exportBtn}
+              disabled={exportDisabled}
+              onClick={() => void ensureReport().then((d) => d && exportXmlFrom(d))}
+            >
+              XML
+            </button>
           </div>
         </form>
       ) : (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <p className={layout.dateLine}>Дата: {fmtRu(report.date)}</p>
-              <div className={extra.tableWrap}>
-                <table className={extra.table}>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  Дата: {fmtRu(report.date)}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-layer-group" aria-hidden />
+                  {TYPES.find((t) => t.id === report.reportType)?.label || report.bucketLabel}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-users" aria-hidden />
+                  Строк: {report.rows.length}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
                   <thead>
                     <tr>
                       <th>{report.bucketLabel}</th>
@@ -573,16 +628,16 @@ export default function GenderReportPage() {
                         {report.rows.map((r) => (
                           <tr key={r.label}>
                             <td>{r.label}</td>
-                            <td className={extra.num}>{fmtNum(r.male)}</td>
-                            <td className={extra.num}>{fmtNum(r.female)}</td>
-                            <td className={extra.num}>{fmtNum(r.total)}</td>
+                            <td className={styles.num}>{fmtNum(r.male)}</td>
+                            <td className={styles.num}>{fmtNum(r.female)}</td>
+                            <td className={styles.num}>{fmtNum(r.total)}</td>
                           </tr>
                         ))}
-                        <tr className={extra.totalRow}>
+                        <tr className={styles.totalRow}>
                           <td>Итого</td>
-                          <td className={extra.num}>{fmtNum(report.totals.male)}</td>
-                          <td className={extra.num}>{fmtNum(report.totals.female)}</td>
-                          <td className={extra.num}>{fmtNum(report.totals.total)}</td>
+                          <td className={styles.num}>{fmtNum(report.totals.male)}</td>
+                          <td className={styles.num}>{fmtNum(report.totals.female)}</td>
+                          <td className={styles.num}>{fmtNum(report.totals.total)}</td>
                         </tr>
                       </>
                     )}

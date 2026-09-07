@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -433,10 +435,10 @@ function RolesInner({ section }: { section: RolesSection }) {
     );
   }
 
-  if (mode !== 'list') {
+  if (mode === 'view') {
     const viewRow = editId ? rows.find((r) => r.id === editId) : null;
     const meta = asRoleMeta(viewRow?.meta);
-    if (mode === 'view' && viewRow) {
+    if (viewRow) {
       return (
         <div className={styles.wrap}>
           <PageSubnav group={{ title: 'Роль (просмотр)', siblings: [] }} />
@@ -554,56 +556,6 @@ function RolesInner({ section }: { section: RolesSection }) {
         </div>
       );
     }
-
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title: mode === 'edit' ? 'Роль (изменение)' : 'Роль (создание)',
-            siblings: [],
-          }}
-        />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button
-              type="button"
-              className={formStyles.btnSave}
-              disabled={saving}
-              onClick={() => void saveRole()}
-            >
-              Сохранить
-            </button>
-            <button type="button" className={formStyles.btnClose} onClick={() => setMode('list')}>
-              Закрыть
-            </button>
-          </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${formStyles.cardForm}`}>
-            <div className={formStyles.field}>
-              <label>
-                Название <span className={formStyles.req}>*</span>
-              </label>
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className={formStyles.field} style={{ maxWidth: 280 }}>
-              <label>Порядковый номер</label>
-              <input value={seq} onChange={(e) => setSeq(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>Статус</label>
-              <label className={formStyles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                  onClick={() => setActive((v) => !v)}
-                />
-                <span>Активный</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -835,6 +787,61 @@ function RolesInner({ section }: { section: RolesSection }) {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={mode === 'edit' ? 'Роль (изменение)' : 'Роль (создание)'}
+        width="md"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void saveRole()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>
+            Название <span className={modal.req}>*</span>
+          </label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>Порядковый номер</label>
+          <input value={seq} onChange={(e) => setSeq(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <span>Статус</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+              onClick={() => setActive((v) => !v)}
+            />
+            <span>{active ? 'Активный' : 'Неактивный'}</span>
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }

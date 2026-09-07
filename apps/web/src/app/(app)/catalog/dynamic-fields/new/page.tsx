@@ -1,7 +1,13 @@
 'use client';
 
-import { DynamicFieldForm } from '../DynamicFieldForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewDynamicFieldPage() {
-  return <DynamicFieldForm />;
+/** Legacy /new → list with create modal */
+export default function NewDynamicFieldRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/dynamic-fields?create=1');
+  }, [router]);
+  return null;
 }

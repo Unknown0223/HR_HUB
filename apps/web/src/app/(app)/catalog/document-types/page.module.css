@@ -1,16 +1,27 @@
 .btnOutline {
   appearance: none;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1.5px solid #e3e9f1;
+  border-radius: 12px;
   background: #fff;
-  color: #374151;
+  color: #354862;
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.85rem;
+  font-size: 13px;
+  font-weight: 650;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 14px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.btnOutline:hover:not(:disabled) {
+  background: #f2f5f9;
+  border-color: rgba(10, 133, 226, 0.4);
+  color: #0a85e2;
 }
 
 .btnOutline:disabled {
@@ -20,17 +31,28 @@
 
 .btnDanger {
   appearance: none;
-  border: none;
-  border-radius: 4px;
-  background: #f1416c;
-  color: #fff;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b91c1c;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.85rem;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 14px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #9f1239;
 }
 
 .btnDanger:disabled {
@@ -54,7 +76,7 @@
 .side {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.9rem 1rem;
   display: flex;
   flex-direction: column;
@@ -83,14 +105,14 @@
   font: inherit;
   font-size: 0.85rem;
   padding: 0.45rem 0.55rem;
-  border-radius: 4px;
+  border-radius: 8px;
   color: #5e6278;
   cursor: pointer;
 }
 
 .sideNavOn {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
   font-weight: 600;
 }
 
@@ -119,7 +141,7 @@
   align-items: center;
   padding: 0 0.65rem;
   border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  border-radius: 8px;
   background: #f9fafb;
   color: #3f4254;
   font-size: 0.9rem;

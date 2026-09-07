@@ -66,7 +66,17 @@ function isoDate(v?: string | null) {
   return String(v).slice(0, 10);
 }
 
-export function ProductionCalendarForm({ calendarId }: { calendarId?: string }) {
+export function ProductionCalendarForm({
+  calendarId,
+  embedded,
+  onClose,
+  onSaved,
+}: {
+  calendarId?: string;
+  embedded?: boolean;
+  onClose?: () => void;
+  onSaved?: (id: string) => void;
+}) {
   const router = useRouter();
   const isNew = !calendarId;
   const [loading, setLoading] = useState(!isNew);
@@ -175,8 +185,9 @@ export function ProductionCalendarForm({ calendarId }: { calendarId?: string }) 
           body: JSON.stringify(body),
         });
         setTotals(created.totals || null);
-        router.replace(`/catalog/production-calendars/${created.id}`);
         setSaved('Сохранено');
+        if (onSaved) onSaved(created.id);
+        else router.replace(`/catalog/production-calendars/${created.id}`);
       } else {
         const updated = await apiFetch<Calendar>(
           `/api/attendance/production-calendars/${calendarId}`,
@@ -184,6 +195,7 @@ export function ProductionCalendarForm({ calendarId }: { calendarId?: string }) 
         );
         setTotals(updated.totals || null);
         setSaved('Сохранено');
+        if (onSaved) onSaved(calendarId!);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
@@ -214,21 +226,31 @@ export function ProductionCalendarForm({ calendarId }: { calendarId?: string }) 
 
   if (loading) return <p className={styles.muted}>Загрузка…</p>;
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>
-          Производственный календарь ({isNew ? 'создание' : 'изменение'})
-        </h1>
-        <div className={styles.actions}>
-          <button type="button" className={styles.btnSave} disabled={busy} onClick={() => void save()}>
-            Сохранить
+  const chrome = (
+    <div className={styles.topBar}>
+      <h1 className={styles.title}>
+        Производственный календарь ({isNew ? 'создание' : 'изменение'})
+      </h1>
+      <div className={styles.actions}>
+        <button type="button" className={styles.btnSave} disabled={busy} onClick={() => void save()}>
+          Сохранить
+        </button>
+        {embedded ? (
+          <button type="button" className={styles.btnClose} onClick={() => onClose?.()}>
+            Закрыть
           </button>
+        ) : (
           <Link href="/catalog/production-calendars" className={styles.btnClose}>
             Закрыть
           </Link>
-        </div>
+        )}
       </div>
+    </div>
+  );
+
+  return (
+    <div className={embedded ? undefined : styles.page}>
+      {chrome}
 
       {error ? <p className={styles.error}>{error}</p> : null}
       {saved ? <p className={styles.ok}>{saved}</p> : null}

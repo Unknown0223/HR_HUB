@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { QUICKSTART_STEPS, type QuickstartState } from '@/lib/quickstart';
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
+import shared from '../../../page-shared.module.css';
 import ui from './page.module.css';
 
 export function QuickstartPage() {
@@ -63,7 +64,18 @@ export function QuickstartPage() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={{ title: 'Инструкция для быстрого запуска', siblings: [] }} />
+      <PageSubnav groupKey="settings-admin" />
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeRequest}`}>
+          <i className="fas fa-rocket" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Инструкция для быстрого запуска</h1>
+          <p className={shared.pageSubtitle}>
+            Чек-лист первоначальной настройки системы
+          </p>
+        </div>
+      </div>
       <div className={formStyles.actions} style={{ marginBottom: '0.5rem' }}>
         <button type="button" className={formStyles.btnClose} onClick={() => router.push('/settings?tab=admin')}>
           Закрыть

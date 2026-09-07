@@ -1,7 +1,5 @@
-'use client';
-
-import { PositionForm } from '../PositionForm';
+import { redirect } from 'next/navigation';
 
 export default function NewPositionPage() {
-  return <PositionForm mode="create" />;
+  redirect('/positions?tab=positions&create=1');
 }

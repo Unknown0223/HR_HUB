@@ -242,23 +242,31 @@ function LocationDetailInner() {
     );
   }, [row, search]);
 
-  if (loading) return <p>Загрузка…</p>;
-  if (!row) return <p className={styles.error}>{error || 'Локация не найдена'}</p>;
+  if (loading) return <div className={styles.page}><p style={{ padding: '2rem', color: '#64788f' }}>Загрузка…</p></div>;
+  if (!row) return <div className={styles.page}><p className={styles.error}>{error || 'Локация не найдена'}</p></div>;
 
   const lat = row.latitude;
   const lon = row.longitude;
   const hasGeo = lat != null && lon != null && !Number.isNaN(lat) && !Number.isNaN(lon);
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>Локация (просмотр)</h1>
-        <div className={styles.actions}>
-          <button type="button" className={styles.btnEdit} onClick={() => setEditOpen(true)}>
+    <div className={styles.page}>
+      {/* ── Header ── */}
+      <div className={styles.header}>
+        <div className={styles.iconBadge}>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z" fill="currentColor"/></svg>
+        </div>
+        <div className={styles.headerText}>
+          <h1 className={styles.h1}>{row.name}</h1>
+          <p className={styles.subtitle}>{row.code}{row.address ? ` · ${row.address}` : ''}{row.timezone ? ` · ${row.timezone}` : ''}</p>
+        </div>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.btnPrimary} onClick={() => setEditOpen(true)}>
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M16.474 5.408l2.118 2.118m-.756-3.982L12.109 9.27a2.118 2.118 0 00-.58 1.082L11 13l2.648-.529c.404-.08.777-.27 1.082-.58l5.727-5.727a1.853 1.853 0 00-2.983-2.756z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 15v3a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Изменить
           </button>
           <Link href="/catalog/locations" className={styles.btnGhost}>
-            Закрыть
+            ← Назад
           </Link>
         </div>
       </div>
@@ -408,6 +416,7 @@ function LocationDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -439,7 +448,7 @@ function LocationDetailInner() {
                         <td>{d._count?.employees ?? 0}</td>
                         <td>{fmtDate(d.openedAt)}</td>
                         <td>
-                          <span className={styles.pillActive}>
+                          <span className={d.isActive ? styles.pillActive : styles.pillInactive}>
                             {d.isActive ? 'Активный' : 'Неактивный'}
                           </span>
                         </td>
@@ -448,6 +457,7 @@ function LocationDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
@@ -464,6 +474,7 @@ function LocationDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -504,6 +515,7 @@ function LocationDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
@@ -520,6 +532,7 @@ function LocationDetailInner() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -554,12 +567,14 @@ function LocationDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
 
           {tab === 'history' ? (
             <>
               <h2 className={styles.sectionTitle}>История изменений</h2>
+              <div className={styles.panel}><div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -592,6 +607,7 @@ function LocationDetailInner() {
                   )}
                 </tbody>
               </table>
+              </div></div>
             </>
           ) : null}
         </section>

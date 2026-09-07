@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
 import treeS from '../dismissals-by-reason/page.module.css';
 import posS from '../positions/page.module.css';
@@ -140,6 +141,19 @@ function fmtRu(iso?: string) {
   if (!y || !m || !d) return iso;
   return `${d}.${m}.${y}`;
 }
+function fmtGen(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
 function fileStamp(iso?: string) {
   const d = iso ? new Date(iso) : new Date();
   const dd = String(d.getDate()).padStart(2, '0');
@@ -240,7 +254,7 @@ function DatePicker({ value, onChange }: { value: string; onChange: (ymd: string
   }, [open]);
   return (
     <div className={extra.periodWrap} ref={wrapRef}>
-      <button type="button" className={s.periodBtn} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={arena.periodBtn} onClick={() => setOpen((v) => !v)}>
         {fmtRu(value)}
       </button>
       {open ? (
@@ -540,7 +554,7 @@ function printHtml(report: Payload, leaves: Leaf[]) {
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .meta{padding:10px 16px;font-size:13px}
@@ -713,59 +727,76 @@ export default function EmployeesReportPage() {
   }
 
   const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : extra.exportLinks}>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportCsv(d))}>CSV</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportXml(d))}>XML</button>
+    <div className={ghost ? arena.exportBtns : arena.exportLinks}>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportCsv(d))}>CSV</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportXml(d))}>XML</button>
     </div>
   );
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>Отчет по сотрудникам</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>Фильтр</button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
-        <button type="button" className={tab === 'settings' ? layout.tabOn : layout.tab} onClick={() => setTab('settings')}>Настройки</button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button type="button" className={tab === 'filter' ? arena.tabOn : arena.tab} onClick={() => setTab('filter')}>Фильтр</button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+          <button type="button" className={tab === 'settings' ? arena.tabOn : arena.tab} onClick={() => setTab('settings')}>Настройки</button>
+        </div>
         {tab === 'settings' ? (
           <>
-            <button type="button" className={layout.tabOn} onClick={saveSettings}>Сохранить</button>
-            <button type="button" className={layout.tab} onClick={resetSettings}>Сбросить</button>
+            <button type="button" className={arena.ghostBtn} onClick={saveSettings}>Сохранить</button>
+            <button type="button" className={arena.ghostBtn} onClick={resetSettings}>Сбросить</button>
           </>
         ) : null}
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
             {exportBtns(true)}
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-users" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет по сотрудникам</h1>
+          <p className={shared.pageSubtitle}>Список сотрудников с кадровыми, контактными и образовательными данными</p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
       {savedNote ? <p className={s.saved}>{savedNote}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${s.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Дата</label>
             <DatePicker value={date} onChange={setDate} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Группы подразделений</label>
             <FilterPick options={divisionGroups} selected={divisionGroupIds} onChange={setDivisionGroupIds} />
           </div>
-          <div className={layout.field}>
+          <div className={`${arena.field} ${arena.fieldWide}`}>
             <div className={s.labelRow}>
               <label>Подразделения</label>
               <button type="button" className={s.switchBtn} onClick={() => setFilterByDept((v) => !v)}>
@@ -777,31 +808,31 @@ export default function EmployeesReportPage() {
             </div>
             <DivisionTree nodes={tree} selected={new Set(divisionIds)} onChange={(next) => setDivisionIds([...next])} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Должности</label>
             <FilterPick options={positions} selected={positionIds} onChange={setPositionIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Сотрудники</label>
             <FilterPick options={employees} selected={employeeIds} onChange={setEmployeeIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Виды образования</label>
             <FilterPick options={eduOpts} selected={educationTypes} onChange={setEducationTypes} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>График работы</label>
             <FilterPick options={schedules} selected={scheduleIds} onChange={setScheduleIds} />
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>{busy ? 'Формирование…' : 'Составить отчет'}</button>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>{busy ? 'Формирование…' : 'Составить отчет'}</button>
             {exportBtns(false)}
           </div>
         </form>
       ) : null}
 
       {tab === 'settings' ? (
-        <div className={`${layout.card} ${s.settingsCard}`}>
+        <div className={arena.settingsCard}>
           <div className={s.checkGrid}>
             {SETTINGS_FIELDS.map((f) => (
               <label key={f.id} className={s.check}>
@@ -818,16 +849,34 @@ export default function EmployeesReportPage() {
       ) : null}
 
       {tab === 'view' ? (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <p className={s.periodLine}>
-                Дата: {report.dateLabel} &nbsp; Общая зарплата: {fmtMoney(report.totalSalary)}
-              </p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  Дата: {report.dateLabel}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-users" aria-hidden />
+                  Строк: {report.rows.length}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-coins" aria-hidden />
+                  Общая зарплата: {fmtMoney(report.totalSalary)}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <div className={s.tableWrap}>
                 <table className={s.table}>
                   <thead>

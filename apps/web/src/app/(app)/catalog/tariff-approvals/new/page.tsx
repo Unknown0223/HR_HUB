@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense } from 'react';
-import { TariffApprovalForm } from '../TariffApprovalForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewTariffApprovalPage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <TariffApprovalForm mode="create" />
-    </Suspense>
-  );
+/** Legacy /new → list with create modal */
+export default function NewTariffApprovalRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/tariff-approvals?create=1');
+  }, [router]);
+  return null;
 }

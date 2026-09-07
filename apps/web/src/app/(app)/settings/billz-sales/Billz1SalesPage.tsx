@@ -19,6 +19,7 @@ import {
 import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import local from '../../catalog/document-types/page.module.css';
+import shared from '../../../page-shared.module.css';
 import extra from '../artix/page.module.css';
 import iikoLocal from '../iiko/page.module.css';
 import salesCss from '../iiko-sales/page.module.css';
@@ -314,6 +315,17 @@ function Billz1SalesInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav group={SIBLINGS} />
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-receipt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Продажи Billz 1.0</h1>
+          <p className={shared.pageSubtitle}>
+            Загрузка и сопоставление продаж Billz 1.0 по подразделениям и продавцам
+          </p>
+        </div>
+      </div>
       {error ? <p className={styles.error}>{error}</p> : null}
       {ok ? <p className={formStyles.ok}>{ok}</p> : null}
       <div className={styles.toolbar}>
@@ -403,7 +415,9 @@ function Billz1SalesInner() {
                 })),
               )
             }
+            title="Экспорт Excel"
           >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
@@ -414,6 +428,7 @@ function Billz1SalesInner() {
             className={styles.toolBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
           >
             ‹
           </button>
@@ -423,6 +438,7 @@ function Billz1SalesInner() {
             className={styles.toolBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
             ›
           </button>
@@ -430,9 +446,11 @@ function Billz1SalesInner() {
             type="button"
             className={styles.toolBtn}
             onClick={() => void load()}
+            title="Обновить"
             aria-label="Обновить"
           >
-            ↻
+            <i className="fas fa-sync-alt" aria-hidden />
+            Обновить
           </button>
         </div>
       </div>

@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { useUrlParam } from '@/lib/use-url-state';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
+import { PageSubnav } from '@/components/PageSubnav';
 import { SystemSettingsPanel } from './SystemSettingsPanel';
 import styles from '../../page-shared.module.css';
 
@@ -169,6 +172,21 @@ export default function SettingsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [audit, setAudit] = useState<Audit[]>([]);
   const [dictId, setDictId] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
+  const [itemMode, setItemMode] = useState<'none' | 'create' | 'edit'>('none');
+  const [editItemId, setEditItemId] = useState<string | null>(null);
+  const [itemCode, setItemCode] = useState('');
+  const [itemName, setItemName] = useState('');
+  const [itemPlate, setItemPlate] = useState('');
+  const [itemVin, setItemVin] = useState('');
+  const [itemIsDebit, setItemIsDebit] = useState(true);
+  const [itemIsCredit, setItemIsCredit] = useState(true);
+  const [itemCurrency, setItemCurrency] = useState('UZS');
+  const [itemSaving, setItemSaving] = useState(false);
+  const [dictModalOpen, setDictModalOpen] = useState(false);
+  const [newDictCode, setNewDictCode] = useState('');
+  const [newDictName, setNewDictName] = useState('');
+  const [dictSaving, setDictSaving] = useState(false);
 
   async function load() {
     setError('');
@@ -264,6 +282,9 @@ export default function SettingsPage() {
     if (tab === 'admin' && panel === 'import_docs') {
       router.replace('/settings/person-docs');
     }
+    if (tab === 'audit') {
+      router.replace('/settings/audit');
+    }
     if (tab === 'users') {
       router.replace('/settings/users');
     }
@@ -332,52 +353,109 @@ export default function SettingsPage() {
     await load();
   }
 
-  async function createDict(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const kind = tab === 'extra' ? 'extra' : tab === 'admin' ? 'admin' : 'core';
-    const d = await apiFetch<Dict>('/api/settings/dictionaries', {
-      method: 'POST',
-      body: JSON.stringify({
-        code: fd.get('code'),
-        name: fd.get('name'),
-        kind,
-      }),
-    });
-    setDictId(d.id);
-    setDictCode(d.code);
-    e.currentTarget.reset();
-    await load();
+  async function createDict() {
+    if (!newDictCode.trim() || !newDictName.trim()) return;
+    setDictSaving(true);
+    setError('');
+    try {
+      const kind = tab === 'extra' ? 'extra' : tab === 'admin' ? 'admin' : 'core';
+      const d = await apiFetch<Dict>('/api/settings/dictionaries', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: newDictCode.trim(),
+          name: newDictName.trim(),
+          kind,
+        }),
+      });
+      setDictId(d.id);
+      setDictCode(d.code);
+      setDictModalOpen(false);
+      setNewDictCode('');
+      setNewDictName('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setDictSaving(false);
+    }
   }
 
-  async function addItem(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!dictId) return;
-    const fd = new FormData(e.currentTarget);
+  function openCreateItem() {
+    setEditItemId(null);
+    setItemCode('');
+    setItemName('');
+    setItemPlate('');
+    setItemVin('');
+    setItemIsDebit(true);
+    setItemIsCredit(true);
+    setItemCurrency('UZS');
+    setItemMode('create');
+    setError('');
+  }
+
+  function openEditItem(item: {
+    id: string;
+    code: string;
+    name: string;
+    meta?: Record<string, unknown> | null;
+  }) {
+    const meta = (item.meta ?? {}) as Record<string, unknown>;
+    setEditItemId(item.id);
+    setItemCode(item.code);
+    setItemName(item.name);
+    setItemPlate(String(meta.plate ?? ''));
+    setItemVin(String(meta.vin ?? ''));
+    setItemIsDebit(meta.isDebit !== false);
+    setItemIsCredit(meta.isCredit !== false);
+    setItemCurrency(String(meta.currency ?? 'UZS'));
+    setItemMode('edit');
+    setError('');
+  }
+
+  function closeItemModal() {
+    setItemMode('none');
+    setEditItemId(null);
+  }
+
+  async function saveItem() {
+    if (!dictId || !itemCode.trim() || !itemName.trim()) return;
     const code = selected?.code;
     const meta: Record<string, unknown> = {};
     if (code === 'cars') {
-      const plate = String(fd.get('plate') || '').trim();
-      const vin = String(fd.get('vin') || '').trim();
-      if (plate) meta.plate = plate;
-      if (vin) meta.vin = vin;
+      if (itemPlate.trim()) meta.plate = itemPlate.trim();
+      if (itemVin.trim()) meta.vin = itemVin.trim();
     }
     if (code === 'coa') {
-      meta.isDebit = fd.get('isDebit') === 'on';
-      meta.isCredit = fd.get('isCredit') === 'on';
-      const currency = String(fd.get('currency') || '').trim();
-      if (currency) meta.currency = currency;
+      meta.isDebit = itemIsDebit;
+      meta.isCredit = itemIsCredit;
+      if (itemCurrency.trim()) meta.currency = itemCurrency.trim();
     }
-    await apiFetch(`/api/settings/dictionaries/${dictId}/items`, {
-      method: 'POST',
-      body: JSON.stringify({
-        code: fd.get('code'),
-        name: fd.get('name'),
-        ...(Object.keys(meta).length ? { meta } : {}),
-      }),
-    });
-    e.currentTarget.reset();
-    await load();
+    const body = {
+      code: itemCode.trim(),
+      name: itemName.trim(),
+      ...(Object.keys(meta).length ? { meta } : {}),
+    };
+    setItemSaving(true);
+    setError('');
+    try {
+      if (itemMode === 'edit' && editItemId) {
+        await apiFetch(`/api/settings/dictionaries/${dictId}/items/${editItemId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
+      } else {
+        await apiFetch(`/api/settings/dictionaries/${dictId}/items`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+      }
+      closeItemModal();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setItemSaving(false);
+    }
   }
 
   async function deleteItem(itemId: string) {
@@ -460,244 +538,433 @@ export default function SettingsPage() {
     setDictCode(code);
     const match = dicts.find((d) => d.code === code);
     if (match) setDictId(match.id);
+    setItemSearch('');
   }
+
+  const filteredItems = useMemo(() => {
+    const items = selected?.items ?? [];
+    const q = itemSearch.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((i) => {
+      const meta = (i.meta ?? {}) as Record<string, unknown>;
+      const blob = [
+        i.code,
+        i.name,
+        String(meta.plate ?? ''),
+        String(meta.vin ?? ''),
+        String(meta.currency ?? ''),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [selected?.items, itemSearch]);
+
+  const itemColSpan =
+    selected?.code === 'cars' ? 5 : selected?.code === 'coa' ? 6 : 3;
 
   function renderDictionaryCrud(title: string) {
     return (
-      <div className={styles.split}>
-        <div className={styles.panel}>
-          <h2 style={{ fontSize: '1rem', margin: '0 0 0.75rem', padding: '0 1rem' }}>{title}</h2>
-          <div style={{ padding: '0 1rem 1rem', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {dictNavCodes.map((code) => {
-              const d = dicts.find((x) => x.code === code);
-              const label = d?.name ?? code;
-              return (
+      <>
+        <div className={styles.split}>
+          <div className={styles.panel}>
+            <h2 style={{ fontSize: '1rem', margin: '0 0 0.75rem', padding: '1rem 1rem 0' }}>
+              {title}
+            </h2>
+            <div style={{ padding: '0 1rem 1rem', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {dictNavCodes.map((code) => {
+                const d = dicts.find((x) => x.code === code);
+                const label = d?.name ?? code;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    className={
+                      (dictCode || selected?.code) === code ? styles.tabActive : styles.tab
+                    }
+                    onClick={() => selectDictByCode(code)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className={styles.toolbar} style={{ padding: '0 1rem', marginBottom: 8 }}>
+              <div className={styles.leftActions}>
                 <button
-                  key={code}
                   type="button"
-                  className={
-                    (dictCode || selected?.code) === code ? styles.tabActive : styles.tab
-                  }
-                  onClick={() => selectDictByCode(code)}
+                  className={styles.createBtn}
+                  onClick={() => {
+                    setNewDictCode('');
+                    setNewDictName('');
+                    setDictModalOpen(true);
+                  }}
                 >
-                  {label}
+                  <i className="fas fa-plus" aria-hidden />
+                  Справочник
                 </button>
-              );
-            })}
+              </div>
+              <div className={styles.rightTools}>
+                <span className={styles.countBadge}>{dicts.length}</span>
+              </div>
+            </div>
+            <div style={{ padding: '0 1rem 1rem' }}>
+              {dicts.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className={dictId === d.id ? styles.tabActive : styles.tab}
+                  style={{ display: 'block', width: '100%', marginBottom: 6, textAlign: 'left' }}
+                  onClick={() => {
+                    setDictId(d.id);
+                    setDictCode(d.code);
+                    setItemSearch('');
+                  }}
+                >
+                  {d.name} ({d.code})
+                </button>
+              ))}
+            </div>
           </div>
-          <form className={styles.form} onSubmit={createDict}>
-            <label>
-              Код
-              <input name="code" required placeholder="new_dict" />
-            </label>
-            <label>
-              Наименование
-              <input name="name" required placeholder="Новый справочник" />
-            </label>
-            <button className={styles.btn} type="submit">
-              Создать справочник
-            </button>
-          </form>
-          <div style={{ padding: '0 1rem 1rem' }}>
-            {dicts.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                className={dictId === d.id ? styles.tabActive : styles.tab}
-                style={{ display: 'block', width: '100%', marginBottom: 6, textAlign: 'left' }}
-                onClick={() => {
-                  setDictId(d.id);
-                  setDictCode(d.code);
-                }}
-              >
-                {d.name} ({d.code})
-              </button>
-            ))}
+
+          <div>
+            <div className={styles.toolbar}>
+              <div className={styles.leftActions}>
+                <button
+                  type="button"
+                  className={styles.createBtn}
+                  disabled={!dictId}
+                  onClick={openCreateItem}
+                >
+                  <i className="fas fa-plus" aria-hidden />
+                  Создать
+                </button>
+              </div>
+              <div className={styles.rightTools}>
+                <div className={styles.searchWrap}>
+                  <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+                  <input
+                    className={styles.search}
+                    placeholder="Поиск…"
+                    value={itemSearch}
+                    onChange={(e) => setItemSearch(e.target.value)}
+                    aria-label="Поиск элементов"
+                  />
+                </div>
+                <span className={styles.countBadge}>
+                  {filteredItems.length}
+                  {selected?.items?.length != null && filteredItems.length !== selected.items.length
+                    ? ` / ${selected.items.length}`
+                    : ''}
+                </span>
+                <button
+                  type="button"
+                  className={styles.iconBtn}
+                  onClick={() => void load()}
+                  title="Обновить"
+                  aria-label="Обновить"
+                >
+                  <i className="fas fa-sync-alt" aria-hidden />
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.tableCard}>
+              <table className={styles.dataTable}>
+                <thead>
+                  <tr>
+                    <th>Код</th>
+                    <th>Наименование</th>
+                    {selected?.code === 'cars' ? (
+                      <>
+                        <th>Гос. номер</th>
+                        <th>VIN</th>
+                      </>
+                    ) : null}
+                    {selected?.code === 'coa' ? (
+                      <>
+                        <th>Дт</th>
+                        <th>Кт</th>
+                        <th>Валюта</th>
+                      </>
+                    ) : null}
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((i) => {
+                    const meta = (i.meta ?? {}) as Record<string, unknown>;
+                    return (
+                      <tr key={i.id}>
+                        <td>{i.code}</td>
+                        <td>{i.name}</td>
+                        {selected?.code === 'cars' ? (
+                          <>
+                            <td>{String(meta.plate ?? i.code)}</td>
+                            <td>{String(meta.vin ?? '—')}</td>
+                          </>
+                        ) : null}
+                        {selected?.code === 'coa' ? (
+                          <>
+                            <td>{meta.isDebit ? '✓' : '—'}</td>
+                            <td>{meta.isCredit ? '✓' : '—'}</td>
+                            <td>{String(meta.currency ?? 'UZS')}</td>
+                          </>
+                        ) : null}
+                        <td className={styles.actionsCell}>
+                          <span className={styles.rowHoverActions}>
+                            <button
+                              type="button"
+                              className={styles.rowActionBtn}
+                              onClick={() => openEditItem(i)}
+                            >
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.btnGhost}
+                              onClick={() => void deleteItem(i.id)}
+                            >
+                              Удалить
+                            </button>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!filteredItems.length ? (
+                    <tr className={styles.rowExpand}>
+                      <td colSpan={itemColSpan} className={styles.muted}>
+                        {selected?.items?.length
+                          ? 'Ничего не найдено'
+                          : 'Пусто — добавьте элемент'}
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-        <div className={styles.panel}>
-          <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem', padding: '1rem 1rem 0' }}>
-            {selected?.name ?? 'Элементы'}
-            {selected?.code === 'cars'
-              ? ' — код, наименование, гос. номер, VIN'
-              : selected?.code === 'coa'
-                ? ' — код, наименование, дебет/кредит, валюта'
-                : ' — код, наименование'}
-          </h3>
-          <form className={styles.form} onSubmit={addItem}>
-            <label>
-              Код
-              <input name="code" required />
+
+        <FormModal
+          open={dictModalOpen}
+          title="Новый справочник"
+          width="sm"
+          onClose={() => setDictModalOpen(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                className={modal.btnPrimary}
+                disabled={dictSaving || !newDictCode.trim() || !newDictName.trim()}
+                onClick={() => void createDict()}
+              >
+                {dictSaving ? '…' : 'Создать'}
+              </button>
+              <button
+                type="button"
+                className={modal.btnGhost}
+                onClick={() => setDictModalOpen(false)}
+              >
+                Закрыть
+              </button>
+            </>
+          }
+        >
+          <div className={modal.fields}>
+            <label className={modal.field}>
+              <span>
+                Код <em className={modal.req}>*</em>
+              </span>
+              <input
+                value={newDictCode}
+                onChange={(e) => setNewDictCode(e.target.value)}
+                placeholder="new_dict"
+                required
+              />
             </label>
-            <label>
-              Наименование
-              <input name="name" required />
+            <label className={modal.field}>
+              <span>
+                Наименование <em className={modal.req}>*</em>
+              </span>
+              <input
+                value={newDictName}
+                onChange={(e) => setNewDictName(e.target.value)}
+                placeholder="Новый справочник"
+                required
+              />
+            </label>
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={itemMode === 'create' || itemMode === 'edit'}
+          title={
+            itemMode === 'edit'
+              ? `${selected?.name ?? 'Элемент'} (изменение)`
+              : `${selected?.name ?? 'Элемент'} (создание)`
+          }
+          width="md"
+          onClose={closeItemModal}
+          footer={
+            <>
+              <button
+                type="button"
+                className={modal.btnPrimary}
+                disabled={itemSaving || !itemCode.trim() || !itemName.trim()}
+                onClick={() => void saveItem()}
+              >
+                {itemSaving ? '…' : 'Сохранить'}
+              </button>
+              <button type="button" className={modal.btnGhost} onClick={closeItemModal}>
+                Закрыть
+              </button>
+            </>
+          }
+        >
+          <div className={modal.fields}>
+            <label className={modal.field}>
+              <span>
+                Код <em className={modal.req}>*</em>
+              </span>
+              <input
+                value={itemCode}
+                onChange={(e) => setItemCode(e.target.value)}
+                required
+              />
+            </label>
+            <label className={modal.field}>
+              <span>
+                Наименование <em className={modal.req}>*</em>
+              </span>
+              <input
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                required
+              />
             </label>
             {selected?.code === 'cars' ? (
               <>
-                <label>
-                  Гос. номер
-                  <input name="plate" placeholder="01A001AA" />
+                <label className={modal.field}>
+                  <span>Гос. номер</span>
+                  <input
+                    value={itemPlate}
+                    onChange={(e) => setItemPlate(e.target.value)}
+                    placeholder="01A001AA"
+                  />
                 </label>
-                <label>
-                  VIN
-                  <input name="vin" placeholder="XWB…" />
+                <label className={modal.field}>
+                  <span>VIN</span>
+                  <input
+                    value={itemVin}
+                    onChange={(e) => setItemVin(e.target.value)}
+                    placeholder="XWB…"
+                  />
                 </label>
               </>
             ) : null}
             {selected?.code === 'coa' ? (
               <>
-                <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <input name="isDebit" type="checkbox" defaultChecked /> Дебет
+                <label className={modal.checkRow}>
+                  <input
+                    type="checkbox"
+                    checked={itemIsDebit}
+                    onChange={(e) => setItemIsDebit(e.target.checked)}
+                  />
+                  <span>Дебет</span>
                 </label>
-                <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <input name="isCredit" type="checkbox" defaultChecked /> Кредит
+                <label className={modal.checkRow}>
+                  <input
+                    type="checkbox"
+                    checked={itemIsCredit}
+                    onChange={(e) => setItemIsCredit(e.target.checked)}
+                  />
+                  <span>Кредит</span>
                 </label>
-                <label>
-                  Валюта
-                  <input name="currency" placeholder="UZS" defaultValue="UZS" />
+                <label className={modal.field}>
+                  <span>Валюта</span>
+                  <input
+                    value={itemCurrency}
+                    onChange={(e) => setItemCurrency(e.target.value)}
+                    placeholder="UZS"
+                  />
                 </label>
               </>
             ) : null}
-            <button className={styles.btn} type="submit" disabled={!dictId}>
-              Добавить
-            </button>
-          </form>
-          <table>
-            <thead>
-              <tr>
-                <th>Код</th>
-                <th>Наименование</th>
-                {selected?.code === 'cars' ? (
-                  <>
-                    <th>Гос. номер</th>
-                    <th>VIN</th>
-                  </>
-                ) : null}
-                {selected?.code === 'coa' ? (
-                  <>
-                    <th>Дт</th>
-                    <th>Кт</th>
-                    <th>Валюта</th>
-                  </>
-                ) : null}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {(selected?.items ?? []).map((i) => {
-                const meta = (i.meta ?? {}) as Record<string, unknown>;
-                return (
-                  <tr key={i.id}>
-                    <td>{i.code}</td>
-                    <td>{i.name}</td>
-                    {selected?.code === 'cars' ? (
-                      <>
-                        <td>{String(meta.plate ?? i.code)}</td>
-                        <td>{String(meta.vin ?? '—')}</td>
-                      </>
-                    ) : null}
-                    {selected?.code === 'coa' ? (
-                      <>
-                        <td>{meta.isDebit ? '✓' : '—'}</td>
-                        <td>{meta.isCredit ? '✓' : '—'}</td>
-                        <td>{String(meta.currency ?? 'UZS')}</td>
-                      </>
-                    ) : null}
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.btnGhost}
-                        onClick={() => deleteItem(i.id)}
-                      >
-                        Удалить
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {!selected?.items?.length ? (
-                <tr>
-                  <td
-                    colSpan={
-                      selected?.code === 'cars' || selected?.code === 'coa' ? 6 : 3
-                    }
-                    className={styles.muted}
-                  >
-                    Пусто — добавьте элемент
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          </div>
+        </FormModal>
+      </>
     );
   }
 
+  const pageTitle =
+    tab === 'main' && panel === 'news'
+      ? 'Новостная лента'
+      : tab === 'org'
+        ? 'Кадровый учет'
+        : tab === 'dictionaries'
+          ? 'Справочники'
+          : tab === 'extra'
+            ? 'Дополнительные справочники'
+            : tab === 'admin'
+              ? 'Администрирование'
+              : tab === 'users'
+                ? 'Пользователи'
+                : tab === 'integrations'
+                  ? 'Внешние системы'
+                  : tab === 'audit'
+                    ? 'Аудит'
+                    : 'Настройки';
+
+  const pageSubtitle =
+    tab === 'org'
+      ? 'Реквизиты организации, часовой пояс и локаль'
+      : tab === 'main' && panel === 'news'
+        ? 'Служебные объявления для сотрудников'
+        : tab !== 'main'
+          ? 'Организация, справочники, администрирование и внешние системы'
+          : '';
+
+  const pageIcon =
+    tab === 'org'
+      ? 'fa-id-badge'
+      : tab === 'main' && panel === 'news'
+        ? 'fa-newspaper'
+        : tab === 'dictionaries' || tab === 'extra'
+          ? 'fa-book'
+          : tab === 'admin'
+            ? 'fa-tools'
+            : tab === 'users'
+              ? 'fa-users'
+              : tab === 'integrations'
+                ? 'fa-plug'
+                : tab === 'audit'
+                  ? 'fa-history'
+                  : 'fa-cog';
+
+  const pageIconMod =
+    tab === 'org'
+      ? styles.pageIconBadgeHr
+      : tab === 'main' && panel === 'news'
+        ? styles.pageIconBadgeAbsence
+        : tab === 'integrations'
+          ? styles.pageIconBadgeDoc
+          : tab === 'audit'
+            ? styles.pageIconBadgeTimesheet
+            : '';
+
   return (
     <div className={styles.wrap}>
-      <header className={styles.header}>
-        <div>
-          {tab === 'main' && panel !== 'news' ? null : (
-            <>
-              <h1 className={styles.h1}>
-                {tab === 'main' && panel === 'news'
-                  ? 'Новостная лента'
-                  : tab === 'org'
-                    ? 'Организация'
-                    : tab === 'dictionaries'
-                      ? 'Справочники'
-                      : tab === 'extra'
-                        ? 'Дополнительные справочники'
-                        : tab === 'admin'
-                          ? 'Администрирование'
-                          : tab === 'users'
-                            ? 'Пользователи'
-                            : tab === 'integrations'
-                              ? 'Внешние системы'
-                              : tab === 'audit'
-                                ? 'Аудит'
-                                : 'Настройки'}
-              </h1>
-              {tab !== 'main' ? (
-                <p className={styles.lead}>
-                  Организация, справочники, администрирование и внешние системы.
-                </p>
-              ) : null}
-            </>
-          )}
-        </div>
-        {tab === 'users' && users.length ? (
-          <button
-            type="button"
-            className={styles.btnSecondary}
-            onClick={() => downloadCsv('settings-users', users)}
-          >
-            CSV
-          </button>
-        ) : null}
-        {(tab === 'dictionaries' || tab === 'extra' || (tab === 'admin' && !ADMIN_SPECIAL.includes(panel as typeof ADMIN_SPECIAL[number]))) &&
-        selected?.items?.length ? (
-          <button
-            type="button"
-            className={styles.btnSecondary}
-            onClick={() =>
-              downloadCsv(`dictionary-${selected?.code ?? 'items'}`, selected?.items ?? [])
-            }
-          >
-            CSV
-          </button>
-        ) : null}
-      </header>
+      <PageSubnav groupKey="settings-main" />
 
-      {/* Verifix: system settings page has no secondary tab bar — only sub-panels */}
+      {/* Section tabs always at top (same band as PageSubnav) */}
       {tab !== 'main' || panel === 'news' ? (
         <div className={styles.tabs}>
           {(
             [
               ['main', 'Главное'],
-              ['org', 'Организация'],
+              ['org', 'Кадровый учет'],
               ['dictionaries', 'Справочники'],
               ['extra', 'Доп. справочники'],
               ['admin', 'Администрирование'],
@@ -724,90 +991,131 @@ export default function SettingsPage() {
         </div>
       ) : null}
 
+      {tab === 'main' && panel !== 'news' ? null : (
+        <header className={styles.pageHeader}>
+          <div
+            className={[styles.pageIconBadge, pageIconMod].filter(Boolean).join(' ')}
+            aria-hidden="true"
+          >
+            <i className={`fas ${pageIcon}`} />
+          </div>
+          <div className={styles.pageHeaderText}>
+            <h1 className={styles.pageTitle}>{pageTitle}</h1>
+            {pageSubtitle ? <p className={styles.pageSubtitle}>{pageSubtitle}</p> : null}
+          </div>
+          <div className={styles.pageHeaderActions}>
+            {tab === 'users' && users.length ? (
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() => downloadCsv('settings-users', users)}
+              >
+                CSV
+              </button>
+            ) : null}
+            {(tab === 'dictionaries' ||
+              tab === 'extra' ||
+              (tab === 'admin' &&
+                !ADMIN_SPECIAL.includes(panel as (typeof ADMIN_SPECIAL)[number]))) &&
+            selected?.items?.length ? (
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() =>
+                  downloadCsv(`dictionary-${selected?.code ?? 'items'}`, selected?.items ?? [])
+                }
+              >
+                CSV
+              </button>
+            ) : null}
+            {tab === 'main' && panel === 'news' ? (
+              <a className={styles.btnSecondary} href="/news">
+                Открыть ленту
+              </a>
+            ) : null}
+          </div>
+        </header>
+      )}
+
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {tab === 'main' ? (
         panel === 'news' ? (
-        <div className={styles.panel}>
-              <p className={styles.lead} style={{ marginBottom: '1rem' }}>
-                Новостная лента: служебные объявления для сотрудников.{' '}
-                <a href="/news" style={{ color: '#3699ff', fontWeight: 600 }}>
-                  Открыть ленту →
-                </a>
-              </p>
-              <div style={{ marginTop: '0.5rem', padding: '1rem', background: 'var(--bg-elevated)' }}>
-              <h3 style={{ marginTop: 0 }}>Новостная лента</h3>
-              <p className={styles.muted}>
-                Служебные объявления для сотрудников. Записи хранятся в справочнике «Новостная лента».
-              </p>
-              <form
-                className={styles.form}
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const fd = new FormData(e.currentTarget);
-                  const title = String(fd.get('title') || '').trim();
-                  const body = String(fd.get('body') || '').trim();
-                  if (!title) return;
-                  try {
-                    let newsDict = dicts.find((d) => d.code === 'news_feed');
-                    if (!newsDict) {
-                      newsDict = await apiFetch<Dict>('/api/settings/dictionaries', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          code: 'news_feed',
-                          name: 'Новостная лента',
-                          kind: 'extra',
-                        }),
-                      });
-                    }
-                    const code = `N-${Date.now().toString(36).toUpperCase()}`;
-                    await apiFetch(`/api/settings/dictionaries/${newsDict.id}/items`, {
+          <div className={styles.formPanel} style={{ padding: '1.15rem 1.25rem 1.35rem' }}>
+            <p className={styles.hint} style={{ marginBottom: '1rem' }}>
+              Записи хранятся в справочнике «Новостная лента». Полная лента с FormModal — на{' '}
+              <a href="/news" style={{ color: 'var(--accent)', fontWeight: 700 }}>
+                /news
+              </a>
+              .
+            </p>
+            <form
+              className={styles.form}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const title = String(fd.get('title') || '').trim();
+                const body = String(fd.get('body') || '').trim();
+                if (!title) return;
+                try {
+                  let newsDict = dicts.find((d) => d.code === 'news_feed');
+                  if (!newsDict) {
+                    newsDict = await apiFetch<Dict>('/api/settings/dictionaries', {
                       method: 'POST',
                       body: JSON.stringify({
-                        code,
-                        name: title,
-                        meta: { body },
+                        code: 'news_feed',
+                        name: 'Новостная лента',
+                        kind: 'extra',
                       }),
                     });
-                    setError('');
-                    e.currentTarget.reset();
-                    await load();
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Ошибка');
                   }
-                }}
-              >
-                <label>
-                  Заголовок
-                  <input name="title" required />
-                </label>
-                <label>
-                  Текст
-                  <textarea name="body" rows={3} />
-                </label>
-                <button className={styles.btn} type="submit">
-                  Добавить
-                </button>
-              </form>
-              <ul style={{ marginTop: '1rem' }}>
-                {(dicts.find((d) => d.code === 'news_feed')?.items || []).map((it) => (
-                  <li key={it.id}>
-                    <strong>{it.name}</strong>
-                    {it.meta && typeof it.meta === 'object' && 'body' in it.meta
-                      ? ` — ${String((it.meta as { body?: string }).body || '')}`
-                      : null}
-                  </li>
-                ))}
-              </ul>
-              </div>
-        </div>
+                  const code = `N-${Date.now().toString(36).toUpperCase()}`;
+                  await apiFetch(`/api/settings/dictionaries/${newsDict.id}/items`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      code,
+                      name: title,
+                      meta: { body },
+                    }),
+                  });
+                  setError('');
+                  e.currentTarget.reset();
+                  await load();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Ошибка');
+                }
+              }}
+            >
+              <label>
+                Заголовок
+                <input name="title" required />
+              </label>
+              <label>
+                Текст
+                <textarea name="body" rows={3} />
+              </label>
+              <button className={styles.btn} type="submit">
+                Добавить
+              </button>
+            </form>
+            <ul style={{ marginTop: '1rem', paddingLeft: '1.1rem' }}>
+              {(dicts.find((d) => d.code === 'news_feed')?.items || []).map((it) => (
+                <li key={it.id} style={{ marginBottom: '0.45rem' }}>
+                  <strong>{it.name}</strong>
+                  {it.meta && typeof it.meta === 'object' && 'body' in it.meta
+                    ? ` — ${String((it.meta as { body?: string }).body || '')}`
+                    : null}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : (
           <SystemSettingsPanel />
         )
       ) : null}
 
       {tab === 'org' && org ? (
-        <div className={styles.panel}>
+        <div className={styles.formPanel} style={{ padding: '1.15rem 1.25rem 1.35rem' }}>
           <form className={styles.form} onSubmit={saveOrg}>
             <label>
               Код tenant
@@ -1182,37 +1490,58 @@ export default function SettingsPage() {
       ) : null}
 
       {tab === 'audit' ? (
-        <div className={styles.panel}>
-          <table>
-            <thead>
-              <tr>
-                <th>Время</th>
-                <th>Действие</th>
-                <th>Сущность</th>
-                <th>ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {audit.map((a) => (
-                <tr key={a.id}>
-                  <td>{String(a.createdAt).replace('T', ' ').slice(0, 19)}</td>
-                  <td>{a.action}</td>
-                  <td>{a.entity ?? '—'}</td>
-                  <td>
-                    <code style={{ fontSize: 11 }}>{a.entityId?.slice(0, 8) ?? '—'}</code>
-                  </td>
-                </tr>
-              ))}
-              {audit.length === 0 ? (
+        <>
+          <div className={styles.toolbar}>
+            <div className={styles.leftActions}>
+              <span className={styles.muted} style={{ fontSize: 13, fontWeight: 600 }}>
+                Журнал действий
+              </span>
+            </div>
+            <div className={styles.rightTools}>
+              <span className={styles.countBadge}>{audit.length}</span>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                onClick={() => void load()}
+                title="Обновить"
+                aria-label="Обновить"
+              >
+                <i className="fas fa-sync-alt" aria-hidden />
+              </button>
+            </div>
+          </div>
+          <div className={styles.tableCard}>
+            <table className={styles.dataTable}>
+              <thead>
                 <tr>
-                  <td colSpan={4} className={styles.muted}>
-                    Пусто
-                  </td>
+                  <th>Время</th>
+                  <th>Действие</th>
+                  <th>Сущность</th>
+                  <th>ID</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {audit.map((a) => (
+                  <tr key={a.id} className={styles.rowExpand}>
+                    <td>{String(a.createdAt).replace('T', ' ').slice(0, 19)}</td>
+                    <td>{a.action}</td>
+                    <td>{a.entity ?? '—'}</td>
+                    <td>
+                      <code style={{ fontSize: 11 }}>{a.entityId?.slice(0, 8) ?? '—'}</code>
+                    </td>
+                  </tr>
+                ))}
+                {audit.length === 0 ? (
+                  <tr className={styles.rowExpand}>
+                    <td colSpan={4} className={styles.muted}>
+                      Пусто
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : null}
     </div>
   );

@@ -4,7 +4,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { SearchLookup } from '@/app/(app)/catalog/avg-salaries/SearchLookup';
 import { apiFetch } from '@/lib/api';
 import { downloadMultiSheetXlsx } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
 import treeS from '../dismissals-by-reason/page.module.css';
 import s from './page.module.css';
@@ -406,7 +407,7 @@ h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .tabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid #e4e6ef}
 .tab{border:0;background:transparent;padding:8px 12px;cursor:pointer;color:#5e6278;font:inherit;font-size:13px;font-weight:600}
-.tab.on{color:#3699ff;border-bottom:2px solid #3699ff}
+.tab.on{color:#0a85e2;border-bottom:2px solid #0a85e2}
 .meta{padding:10px 16px;font-size:13px}
 .wrap{padding:0 16px 16px}
 table{border-collapse:collapse;width:100%;font-size:13px}
@@ -596,121 +597,157 @@ export default function PositionsReportPage() {
     w.document.getElementById('btnExcel')?.addEventListener('click', () => void exportExcel(data));
   }
 
-  const exportBtns = (ghost = false) => (
-    <div className={ghost ? undefined : extra.exportLinks} style={ghost ? { display: 'flex', gap: 8 } : undefined}>
-      <button type="button" className={ghost ? extra.exportGhost : undefined} disabled={busy} onClick={() => void openHtml()}>
-        HTML
-      </button>
-      <button type="button" className={ghost ? extra.exportGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>
-        Excel
-      </button>
-    </div>
-  );
+  const exportDisabled = busy;
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>Отчёт по позициям</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>
-          Фильтр
-        </button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+        </div>
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns(true)}
+            <div className={arena.exportBtns}>
+                                    <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+                                      HTML
+                                    </button>
+                                    <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+                                      Excel
+                                    </button>
+                                  </div>
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-briefcase" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчёт по позициям</h1>
+          <p className={shared.pageSubtitle}>
+            Запланированные, занятые и доступные позиции по подразделениям и должностям
+          </p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${s.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={s.stack}>
-            <div className={layout.field}>
-              <label>Период</label>
-              <DatePicker value={date} onChange={setDate} />
-            </div>
-            <div className={layout.field}>
-              <label>Группы подразделений</label>
-              <div className={s.lookup}>
-                <SearchLookup
-                  value={divisionGroupId}
-                  options={divisionGroups}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setDivisionGroupId}
-                />
-              </div>
-            </div>
-            <div className={layout.field}>
-              <label>Подразделения</label>
-              <DivisionTree nodes={tree} selected={selected} onChange={setSelected} />
-            </div>
-            <div className={layout.field}>
-              <label>Группы должностей</label>
-              <div className={s.lookup}>
-                <SearchLookup
-                  value={positionGroupId}
-                  options={positionGroups}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setPositionGroupId}
-                />
-              </div>
-            </div>
-            <div className={layout.field}>
-              <label>Должности</label>
-              <div className={s.lookup}>
-                <SearchLookup
-                  value={positionId}
-                  options={positions}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setPositionId}
-                />
-              </div>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
+            <label>Период</label>
+            <DatePicker value={date} onChange={setDate} />
+          </div>
+          <div className={arena.field}>
+            <label>Группы подразделений</label>
+            <div className={s.lookup}>
+              <SearchLookup
+                value={divisionGroupId}
+                options={divisionGroups}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setDivisionGroupId}
+              />
             </div>
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={`${arena.field} ${s.fieldWide}`}>
+            <label>Подразделения</label>
+            <DivisionTree nodes={tree} selected={selected} onChange={setSelected} />
+          </div>
+          <div className={arena.field}>
+            <label>Группы должностей</label>
+            <div className={s.lookup}>
+              <SearchLookup
+                value={positionGroupId}
+                options={positionGroups}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setPositionGroupId}
+              />
+            </div>
+          </div>
+          <div className={arena.field}>
+            <label>Должности</label>
+            <div className={s.lookup}>
+              <SearchLookup
+                value={positionId}
+                options={positions}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setPositionId}
+              />
+            </div>
+          </div>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            {exportBtns()}
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void openHtml()}>
+              HTML
+            </button>
+            <button type="button" className={arena.exportBtn} disabled={exportDisabled} onClick={() => void exportExcel()}>
+              Excel
+            </button>
           </div>
         </form>
       ) : (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
-              <div className={s.subtabs}>
+              <div className={arena.subTabs}>
                 {VIEWS.map((v) => (
                   <button
                     key={v.id}
                     type="button"
-                    className={view === v.id ? s.subOn : s.sub}
+                    className={view === v.id ? arena.subTabOn : arena.subTab}
                     onClick={() => setView(v.id)}
                   >
                     {v.label}
                   </button>
                 ))}
               </div>
-              <p className={layout.dateLine}>{dateLine(report.date)}</p>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  {dateLine(report.date)}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               {view === 'division' ? <DivisionTable groups={report.byDivision} /> : null}
               {view === 'position' ? <PositionTable rows={report.byPosition} /> : null}
               {view === 'divisionOnly' ? <DivisionOnlyTable rows={report.byDivisionOnly} /> : null}
@@ -739,7 +776,7 @@ function DivisionTable({ groups }: { groups: DivisionGroup[] }) {
         <tbody>
           {groups.length === 0 ? (
             <tr>
-              <td className={layout.muted} colSpan={6}>
+              <td colSpan={6}>
                 Нет данных
               </td>
             </tr>
@@ -798,7 +835,7 @@ function PositionTable({ rows }: { rows: PositionRow[] }) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td className={layout.muted} colSpan={4}>
+              <td colSpan={4}>
                 Нет данных
               </td>
             </tr>
@@ -834,7 +871,7 @@ function DivisionOnlyTable({ rows }: { rows: DivisionOnlyRow[] }) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td className={layout.muted} colSpan={5}>
+              <td colSpan={5}>
                 Нет данных
               </td>
             </tr>

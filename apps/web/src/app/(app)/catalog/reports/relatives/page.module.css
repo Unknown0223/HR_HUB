@@ -1,34 +1,44 @@
-.card {
-  max-width: 720px;
-}
+/* Relatives report — filters / table (shell in report-arena); also reused by access picks */
 
 .treeTall {
-  max-height: none;
+  max-height: min(200px, 30vh);
+  overflow: auto;
 }
 
 .yearRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  width: 100%;
+}
+
+.yearRow > * {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .yearRow {
+    grid-template-columns: 1fr;
+  }
 }
 
 .numInput {
   width: 100%;
   box-sizing: border-box;
   height: 36px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1.5px solid #e3e9f1;
+  border-radius: 9px;
   padding: 0 0.55rem;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.8125rem;
   background: #fff;
-  color: #3f4254;
+  color: #0a1322;
 }
 
 .numInput:focus {
   outline: none;
-  border-color: #3699ff;
-  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+  border-color: #0a85e2;
+  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
 }
 
 .pickWrap {
@@ -39,19 +49,19 @@
   width: 100%;
   box-sizing: border-box;
   height: 36px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1.5px solid #e3e9f1;
+  border-radius: 9px;
   padding: 0 0.55rem;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.8125rem;
   background: #fff;
-  color: #3f4254;
+  color: #0a1322;
 }
 
 .pickInput:focus {
   outline: none;
-  border-color: #3699ff;
-  box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
+  border-color: #0a85e2;
+  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
 }
 
 .pickMenu {
@@ -59,39 +69,49 @@
   z-index: 25;
   left: 0;
   right: 0;
-  top: calc(100% + 2px);
-  max-height: none;
-  overflow: visible;
+  top: calc(100% + 4px);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(180px, 28vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e8eef5;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
 }
 
 .pickMenuWide {
-  min-width: min(560px, 80vw);
+  left: 0;
   right: auto;
+  width: min(100%, 520px);
+  min-width: min(100%, 320px);
+  max-width: min(520px, 92vw);
+  max-height: min(200px, 30vh);
 }
 
 .pickSearch {
   width: 100%;
   box-sizing: border-box;
-  height: 32px;
+  height: 36px;
   border: none;
-  border-bottom: 1px solid #e4e6ef;
-  padding: 0 0.55rem;
+  border-bottom: 1px solid #e8eef5;
+  padding: 0 0.75rem;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
 }
 
 .pickSearch:focus {
   outline: none;
+  background: #f2f5f9;
 }
 
 .pickEmpty {
-  padding: 0.7rem 0.55rem;
-  color: #a1a5b7;
-  font-size: 0.82rem;
+  padding: 0.7rem 0.75rem;
+  color: #8ca0b8;
+  font-size: 0.8rem;
 }
 
 .pickOpt {
@@ -103,32 +123,33 @@
   border: none;
   background: #fff;
   text-align: left;
-  padding: 0.35rem 0.55rem;
+  padding: 0.35rem 0.75rem;
   font: inherit;
-  font-size: 0.82rem;
-  color: #181c32;
+  font-size: 0.8125rem;
+  color: #0a1322;
   cursor: pointer;
 }
 
 .pickOpt:hover,
 .pickOptOn {
-  background: #f3f6f9;
+  background: rgba(10, 133, 226, 0.08);
 }
 
 .pickOpt input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .pickAll {
   appearance: none;
   width: 100%;
   border: none;
-  border-top: 1px solid #e4e6ef;
+  border-top: 1px solid #e8eef5;
   background: #fff;
-  color: #3699ff;
-  padding: 0.4rem;
+  color: #0a85e2;
+  padding: 0.38rem 0.75rem;
   font: inherit;
   font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -138,16 +159,19 @@
   grid-template-columns: 22px 130px 1fr;
   gap: 0.35rem;
   align-items: center;
-  padding: 0.3rem 0.45rem;
+  padding: 0.32rem 0.65rem;
   font-size: 0.75rem;
 }
 
 .empHead {
-  background: #f5f8fa;
-  color: #5e6278;
-  font-weight: 600;
+  background: #fbfcfe;
+  color: #64788f;
+  font-weight: 700;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   position: sticky;
-  top: 32px;
+  top: 36px;
 }
 
 .empRow {
@@ -157,29 +181,30 @@
   background: #fff;
   text-align: left;
   cursor: pointer;
-  color: #181c32;
+  color: #0a1322;
 }
 
 .empRow:hover,
 .empOn {
-  background: #e8f4ff;
+  background: rgba(10, 133, 226, 0.08);
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.3rem;
+  gap: 5px;
+  margin-top: 2px;
 }
 
 .chip {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #f5f8fa;
-  color: #3f4254;
-  border-radius: 3px;
-  font-size: 11px;
-  padding: 0.1rem 0.4rem;
+  border: 1px solid #bae6fd;
+  background: #edf6fe;
+  color: #0770c2;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  padding: 3px 9px;
   cursor: pointer;
 }
 
@@ -194,54 +219,73 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.88rem;
-  color: #3f4254;
+  font-size: 0.875rem;
+  color: #354862;
   cursor: pointer;
 }
 
 .radio input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .check {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.88rem;
-  color: #3f4254;
+  font-size: 0.875rem;
+  color: #354862;
   cursor: pointer;
+  grid-column: 1 / -1;
 }
 
 .check input {
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .tableWrap {
   overflow: auto;
+  border: 1px solid var(--line, #e3e9f1);
+  border-radius: 12px;
   background: #fff;
-  border: 1px solid #e4e6ef;
-  max-height: none;
+  max-height: min(70vh, 820px);
 }
 
 .table {
-  border-collapse: collapse;
-  font-size: 0.78rem;
-  background: #fff;
-  min-width: 980px;
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.78rem;
+  min-width: 980px;
 }
 
 .table th,
 .table td {
-  border: 1px solid #d8dbe0;
-  padding: 0.35rem 0.5rem;
-  color: #181c32;
+  border-bottom: 1px solid #e8eef5;
+  border-right: 1px solid #eef2f7;
+  padding: 0.45rem 0.55rem;
+  color: #0a1322;
   white-space: nowrap;
   text-align: center;
+  vertical-align: middle;
 }
 
-.table th {
-  background: #eef0f4;
+.table th:last-child,
+.table td:last-child {
+  border-right: none;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f2f5f9;
+  font-weight: 700;
+  color: #354862;
+  box-shadow: 0 1px 0 #e3e9f1;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
@@ -255,17 +299,32 @@
 
 .total td {
   font-weight: 700;
-  background: #f5f8fa;
+  background: #edf6fe;
+}
+
+.table tbody tr:hover td {
+  background: #f5f9fd;
+}
+
+.total:hover td {
+  background: #e3f0fb;
 }
 
 .empty {
   text-align: center;
-  color: #a1a5b7;
+  color: #8ca0b8;
   padding: 1.5rem;
 }
 
-.periodLine {
-  margin: 0 0 0.55rem;
-  font-size: 0.88rem;
-  color: #3f4254;
+@media print {
+  .tableWrap {
+    overflow: visible;
+    border: 0;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .table thead th {
+    position: static;
+  }
 }

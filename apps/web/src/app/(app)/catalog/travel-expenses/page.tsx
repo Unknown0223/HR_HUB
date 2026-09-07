@@ -5,42 +5,40 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ListBulkBar, runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
-import {
-  fmtDate,
-  travelStatusLabel,
-  type TravelDoc,
-} from '@/lib/travel-expenses';
-import styles from '../absence-types/page.module.css';
+import { fmtDate, travelStatusLabel, type TravelDoc } from '@/lib/travel-expenses';
+import { TravelExpenseFormModal } from './TravelExpenseForm';
+import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/travel-expenses';
-const PAGE_SIZE = 50;
 const FILTER_KEYS = ['q', 'number', 'status', 'from', 'to'] as const;
+const COL_COUNT = 6;
 
-function Inner() {
+function TravelExpensesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
   const q = filters.q;
+
   const [rows, setRows] = useState<TravelDoc[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [focusId, setFocusId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [searchDraft, setSearchDraft] = useState(q);
-  const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(filters.number || filters.status || filters.from || filters.to),
   );
+  const [searchDraft, setSearchDraft] = useState(q);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   async function load() {
-    setError('');
     setLoading(true);
+    setError('');
     try {
       setRows(await apiFetch<TravelDoc[]>('/api/payroll/travel-expenses'));
     } catch (e) {
@@ -54,6 +52,14 @@ function Inner() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setModalOpen(true);
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -77,45 +83,50 @@ function Inner() {
     return list;
   }, [rows, q, filters.number, filters.status, filters.from, filters.to, sortDir]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const ids = paged.map((r) => r.id);
-
-  useEffect(() => {
-    setPage(1);
-  }, [q, filters.number, filters.status, filters.from, filters.to, sortDir]);
-
-  function patchUrl(patch: Record<string, string | null>) {
-    const params = new URLSearchParams(searchParams?.toString() ?? '');
-    for (const [k, v] of Object.entries(patch)) {
-      if (v) params.set(k, v);
-      else params.delete(k);
-    }
-    router.replace(`${PATH}?${params.toString()}`, { scroll: false });
-  }
-
-  const selectedRows = rows.filter((r) => selected.has(r.id));
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+  const selectedRows = useMemo(
+    () => filtered.filter((r) => checked[r.id]),
+    [filtered, checked],
+  );
   const completeCount = selectedRows.filter((r) => r.status !== 'approved').length;
   const deleteCount = selectedRows.filter((r) => r.status !== 'approved').length;
 
-  async function bulk(kind: 'complete' | 'delete') {
-    const ids = selectedRows.filter((r) => r.status !== 'approved').map((r) => r.id);
-    setBusy(true);
-    setError('');
-    try {
-      const ok = await runListBulk({
-        path: `/api/payroll/travel-expenses/bulk-${kind}`,
-        ids,
-        message: kind === 'delete' ? 'Удалить выбранные отчеты?' : 'Завершить выбранные отчеты?',
-        variant: kind === 'delete' ? 'danger' : undefined,
-      });
-      if (!ok) return;
-      setSelected(new Set());
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setBusy(false);
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    if (searchParams.get('create') === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      const qs = params.toString();
+      router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
     }
   }
 
@@ -124,9 +135,51 @@ function Inner() {
     setBusy(true);
     setError('');
     try {
-      if (action === 'delete') await apiFetch(`/api/payroll/travel-expenses/${row.id}`, { method: 'DELETE' });
-      else await apiFetch(`/api/payroll/travel-expenses/${row.id}/complete`, { method: 'POST' });
-      setFocusId(null);
+      if (action === 'delete') {
+        await apiFetch(`/api/payroll/travel-expenses/${row.id}`, { method: 'DELETE' });
+      } else {
+        await apiFetch(`/api/payroll/travel-expenses/${row.id}/complete`, { method: 'POST' });
+      }
+      setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function bulk(kind: 'complete' | 'delete') {
+    const ids = selectedRows.filter((r) => r.status !== 'approved').map((r) => r.id);
+    if (!ids.length) return;
+    const message =
+      kind === 'delete'
+        ? `Удалить выбранные отчеты (${ids.length} шт.)?`
+        : `Завершить выбранные отчеты (${ids.length} шт.)?`;
+    if (
+      !(await confirm({
+        message,
+        confirmText: 'Да',
+        cancelText: 'Нет',
+        variant: kind === 'delete' ? 'danger' : undefined,
+      }))
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/payroll/travel-expenses/bulk-${kind}`, {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      });
+      setChecked({});
+      setSelectedId(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
@@ -137,7 +190,7 @@ function Inner() {
 
   function exportCsv() {
     downloadCsv(
-      'travel-expenses.csv',
+      `travel-expenses-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((r) => ({
         Дата: fmtDate(r.docDate),
         Номер: r.number,
@@ -151,11 +204,38 @@ function Inner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="travel-expenses" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-plane" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Авансовые отчёты</h1>
+          <p className={shared.pageSubtitle}>Отчёты по командировочным расходам</p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href={`${PATH}/new`} className={styles.createBtn}>
+          <button type="button" className={styles.createBtn} onClick={() => setModalOpen(true)}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
-          </Link>
+          </button>
           <FilterPanel
             inline
             urlSync
@@ -175,157 +255,205 @@ function Inner() {
               },
             ]}
           />
-          <ListBulkBar
-            count={selected.size}
-            busy={busy}
-            onClear={() => setSelected(new Set())}
-            actions={[
-              { key: 'complete', label: 'Завершить', count: completeCount, onClick: () => void bulk('complete') },
-              { key: 'delete', label: 'Удалить', count: deleteCount, variant: 'danger', onClick: () => void bulk('delete') },
-            ]}
-          />
         </div>
+
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <span className={styles.pagerMeta}>
-            {paged.length}/{filtered.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            ‹
-          </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            className={filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn}
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ›
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
+          <button type="button" className={styles.iconBtn} onClick={exportCsv} title="CSV" aria-label="Экспорт CSV">
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
+
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          {completeCount > 0 ? (
+            <button type="button" className={styles.bulkBtn} disabled={busy} onClick={() => void bulk('complete')}>
+              <i className="fas fa-check" aria-hidden />
+              Завершить ({completeCount})
+            </button>
+          ) : null}
+          {deleteCount > 0 ? (
+            <button
+              type="button"
+              className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+              disabled={busy}
+              onClick={() => void bulk('delete')}
+            >
+              <i className="fas fa-trash" aria-hidden />
+              Удалить ({deleteCount})
+            </button>
+          ) : null}
+          <button type="button" className={styles.bulkGhost} disabled={busy} onClick={() => setChecked({})}>
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={ids.length > 0 && ids.every((id) => selected.has(id))}
-                  onChange={(e) => setSelected(togglePage(selected, ids, e.target.checked))}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>
-                <button
-                  type="button"
-                  style={{ all: 'unset', cursor: 'pointer' }}
-                  onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                >
-                  Дата <span>{sortDir === 'asc' ? '↑' : '↓'}</span>
-                </button>
-              </th>
-              <th>Номер</th>
-              <th>Сотрудник</th>
-              <th>Номер документа командировки</th>
-              <th>Состояние</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
-              </tr>
-            ) : null}
-            {!loading && paged.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {paged.map((row) => {
-              const open = focusId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    onClick={() => setFocusId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                    className={open || selected.has(row.id) ? styles.rowSelected : undefined}
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>
+                  <button
+                    type="button"
+                    style={{ all: 'unset', cursor: 'pointer' }}
+                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
                   >
-                    <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                      />
-                    </td>
-                    <td>{fmtDate(row.docDate)}</td>
-                    <td>{row.number || '—'}</td>
-                    <td>{row.employee?.label || '—'}</td>
-                    <td>{row.tripNumber || row.trip?.title || '—'}</td>
-                    <td>
-                      <span className={row.status === 'approved' ? styles.postedYes : styles.postedNo}>
-                        {travelStatusLabel(row.status)}
-                      </span>
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={6}>
-                        <div className={styles.rowActions}>
-                          <Link href={`${PATH}/${row.id}`}>Просмотреть</Link>
-                          {row.status !== 'approved' ? <Link href={`${PATH}/${row.id}/edit`}>Изменить</Link> : null}
-                          {row.status !== 'approved' ? (
-                            <button type="button" disabled={busy} onClick={() => void run(row, 'complete')}>
-                              Завершить
-                            </button>
-                          ) : null}
-                          {row.status !== 'approved' ? (
-                            <button
-                              type="button"
-                              className={styles.danger}
-                              disabled={busy}
-                              onClick={() => void run(row, 'delete')}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+                    Дата {sortDir === 'asc' ? '↑' : '↓'}
+                  </button>
+                </th>
+                <th>Номер</th>
+                <th>Сотрудник</th>
+                <th>Номер документа командировки</th>
+                <th>Состояние</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.number || row.id}`}
+                        />
+                      </td>
+                      <td>{fmtDate(row.docDate)}</td>
+                      <td>{row.number || '—'}</td>
+                      <td className={styles.empName}>{row.employee?.label || '—'}</td>
+                      <td>{row.tripNumber || row.trip?.title || '—'}</td>
+                      <td>
+                        <span className={row.status === 'approved' ? styles.statusOk : styles.statusMuted}>
+                          {travelStatusLabel(row.status)}
+                        </span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`${PATH}/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотреть
+                            </Link>
+                            {row.status !== 'approved' ? (
+                              <Link href={`${PATH}/${row.id}/edit`}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                            ) : null}
+                            {row.status !== 'approved' ? (
+                              <button type="button" disabled={busy} onClick={() => void run(row, 'complete')}>
+                                <i className="fas fa-check" aria-hidden />
+                                Завершить
+                              </button>
+                            ) : null}
+                            {row.status !== 'approved' ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void run(row, 'delete')}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <TravelExpenseFormModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function TravelExpensesPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <Inner />
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
+      <TravelExpensesInner />
     </Suspense>
   );
 }

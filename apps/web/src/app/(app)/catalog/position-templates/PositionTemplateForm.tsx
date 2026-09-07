@@ -1,8 +1,14 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import styles from './form.module.css';
 
@@ -30,14 +36,22 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export function PositionTemplateForm({ templateId }: { templateId?: string }) {
-  const router = useRouter();
-  const isNew = !templateId;
+export function PositionTemplateFormModal({
+  open,
+  onClose,
+  onSaved,
+  editId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  editId?: string | null;
+}) {
+  const isEdit = Boolean(editId);
 
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [ok, setOk] = useState('');
 
   const [divisionId, setDivisionId] = useState('');
   const [positionId, setPositionId] = useState('');
@@ -46,6 +60,7 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
   const [extraSchedules, setExtraSchedules] = useState<SchedItem[]>([]);
   const [tariffGroupId, setTariffGroupId] = useState('');
   const [code, setCode] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [accruals, setAccruals] = useState<PayRow[]>([]);
   const [deductions, setDeductions] = useState<PayRow[]>([]);
 
@@ -91,13 +106,30 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
   }, []);
 
   useEffect(() => {
+    if (!open) return;
     void loadLookups();
-  }, [loadLookups]);
+  }, [open, loadLookups]);
 
   useEffect(() => {
-    if (isNew) return;
+    if (!open) return;
+    setError('');
+    setBusy(false);
+    if (!editId) {
+      setDivisionId('');
+      setPositionId('');
+      setGradeId('');
+      setScheduleId('');
+      setExtraSchedules([]);
+      setTariffGroupId('');
+      setCode('');
+      setIsActive(true);
+      setAccruals([]);
+      setDeductions([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    apiFetch<Row>(`/api/catalog/position-templates/${templateId}`)
+    apiFetch<Row>(`/api/catalog/position-templates/${editId}`)
       .then((row) => {
         setCode(row.code || '');
         setDivisionId(row.divisionId || '');
@@ -105,12 +137,13 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
         setGradeId(row.gradeId || '');
         setScheduleId(row.scheduleId || '');
         setTariffGroupId(row.tariffGroupId || '');
+        setIsActive(row.isActive !== false);
         const items = Array.isArray(row.scheduleItems) ? row.scheduleItems : [];
         setExtraSchedules(
           items
             .map((x) => String(x?.scheduleId || ''))
             .filter((id) => id && id !== (row.scheduleId || ''))
-            .map((scheduleId) => ({ id: uid(), scheduleId })),
+            .map((sid) => ({ id: uid(), scheduleId: sid })),
         );
         setAccruals(
           (Array.isArray(row.accruals) ? row.accruals : []).map((a) => ({
@@ -127,14 +160,13 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
           })),
         );
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [templateId, isNew]);
+  }, [open, editId]);
 
   async function save() {
     setBusy(true);
     setError('');
-    setOk('');
     try {
       const scheduleItems = [
         ...(scheduleId ? [{ scheduleId }] : []),
@@ -143,9 +175,7 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
           .map((s) => ({ scheduleId: s.scheduleId })),
       ];
       const body = {
-        code:
-          code.trim() ||
-          `PT-${Date.now().toString(36).toUpperCase()}`,
+        code: code.trim() || `PT-${Date.now().toString(36).toUpperCase()}`,
         divisionId: divisionId || null,
         positionId: positionId || null,
         gradeId: gradeId || null,
@@ -164,23 +194,23 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
             name: name.trim(),
             indicators: indicators.trim(),
           })),
-        isActive: true,
+        isActive,
       };
-      if (isNew) {
-        await apiFetch('/api/catalog/position-templates', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        router.push('/catalog/position-templates');
-      } else {
-        await apiFetch(`/api/catalog/position-templates/${templateId}`, {
+      if (isEdit && editId) {
+        await apiFetch(`/api/catalog/position-templates/${editId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        setOk('Сохранено');
+        onSaved(editId);
+      } else {
+        const created = await apiFetch<Row>('/api/catalog/position-templates', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        onSaved(created?.id || '');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
       setBusy(false);
     }
@@ -219,10 +249,7 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
               type="button"
               className={styles.addBtn}
               onClick={() =>
-                setRows((prev) => [
-                  ...prev,
-                  { id: uid(), name: '', indicators: '' },
-                ])
+                setRows((prev) => [...prev, { id: uid(), name: '', indicators: '' }])
               }
             >
               Добавить
@@ -295,156 +322,165 @@ export function PositionTemplateForm({ templateId }: { templateId?: string }) {
     );
   }
 
-  if (loading) return <p className={styles.muted}>Загрузка…</p>;
-
   return (
-    <div className={styles.page}>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>
-          {isNew ? 'Шаблон должности (создание)' : 'Шаблон должности (изменение)'}
-        </h1>
-        <div className={styles.actions}>
+    <FormModal
+      open={open}
+      title={isEdit ? 'Шаблон должности (изменение)' : 'Шаблон должности (создание)'}
+      onClose={onClose}
+      width="xl"
+      footer={
+        <>
           <button
             type="button"
-            className={styles.btnSave}
-            disabled={busy}
+            className={modal.btnPrimary}
+            disabled={busy || loading}
             onClick={() => void save()}
           >
             {busy ? '…' : 'Сохранить'}
           </button>
-          <Link href="/catalog/position-templates" className={styles.btnClose}>
+          <button type="button" className={modal.btnGhost} onClick={onClose}>
             Закрыть
-          </Link>
-        </div>
-      </div>
-
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {ok ? <p className={styles.ok}>{ok}</p> : null}
-
-      <div className={styles.card}>
-        <div className={styles.grid2}>
-          <div className={styles.col}>
-            <div className={styles.field}>
-              <label>Подразделение</label>
-              <select
-                value={divisionId}
-                onChange={(e) => setDivisionId(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label>Должность</label>
-              <select
-                value={positionId}
-                onChange={(e) => setPositionId(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {positions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label>Разряд</label>
-              <select value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
-                <option value="">Поиск...</option>
-                {grades.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.col}>
-            <div className={styles.field}>
-              <label>График работы</label>
-              <select
-                value={scheduleId}
-                onChange={(e) => setScheduleId(e.target.value)}
-              >
-                <option value="">Поиск...</option>
-                {schedules.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {extraSchedules.length > 0 ? (
-              <div className={styles.schedList}>
-                {extraSchedules.map((item) => (
-                  <div key={item.id} className={styles.schedRow}>
-                    <select
-                      value={item.scheduleId}
-                      onChange={(e) =>
-                        setExtraSchedules((prev) =>
-                          prev.map((x) =>
-                            x.id === item.id
-                              ? { ...x, scheduleId: e.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    >
-                      <option value="">Поиск...</option>
-                      {schedules.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExtraSchedules((prev) =>
-                          prev.filter((x) => x.id !== item.id),
-                        )
-                      }
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                ))}
+          </button>
+        </>
+      }
+    >
+      {error ? <p className={modal.error}>{error}</p> : null}
+      {loading ? (
+        <p className={styles.muted}>Загрузка…</p>
+      ) : (
+        <div className={styles.card}>
+          <div className={styles.grid2}>
+            <div className={styles.col}>
+              <div className={styles.field}>
+                <label>Подразделение</label>
+                <select
+                  value={divisionId}
+                  onChange={(e) => setDivisionId(e.target.value)}
+                >
+                  <option value="">Поиск...</option>
+                  {divisions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : null}
-            <button
-              type="button"
-              className={styles.addLink}
-              onClick={() =>
-                setExtraSchedules((prev) => [
-                  ...prev,
-                  { id: uid(), scheduleId: '' },
-                ])
-              }
-            >
-              + Добавить пункт
-            </button>
-          </div>
-        </div>
+              <div className={styles.field}>
+                <label>Должность</label>
+                <select
+                  value={positionId}
+                  onChange={(e) => setPositionId(e.target.value)}
+                >
+                  <option value="">Поиск...</option>
+                  {positions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label>Разряд</label>
+                <select value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
+                  <option value="">Поиск...</option>
+                  {grades.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-        <PayBlock
-          title="Оплата труда"
-          nameHeader="Начисление"
-          rows={accruals}
-          setRows={setAccruals}
-        />
-        <PayBlock
-          title="Удержания"
-          nameHeader="Удержания"
-          rows={deductions}
-          setRows={setDeductions}
-        />
-      </div>
-    </div>
+            <div className={styles.col}>
+              <div className={styles.field}>
+                <label>График работы</label>
+                <select
+                  value={scheduleId}
+                  onChange={(e) => setScheduleId(e.target.value)}
+                >
+                  <option value="">Поиск...</option>
+                  {schedules.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {extraSchedules.length > 0 ? (
+                <div className={styles.schedList}>
+                  {extraSchedules.map((item) => (
+                    <div key={item.id} className={styles.schedRow}>
+                      <select
+                        value={item.scheduleId}
+                        onChange={(e) =>
+                          setExtraSchedules((prev) =>
+                            prev.map((x) =>
+                              x.id === item.id
+                                ? { ...x, scheduleId: e.target.value }
+                                : x,
+                            ),
+                          )
+                        }
+                      >
+                        <option value="">Поиск...</option>
+                        {schedules.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExtraSchedules((prev) =>
+                            prev.filter((x) => x.id !== item.id),
+                          )
+                        }
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className={styles.addLink}
+                onClick={() =>
+                  setExtraSchedules((prev) => [
+                    ...prev,
+                    { id: uid(), scheduleId: '' },
+                  ])
+                }
+              >
+                + Добавить пункт
+              </button>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                />
+                Активный
+              </label>
+            </div>
+          </div>
+
+          <PayBlock
+            title="Оплата труда"
+            nameHeader="Начисление"
+            rows={accruals}
+            setRows={setAccruals}
+          />
+          <PayBlock
+            title="Удержания"
+            nameHeader="Удержания"
+            rows={deductions}
+            setRows={setDeductions}
+          />
+        </div>
+      )}
+    </FormModal>
   );
 }

@@ -16,11 +16,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiQuery, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
-import { memoryStorage } from 'multer';
 import { Roles } from '../auth/decorators';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import { sendExcelAttachment } from '../common/excel';
+import { excelImportMulterOptions } from '../common/excel-import';
 import { CatalogService } from './catalog.service';
 
 @ApiTags('catalog')
@@ -1593,12 +1593,7 @@ export class CatalogController {
       },
     },
   })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: { fileSize: 8 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', excelImportMulterOptions))
   importScheduleOverrides(
     @CurrentTenant() t: string | null,
     @UploadedFile() file: Express.Multer.File,
@@ -1628,12 +1623,7 @@ export class CatalogController {
       },
     },
   })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: { fileSize: 8 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', excelImportMulterOptions))
   importPositionSchedules(
     @CurrentTenant() t: string | null,
     @UploadedFile() file: Express.Multer.File,

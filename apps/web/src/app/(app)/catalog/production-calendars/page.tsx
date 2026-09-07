@@ -3,9 +3,12 @@ import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { ProductionCalendarForm } from './ProductionCalendarForm';
 import styles from './page.module.css';
 
 const FILTER_KEYS = ['name', 'year'] as const;
@@ -20,6 +23,8 @@ type Row = {
 };
 
 function ProductionCalendarsInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
@@ -28,6 +33,7 @@ function ProductionCalendarsInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -46,6 +52,26 @@ function ProductionCalendarsInner() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') setCreateOpen(true);
+  }, [searchParams]);
+
+  function clearCreateParam() {
+    if (searchParams.get('create') !== '1') return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('create');
+    const qs = params.toString();
+    router.replace(
+      qs ? `/catalog/production-calendars?${qs}` : '/catalog/production-calendars',
+      { scroll: false },
+    );
+  }
+
+  function closeCreate() {
+    setCreateOpen(false);
+    clearCreateParam();
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -81,9 +107,13 @@ function ProductionCalendarsInner() {
 
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/production-calendars/new" className={styles.createBtn}>
+          <button
+            type="button"
+            className={styles.createBtn}
+            onClick={() => setCreateOpen(true)}
+          >
             Создать
-          </Link>
+          </button>
           <Link href="/catalog/work-schedules" className={styles.closeBtn}>
             Закрыть
           </Link>
@@ -186,6 +216,23 @@ function ProductionCalendarsInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={createOpen}
+        title="Производственный календарь (создание)"
+        width="xl"
+        onClose={closeCreate}
+      >
+        <ProductionCalendarForm
+          embedded
+          onClose={closeCreate}
+          onSaved={(id) => {
+            closeCreate();
+            void load();
+            router.push(`/catalog/production-calendars/${id}`);
+          }}
+        />
+      </FormModal>
     </div>
   );
 }

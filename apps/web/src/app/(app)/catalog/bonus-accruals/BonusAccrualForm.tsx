@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
+import { FormModal } from '@/components/FormModal';
+import modalCss from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { EmployeeLookup } from '@/components/EmployeeLookup';
 import { toPickItems } from '@/components/employee-pick';
@@ -12,6 +14,29 @@ import form from '../../payroll/accruals/form.module.css';
 import extra from '../settlements/extra.module.css';
 
 const PATH = '/catalog/bonus-accruals';
+
+/** Create modal for Arena list */
+export function BonusAccrualFormModal({
+  open,
+  kind: kindProp = 'fact',
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  kind?: BonusKind;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+}) {
+  return (
+    <BonusAccrualForm
+      asModal
+      modalOpen={open}
+      modalKind={kindProp}
+      onModalClose={onClose}
+      onModalSaved={onSaved}
+    />
+  );
+}
 
 type Opt = { id: string; label: string };
 type TypeOpt = { id: string; name: string; accrualName?: string | null };
@@ -103,11 +128,30 @@ function SearchLookup({
   );
 }
 
-export function BonusAccrualForm({ docId, viewOnly }: { docId?: string; viewOnly?: boolean }) {
+export function BonusAccrualForm({
+  docId,
+  viewOnly,
+  asModal,
+  modalOpen,
+  modalKind,
+  onModalClose,
+  onModalSaved,
+}: {
+  docId?: string;
+  viewOnly?: boolean;
+  asModal?: boolean;
+  modalOpen?: boolean;
+  modalKind?: BonusKind;
+  onModalClose?: () => void;
+  onModalSaved?: (id: string) => void;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isModal = Boolean(asModal);
   const isNew = !docId;
-  const [kind, setKind] = useState<BonusKind>(searchParams.get('kind') === 'kpi' ? 'kpi' : 'fact');
+  const [kind, setKind] = useState<BonusKind>(
+    modalKind || (searchParams.get('kind') === 'kpi' ? 'kpi' : 'fact'),
+  );
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -155,7 +199,28 @@ export function BonusAccrualForm({ docId, viewOnly }: { docId?: string; viewOnly
   }, [q]);
 
   useEffect(() => {
+    if (isModal && modalKind) setKind(modalKind);
+  }, [isModal, modalKind, modalOpen]);
+
+  useEffect(() => {
+    if (isModal && !modalOpen) return;
     void (async () => {
+      setLoading(true);
+      setError('');
+      if (isModal && isNew) {
+        setStatus('draft');
+        setNumber('');
+        setDocDate(today());
+        setStartDate(firstOfMonth());
+        setEndDate(lastOfMonth());
+        setDivisionId('');
+        setFactTypeId('');
+        setConsiderPayroll(false);
+        setNote('');
+        setLines([]);
+        setQ('');
+        setKind(modalKind || 'fact');
+      }
       try {
         const [divs, factsRaw, accRaw, emps] = await Promise.all([
           apiFetch<Array<{ id: string; name: string }>>('/api/organization/divisions').catch(() => []),
@@ -213,7 +278,7 @@ export function BonusAccrualForm({ docId, viewOnly }: { docId?: string; viewOnly
         setLoading(false);
       }
     })();
-  }, [docId]);
+  }, [docId, isModal, modalOpen, isNew, modalKind]);
 
   function patchLine(i: number, patch: Partial<BonusLine>) {
     setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -277,7 +342,8 @@ export function BonusAccrualForm({ docId, viewOnly }: { docId?: string; viewOnly
       if (andPost && id) {
         await apiFetch(`/api/payroll/bonus-accruals/${id}/post`, { method: 'POST' });
       }
-      router.push(PATH);
+      if (isModal) onModalSaved?.(id || '');
+      else router.push(PATH);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -313,32 +379,15 @@ export function BonusAccrualForm({ docId, viewOnly }: { docId?: string; viewOnly
     }
   }
 
-  if (loading) return <p>Загрузка…</p>;
+  if (isModal && !modalOpen) return null;
+  if (loading && !isModal) return <p>Загрузка…</p>;
 
   const colSpan = isFact ? (readOnly ? 5 : 6) : readOnly ? 6 : 7;
 
-  return (
-    <div className={form.page}>
-      <PageSubnav groupKey="bonus-accruals" titleOverride={pageTitle} />
-      <div className={form.topBar}>
-        <h1 className={form.title}>{pageTitle}</h1>
-        <div className={form.actions}>
-          {!readOnly ? (
-            <>
-              <button type="button" className={form.btnSave} disabled={saving} onClick={() => void save(false)}>
-                Сохранить
-              </button>
-              <button type="button" className={form.btnPost} disabled={saving} onClick={() => void save(true)}>
-                Провести
-              </button>
-            </>
-          ) : null}
-          <button type="button" className={form.btnClose} onClick={() => router.push(PATH)}>
-            Закрыть
-          </button>
-        </div>
-      </div>
-      {error ? <p className={form.error}>{error}</p> : null}
+  const body = (
+    <>
+      {error ? <p className={isModal ? modalCss.error : form.error}>{error}</p> : null}
+      {loading && isModal ? <p className={extra.muted}>Загрузка…</p> : null}
 
       <div className={form.card}>
         <div className={form.grid4}>
@@ -535,6 +584,71 @@ export function BonusAccrualForm({ docId, viewOnly }: { docId?: string; viewOnly
           </table>
         </div>
       </div>
+    </>
+  );
+
+  if (isModal) {
+    return (
+      <FormModal
+        open={Boolean(modalOpen)}
+        title={pageTitle}
+        onClose={() => onModalClose?.()}
+        width="xl"
+        footer={
+          <>
+            {!readOnly ? (
+              <>
+                <button
+                  type="button"
+                  className={modalCss.btnPrimary}
+                  disabled={saving || loading}
+                  onClick={() => void save(false)}
+                >
+                  {saving ? '…' : 'Сохранить'}
+                </button>
+                <button
+                  type="button"
+                  className={modalCss.btnGhost}
+                  disabled={saving || loading}
+                  onClick={() => void save(true)}
+                >
+                  Провести
+                </button>
+              </>
+            ) : null}
+            <button type="button" className={modalCss.btnGhost} onClick={() => onModalClose?.()}>
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {body}
+      </FormModal>
+    );
+  }
+
+  return (
+    <div className={form.page}>
+      <PageSubnav groupKey="bonus-accruals" titleOverride={pageTitle} />
+      <div className={form.topBar}>
+        <h1 className={form.title}>{pageTitle}</h1>
+        <div className={form.actions}>
+          {!readOnly ? (
+            <>
+              <button type="button" className={form.btnSave} disabled={saving} onClick={() => void save(false)}>
+                Сохранить
+              </button>
+              <button type="button" className={form.btnPost} disabled={saving} onClick={() => void save(true)}>
+                Провести
+              </button>
+            </>
+          ) : null}
+          <button type="button" className={form.btnClose} onClick={() => router.push(PATH)}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+      {body}
     </div>
   );
 }

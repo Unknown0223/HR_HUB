@@ -26,7 +26,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -46,7 +46,7 @@
 .btnClose {
   border: 1px solid #d1d5db;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -118,7 +118,7 @@
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -151,7 +151,7 @@
 
 .typeOption input {
   margin: 0;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
   flex-shrink: 0;
 }
 
@@ -189,7 +189,7 @@
 }
 
 .toggleOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .toggle::after {

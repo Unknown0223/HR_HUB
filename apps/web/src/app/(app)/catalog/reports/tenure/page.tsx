@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
 import treeS from '../dismissals-by-reason/page.module.css';
 import s from './page.module.css';
@@ -92,6 +93,19 @@ function fileStamp(iso?: string) {
   const ss = String(d.getSeconds()).padStart(2, '0');
   return `${dd}.${mm}.${yyyy}+${hh}_${mi}_${ss}`;
 }
+function fmtGen(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
 function escapeHtml(v: string) {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -132,7 +146,7 @@ function printHtml(report: Payload) {
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#3699ff;font-weight:700;margin-right:10px}
+.brand{color:#0a85e2;font-weight:700;margin-right:10px}
 h1{margin:0;font-size:15px;display:inline}
 .btn{border:1px solid #e4e6ef;background:#fff;color:#5e6278;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
 .wrap{overflow:auto;padding:16px}
@@ -541,92 +555,109 @@ export default function TenureReportPage() {
   }
 
   const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : extra.exportLinks}>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportCsv(d))}>CSV</button>
-      <button type="button" className={ghost ? layout.exportBtnGhost : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportXml(d))}>XML</button>
+    <div className={ghost ? arena.exportBtns : arena.exportLinks}>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void openHtml()}>HTML</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void exportExcel()}>Excel</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportCsv(d))}>CSV</button>
+      <button type="button" className={ghost ? arena.exportBtn : undefined} disabled={busy} onClick={() => void ensureReport().then((d) => d && exportXml(d))}>XML</button>
     </div>
   );
 
   return (
-    <div className={layout.page}>
-      <h1 className={layout.h1}>Отчет по стажам</h1>
-      <div className={layout.toolbar}>
-        <button type="button" className={tab === 'filter' ? layout.tabOn : layout.tab} onClick={() => setTab('filter')}>Фильтр</button>
-        <button
-          type="button"
-          className={tab === 'view' ? layout.tabOn : layout.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
-        <button type="button" className={tab === 'settings' ? layout.tabOn : layout.tab} onClick={() => setTab('settings')}>Настройки</button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button type="button" className={tab === 'filter' ? arena.tabOn : arena.tab} onClick={() => setTab('filter')}>Фильтр</button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+          <button type="button" className={tab === 'settings' ? arena.tabOn : arena.tab} onClick={() => setTab('settings')}>Настройки</button>
+        </div>
         {tab === 'settings' ? (
           <>
-            <button type="button" className={layout.tabOn} onClick={saveSettings}>Сохранить</button>
-            <button type="button" className={layout.tab} onClick={resetSettings}>Сбросить</button>
+            <button type="button" className={arena.ghostBtn} onClick={saveSettings}>Сохранить</button>
+            <button type="button" className={arena.ghostBtn} onClick={resetSettings}>Сбросить</button>
           </>
         ) : null}
         {tab === 'view' ? (
           <>
-            <button type="button" className={layout.iconBtn} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
             {exportBtns(true)}
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-hourglass-half" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет по стажам</h1>
+          <p className={shared.pageSubtitle}>Стаж сотрудников и соответствие начислений заданным правилам</p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
       {savedNote ? <p className={s.saved}>{savedNote}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={`${layout.card} ${s.card}`} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={`${arena.field} ${arena.fieldWide}`}>
             <label>Подразделение</label>
             <DivisionTree nodes={tree} selected={new Set(divisionIds)} onChange={(next) => setDivisionIds([...next])} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Должности</label>
             <FilterPick options={positions} selected={positionIds} onChange={setPositionIds} />
           </div>
-          <div className={layout.field}>
+          <div className={arena.field}>
             <label>Сотрудники</label>
             <EmpPick options={employees} selected={employeeIds} onChange={setEmployeeIds} />
           </div>
           <div className={s.yearRow}>
-            <div className={layout.field}>
+            <div className={arena.field}>
               <label>Стаж от (год)</label>
               <input className={s.numInput} inputMode="numeric" value={yearsFrom} onChange={(e) => setYearsFrom(e.target.value.replace(/[^\d]/g, ''))} />
             </div>
-            <div className={layout.field}>
+            <div className={arena.field}>
               <label>до (год)</label>
               <input className={s.numInput} inputMode="numeric" value={yearsTo} onChange={(e) => setYearsTo(e.target.value.replace(/[^\d]/g, ''))} />
             </div>
           </div>
-          <div className={layout.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>{busy ? 'Формирование…' : 'Составить отчет'}</button>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>{busy ? 'Формирование…' : 'Составить отчет'}</button>
             {exportBtns(false)}
           </div>
         </form>
       ) : null}
 
       {tab === 'settings' ? (
-        <div className={`${layout.card} ${s.settingsCard}`}>
+        <div className={arena.settingsCard}>
           {rules.map((r, i) => (
             <div key={i} className={s.ruleRow}>
-              <div className={layout.field}>
+              <div className={arena.field}>
                 <label>от</label>
                 <input className={s.numInput} inputMode="numeric" value={r.from} onChange={(e) => setRules((prev) => prev.map((x, j) => (j === i ? { ...x, from: e.target.value.replace(/[^\d]/g, '') } : x)))} />
               </div>
-              <div className={layout.field}>
+              <div className={arena.field}>
                 <label>до</label>
                 <input className={s.numInput} inputMode="numeric" value={r.to} onChange={(e) => setRules((prev) => prev.map((x, j) => (j === i ? { ...x, to: e.target.value.replace(/[^\d]/g, '') } : x)))} />
               </div>
-              <div className={layout.field}>
+              <div className={arena.field}>
                 <label>Начисления</label>
                 <FilterPick
                   options={accruals}
@@ -649,41 +680,56 @@ export default function TenureReportPage() {
       ) : null}
 
       {tab === 'view' ? (
-        <div className={layout.viewArea}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
-          ) : (
-            <div className={s.tableWrap}>
-              <table className={s.table}>
-                <thead>
-                  <tr>
-                    {COLUMNS.map((c) => (
-                      <th key={c}>{c}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.rows.length === 0 ? (
-                    <tr>
-                      <td className={s.empty} colSpan={COLUMNS.length}>Нет данных</td>
-                    </tr>
-                  ) : (
-                    report.rows.map((r, i) => (
-                      <tr key={`${r.n}-${r.employee}`} className={i % 2 ? s.zebra : undefined}>
-                        <td>{r.n}</td>
-                        <td className={s.rowName}>{r.employee}</td>
-                        <td>{r.division}</td>
-                        <td>{r.position}</td>
-                        <td>{r.tenure}</td>
-                        <td>{r.accrualsMatch}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
             </div>
+          ) : (
+            <>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-users" aria-hidden />
+                  Строк: {report.rows.length}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
+              <div className={s.tableWrap}>
+                <table className={s.table}>
+                  <thead>
+                    <tr>
+                      {COLUMNS.map((c) => (
+                        <th key={c}>{c}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.rows.length === 0 ? (
+                      <tr>
+                        <td className={s.empty} colSpan={COLUMNS.length}>Нет данных</td>
+                      </tr>
+                    ) : (
+                      report.rows.map((r, i) => (
+                        <tr key={`${r.n}-${r.employee}`} className={i % 2 ? s.zebra : undefined}>
+                          <td className={s.num}>{r.n}</td>
+                          <td className={s.rowName}>{r.employee}</td>
+                          <td>{r.division}</td>
+                          <td>{r.position}</td>
+                          <td>{r.tenure}</td>
+                          <td>{r.accrualsMatch}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       ) : null}

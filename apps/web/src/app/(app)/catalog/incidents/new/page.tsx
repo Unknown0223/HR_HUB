@@ -1,7 +1,12 @@
 'use client';
 
-import { IncidentForm } from '../IncidentForm';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function NewIncidentPage() {
-  return <IncidentForm mode="create" />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/incidents?create=1');
+  }, [router]);
+  return null;
 }

@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense } from 'react';
-import { ManualForm } from '../ManualForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function NewManualPage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <ManualForm />
-    </Suspense>
-  );
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/payroll/manual?create=1');
+  }, [router]);
+  return null;
 }

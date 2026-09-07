@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -22,6 +24,7 @@ import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
 import extra from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = { id: string; code: string; name: string; items?: DictItem[] };
 type DictItem = {
@@ -144,7 +147,7 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
         apiFetch<{ employees?: Opt[]; locations?: Opt[] }>('/api/catalog/lookups'),
         apiFetch<{ tenant?: { name?: string }; settings?: { orgName?: string } }>(
           '/api/settings/org',
-        ).catch(() => ({})),
+        ).catch((): { tenant?: { name?: string }; settings?: { orgName?: string } } => ({})),
       ]);
       const dict = (list || []).find((d) => d.code === DICT_CODE);
       const cur = (list || []).find((d) => d.code === 'currencies');
@@ -197,6 +200,10 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
 
   useEffect(() => {
     setPage(1);
@@ -382,93 +389,6 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
       return blob.includes(qq);
     });
   }, [history, filters.from, filters.to, filters.user, filters.event, filters.product, q, orgName]);
-
-  if (mode === 'create' || mode === 'edit') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav
-          group={{
-            title: mode === 'edit' ? 'Касса (изменение)' : 'Касса (создание)',
-            siblings: [],
-          }}
-        />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button
-              type="button"
-              className={formStyles.btnSave}
-              disabled={saving}
-              onClick={() => void save()}
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              className={formStyles.btnClose}
-              onClick={() => setMode('list')}
-            >
-              Закрыть
-            </button>
-          </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${extra.cardWide}`}>
-            <div className={formStyles.layout}>
-              <div>
-                <div className={formStyles.field}>
-                  <label>Код</label>
-                  <input value={code} onChange={(e) => setCode(e.target.value)} />
-                </div>
-                <div className={formStyles.field}>
-                  <label>
-                    Название <span className={formStyles.req}>*</span>
-                  </label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className={formStyles.field}>
-                  <label>Материально ответственные лица</label>
-                  <MultiLookup
-                    value={responsibleIds}
-                    options={employees}
-                    onChange={setResponsibleIds}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className={formStyles.field}>
-                  <label>Рабочие зоны</label>
-                  <MultiLookup
-                    value={locationIds}
-                    options={locations}
-                    onChange={setLocationIds}
-                  />
-                </div>
-                <div className={formStyles.field}>
-                  <label>Валюты</label>
-                  <MultiLookup
-                    value={currencyIds}
-                    options={currencies}
-                    onChange={setCurrencyIds}
-                  />
-                </div>
-                <div className={formStyles.statusBlock}>
-                  <span className={formStyles.fieldLabel}>Статус</span>
-                  <label className={formStyles.toggleRow}>
-                    <button
-                      type="button"
-                      className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                      onClick={() => setActive((v) => !v)}
-                      aria-pressed={active}
-                    />
-                    <span>{active ? 'Активный' : 'Неактивный'}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (mode === 'history') {
     return (
@@ -668,9 +588,38 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
           ],
         }}
       />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-cash-register" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Кассы</h1>
+          <p className={shared.pageSubtitle}>
+            Справочник касс, ответственных лиц и рабочих зон
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <FilterPanel
@@ -689,14 +638,6 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
               { type: 'isActive', key: 'isActive', label: 'Статус' },
             ]}
           />
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => void load()}
-            aria-label="Обновить"
-          >
-            ↻
-          </button>
           {selected.size > 0 ? (
             <>
               <div className={extra.statusWrap}>
@@ -741,40 +682,58 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
           ) : null}
         </div>
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            Excel
-          </button>
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ‹
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="Excel"
+            aria-label="Экспорт Excel"
+          >
+            <i className="fas fa-file-excel" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
+          >
+            <i className="fas fa-chevron-left" aria-hidden />
+          </button>
+          <span className={styles.pagerMeta}>
+            {Math.min(page, pageCount)} / {pageCount}
+          </span>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
-            ›
+            <i className="fas fa-chevron-right" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            Обновить
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
@@ -823,13 +782,95 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={mode === 'edit' ? 'Касса (изменение)' : 'Касса (создание)'}
+        width="lg"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.row2}>
+          <div className={modal.field}>
+            <label>Код</label>
+            <input value={code} onChange={(e) => setCode(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>
+              Название <span className={modal.req}>*</span>
+            </label>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>Материально ответственные лица</label>
+            <MultiLookup
+              value={responsibleIds}
+              options={employees}
+              onChange={setResponsibleIds}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Рабочие зоны</label>
+            <MultiLookup
+              value={locationIds}
+              options={locations}
+              onChange={setLocationIds}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Валюты</label>
+            <MultiLookup
+              value={currencyIds}
+              options={currencies}
+              onChange={setCurrencyIds}
+            />
+          </div>
+          <div className={modal.field}>
+            <span>Статус</span>
+            <label className={formStyles.toggleRow}>
+              <button
+                type="button"
+                className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+                onClick={() => setActive((v) => !v)}
+                aria-pressed={active}
+              />
+              <span>{active ? 'Активный' : 'Неактивный'}</span>
+            </label>
+          </div>
+        </div>
+      </FormModal>
     </div>
   );
 }
 
 export function CashboxesPage({ historyMode }: { historyMode?: boolean }) {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <CashboxesInner historyMode={historyMode} />
     </Suspense>
   );

@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { SearchLookup } from '@/app/(app)/catalog/avg-salaries/SearchLookup';
 import { apiFetch } from '@/lib/api';
@@ -21,6 +23,7 @@ import formStyles from '../../catalog/report-templates/form.module.css';
 import local from '../../catalog/document-types/page.module.css';
 import extra from '../../catalog/cashboxes/page.module.css';
 import ui from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = { id: string; code: string; name: string; items?: GeoItem[] };
 type AuditRow = {
@@ -347,20 +350,11 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
     setFieldsText('');
   }
 
-  const title =
-    mode !== 'list'
-      ? kind === 'region'
-        ? mode === 'create'
-          ? 'Регион (создание)'
-          : 'Регион (изменение)'
-        : mode === 'create'
-          ? 'Страна (создание)'
-          : 'Страна (изменение)'
-      : historyMode
-        ? 'История изменений'
-        : oblastsView
-          ? 'Области'
-          : 'Страны';
+  const title = historyMode
+    ? 'История изменений'
+    : oblastsView
+      ? 'Области'
+      : 'Страны';
 
   function pager(totalFiltered: number, totalAll: number) {
     const count = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
@@ -369,7 +363,13 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
         <span className={styles.pagerMeta}>
           {totalFiltered} / {totalAll}
         </span>
-        <button type="button" className={styles.toolBtn} disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+        <button
+          type="button"
+          className={styles.toolBtn}
+          disabled={page <= 1}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          aria-label="Предыдущая страница"
+        >
           ‹
         </button>
         <span className={styles.pagerMeta}>{Math.min(page, count)}</span>
@@ -378,80 +378,21 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
           className={styles.toolBtn}
           disabled={page >= count}
           onClick={() => setPage((p) => p + 1)}
+          aria-label="Следующая страница"
         >
           ›
         </button>
-        <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-          ↻
+        <button
+          type="button"
+          className={styles.toolBtn}
+          onClick={() => void load()}
+          title="Обновить"
+          aria-label="Обновить"
+        >
+          <i className="fas fa-sync-alt" aria-hidden />
+          Обновить
         </button>
       </>
-    );
-  }
-
-  if (mode !== 'list') {
-    return (
-      <div className={styles.wrap}>
-        <PageSubnav group={{ title, siblings: [] }} />
-        <div className={formStyles.page}>
-          <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
-            <button type="button" className={formStyles.btnSave} disabled={saving} onClick={() => void save()}>
-              Сохранить
-            </button>
-            <button type="button" className={formStyles.btnClose} onClick={() => setMode('list')}>
-              Закрыть
-            </button>
-          </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
-          <div className={`${formStyles.card} ${formStyles.cardForm}`}>
-            <div className={formStyles.field}>
-              <label>
-                Название <span className={formStyles.req}>*</span>
-              </label>
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>Альтернативное название</label>
-              <input value={altName} onChange={(e) => setAltName(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>GPS координаты</label>
-              <div className={ui.gpsWrap}>
-                <input value={gps} readOnly placeholder="" />
-                <button
-                  type="button"
-                  className={ui.gpsBtn}
-                  aria-label="Карта"
-                  onClick={() => {
-                    const next = window.prompt('GPS координаты (широта, долгота)', gps);
-                    if (next != null) setGps(next.trim());
-                  }}
-                >
-                  📍
-                </button>
-                <button type="button" className={ui.gpsBtn} aria-label="Очистить" onClick={() => setGps('')}>
-                  ×
-                </button>
-              </div>
-            </div>
-            <div className={formStyles.field} style={{ maxWidth: 280 }}>
-              <label>Код</label>
-              <input value={code} onChange={(e) => setCode(e.target.value)} />
-            </div>
-            <div className={formStyles.field}>
-              <label>Статус</label>
-              <label className={formStyles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
-                  onClick={() => setActive((v) => !v)}
-                  aria-pressed={active}
-                />
-                <span>Активный</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
     );
   }
 
@@ -460,13 +401,28 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
     return (
       <div className={styles.wrap}>
         <PageSubnav group={{ title: 'История изменений', siblings: [] }} />
+
+        <div className={shared.pageHeader}>
+          <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+            <i className="fas fa-history" aria-hidden />
+          </div>
+          <div className={shared.pageHeaderText}>
+            <h1 className={shared.pageTitle}>История изменений</h1>
+            <p className={shared.pageSubtitle}>
+              Журнал изменений стран и регионов
+            </p>
+          </div>
+        </div>
+
         {error ? <p className={styles.error}>{error}</p> : null}
         <div className={styles.toolbar}>
           <div className={styles.leftActions}>
-            <button type="button" className={formStyles.btnSave} onClick={() => setParamsOpen(true)}>
+            <button type="button" className={styles.createBtn} onClick={() => setParamsOpen(true)}>
+              <i className="fas fa-sliders-h" aria-hidden />
               Параметры
             </button>
             <button type="button" className={formStyles.btnClose} onClick={() => router.push(PATH)}>
+              <i className="fas fa-times" aria-hidden />
               Закрыть
             </button>
           </div>
@@ -479,6 +435,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') applySearch();
               }}
+              aria-label="Поиск"
             />
             <FilterPanel
               inline
@@ -502,7 +459,9 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
                   })),
                 )
               }
+              title="Экспорт Excel"
             >
+              <i className="fas fa-file-excel" aria-hidden />
               Excel
             </button>
             {pager(histFiltered.length, audit.length)}
@@ -624,16 +583,39 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={{ title, siblings: [] }} />
+      <PageSubnav groupKey="settings-admin" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className={`fas ${oblastsView ? 'fa-map-marked-alt' : 'fa-globe'}`} aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>{title}</h1>
+          <p className={shared.pageSubtitle}>
+            {oblastsView
+              ? `Области страны «${focusCountry?.name || ''}»`
+              : 'Справочник стран и областей'}
+          </p>
+        </div>
+      </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={() => openCreate(listKind)}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
-          </button>
+          <FilterPanel
+            inline
+            urlSync
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+              { type: 'isActive', key: 'isActive', label: 'Статус' },
+            ]}
+          />
           {selected.size > 0 ? (
             <button
               type="button"
@@ -641,11 +623,13 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
               disabled={busy}
               onClick={() => void deleteIds(Array.from(selected), undefined, listKind)}
             >
+              <i className="fas fa-trash-alt" aria-hidden />
               Удалить {selected.size}
             </button>
           ) : null}
           {oblastsView ? (
             <button type="button" className={formStyles.btnClose} onClick={() => patchUrl({ country: null })}>
+              <i className="fas fa-times" aria-hidden />
               Закрыть
             </button>
           ) : null}
@@ -659,16 +643,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') applySearch();
             }}
-          />
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
-              { type: 'isActive', key: 'isActive', label: 'Статус' },
-            ]}
+            aria-label="Поиск"
           />
           <button
             type="button"
@@ -689,7 +664,9 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
                 }),
               )
             }
+            title="Экспорт Excel"
           >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           {pager(filtered.length, rowSource.length)}
@@ -790,6 +767,99 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode !== 'list'}
+        title={
+          kind === 'region'
+            ? mode === 'edit'
+              ? 'Регион (изменение)'
+              : 'Регион (создание)'
+            : mode === 'edit'
+              ? 'Страна (изменение)'
+              : 'Страна (создание)'
+        }
+        width="md"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.field}>
+          <label>
+            Название <span className={modal.req}>*</span>
+          </label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>Альтернативное название</label>
+          <input value={altName} onChange={(e) => setAltName(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <label>GPS координаты</label>
+          <div className={ui.gpsWrap}>
+            <input value={gps} readOnly placeholder="" />
+            <button
+              type="button"
+              className={ui.gpsBtn}
+              aria-label="Карта"
+              onClick={() => {
+                const next = window.prompt('GPS координаты (широта, долгота)', gps);
+                if (next != null) setGps(next.trim());
+              }}
+            >
+              📍
+            </button>
+            <button
+              type="button"
+              className={ui.gpsBtn}
+              aria-label="Очистить"
+              onClick={() => setGps('')}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+        <div className={modal.field}>
+          <label>Код</label>
+          <input value={code} onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div className={modal.field}>
+          <span>Статус</span>
+          <label className={formStyles.toggleRow}>
+            <button
+              type="button"
+              className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+              onClick={() => setActive((v) => !v)}
+              aria-pressed={active}
+            />
+            <span>{active ? 'Активный' : 'Неактивный'}</span>
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }

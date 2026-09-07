@@ -50,7 +50,7 @@
 
 .search:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.14);
 }
 
@@ -141,7 +141,7 @@
 
 .btnPrimary {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -175,7 +175,7 @@
 
 .lookupInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .lookupInvalid {
@@ -200,14 +200,17 @@
   position: absolute;
   z-index: 40;
   left: 0;
-  min-width: max(100%, 420px);
-  max-width: 520px;
+  right: auto;
+  width: min(100%, 520px);
+  min-width: min(100%, 320px);
+  max-width: min(520px, 92vw);
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 4px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .dropUp {
@@ -236,8 +239,9 @@
 }
 
 .dropBody {
-  max-height: 220px;
-  overflow: auto;
+  max-height: min(200px, 30vh);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .dropOpt {
@@ -290,7 +294,7 @@
   appearance: none;
   border: none;
   background: none;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;

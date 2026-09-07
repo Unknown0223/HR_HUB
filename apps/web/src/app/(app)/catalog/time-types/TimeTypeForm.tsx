@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
-import styles from '../absence-types/form.module.css';
+import styles from './form.module.css';
 
 type ParentOpt = { id: string; code: string; name: string };
 
@@ -19,7 +19,6 @@ type TimeTypeRow = {
   parentId?: string | null;
   isPaid?: boolean;
   isActive?: boolean;
-  coefficient?: number | null;
 };
 
 const PLAN = [
@@ -28,13 +27,21 @@ const PLAN = [
   { value: 'unplanned', label: 'Внеплановая' },
 ] as const;
 
-export function TimeTypeForm({ typeId }: { typeId?: string }) {
-  const router = useRouter();
-  const isNew = !typeId;
-  const [loading, setLoading] = useState(!isNew);
+export function TimeTypeFormModal({
+  open,
+  onClose,
+  onSaved,
+  editId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  editId?: string | null;
+}) {
+  const isEdit = Boolean(editId);
+  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [ok, setOk] = useState('');
   const [parents, setParents] = useState<ParentOpt[]>([]);
 
   const [name, setName] = useState('');
@@ -48,18 +55,34 @@ export function TimeTypeForm({ typeId }: { typeId?: string }) {
   const [useCoefAbsence, setUseCoefAbsence] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
     apiFetch<ParentOpt[] | { items?: ParentOpt[] }>('/api/catalog/time-types')
       .then((d) => {
         const list = Array.isArray(d) ? d : d.items || [];
-        setParents(list.filter((t) => t.id !== typeId));
+        setParents(list.filter((t) => t.id !== editId));
       })
       .catch(() => setParents([]));
-  }, [typeId]);
+  }, [open, editId]);
 
   useEffect(() => {
-    if (isNew) return;
+    if (!open) return;
+    setError('');
+    setBusy(false);
+    if (!editId) {
+      setName('');
+      setLetterCode('');
+      setDigitalCode('');
+      setColor('#E73C3A');
+      setParentId('');
+      setPlanLoad('partial');
+      setActive(true);
+      setCode('');
+      setUseCoefAbsence(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    apiFetch<TimeTypeRow>(`/api/catalog/time-types/${typeId}`)
+    apiFetch<TimeTypeRow>(`/api/catalog/time-types/${editId}`)
       .then((row) => {
         setName(row.name || '');
         setCode(row.code || '');
@@ -70,9 +93,9 @@ export function TimeTypeForm({ typeId }: { typeId?: string }) {
         setPlanLoad(row.planLoad || 'partial');
         setActive(row.isActive !== false);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [typeId, isNew]);
+  }, [open, editId]);
 
   async function save() {
     if (!name.trim()) {
@@ -85,7 +108,6 @@ export function TimeTypeForm({ typeId }: { typeId?: string }) {
     }
     setBusy(true);
     setError('');
-    setOk('');
     try {
       const body = {
         name: name.trim(),
@@ -98,83 +120,89 @@ export function TimeTypeForm({ typeId }: { typeId?: string }) {
         isActive: active,
         isPaid: true,
       };
-      if (isNew) {
-        await apiFetch<TimeTypeRow>('/api/catalog/time-types', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        router.push('/catalog/time-types');
-      } else {
-        await apiFetch(`/api/catalog/time-types/${typeId}`, {
+      if (isEdit && editId) {
+        await apiFetch(`/api/catalog/time-types/${editId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        setOk('Сохранено');
+        onSaved(editId);
+      } else {
+        const created = await apiFetch<TimeTypeRow>('/api/catalog/time-types', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        onSaved(created?.id || '');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
       setBusy(false);
     }
   }
 
-  if (loading) return <p className={styles.muted}>Загрузка…</p>;
-
   return (
-    <div className={styles.page}>
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>
-          {isNew ? 'Вид рабочего времени (создание)' : 'Вид рабочего времени (изменение)'}
-        </h1>
-        <div className={styles.actions}>
+    <FormModal
+      open={open}
+      title={
+        isEdit ? 'Вид рабочего времени (изменение)' : 'Вид рабочего времени (создание)'
+      }
+      onClose={onClose}
+      width="lg"
+      footer={
+        <>
           <button
             type="button"
-            className={styles.btnSave}
-            disabled={busy}
+            className={modal.btnPrimary}
+            disabled={busy || loading}
             onClick={() => void save()}
           >
-            Сохранить
+            {busy ? '…' : 'Сохранить'}
           </button>
-          <Link href="/catalog/time-types" className={styles.btnClose}>
+          <button type="button" className={modal.btnGhost} onClick={onClose}>
             Закрыть
-          </Link>
-        </div>
-      </div>
-
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {ok ? <p className={styles.ok}>{ok}</p> : null}
-
-      <div className={styles.formLayout} style={{ gridTemplateColumns: '1fr' }}>
-        <div className={styles.col}>
-          <div className={styles.field}>
-            <label>
-              Название <span className={styles.req}>*</span>
-            </label>
+          </button>
+        </>
+      }
+    >
+      {error ? <p className={modal.error}>{error}</p> : null}
+      {loading ? (
+        <p className={styles.muted}>Загрузка…</p>
+      ) : (
+        <div className={modal.fields}>
+          <label className={modal.field}>
+            <span>
+              Название <em className={modal.req}>*</em>
+            </span>
             <input value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>
+                Буквенный код <em className={modal.req}>*</em>
+              </span>
+              <input
+                value={letterCode}
+                onChange={(e) => setLetterCode(e.target.value)}
+              />
+            </label>
+            <label className={modal.field}>
+              <span>Цифровой код</span>
+              <input
+                value={digitalCode}
+                onChange={(e) => setDigitalCode(e.target.value)}
+              />
+            </label>
           </div>
 
-          <div className={styles.grid2}>
-            <div className={styles.field}>
-              <label>
-                Буквенный код <span className={styles.req}>*</span>
-              </label>
-              <input value={letterCode} onChange={(e) => setLetterCode(e.target.value)} />
-            </div>
-            <div className={styles.field}>
-              <label>Цифровой код</label>
-              <input value={digitalCode} onChange={(e) => setDigitalCode(e.target.value)} />
-            </div>
-          </div>
-
-          <div className={styles.grid2}>
-            <div className={styles.field}>
-              <label>Цвет</label>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Цвет</span>
+              <div className={styles.colorRow}>
                 <input
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  style={{ width: 42, height: 34, padding: 2, cursor: 'pointer' }}
                 />
                 <input
                   value={color}
@@ -182,11 +210,9 @@ export function TimeTypeForm({ typeId }: { typeId?: string }) {
                   style={{ flex: 1 }}
                 />
               </div>
-            </div>
-            <div className={styles.field}>
-              <label>
-                Родитель
-              </label>
+            </label>
+            <label className={modal.field}>
+              <span>Родитель</span>
               <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
                 <option value="">— нет —</option>
                 {parents.map((p) => (
@@ -195,62 +221,50 @@ export function TimeTypeForm({ typeId }: { typeId?: string }) {
                   </option>
                 ))}
               </select>
+            </label>
+          </div>
+
+          <div className={modal.field}>
+            <span>Нагрузка на план</span>
+            <div className={modal.radioRow}>
+              {PLAN.map((p) => (
+                <label key={p.value} className={modal.radio}>
+                  <input
+                    type="radio"
+                    checked={planLoad === p.value}
+                    onChange={() => setPlanLoad(p.value)}
+                  />
+                  {p.label}
+                </label>
+              ))}
             </div>
           </div>
 
-          <div className={styles.grid2}>
-            <div className={styles.field}>
-              <label>Нагрузка на план</label>
-              <div className={styles.radioRow}>
-                {PLAN.map((p) => (
-                  <label key={p.value} className={styles.radio}>
-                    <input
-                      type="radio"
-                      checked={planLoad === p.value}
-                      onChange={() => setPlanLoad(p.value)}
-                    />
-                    {p.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className={styles.field}>
-              <label>Коэффициент</label>
-              <input placeholder="1" disabled title="Скоро" />
-            </div>
-          </div>
-
-          <div className={styles.grid2}>
-            <div className={styles.statusBlock}>
-              <span className={styles.fieldLabel}>Статус</span>
-              <label className={styles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${styles.toggle} ${active ? styles.toggleOn : ''}`}
-                  onClick={() => setActive((v) => !v)}
-                  aria-pressed={active}
-                />
-                <span>Активный</span>
-              </label>
-            </div>
-            <div>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={useCoefAbsence}
-                  onChange={(e) => setUseCoefAbsence(e.target.checked)}
-                />
+          <div className={styles.checkGroup}>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+              />
+              Активный
+            </label>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={useCoefAbsence}
+                onChange={(e) => setUseCoefAbsence(e.target.checked)}
+              />
+              <span>
                 Использовать коэффициент в запросах отсутствия
-              </label>
-              <p className={styles.muted} style={{ margin: '0.35rem 0 0 1.4rem', fontSize: '0.78rem' }}>
-                Не учитывает часы по часовой ставке
-                <br />
-                Не учитывает часы по плановым дням
-              </p>
-            </div>
+                <p className={styles.hint}>
+                  Не учитывает часы по часовой ставке / плановым дням
+                </p>
+              </span>
+            </label>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </FormModal>
   );
 }

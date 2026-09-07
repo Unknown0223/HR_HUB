@@ -9,6 +9,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { InternalTripCreateModal } from './InternalTripCreateModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
 
@@ -149,6 +150,7 @@ function InternalTripsInner() {
 
   const allFilteredChecked =
     filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
   const selectedIds = useMemo(() => [...checked], [checked]);
 
   function toggleAll() {
@@ -242,33 +244,34 @@ function InternalTripsInner() {
 
   const showCreate = scope === 'mine';
   const middleCol = scope === 'mine' ? 'Локация' : 'Позиция';
+  const colCount = 9;
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="internal-trips" />
 
-      <div className={styles.scopeTabs}>
-        <button
-          type="button"
-          className={scope === 'to_me' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('to_me')}
-        >
-          Запросы мне
-        </button>
-        <button
-          type="button"
-          className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('mine')}
-        >
-          Мои запросы
-        </button>
-        <button
-          type="button"
-          className={scope === 'shared' ? styles.scopeActive : styles.scopeTab}
-          onClick={() => setScope('shared')}
-        >
-          Общие запросы
-        </button>
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}>
+          <i className="fas fa-route" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Внутренние командировки</h1>
+          <p className={shared.pageSubtitle}>
+            Заявки на временный перевод сотрудников между подразделениями
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
       </div>
 
       <div className={styles.toolbar}>
@@ -279,45 +282,33 @@ function InternalTripsInner() {
               className={styles.createBtn}
               onClick={() => setCreateOpen(true)}
             >
+              <i className="fas fa-plus" aria-hidden />
               Создать
             </button>
           ) : null}
-          {selectedIds.length > 0 ? (
-            <div className={styles.bulkBar}>
-              <span className={styles.bulkCount}>{selectedIds.length}</span>
-              <button
-                type="button"
-                className={styles.bulkOk}
-                disabled={busy}
-                onClick={() => bulkAction('approve', 'Подтвердить')}
-              >
-                Подтвердить
-              </button>
-              <button
-                type="button"
-                className={styles.bulkDanger}
-                disabled={busy}
-                onClick={() => bulkAction('reject', 'Отклонить')}
-              >
-                Отклонить
-              </button>
-              <button
-                type="button"
-                className={styles.bulkClear}
-                onClick={() => setChecked(new Set())}
-              >
-                Сбросить
-              </button>
-            </div>
-          ) : null}
-        </div>
-        <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className={styles.scopeTabs}>
+            <button
+              type="button"
+              className={scope === 'to_me' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('to_me')}
+            >
+              Запросы мне
+            </button>
+            <button
+              type="button"
+              className={scope === 'mine' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('mine')}
+            >
+              Мои запросы
+            </button>
+            <button
+              type="button"
+              className={scope === 'shared' ? styles.scopeActive : styles.scopeTab}
+              onClick={() => setScope('shared')}
+            >
+              Общие запросы
+            </button>
+          </div>
           <FilterPanel
             inline
             urlSync
@@ -339,11 +330,31 @@ function InternalTripsInner() {
               { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
             ]}
           />
-          <span className={styles.pagerMeta}>
+        </div>
+        <div className={styles.rightTools}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()}>
-            ↻
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            disabled={loading}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
@@ -351,117 +362,168 @@ function InternalTripsInner() {
       {error ? <p className={styles.error}>{error}</p> : null}
       {info ? <p className={styles.info}>{info}</p> : null}
 
+      {selectedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{selectedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkOk}`}
+            disabled={busy}
+            onClick={() => void bulkAction('approve', 'Подтвердить')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Подтвердить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void bulkAction('reject', 'Отклонить')}
+          >
+            <i className="fas fa-times" aria-hidden />
+            Отклонить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked(new Set())}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredChecked}
-                  onChange={toggleAll}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>Дата создания</th>
-              <th>Подразделение (получатель)</th>
-              <th>Подразделение (отправитель)</th>
-              <th>Сотрудник</th>
-              <th>{middleCol}</th>
-              <th>Дата начала</th>
-              <th>Дата окончания</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={9} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredChecked}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate = someFilteredChecked && !allFilteredChecked;
+                    }}
+                    onChange={toggleAll}
+                    disabled={!filtered.length}
+                    title="Выбрать все"
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата создания</th>
+                <th>Подразделение (получатель)</th>
+                <th>Подразделение (отправитель)</th>
+                <th>Сотрудник</th>
+                <th>{middleCol}</th>
+                <th>Дата начала</th>
+                <th>Дата окончания</th>
+                <th>Статус</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={9} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : (
-              filtered.map((row) => {
-                const st = statusLabel(row);
-                const mid =
-                  scope === 'mine'
-                    ? row.location?.name || '—'
-                    : row.position?.name || '—';
-                return (
-                  <Fragment key={row.id}>
-                    <tr
-                      className={checked.has(row.id) ? styles.rowSelected : undefined}
-                      onClick={() =>
-                        setExpandedId((id) => (id === row.id ? null : row.id))
-                      }
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={checked.has(row.id)}
-                          onChange={(e) => toggleOne(row.id, e)}
-                        />
-                      </td>
-                      <td>{fmtDt(row.createdAt)}</td>
-                      <td>{row.recipientDivision?.name || '—'}</td>
-                      <td>{row.senderDivision?.name || '—'}</td>
-                      <td>{empName(row.employee)}</td>
-                      <td>{mid}</td>
-                      <td>{fmtDate(row.startDate)}</td>
-                      <td>{fmtDate(row.endDate)}</td>
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
-                    </tr>
-                    {expandedId === row.id ? (
-                      <tr className={styles.actionsRow}>
-                        <td colSpan={9}>
-                          <div className={styles.rowActions}>
-                            <Link href={`/catalog/internal-trips/${row.id}`}>
-                              Открыть
-                            </Link>
-                            {row.requestStatus === 'pending' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void review(row.id, 'approved')}
-                                >
-                                  Подтвердить
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void review(row.id, 'rejected')}
-                                >
-                                  Отклонить
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void cancel(row.id)}
-                                >
-                                  Отменить
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className={styles.empty}>
+                    {showCreate ? 'Нет данных — нажмите «Создать»' : 'Нет данных'}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((row) => {
+                  const st = statusLabel(row);
+                  const isChecked = checked.has(row.id);
+                  const expanded = expandedId === row.id;
+                  const mid =
+                    scope === 'mine'
+                      ? row.location?.name || '—'
+                      : row.position?.name || '—';
+                  return (
+                    <Fragment key={row.id}>
+                      <tr
+                        className={
+                          expanded || isChecked ? styles.rowSelected : undefined
+                        }
+                        onClick={() => setExpandedId(expanded ? null : row.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td className={styles.checkCol}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => toggleOne(row.id, e)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Выбрать ${empName(row.employee)}`}
+                          />
+                        </td>
+                        <td>{fmtDt(row.createdAt)}</td>
+                        <td>{row.recipientDivision?.name || '—'}</td>
+                        <td>{row.senderDivision?.name || '—'}</td>
+                        <td className={styles.empName}>{empName(row.employee)}</td>
+                        <td>{mid}</td>
+                        <td>{fmtDate(row.startDate)}</td>
+                        <td>{fmtDate(row.endDate)}</td>
+                        <td>
+                          <span className={st.cls}>{st.text}</span>
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      {expanded ? (
+                        <tr className={styles.actionsRow}>
+                          <td colSpan={colCount}>
+                            <div className={styles.rowActions}>
+                              <Link href={`/catalog/internal-trips/${row.id}`}>
+                                <i className="fas fa-eye" aria-hidden />
+                                Открыть
+                              </Link>
+                              {row.requestStatus === 'pending' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void review(row.id, 'approved')}
+                                  >
+                                    <i className="fas fa-check" aria-hidden />
+                                    Подтвердить
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void review(row.id, 'rejected')}
+                                  >
+                                    <i className="fas fa-times" aria-hidden />
+                                    Отклонить
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={styles.danger}
+                                    disabled={busy}
+                                    onClick={() => void cancel(row.id)}
+                                  >
+                                    <i className="fas fa-ban" aria-hidden />
+                                    Отменить
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <InternalTripCreateModal
@@ -489,7 +551,7 @@ function InternalTripsInner() {
 
 export default function InternalTripsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <InternalTripsInner />
     </Suspense>
   );

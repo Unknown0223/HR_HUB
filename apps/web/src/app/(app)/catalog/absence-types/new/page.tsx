@@ -1,7 +1,13 @@
 'use client';
 
-import { AbsenceTypeForm } from '../AbsenceTypeForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewAbsenceTypePage() {
-  return <AbsenceTypeForm />;
+/** Legacy /new → list with create modal */
+export default function NewAbsenceTypeRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/absence-types?create=1');
+  }, [router]);
+  return null;
 }

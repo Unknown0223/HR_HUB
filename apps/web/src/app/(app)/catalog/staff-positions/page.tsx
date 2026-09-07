@@ -1,14 +1,20 @@
 'use client';
+
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { StaffPositionFormModal } from './StaffPositionFormModal';
 import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = [
+  'q',
   'title',
   'code',
   'divisionId',
@@ -17,6 +23,8 @@ const FILTER_KEYS = [
   'to',
   'status',
 ] as const;
+
+const COL_COUNT = 6;
 
 type Emp = {
   id: string;
@@ -59,20 +67,34 @@ function fmtDate(iso?: string | null) {
 }
 
 function StaffPositionsInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
+  const q = filters.q;
+
   const [rows, setRows] = useState<StaffPos[]>([]);
   const [divisions, setDivisions] = useState<Opt[]>([]);
   const [positions, setPositions] = useState<Opt[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [closeDate, setCloseDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
+  const [searchDraft, setSearchDraft] = useState(q);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [filtersOpen, setFiltersOpen] = useState(
+    Boolean(
+      filters.title ||
+        filters.code ||
+        filters.divisionId ||
+        filters.positionId ||
+        filters.from ||
+        filters.to ||
+        filters.status,
+    ),
   );
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [closeDate, setCloseDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   async function load() {
     setLoading(true);
@@ -97,13 +119,26 @@ function StaffPositionsInner() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    const create = searchParams.get('create') === '1';
+    const edit = searchParams.get('edit');
+    if (create || edit) {
+      setEditId(edit || null);
+      setModalOpen(true);
+    }
+  }, [searchParams]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const titleF = (filters.title || '').trim().toLowerCase();
-    const codeF = (filters.code || '').trim().toLowerCase();
-    const divF = (filters.divisionId || '').trim();
-    const posF = (filters.positionId || '').trim();
-    const statusF = (filters.status || '').trim();
+    const qq = q.trim().toLowerCase();
+    const titleF = filters.title.trim().toLowerCase();
+    const codeF = filters.code.trim().toLowerCase();
+    const divF = filters.divisionId.trim();
+    const posF = filters.positionId.trim();
+    const statusF = filters.status.trim();
     const from = filters.from ? new Date(filters.from) : null;
     const to = filters.to ? new Date(filters.to) : null;
     if (to) to.setHours(23, 59, 59, 999);
@@ -122,98 +157,84 @@ function StaffPositionsInner() {
         if (from && opened < from) return false;
         if (to && opened > to) return false;
       }
-      if (!q) return true;
+      if (!qq) return true;
       const emps = (r.employees || []).map(empName).join(' ');
       return [displayName(r), r.code, r.division?.name, r.position?.name, emps]
         .join(' ')
         .toLowerCase()
-        .includes(q);
+        .includes(qq);
     });
-  }, [rows, search, filters]);
+  }, [rows, q, filters]);
 
-  const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
 
-  function toggleAll() {
-    if (allFilteredChecked) {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
-        return next;
-      });
-    } else {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
-        return next;
-      });
-    }
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function toggleOne(id: string) {
+  function toggleAllPage(on: boolean) {
     setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
       return next;
     });
   }
 
-  const selectedIds = useMemo(() => [...checked], [checked]);
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(
+      qs ? `/catalog/staff-positions?${qs}` : '/catalog/staff-positions',
+      { scroll: false },
+    );
+  }
 
-  async function bulkClose() {
-    if (!selectedIds.length) return;
-    if (
-      !(await confirm(
-        `Установить дату закрытия для ${selectedIds.length} позиций(и)?`,
-      ))
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await apiFetch('/api/catalog/staff-positions/bulk-close', {
-        method: 'POST',
-        body: JSON.stringify({ ids: selectedIds, closedAt: closeDate }),
-      });
-      setChecked(new Set());
-      setSelectedId(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setBusy(false);
+  function openCreate() {
+    setEditId(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(id: string) {
+    setEditId(id);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditId(null);
+    if (searchParams.get('create') === '1' || searchParams.get('edit')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      params.delete('edit');
+      const qs = params.toString();
+      router.replace(
+        qs ? `/catalog/staff-positions?${qs}` : '/catalog/staff-positions',
+        { scroll: false },
+      );
     }
   }
 
-  async function bulkDelete() {
-    if (!selectedIds.length) return;
-    if (!(await confirm(`Удалить ${selectedIds.length} позиций(и)?`))) return;
+  async function runDelete(row: StaffPos) {
+    if (!(await confirm(`Удалить «${displayName(row)}»?`))) return;
     setBusy(true);
-    try {
-      await apiFetch('/api/catalog/staff-positions/bulk-delete', {
-        method: 'POST',
-        body: JSON.stringify({ ids: selectedIds }),
-      });
-      setChecked(new Set());
-      setSelectedId(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeOne(row: StaffPos) {
-    if (!(await confirm('Удалить позицию?'))) return;
-    setBusy(true);
+    setError('');
     try {
       await apiFetch(`/api/catalog/staff-positions/${row.id}`, { method: 'DELETE' });
       setSelectedId(null);
       setChecked((prev) => {
-        const next = new Set(prev);
-        next.delete(row.id);
+        const next = { ...prev };
+        delete next[row.id];
         return next;
       });
       await load();
@@ -224,49 +245,158 @@ function StaffPositionsInner() {
     }
   }
 
+  async function toggleActive(row: StaffPos, value: boolean) {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/catalog/staff-positions/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: value }),
+      });
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, isActive: value } : r)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulkActive(isActive: boolean) {
+    const targets = filtered.filter((r) => checked[r.id] && r.isActive !== isActive);
+    if (targets.length === 0) return;
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          await apiFetch(`/api/catalog/staff-positions/${row.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isActive }),
+          });
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulkClose() {
+    if (!checkedIds.length) return;
+    if (
+      !(await confirm(
+        `Установить дату закрытия ${fmtDate(closeDate)} для ${checkedIds.length} позиций(и)?`,
+      ))
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch('/api/catalog/staff-positions/bulk-close', {
+        method: 'POST',
+        body: JSON.stringify({ ids: checkedIds, closedAt: closeDate }),
+      });
+      setChecked({});
+      setSelectedId(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulkDelete() {
+    if (!checkedIds.length) return;
+    if (!(await confirm(`Удалить выбранные позиции (${checkedIds.length} шт.)?`))) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch('/api/catalog/staff-positions/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ ids: checkedIds }),
+      });
+      setChecked({});
+      setSelectedId(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `staff-positions-${new Date().toISOString().slice(0, 10)}.csv`,
+      filtered.map((r) => ({
+        Название: displayName(r),
+        Сотрудники: (r.employees || []).map(empName).join(', '),
+        'Дата открытия': r.openedAt ? fmtDate(r.openedAt) : '',
+        Подразделение: r.division?.name || '',
+        Должность: r.position?.name || r.title || '',
+        Статус: r.isActive ? 'Активный' : 'Неактивный',
+      })),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="staff-positions" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-code-branch" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Позиции</h1>
+          <p className={shared.pageSubtitle}>
+            Штатные позиции подразделений, их наполнение и сроки действия
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <Link href="/catalog/staff-positions/new" className={styles.createBtn}>
+          <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
-          </Link>
-          {selectedIds.length > 0 ? (
-            <>
-              <input
-                type="date"
-                className={styles.bulkDate}
-                value={closeDate}
-                onChange={(e) => setCloseDate(e.target.value)}
-                title="Дата закрытия"
-              />
-              <button
-                type="button"
-                className={styles.bulkWarn}
-                disabled={busy}
-                onClick={() => void bulkClose()}
-              >
-                Установить дату закрытия: {selectedIds.length}
-              </button>
-              <button
-                type="button"
-                className={styles.bulkDanger}
-                disabled={busy}
-                onClick={() => void bulkDelete()}
-              >
-                Удалить: {selectedIds.length}
-              </button>
-            </>
-          ) : null}
+          </button>
           <FilterPanel
             inline
             urlSync
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'text', key: 'title', label: 'Название', placeholder: 'Поиск...' },
+              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
+              {
+                type: 'text',
+                key: 'title',
+                label: 'Название',
+                placeholder: 'Поиск...',
+              },
               { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
               {
                 type: 'select',
@@ -298,114 +428,259 @@ function StaffPositionsInner() {
             ]}
           />
         </div>
+
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className={styles.pagerMeta}>
+          <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
         </div>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkActive(true)}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активировать
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkActive(false)}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Деактивировать
+          </button>
+          <span className={styles.bulkDivider} aria-hidden />
+          <input
+            type="date"
+            className={styles.bulkDate}
+            value={closeDate}
+            onChange={(e) => setCloseDate(e.target.value)}
+            aria-label="Дата закрытия"
+          />
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkClose()}
+          >
+            <i className="fas fa-calendar-xmark" aria-hidden />
+            Закрыть позиции
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulkDelete()}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={allFilteredChecked}
-                  onChange={toggleAll}
-                />
-              </th>
-              <th>Название</th>
-              <th>Сотрудники</th>
-              <th>Дата открытия</th>
-              <th>Подразделение</th>
-              <th>Должность</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Название</th>
+                <th>Сотрудники</th>
+                <th>Дата открытия</th>
+                <th>Подразделение</th>
+                <th>Должность</th>
               </tr>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {filtered.map((row) => {
-              const open = selectedId === row.id;
-              const isChecked = checked.has(row.id);
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open || isChecked ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleOne(row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{displayName(row)}</td>
-                    <td>
-                      {(row.employees || []).map(empName).join(', ') || '—'}
-                    </td>
-                    <td>{fmtDate(row.openedAt)}</td>
-                    <td>{row.division?.name || '—'}</td>
-                    <td>{row.position?.name || row.title || '—'}</td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={6}>
-                        <div className={styles.rowActions}>
-                          <Link href={`/catalog/staff-positions/${row.id}`}>
-                            Просмотр
-                          </Link>
-                          <Link href={`/catalog/staff-positions/${row.id}/edit`}>
-                            Изменить
-                          </Link>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void removeOne(row)}
-                          >
-                            Удалить
-                          </button>
-                        </div>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                const staff = (row.employees || []).map(empName);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${displayName(row)}`}
+                        />
                       </td>
+                      <td className={styles.nameCell}>
+                        <span className={styles.nameText}>{displayName(row)}</span>
+                        {!row.isActive ? (
+                          <span className={styles.statusMuted}>Неактивный</span>
+                        ) : null}
+                        {row.closedAt ? (
+                          <span className={styles.statusClosed}>
+                            закрыта {fmtDate(row.closedAt)}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className={styles.staffCell}>
+                        {staff.length ? (
+                          <>
+                            <span className={styles.staffNames}>{staff.join(', ')}</span>
+                            <span className={styles.staffCount}>
+                              {staff.length}/{row.headcount || '—'}
+                            </span>
+                          </>
+                        ) : (
+                          <span className={styles.vacant}>Вакантна</span>
+                        )}
+                      </td>
+                      <td className={styles.dateCell}>{fmtDate(row.openedAt)}</td>
+                      <td>{row.division?.name || '—'}</td>
+                      <td>{row.position?.name || row.title || '—'}</td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`/catalog/staff-positions/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотр
+                            </Link>
+                            <button type="button" onClick={() => openEdit(row.id)}>
+                              <i className="fas fa-pen" aria-hidden />
+                              Изменить
+                            </button>
+                            <Link href={`/catalog/staff-positions/${row.id}/edit`}>
+                              <i className="fas fa-sliders" aria-hidden />
+                              Полная карточка
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void toggleActive(row, !row.isActive)}
+                            >
+                              <i
+                                className={row.isActive ? 'fas fa-ban' : 'fas fa-check'}
+                                aria-hidden
+                              />
+                              {row.isActive ? 'Деактивировать' : 'Активировать'}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.danger}
+                              disabled={busy}
+                              onClick={() => void runDelete(row)}
+                            >
+                              <i className="fas fa-trash" aria-hidden />
+                              Удалить
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <StaffPositionFormModal
+        open={modalOpen}
+        editId={editId}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function StaffPositionsPage() {
   return (
-    <Suspense fallback={<p className={styles.empty}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <StaffPositionsInner />
     </Suspense>
   );

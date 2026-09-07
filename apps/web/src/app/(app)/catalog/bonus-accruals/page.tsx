@@ -5,40 +5,43 @@ import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ListBulkBar, runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
-import { bonusKindLabel, fmtDate, type BonusDoc } from '@/lib/bonus-accruals';
-import styles from '../absence-types/page.module.css';
+import { bonusKindLabel, fmtDate, type BonusDoc, type BonusKind } from '@/lib/bonus-accruals';
+import { BonusAccrualFormModal } from './BonusAccrualForm';
+import styles from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/bonus-accruals';
-const PAGE_SIZE = 50;
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to'] as const;
+const COL_COUNT = 7;
 
-function Inner() {
+function BonusAccrualsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
   const q = filters.q;
+
   const [rows, setRows] = useState<BonusDoc[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [focusId, setFocusId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [searchDraft, setSearchDraft] = useState(q);
-  const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(filters.number || filters.posted || filters.from || filters.to),
   );
+  const [searchDraft, setSearchDraft] = useState(q);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<BonusKind>('fact');
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const createMenuRef = useRef<HTMLDivElement>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [createOpen, setCreateOpen] = useState(false);
-  const createRef = useRef<HTMLDivElement>(null);
 
   async function load() {
-    setError('');
     setLoading(true);
+    setError('');
     try {
       setRows(await apiFetch<BonusDoc[]>('/api/payroll/bonus-accruals'));
     } catch (e) {
@@ -54,12 +57,28 @@ function Inner() {
   }, []);
 
   useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!createRef.current?.contains(e.target as Node)) setCreateOpen(false);
+      if (!createMenuRef.current?.contains(e.target as Node)) setCreateMenuOpen(false);
     }
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') return;
+    const kind = searchParams.get('kind') === 'kpi' ? 'kpi' : 'fact';
+    setCreateKind(kind);
+    setModalOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('create');
+    params.delete('kind');
+    const qs = params.toString();
+    router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
+  }, [searchParams, router]);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -84,51 +103,82 @@ function Inner() {
     return list;
   }, [rows, q, filters.number, filters.posted, filters.from, filters.to, sortDir]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const ids = paged.map((r) => r.id);
-
-  useEffect(() => {
-    setPage(1);
-  }, [q, filters.number, filters.posted, filters.from, filters.to, sortDir]);
-
-  function patchUrl(patch: Record<string, string | null>) {
-    const params = new URLSearchParams(searchParams?.toString() ?? '');
-    for (const [k, v] of Object.entries(patch)) {
-      if (v) params.set(k, v);
-      else params.delete(k);
-    }
-    router.replace(`${PATH}?${params.toString()}`, { scroll: false });
-  }
-
-  const selectedRows = rows.filter((r) => selected.has(r.id));
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+  const selectedRows = useMemo(
+    () => filtered.filter((r) => checked[r.id]),
+    [filtered, checked],
+  );
   const postCount = selectedRows.filter((r) => r.status === 'draft').length;
   const unpostCount = selectedRows.filter((r) => r.status === 'posted').length;
   const deleteCount = selectedRows.filter((r) => r.status !== 'posted').length;
 
-  async function bulk(kind: 'post' | 'unpost' | 'delete') {
-    const ids =
-      kind === 'post'
-        ? selectedRows.filter((r) => r.status === 'draft').map((r) => r.id)
-        : kind === 'unpost'
-          ? selectedRows.filter((r) => r.status === 'posted').map((r) => r.id)
-          : selectedRows.filter((r) => r.status !== 'posted').map((r) => r.id);
+  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
+  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of filtered) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
+  function applySearch() {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (searchDraft.trim()) params.set('q', searchDraft.trim());
+    else params.delete('q');
+    const qs = params.toString();
+    router.replace(qs ? `${PATH}?${qs}` : PATH, { scroll: false });
+  }
+
+  function openCreate(kind: BonusKind) {
+    setCreateKind(kind);
+    setCreateMenuOpen(false);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+  }
+
+  async function run(row: BonusDoc, action: 'post' | 'unpost' | 'delete') {
+    if (action === 'delete' && !(await confirm(`Удалить документ ${row.number || ''}?`))) return;
+    if (
+      action === 'post' &&
+      !(await confirm({ message: 'Сохранить и провести документ?', confirmText: 'Да', cancelText: 'Нет' }))
+    ) {
+      return;
+    }
+    if (
+      action === 'unpost' &&
+      !(await confirm({ message: 'Отменить проведение?', confirmText: 'Да', cancelText: 'Нет' }))
+    ) {
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      const ok = await runListBulk({
-        path: `/api/payroll/bonus-accruals/bulk-${kind === 'unpost' ? 'unpost' : kind === 'post' ? 'post' : 'delete'}`,
-        ids,
-        message:
-          kind === 'delete'
-            ? 'Удалить выбранные документы?'
-            : kind === 'post'
-              ? 'Провести выбранные документы?'
-              : 'Отменить проведение выбранных документов?',
-        variant: kind === 'delete' ? 'danger' : undefined,
+      if (action === 'delete') {
+        await apiFetch(`/api/payroll/bonus-accruals/${row.id}`, { method: 'DELETE' });
+      } else {
+        await apiFetch(`/api/payroll/bonus-accruals/${row.id}/${action}`, { method: 'POST' });
+      }
+      setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
       });
-      if (!ok) return;
-      setSelected(new Set());
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
@@ -137,20 +187,39 @@ function Inner() {
     }
   }
 
-  async function run(row: BonusDoc, action: 'post' | 'unpost' | 'delete') {
-    if (action === 'delete' && !(await confirm(`Удалить документ ${row.number || ''}?`))) return;
-    if (action === 'post' && !(await confirm({ message: 'Сохранить и провести документ?', confirmText: 'Да', cancelText: 'Нет' }))) {
-      return;
-    }
-    if (action === 'unpost' && !(await confirm({ message: 'Отменить проведение?', confirmText: 'Да', cancelText: 'Нет' }))) {
+  async function bulk(kind: 'post' | 'unpost' | 'delete') {
+    const ids =
+      kind === 'post'
+        ? selectedRows.filter((r) => r.status === 'draft').map((r) => r.id)
+        : kind === 'unpost'
+          ? selectedRows.filter((r) => r.status === 'posted').map((r) => r.id)
+          : selectedRows.filter((r) => r.status !== 'posted').map((r) => r.id);
+    if (!ids.length) return;
+    const message =
+      kind === 'delete'
+        ? `Удалить выбранные документы (${ids.length} шт.)?`
+        : kind === 'post'
+          ? `Провести выбранные документы (${ids.length} шт.)?`
+          : `Отменить проведение выбранных документов (${ids.length} шт.)?`;
+    if (
+      !(await confirm({
+        message,
+        confirmText: 'Да',
+        cancelText: 'Нет',
+        variant: kind === 'delete' ? 'danger' : undefined,
+      }))
+    ) {
       return;
     }
     setBusy(true);
     setError('');
     try {
-      if (action === 'delete') await apiFetch(`/api/payroll/bonus-accruals/${row.id}`, { method: 'DELETE' });
-      else await apiFetch(`/api/payroll/bonus-accruals/${row.id}/${action}`, { method: 'POST' });
-      setFocusId(null);
+      await apiFetch(`/api/payroll/bonus-accruals/bulk-${kind}`, {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      });
+      setChecked({});
+      setSelectedId(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
@@ -161,7 +230,7 @@ function Inner() {
 
   function exportCsv() {
     downloadCsv(
-      'bonus-accruals.csv',
+      `bonus-accruals-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((r) => ({
         Дата: fmtDate(r.docDate),
         Номер: r.number,
@@ -176,20 +245,52 @@ function Inner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="bonus-accruals" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-gift" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Бонусные начисления</h1>
+          <p className={shared.pageSubtitle}>Документы бонусных начислений (факт / КПЭ)</p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
-          <div className={styles.createWrap} ref={createRef}>
-            <button type="button" className={styles.createBtn} onClick={() => setCreateOpen((v) => !v)}>
-              Создать +
+          <div className={styles.createWrap} ref={createMenuRef}>
+            <button
+              type="button"
+              className={styles.createBtn}
+              onClick={() => setCreateMenuOpen((v) => !v)}
+              aria-expanded={createMenuOpen}
+            >
+              <i className="fas fa-plus" aria-hidden />
+              Создать
             </button>
-            {createOpen ? (
+            {createMenuOpen ? (
               <div className={styles.createMenu}>
-                <Link href={`${PATH}/new?kind=fact`} className={styles.createMenuLink} onClick={() => setCreateOpen(false)}>
+                <button type="button" onClick={() => openCreate('fact')}>
                   Бонусное начисление - Факт
-                </Link>
-                <Link href={`${PATH}/new?kind=kpi`} className={styles.createMenuLink} onClick={() => setCreateOpen(false)}>
+                </button>
+                <button type="button" onClick={() => openCreate('kpi')}>
                   Бонусные начисления - КПЭ
-                </Link>
+                </button>
               </div>
             ) : null}
           </div>
@@ -204,167 +305,222 @@ function Inner() {
               { type: 'postedChecks', key: 'posted', label: 'Проведен' },
             ]}
           />
-          <ListBulkBar
-            count={selected.size}
-            busy={busy}
-            onClear={() => setSelected(new Set())}
-            actions={[
-              { key: 'post', label: 'Провести', count: postCount, onClick: () => void bulk('post') },
-              { key: 'unpost', label: 'Отменить', count: unpostCount, variant: 'danger', onClick: () => void bulk('unpost') },
-              { key: 'delete', label: 'Удалить', count: deleteCount, variant: 'danger', onClick: () => void bulk('delete') },
-            ]}
-          />
         </div>
+
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') patchUrl({ q: searchDraft.trim() || null });
-            }}
-          />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
-          </button>
-          <span className={styles.pagerMeta}>
-            {paged.length}/{filtered.length}
+          <span className={styles.countBadge}>
+            {filtered.length} / {rows.length}
           </span>
-          <button type="button" className={styles.toolBtn} disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            ‹
-          </button>
-          <span className={styles.pagerMeta}>{Math.min(page, pageCount)}</span>
           <button
             type="button"
-            className={styles.toolBtn}
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
+            className={filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn}
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
           >
-            ›
+            <i className="fas fa-filter" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => void load()} aria-label="Обновить">
-            ↻
+          <button type="button" className={styles.iconBtn} onClick={exportCsv} title="CSV" aria-label="Экспорт CSV">
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
       </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
+
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          {postCount > 0 ? (
+            <button type="button" className={styles.bulkBtn} disabled={busy} onClick={() => void bulk('post')}>
+              <i className="fas fa-check" aria-hidden />
+              Провести ({postCount})
+            </button>
+          ) : null}
+          {unpostCount > 0 ? (
+            <button type="button" className={styles.bulkBtn} disabled={busy} onClick={() => void bulk('unpost')}>
+              <i className="fas fa-undo" aria-hidden />
+              Отменить ({unpostCount})
+            </button>
+          ) : null}
+          {deleteCount > 0 ? (
+            <button
+              type="button"
+              className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+              disabled={busy}
+              onClick={() => void bulk('delete')}
+            >
+              <i className="fas fa-trash" aria-hidden />
+              Удалить ({deleteCount})
+            </button>
+          ) : null}
+          <button type="button" className={styles.bulkGhost} disabled={busy} onClick={() => setChecked({})}>
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol}>
-                <input
-                  type="checkbox"
-                  checked={ids.length > 0 && ids.every((id) => selected.has(id))}
-                  onChange={(e) => setSelected(togglePage(selected, ids, e.target.checked))}
-                  aria-label="Выбрать все"
-                />
-              </th>
-              <th>
-                <button
-                  type="button"
-                  style={{ all: 'unset', cursor: 'pointer' }}
-                  onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                >
-                  Дата <span>{sortDir === 'asc' ? '↑' : '↓'}</span>
-                </button>
-              </th>
-              <th>Номер</th>
-              <th>Дата начала</th>
-              <th>Дата окончания</th>
-              <th>Подразделение</th>
-              <th>Проведен</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && filtered.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Загрузка…
-                </td>
-              </tr>
-            ) : null}
-            {!loading && paged.length === 0 ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {paged.map((row) => {
-              const open = focusId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    onClick={() => setFocusId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                    className={open || selected.has(row.id) ? styles.rowSelected : undefined}
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>
+                  <button
+                    type="button"
+                    style={{ all: 'unset', cursor: 'pointer' }}
+                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
                   >
-                    <td className={styles.checkCol} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
-                      />
-                    </td>
-                    <td>{fmtDate(row.docDate)}</td>
-                    <td>{row.number || '—'}</td>
-                    <td>{fmtDate(row.startDate)}</td>
-                    <td>{fmtDate(row.endDate)}</td>
-                    <td>{row.division?.name || '—'}</td>
-                    <td>
-                      {row.status === 'posted' ? (
-                        <span className={styles.postedYes}>Да</span>
-                      ) : (
-                        <span className={styles.postedNo}>Нет</span>
-                      )}
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={7}>
-                        <div className={styles.rowActions}>
-                          <Link href={`${PATH}/${row.id}`}>Просмотреть</Link>
-                          {row.status !== 'posted' ? <Link href={`${PATH}/${row.id}/edit`}>Изменить</Link> : null}
-                          {row.status === 'draft' ? (
-                            <button type="button" disabled={busy} onClick={() => void run(row, 'post')}>
-                              Провести
-                            </button>
-                          ) : null}
-                          {row.status === 'posted' ? (
-                            <button type="button" disabled={busy} onClick={() => void run(row, 'unpost')}>
-                              Отменить
-                            </button>
-                          ) : null}
-                          {row.status !== 'posted' ? (
-                            <button
-                              type="button"
-                              className={styles.danger}
-                              disabled={busy}
-                              onClick={() => void run(row, 'delete')}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+                    Дата {sortDir === 'asc' ? '↑' : '↓'}
+                  </button>
+                </th>
+                <th>Номер</th>
+                <th>Дата начала</th>
+                <th>Дата окончания</th>
+                <th>Подразделение</th>
+                <th>Проведен</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {filtered.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.number || row.id}`}
+                        />
+                      </td>
+                      <td>{fmtDate(row.docDate)}</td>
+                      <td>{row.number || '—'}</td>
+                      <td>{fmtDate(row.startDate)}</td>
+                      <td>{fmtDate(row.endDate)}</td>
+                      <td>{row.division?.name || '—'}</td>
+                      <td>
+                        {row.status === 'posted' ? (
+                          <span className={styles.badgeOk}>Да</span>
+                        ) : (
+                          <span className={styles.badgeMuted}>Нет</span>
+                        )}
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={`${PATH}/${row.id}`}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотреть
+                            </Link>
+                            {row.status !== 'posted' ? (
+                              <Link href={`${PATH}/${row.id}/edit`}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                            ) : null}
+                            {row.status === 'draft' ? (
+                              <button type="button" disabled={busy} onClick={() => void run(row, 'post')}>
+                                <i className="fas fa-check" aria-hidden />
+                                Провести
+                              </button>
+                            ) : null}
+                            {row.status === 'posted' ? (
+                              <button type="button" disabled={busy} onClick={() => void run(row, 'unpost')}>
+                                <i className="fas fa-undo" aria-hidden />
+                                Отменить
+                              </button>
+                            ) : null}
+                            {row.status !== 'posted' ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void run(row, 'delete')}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+          </p>
+        </div>
       </div>
+
+      <BonusAccrualFormModal
+        open={modalOpen}
+        kind={createKind}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 export default function BonusAccrualsPage() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <Inner />
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
+      <BonusAccrualsInner />
     </Suspense>
   );
 }

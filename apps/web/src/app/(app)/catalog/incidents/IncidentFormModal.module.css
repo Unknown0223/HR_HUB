@@ -1,0 +1,92 @@
+.muted {
+  margin: 0;
+  padding: 1rem 0;
+  color: #8ca0b8;
+  font-size: 0.86rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: #0a85e2;
+}
+
+.fileZone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fileLabel {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.drop {
+  display: grid;
+  place-items: center;
+  min-height: 60px;
+  padding: 0.65rem 0.75rem;
+  border: 1px dashed #c7d2e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #8ca0b8;
+  font-size: 0.82rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop:hover {
+  border-color: #0a85e2;
+  color: #0a85e2;
+}
+
+.fileEmpty {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.fileList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fileList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e3e9f1;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #1f2937;
+}
+
+.linkBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.linkBtn:hover {
+  text-decoration: underline;
+}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
 type Row = {
@@ -33,9 +34,9 @@ type Dashboard = {
   };
 };
 
-const ORANGE = '#e8a87c';
-const BEIGE = '#d4c4a8';
-const GREEN = '#7dcea0';
+const ORANGE = '#d97706';
+const BEIGE = '#8ca0b8';
+const GREEN = '#0e9f6e';
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -65,7 +66,7 @@ function Donut({
   return (
     <div className={styles.donutWrap}>
       <svg viewBox="0 0 200 200" className={styles.donut}>
-        <circle cx="100" cy="100" r={r} fill="none" stroke="#f0f2f5" strokeWidth="28" />
+        <circle cx="100" cy="100" r={r} fill="none" stroke="#eef3f9" strokeWidth="28" />
         {parts.map((p) => {
           const len = (p.n / sum) * c;
           const el = (
@@ -118,6 +119,7 @@ function NotOpenedBar({ value, maxHint = 25 }: { value: number; maxHint?: number
   return (
     <div className={styles.barBlock}>
       <div className={styles.barTitle}>Не открылись</div>
+      <p className={styles.blockSub}>Подразделения без отметки об открытии</p>
       <div className={styles.hBarRow}>
         <div className={styles.hBarTrack}>
           <div
@@ -195,31 +197,44 @@ function DivisionStatsInner() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.head}>
-        <PageSubnav groupKey="division-stats" />
-        <button
-          type="button"
-          className={styles.filterIcon}
-          title="Фильтр"
-          onClick={() => setFiltersOpen((v) => !v)}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-            <path
-              d="M4 6h16M7 12h10M10 18h4"
-              stroke="#f1c40f"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              fill="none"
-            />
-            <path d="M4 6l5 6v5l6 3v-8l5-6H4z" fill="#f1c40f" opacity="0.35" />
-          </svg>
-        </button>
+      <PageSubnav groupKey="division-stats" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-building" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Статистика работы подразделений</h1>
+          <p className={shared.pageSubtitle}>
+            Открытие и закрытие подразделений, соответствие режиму работы
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <span className={styles.datePill}>
+            <i className="fas fa-calendar-alt" aria-hidden />
+            {dateFrom === dateTo ? dateFrom : `${dateFrom} — ${dateTo}`}
+          </span>
+          <button
+            type="button"
+            className={`${styles.filterBtn} ${filtersOpen ? styles.filterBtnActive : ''}`}
+            title="Фильтр"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            <i className="fas fa-sliders-h" aria-hidden />
+            Фильтр
+          </button>
+        </div>
       </div>
 
       <div className={styles.layout}>
         <aside className={styles.left}>
           {data ? (
             <>
+              <div>
+                <h2 className={styles.blockTitle}>Состояние подразделений</h2>
+                <p className={styles.blockSub}>Распределение по режиму работы</p>
+              </div>
               <Donut
                 total={data.summary.total}
                 modeNotSet={data.summary.modeNotSet}
@@ -245,6 +260,7 @@ function DivisionStatsInner() {
               {filteredRows.length} / {data?.summary.total ?? 0}
             </span>
             <button type="button" className={styles.refreshBtn} onClick={() => void load()}>
+              <i className="fas fa-sync-alt" aria-hidden />
               Обновить
             </button>
           </div>
@@ -300,7 +316,10 @@ function DivisionStatsInner() {
 
         {filtersOpen ? (
           <aside className={styles.filterPanel}>
-            <h3>Фильтр</h3>
+            <h3>
+              <i className="fas fa-sliders-h" aria-hidden />
+              Фильтр
+            </h3>
             <label>
               Дата с
               <input
@@ -344,7 +363,8 @@ function DivisionStatsInner() {
               />
             </label>
             <button type="button" className={styles.applyBtn} onClick={() => void load()}>
-              Обновить
+              <i className="fas fa-check" aria-hidden />
+              Применить
             </button>
           </aside>
         ) : null}

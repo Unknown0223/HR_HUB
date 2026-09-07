@@ -1,11 +1,7 @@
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
+/* Positions report — filter extras + tables (shell in report-arena) */
 
-.card {
-  max-width: 560px;
+.fieldWide {
+  grid-column: 1 / -1;
 }
 
 .lookup > div {
@@ -18,69 +14,58 @@
   top: calc(100% + 4px);
   left: 0;
   background: #fff;
-  border: 1px solid #e4e6ef;
-  border-radius: 6px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  border: 1px solid #e3e9f1;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px -18px rgba(16, 30, 54, 0.4);
   padding: 0.55rem 0.7rem 0.45rem;
-}
-
-.subtabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem;
-  margin: 0 0 0.65rem;
-}
-
-.sub,
-.subOn {
-  appearance: none;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.4rem 0.7rem;
-  border-radius: 4px;
-  cursor: pointer;
-  color: #5e6278;
-}
-
-.subOn {
-  background: #e1f0ff;
-  color: #3699ff;
 }
 
 .tableWrap {
   overflow: auto;
+  border: 1px solid var(--line, #e3e9f1);
+  border-radius: 12px;
   background: #fff;
-  border: 1px solid #e4e6ef;
+  max-height: min(70vh, 820px);
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
   min-width: 640px;
 }
 
 .table th,
 .table td {
-  border: 1px solid #d8dbe0;
-  padding: 0.35rem 0.5rem;
-  color: #181c32;
+  border-bottom: 1px solid #e8eef5;
+  border-right: 1px solid #eef2f7;
+  padding: 0.4rem 0.5rem;
+  color: #0a1322;
   vertical-align: middle;
 }
 
-.table th {
-  background: #f5f8fa;
-  font-weight: 600;
+.table th:last-child,
+.table td:last-child {
+  border-right: none;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f2f5f9;
+  font-weight: 700;
   text-align: center;
+  color: #354862;
+  box-shadow: 0 1px 0 #e3e9f1;
 }
 
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  font-weight: 600;
 }
 
 .divCell {
@@ -92,6 +77,7 @@
 .posCell {
   text-align: left;
   min-width: 160px;
+  color: #354862;
 }
 
 .groupRow td {
@@ -99,5 +85,22 @@
 }
 
 .zebra td {
-  background: #f9fafb;
+  background: #f7f9fc;
+}
+
+.table tbody tr:hover td {
+  background: #f5f9fd;
+}
+
+@media print {
+  .tableWrap {
+    overflow: visible;
+    border: 0;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .table thead th {
+    position: static;
+  }
 }

@@ -1,7 +1,5 @@
-'use client';
-
-import { DivisionForm } from '../DivisionForm';
+import { redirect } from 'next/navigation';
 
 export default function NewDivisionPage() {
-  return <DivisionForm mode="create" />;
+  redirect('/divisions?tab=divisions&create=1');
 }

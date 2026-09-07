@@ -95,7 +95,7 @@ function MiniPick({
     <div className={local.reveal}>
       <input
         className={local.dropSearch}
-        style={{ border: '1px solid #d1d5db', borderRadius: 4 }}
+        style={{ border: '1.5px solid #e3e9f1', borderRadius: 9 }}
         placeholder={placeholder}
         value={open ? q : selected.length ? `Выбрано: ${selected.length}` : ''}
         onFocus={() => setOpen(true)}
@@ -143,7 +143,7 @@ function SinglePick({
     <div className={local.reveal}>
       <input
         className={local.dropSearch}
-        style={{ border: '1px solid #d1d5db', borderRadius: 4 }}
+        style={{ border: '1.5px solid #e3e9f1', borderRadius: 9 }}
         placeholder="Поиск..."
         value={open ? q : label}
         onFocus={() => setOpen(true)}

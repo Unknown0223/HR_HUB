@@ -1,10 +1,18 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { GradeForm } from '../GradeForm';
+import { use, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function EditGradePage() {
-  const params = useParams();
-  const id = String(params.id || '');
-  return <GradeForm mode="edit" gradeId={id} />;
+/** Legacy /[id] → list with edit modal */
+export default function EditGradeRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(`/catalog/grades?edit=${encodeURIComponent(id)}`);
+  }, [router, id]);
+  return null;
 }

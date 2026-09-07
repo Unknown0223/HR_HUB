@@ -2,16 +2,21 @@
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiDownload, apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox, type PhotoLightboxApi } from '@/components/PhotoLightbox';
 import { downloadXlsxViaApi } from '@/lib/excel';
 import { useUrlParam } from '@/lib/use-url-state';
+import { DivisionForm } from './DivisionForm';
 import list from './list.module.css';
 import chart from './org-chart.module.css';
+import shared from '../../page-shared.module.css';
 
 type Tab = 'tree' | 'divisions' | 'groups';
 const TABS = ['divisions', 'tree', 'groups'] as const;
@@ -460,7 +465,12 @@ function FullMap({ roots }: { roots: TreeNode[] }) {
   );
 }
 
+const CREATE_FORM_ID = 'division-create-form';
+
 function DivisionsPageInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [tab] = useUrlParam('tab', 'divisions', TABS);
   const filters = useFilterFromUrl(DIV_FILTER_KEYS);
   const [tree, setTree] = useState<TreeNode[]>([]);
@@ -468,6 +478,8 @@ function DivisionsPageInner() {
   const [groups, setGroups] = useState<DivisionGroupRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [checkedDiv, setCheckedDiv] = useState<Record<string, boolean>>({});
+  const [checkedGroup, setCheckedGroup] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -475,6 +487,14 @@ function DivisionsPageInner() {
   const [exportBusy, setExportBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [chartMode, setChartMode] = useState<'focus' | 'full'>('focus');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupSaving, setGroupSaving] = useState(false);
+  const [groupError, setGroupError] = useState('');
+  const [groupCode, setGroupCode] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [groupActive, setGroupActive] = useState(true);
   const exportRef = useRef<HTMLDivElement>(null);
 
   async function load() {
@@ -496,6 +516,60 @@ function DivisionsPageInner() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (searchParams?.get('create') === '1') openCreate();
+  }, [searchParams]);
+
+  function openCreate() {
+    setCreateSaving(false);
+    setCreateOpen(true);
+  }
+
+  function closeCreate() {
+    setCreateOpen(false);
+    setCreateSaving(false);
+    if (searchParams?.get('create') === '1') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('create');
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+  }
+
+  function openGroupCreate() {
+    setGroupCode('');
+    setGroupName('');
+    setGroupActive(true);
+    setGroupError('');
+    setGroupSaving(false);
+    setGroupOpen(true);
+  }
+
+  async function saveGroup() {
+    if (!groupName.trim()) {
+      setGroupError('Название обязательно');
+      return;
+    }
+    setGroupSaving(true);
+    setGroupError('');
+    try {
+      await apiFetch('/api/catalog/division-groups', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: groupCode.trim() || `DG-${Date.now().toString(36).toUpperCase()}`,
+          name: groupName.trim(),
+          isActive: groupActive,
+        }),
+      });
+      setGroupOpen(false);
+      await load();
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } finally {
+      setGroupSaving(false);
+    }
+  }
 
   useEffect(() => {
     const ac = new AbortController();
@@ -578,6 +652,71 @@ function DivisionsPageInner() {
     [groups],
   );
 
+  const checkedDivIds = useMemo(
+    () => Object.keys(checkedDiv).filter((id) => checkedDiv[id]),
+    [checkedDiv],
+  );
+  const checkedGroupIds = useMemo(
+    () => Object.keys(checkedGroup).filter((id) => checkedGroup[id]),
+    [checkedGroup],
+  );
+
+  const allDivChecked =
+    filteredDivisions.length > 0 &&
+    filteredDivisions.every((d) => checkedDiv[d.id]);
+  const someDivChecked =
+    filteredDivisions.some((d) => checkedDiv[d.id]) && !allDivChecked;
+
+  const allGroupChecked =
+    filteredGroups.length > 0 && filteredGroups.every((g) => checkedGroup[g.id]);
+  const someGroupChecked =
+    filteredGroups.some((g) => checkedGroup[g.id]) && !allGroupChecked;
+
+  useEffect(() => {
+    setCheckedDiv({});
+    setCheckedGroup({});
+  }, [
+    tab,
+    search,
+    filters.code,
+    filters.name,
+    filters.groupId,
+    filters.createdBy,
+    filters.from,
+    filters.to,
+    filters.status,
+  ]);
+
+  function toggleDivCheck(id: string) {
+    setCheckedDiv((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllDiv(on: boolean) {
+    setCheckedDiv((prev) => {
+      const next = { ...prev };
+      for (const d of filteredDivisions) {
+        if (on) next[d.id] = true;
+        else delete next[d.id];
+      }
+      return next;
+    });
+  }
+
+  function toggleGroupCheck(id: string) {
+    setCheckedGroup((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllGroup(on: boolean) {
+    setCheckedGroup((prev) => {
+      const next = { ...prev };
+      for (const g of filteredGroups) {
+        if (on) next[g.id] = true;
+        else delete next[g.id];
+      }
+      return next;
+    });
+  }
+
   async function exportOrg(format: 'xlsx' | 'csv') {
     setExportBusy(true);
     setExportOpen(false);
@@ -606,6 +745,11 @@ function DivisionsPageInner() {
     try {
       await apiFetch(`/api/organization/divisions/${id}`, { method: 'DELETE' });
       setSelectedId(null);
+      setCheckedDiv((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка удаления');
@@ -614,7 +758,102 @@ function DivisionsPageInner() {
     }
   }
 
+  async function runBulkDivisions(action: 'activate' | 'deactivate' | 'delete') {
+    const targets = filteredDivisions.filter((d) => checkedDiv[d.id]);
+    if (!targets.length) return;
+
+    if (action === 'delete') {
+      if (!(await confirm(`Удалить выбранные подразделения (${targets.length} шт.)?`))) {
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const d of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/organization/divisions/${d.id}`, {
+              method: 'DELETE',
+            });
+          } else {
+            const isActive = action === 'activate';
+            if (d.isActive === isActive) continue;
+            await apiFetch(`/api/organization/divisions/${d.id}/active`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setCheckedDiv({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulkGroups(action: 'activate' | 'deactivate' | 'delete') {
+    const targets = filteredGroups.filter((g) => checkedGroup[g.id]);
+    if (!targets.length) return;
+
+    if (action === 'delete') {
+      if (!(await confirm(`Удалить выбранные группы (${targets.length} шт.)?`))) {
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const g of targets) {
+        try {
+          if (action === 'delete') {
+            await apiFetch(`/api/catalog/division-groups/${g.id}`, {
+              method: 'DELETE',
+            });
+          } else {
+            const isActive = action === 'activate';
+            if (g.isActive === isActive) continue;
+            await apiFetch(`/api/catalog/division-groups/${g.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive }),
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setCheckedGroup({});
+      setSelectedGroupId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const subnavKey = 'divisions';
+
+  const pageTitle =
+    tab === 'groups'
+      ? 'Группы отделов'
+      : tab === 'tree'
+        ? 'Организационная структура'
+        : 'Подразделения';
+  const pageSubtitle =
+    tab === 'groups'
+      ? 'Группы подразделений организации'
+      : tab === 'tree'
+        ? 'Иерархия подразделений и руководителей'
+        : 'Список подразделений организации';
 
   function managerLabel(d: Division) {
     const m = d.manager;
@@ -635,6 +874,30 @@ function DivisionsPageInner() {
     <div className={list.wrap}>
       <PageSubnav groupKey={subnavKey} />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-sitemap" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>{pageTitle}</h1>
+          <p className={shared.pageSubtitle}>{pageSubtitle}</p>
+        </div>
+        {tab !== 'tree' ? (
+          <div className={shared.pageHeaderActions}>
+            <div className={list.searchWrap}>
+              <i className={`fas fa-search ${list.searchIcon}`} aria-hidden />
+              <input
+                className={list.search}
+                placeholder="Поиск…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Поиск"
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       <div className={list.toolbar}>
         <div className={list.leftActions}>
           {tab === 'tree' ? (
@@ -645,7 +908,8 @@ function DivisionsPageInner() {
                 disabled={exportBusy || !tree.length}
                 onClick={() => setExportOpen((v) => !v)}
               >
-                {exportBusy ? '…' : 'Экспорт ▾'}
+                <i className="fas fa-download" aria-hidden />
+                {exportBusy ? '…' : 'Экспорт'}
               </button>
               {exportOpen ? (
                 <div className={list.exportMenu} role="menu">
@@ -659,22 +923,30 @@ function DivisionsPageInner() {
               ) : null}
             </div>
           ) : tab === 'groups' ? (
-            <Link href="/catalog/division-groups" className={list.createBtn}>
+            <button
+              type="button"
+              className={list.createBtn}
+              onClick={openGroupCreate}
+            >
+              <i className="fas fa-plus" aria-hidden />
               Создать
-            </Link>
+            </button>
           ) : (
             <>
-              <Link href="/divisions/new" className={list.createBtn}>
+              <button
+                type="button"
+                className={list.createBtn}
+                onClick={openCreate}
+              >
+                <i className="fas fa-plus" aria-hidden />
                 Создать
-              </Link>
+              </button>
               <Link href="/divisions/import" className={list.importBtn}>
+                <i className="fas fa-file-import" aria-hidden />
                 Импорт
               </Link>
             </>
           )}
-          <button type="button" className={list.toolBtn} onClick={() => void load()}>
-            Обновить
-          </button>
           {tab === 'divisions' || tab === 'groups' ? (
             <FilterPanel
               inline
@@ -732,24 +1004,126 @@ function DivisionsPageInner() {
           ) : null}
         </div>
 
-        {tab !== 'tree' ? (
-          <div className={list.rightTools}>
-            <input
-              className={list.search}
-              placeholder="Поиск..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <span className={list.pagerMeta}>
+        <div className={list.rightTools}>
+          {tab !== 'tree' ? (
+            <span className={list.countBadge}>
               {tab === 'divisions'
                 ? `${filteredDivisions.length} / ${divisions.length}`
                 : `${filteredGroups.length} / ${groups.length}`}
             </span>
-          </div>
-        ) : null}
+          ) : null}
+          {tab === 'divisions' || tab === 'groups' ? (
+            <button
+              type="button"
+              className={
+                filtersOpen ? `${list.iconBtn} ${list.iconBtnActive}` : list.iconBtn
+              }
+              onClick={() => setFiltersOpen((v) => !v)}
+              title="Фильтр"
+              aria-label="Фильтр"
+            >
+              <i className="fas fa-filter" aria-hidden />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={list.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
+        </div>
       </div>
 
       {error ? <p className={list.error}>{error}</p> : null}
+
+      {tab === 'divisions' && checkedDivIds.length > 0 ? (
+        <div className={list.bulkBar}>
+          <span className={list.bulkMeta}>
+            Выбрано: <strong>{checkedDivIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={list.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkDivisions('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активный
+          </button>
+          <button
+            type="button"
+            className={list.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkDivisions('deactivate')}
+          >
+            <i className="fas fa-pause" aria-hidden />
+            Неактивный
+          </button>
+          <button
+            type="button"
+            className={`${list.bulkBtn} ${list.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulkDivisions('delete')}
+          >
+            <i className="fas fa-trash-alt" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={list.bulkGhost}
+            disabled={busy}
+            onClick={() => setCheckedDiv({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      {tab === 'groups' && checkedGroupIds.length > 0 ? (
+        <div className={list.bulkBar}>
+          <span className={list.bulkMeta}>
+            Выбрано: <strong>{checkedGroupIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={list.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkGroups('activate')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Активный
+          </button>
+          <button
+            type="button"
+            className={list.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulkGroups('deactivate')}
+          >
+            <i className="fas fa-pause" aria-hidden />
+            Неактивный
+          </button>
+          <button
+            type="button"
+            className={`${list.bulkBtn} ${list.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulkGroups('delete')}
+          >
+            <i className="fas fa-trash-alt" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={list.bulkGhost}
+            disabled={busy}
+            onClick={() => setCheckedGroup({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
 
       {tab === 'tree' ? (
         <div className={chart.chartWrap}>
@@ -785,179 +1159,352 @@ function DivisionsPageInner() {
 
       {tab === 'divisions' ? (
         <div className={list.tableWrap}>
-          <table className={list.table}>
-            <thead>
-              <tr>
-                <th className={list.checkCol} />
-                <th>Код</th>
-                <th>Название</th>
-                <th>Руководитель</th>
-                <th>Группа подразделений</th>
-                <th>Создал</th>
-                <th>Дата создания</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDivisions.map((d) => {
-                const open = selectedId === d.id;
-                return (
-                  <Fragment key={d.id}>
-                    <tr
-                      className={open ? list.rowSelected : undefined}
-                      onClick={() => setSelectedId(open ? null : d.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={open}
-                          onChange={() => setSelectedId(open ? null : d.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td>{d.code || '—'}</td>
-                      <td>{d.name}</td>
-                      <td>{managerLabel(d)}</td>
-                      <td>{d.divisionGroup?.name || '—'}</td>
-                      <td>{d.createdByLabel || 'Admin'}</td>
-                      <td>{fmtCreated(d.createdAt)}</td>
-                      <td>
-                        <StatusBadge active={d.isActive} />
-                      </td>
-                    </tr>
-                    {open ? (
-                      <tr className={list.actionsRow}>
-                        <td colSpan={8}>
-                          <div className={list.rowActions}>
-                            <Link href={`/divisions/${d.id}`}>Просмотреть</Link>
-                            <Link href={`/divisions/${d.id}/edit`}>Изменить</Link>
-                            <Link href="/divisions?tab=tree">Подразделения</Link>
-                            <Link href={`/employees?divisionId=${d.id}`}>Сотрудники</Link>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void deleteDivision(d.id)}
-                            >
-                              Удалить
-                            </button>
-                          </div>
+          <div className={list.tableScroll}>
+            <table className={list.table}>
+              <thead>
+                <tr>
+                  <th className={list.checkCol}>
+                    <input
+                      type="checkbox"
+                      checked={allDivChecked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someDivChecked;
+                      }}
+                      onChange={(e) => toggleAllDiv(e.target.checked)}
+                      aria-label="Выбрать все"
+                    />
+                  </th>
+                  <th>Код</th>
+                  <th>Название</th>
+                  <th>Руководитель</th>
+                  <th>Группа подразделений</th>
+                  <th>Создал</th>
+                  <th>Дата создания</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDivisions.map((d) => {
+                  const open = selectedId === d.id;
+                  const isChecked = Boolean(checkedDiv[d.id]);
+                  return (
+                    <Fragment key={d.id}>
+                      <tr
+                        className={
+                          open || isChecked ? list.rowSelected : undefined
+                        }
+                        onClick={() => setSelectedId(open ? null : d.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td className={list.checkCol}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleDivCheck(d.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Выбрать ${d.code || d.name}`}
+                          />
+                        </td>
+                        <td>{d.code || '—'}</td>
+                        <td className={list.nameCell}>{d.name}</td>
+                        <td>{managerLabel(d)}</td>
+                        <td>{d.divisionGroup?.name || '—'}</td>
+                        <td>{d.createdByLabel || 'Admin'}</td>
+                        <td>{fmtCreated(d.createdAt)}</td>
+                        <td>
+                          <StatusBadge active={d.isActive} />
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-              {filteredDivisions.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className={list.empty}>
-                    Нет данных
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+                      {open ? (
+                        <tr className={list.actionsRow}>
+                          <td colSpan={8}>
+                            <div className={list.rowActions}>
+                              <Link href={`/divisions/${d.id}`}>
+                                <i className="fas fa-eye" aria-hidden />
+                                Просмотреть
+                              </Link>
+                              <Link href={`/divisions/${d.id}/edit`}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                              <Link href="/divisions?tab=tree">
+                                <i className="fas fa-project-diagram" aria-hidden />
+                                Структура
+                              </Link>
+                              <Link href={`/employees?divisionId=${d.id}`}>
+                                <i className="fas fa-users" aria-hidden />
+                                Сотрудники
+                              </Link>
+                              <button
+                                type="button"
+                                className={list.danger}
+                                disabled={busy}
+                                onClick={() => void deleteDivision(d.id)}
+                              >
+                                <i className="fas fa-trash-alt" aria-hidden />
+                                Удалить
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+                {filteredDivisions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className={list.empty}>
+                      Нет данных
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+          <div className={list.footer}>
+            <p>
+              Показано{' '}
+              <strong>
+                {filteredDivisions.length === 0 ? 0 : 1}–{filteredDivisions.length}
+              </strong>{' '}
+              из <strong>{filteredDivisions.length}</strong>
+            </p>
+          </div>
         </div>
       ) : null}
 
       {tab === 'groups' ? (
         <div className={list.tableWrap}>
-          <table className={list.table}>
-            <thead>
-              <tr>
-                <th className={list.checkCol} />
-                <th>Код</th>
-                <th>Название</th>
-                <th>Количество отделов</th>
-                <th>Создал</th>
-                <th>Дата создания</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredGroups.map((g) => {
-                const open = selectedGroupId === g.id;
-                return (
-                  <Fragment key={g.id}>
-                    <tr
-                      className={open ? list.rowSelected : undefined}
-                      onClick={() => setSelectedGroupId(open ? null : g.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={open}
-                          onChange={() => setSelectedGroupId(open ? null : g.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td>{g.code || '—'}</td>
-                      <td>{g.name}</td>
-                      <td>{g._count?.divisions ?? 0}</td>
-                      <td>Admin</td>
-                      <td>{fmtCreated(g.createdAt)}</td>
-                      <td>
-                        <StatusBadge active={g.isActive} />
-                      </td>
-                    </tr>
-                    {open ? (
-                      <tr className={list.actionsRow}>
-                        <td colSpan={7}>
-                          <div className={list.rowActions}>
-                            <Link href="/catalog/division-groups">Просмотреть</Link>
-                            <Link href="/catalog/division-groups">Изменить</Link>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  await apiFetch(`/api/catalog/division-groups/${g.id}`, {
-                                    method: 'PATCH',
-                                    body: JSON.stringify({ isActive: !g.isActive }),
-                                  });
-                                  await load();
-                                } catch (err) {
-                                  setError(err instanceof Error ? err.message : 'Ошибка');
-                                }
-                              }}
-                            >
-                              {g.isActive ? 'Неактивный' : 'Активный'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!(await confirm('Удалить группу?'))) return;
-                                try {
-                                  await apiFetch(`/api/catalog/division-groups/${g.id}`, {
-                                    method: 'DELETE',
-                                  });
-                                  setSelectedGroupId(null);
-                                  await load();
-                                } catch (err) {
-                                  setError(err instanceof Error ? err.message : 'Ошибка');
-                                }
-                              }}
-                            >
-                              Удалить
-                            </button>
-                          </div>
+          <div className={list.tableScroll}>
+            <table className={list.table}>
+              <thead>
+                <tr>
+                  <th className={list.checkCol}>
+                    <input
+                      type="checkbox"
+                      checked={allGroupChecked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someGroupChecked;
+                      }}
+                      onChange={(e) => toggleAllGroup(e.target.checked)}
+                      aria-label="Выбрать все"
+                    />
+                  </th>
+                  <th>Код</th>
+                  <th>Название</th>
+                  <th>Количество отделов</th>
+                  <th>Создал</th>
+                  <th>Дата создания</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredGroups.map((g) => {
+                  const open = selectedGroupId === g.id;
+                  const isChecked = Boolean(checkedGroup[g.id]);
+                  return (
+                    <Fragment key={g.id}>
+                      <tr
+                        className={
+                          open || isChecked ? list.rowSelected : undefined
+                        }
+                        onClick={() => setSelectedGroupId(open ? null : g.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td className={list.checkCol}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleGroupCheck(g.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Выбрать ${g.code || g.name}`}
+                          />
+                        </td>
+                        <td>{g.code || '—'}</td>
+                        <td className={list.nameCell}>{g.name}</td>
+                        <td>{g._count?.divisions ?? 0}</td>
+                        <td>Admin</td>
+                        <td>{fmtCreated(g.createdAt)}</td>
+                        <td>
+                          <StatusBadge active={g.isActive} />
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-              {filteredGroups.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={list.empty}>
-                    Нет данных
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+                      {open ? (
+                        <tr className={list.actionsRow}>
+                          <td colSpan={7}>
+                            <div className={list.rowActions}>
+                              <Link href="/catalog/division-groups">
+                                <i className="fas fa-eye" aria-hidden />
+                                Просмотреть
+                              </Link>
+                              <Link href="/catalog/division-groups">
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={async () => {
+                                  try {
+                                    await apiFetch(
+                                      `/api/catalog/division-groups/${g.id}`,
+                                      {
+                                        method: 'PATCH',
+                                        body: JSON.stringify({
+                                          isActive: !g.isActive,
+                                        }),
+                                      },
+                                    );
+                                    await load();
+                                  } catch (err) {
+                                    setError(
+                                      err instanceof Error ? err.message : 'Ошибка',
+                                    );
+                                  }
+                                }}
+                              >
+                                <i
+                                  className={`fas ${g.isActive ? 'fa-pause' : 'fa-check'}`}
+                                  aria-hidden
+                                />
+                                {g.isActive ? 'Неактивный' : 'Активный'}
+                              </button>
+                              <button
+                                type="button"
+                                className={list.danger}
+                                disabled={busy}
+                                onClick={async () => {
+                                  if (!(await confirm('Удалить группу?'))) return;
+                                  try {
+                                    await apiFetch(
+                                      `/api/catalog/division-groups/${g.id}`,
+                                      { method: 'DELETE' },
+                                    );
+                                    setSelectedGroupId(null);
+                                    await load();
+                                  } catch (err) {
+                                    setError(
+                                      err instanceof Error ? err.message : 'Ошибка',
+                                    );
+                                  }
+                                }}
+                              >
+                                <i className="fas fa-trash-alt" aria-hidden />
+                                Удалить
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+                {filteredGroups.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className={list.empty}>
+                      Нет данных
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+          <div className={list.footer}>
+            <p>
+              Показано{' '}
+              <strong>
+                {filteredGroups.length === 0 ? 0 : 1}–{filteredGroups.length}
+              </strong>{' '}
+              из <strong>{filteredGroups.length}</strong>
+            </p>
+          </div>
         </div>
       ) : null}
+
+      <FormModal
+        open={createOpen}
+        title="Подразделение (создание)"
+        onClose={closeCreate}
+        width="lg"
+        footer={
+          <>
+            <button
+              type="submit"
+              form={CREATE_FORM_ID}
+              className={modal.btnPrimary}
+              disabled={createSaving}
+            >
+              {createSaving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+            <button type="button" className={modal.btnGhost} onClick={closeCreate}>
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        <DivisionForm
+          mode="create"
+          variant="modal"
+          formId={CREATE_FORM_ID}
+          onSavingChange={setCreateSaving}
+          onSaved={() => {
+            closeCreate();
+            void load();
+          }}
+        />
+      </FormModal>
+
+      <FormModal
+        open={groupOpen}
+        title="Группа отделов (создание)"
+        onClose={() => setGroupOpen(false)}
+        width="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={groupSaving}
+              onClick={() => void saveGroup()}
+            >
+              {groupSaving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => setGroupOpen(false)}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {groupError ? <p className={modal.error}>{groupError}</p> : null}
+        <div className={modal.fields}>
+          <label className={modal.field}>
+            <span>
+              Название <em className={modal.req}>*</em>
+            </span>
+            <input value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+          </label>
+          <label className={modal.field}>
+            <span>Код</span>
+            <input
+              value={groupCode}
+              onChange={(e) => setGroupCode(e.target.value)}
+              placeholder="авто"
+            />
+          </label>
+          <label className={modal.radio}>
+            <input
+              type="checkbox"
+              checked={groupActive}
+              onChange={(e) => setGroupActive(e.target.checked)}
+            />
+            Активный
+          </label>
+        </div>
+      </FormModal>
     </div>
   );
 }

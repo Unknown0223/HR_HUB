@@ -17,7 +17,7 @@
 
 .searchInput:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -69,7 +69,7 @@
 .opt:hover,
 .optOn {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .optEmpty {

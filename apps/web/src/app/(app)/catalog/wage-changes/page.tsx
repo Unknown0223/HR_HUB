@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
@@ -38,6 +40,7 @@ type EmpOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'employeeId'] as const;
 const PAGE_SIZES = [25, 50, 100] as const;
+const COL_COUNT = 8;
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -91,6 +94,7 @@ function WageChangesPageInner() {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [exportBusy, setExportBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
   const [page, setPage] = useState(1);
@@ -145,6 +149,28 @@ function WageChangesPageInner() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
+  const rangeFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, filtered.length);
+
+  const checkedIds = useMemo(() => Object.keys(checked).filter((id) => checked[id]), [checked]);
+  const allPageChecked = pageRows.length > 0 && pageRows.every((r) => checked[r.id]);
+  const somePageChecked = pageRows.some((r) => checked[r.id]) && !allPageChecked;
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of pageRows) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
+
   async function load() {
     setLoading(true);
     setError('');
@@ -168,6 +194,15 @@ function WageChangesPageInner() {
   }, [q, numberFilter, employeeIdFilter, postedFilter, from, to, pageSize]);
 
   useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (searchParams?.get('action') === 'create') openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
     apiFetch<{ employees?: EmpOpt[] }>('/api/catalog/lookups')
       .then((d) => setEmployees(d.employees || []))
       .catch(() => setEmployees([]));
@@ -184,6 +219,7 @@ function WageChangesPageInner() {
   }
 
   function openCreate() {
+    setError('');
     setEditId(null);
     setEditDefaults({
       effectiveAt: new Date().toISOString().slice(0, 10),
@@ -192,6 +228,7 @@ function WageChangesPageInner() {
   }
 
   function openEdit(row: WageChangeRow) {
+    setError('');
     setEditId(row.id);
     setEditDefaults({
       employeeId: row.employeeId,
@@ -201,6 +238,12 @@ function WageChangesPageInner() {
       documentNumber: row.documentNumber || '',
     });
     setPanel('edit');
+  }
+
+  function closePanel() {
+    setPanel('none');
+    setEditId(null);
+    setError('');
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -240,11 +283,13 @@ function WageChangesPageInner() {
   }
 
   async function runAction(row: WageChangeRow, action: 'post' | 'cancel' | 'delete') {
+    if (action === 'delete') {
+      if (!(await confirm(`Удалить документ ${row.documentNumber || row.id}?`))) return;
+    }
     setBusy(true);
     setError('');
     try {
       if (action === 'delete') {
-        if (!(await confirm(`Удалить документ ${row.documentNumber || row.id}?`))) return;
         await apiFetch(`/api/catalog/wage-changes/${row.id}`, { method: 'DELETE' });
       } else {
         await apiFetch(`/api/catalog/wage-changes/${row.id}/${action}`, {
@@ -252,9 +297,66 @@ function WageChangesPageInner() {
         });
       }
       setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка действия');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'post' | 'cancel' | 'delete') {
+    const targets = filtered.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'delete') {
+      const deletable = targets.filter((r) => !isPosted(r));
+      if (deletable.length === 0) {
+        setError('Нельзя удалить проведённые документы');
+        return;
+      }
+      if (!(await confirm(`Удалить выбранные документы (${deletable.length} шт.)?`))) return;
+    } else if (action === 'post') {
+      if (targets.every((r) => r.status !== 'draft')) {
+        setError('Нет черновиков среди выбранных');
+        return;
+      }
+    } else if (action === 'cancel') {
+      if (targets.every((r) => r.status !== 'draft')) {
+        setError('Нет черновиков среди выбранных');
+        return;
+      }
+      if (!(await confirm(`Отменить выбранные документы (${targets.length} шт.)?`))) return;
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'delete') {
+            if (isPosted(row)) continue;
+            await apiFetch(`/api/catalog/wage-changes/${row.id}`, { method: 'DELETE' });
+          } else {
+            if (row.status !== 'draft') continue;
+            await apiFetch(`/api/catalog/wage-changes/${row.id}/${action}`, {
+              method: 'POST',
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) setError(`Часть операций не выполнена: ${failed}`);
     } finally {
       setBusy(false);
     }
@@ -294,9 +396,35 @@ function WageChangesPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="wage-changes" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-ruble-sign" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Все изменения в оплате труда</h1>
+          <p className={shared.pageSubtitle}>История изменений тарифов и окладов сотрудников</p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
           <FilterPanel
@@ -332,80 +460,127 @@ function WageChangesPageInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
+          <span className={styles.countBadge}>
+            {pageRows.length} / {filtered.length}
+          </span>
+          <button
+            type="button"
+            className={filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn}
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
           </button>
           <button
             type="button"
-            className={styles.exportBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
+            title="Excel"
+            aria-label="Экспорт Excel"
           >
-            {exportBusy ? 'Excel…' : 'Excel'}
+            <i className="fas fa-file-excel" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()}>
-            Обновить
-          </button>
-          <span className={styles.pagerMeta}>
-            {pageSize} / {filtered.length}
-          </span>
           <button
             type="button"
-            className={styles.pagerBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
           >
-            ‹
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>
-            {page}/{totalPages}
-          </span>
-          <button
-            type="button"
-            className={styles.pagerBtn}
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            ›
-          </button>
-          <select
-            aria-label="Размер страницы"
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            className={styles.search}
-            style={{ minWidth: 72, width: 72 }}
-          >
-            {PAGE_SIZES.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {error ? <p className={styles.error}>{error}</p> : null}
+      {error && panel === 'none' ? <p className={styles.error}>{error}</p> : null}
 
-      {panel !== 'none' ? (
-        <form className={styles.panel} onSubmit={onSubmit}>
-          <h2 className={styles.panelTitle}>
-            {panel === 'edit' ? 'Изменить оплату труда' : 'Создать изменение оплаты труда'}
-          </h2>
-          <div className={styles.formGrid}>
-            <label>
-              Дата документа *
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('post')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Провести
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('cancel')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Отменить
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('delete')}
+          >
+            <i className="fas fa-trash" aria-hidden />
+            Удалить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <FormModal
+        open={panel !== 'none'}
+        title={panel === 'edit' ? 'Изменить оплату труда' : 'Создать изменение оплаты труда'}
+        onClose={closePanel}
+        width="md"
+        footer={
+          <>
+            <button
+              type="submit"
+              form="wage-change-form"
+              className={modal.btnPrimary}
+              disabled={saving}
+            >
+              {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+            <button type="button" className={modal.btnGhost} onClick={closePanel}>
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <form
+          id="wage-change-form"
+          key={editId ?? 'create'}
+          className={modal.fields}
+          onSubmit={onSubmit}
+        >
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>
+                Дата документа <em className={modal.req}>*</em>
+              </span>
               <input
                 name="effectiveAt"
                 type="date"
@@ -413,31 +588,33 @@ function WageChangesPageInner() {
                 defaultValue={editDefaults.effectiveAt || ''}
               />
             </label>
-            <label>
-              Номер документа
+            <label className={modal.field}>
+              <span>Номер документа</span>
               <input
                 name="documentNumber"
                 placeholder="авто"
                 defaultValue={editDefaults.documentNumber || ''}
               />
             </label>
-            <label>
-              Сотрудник *
-              <select
-                name="employeeId"
-                required
-                defaultValue={editDefaults.employeeId || ''}
-              >
-                <option value="">— выберите —</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Новая сумма *
+          </div>
+          <label className={modal.field}>
+            <span>
+              Сотрудник <em className={modal.req}>*</em>
+            </span>
+            <select name="employeeId" required defaultValue={editDefaults.employeeId || ''}>
+              <option value="">— выберите —</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>
+                Новая сумма <em className={modal.req}>*</em>
+              </span>
               <input
                 name="newAmount"
                 type="number"
@@ -447,142 +624,188 @@ function WageChangesPageInner() {
                 defaultValue={editDefaults.newAmount || ''}
               />
             </label>
-            <label>
-              Причина
+            <label className={modal.field}>
+              <span>Причина</span>
               <input name="reason" defaultValue={editDefaults.reason || ''} />
             </label>
           </div>
-          <div className={styles.panelActions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={styles.ghost}
-              onClick={() => {
-                setPanel('none');
-                setEditId(null);
-              }}
-            >
-              Закрыть
-            </button>
-          </div>
         </form>
-      ) : null}
+      </FormModal>
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Дата документа</th>
-              <th>Номер документа</th>
-              <th>Сотрудник</th>
-              <th>Дата</th>
-              <th>Начисления (до изменения)</th>
-              <th>Начисления</th>
-              <th>Проведен</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && pageRows.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата документа</th>
+                <th>Номер документа</th>
+                <th>Сотрудник</th>
+                <th>Дата</th>
+                <th>Начисления (до изменения)</th>
+                <th>Начисления</th>
+                <th>Проведен</th>
               </tr>
-            ) : null}
-            {!loading && pageRows.length === 0 ? (
-              <tr>
-                <td colSpan={8} className={styles.empty}>
-                  Нет данных
-                </td>
-              </tr>
-            ) : null}
-            {pageRows.map((row) => {
-              const open = selectedId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{fmtDate(row.createdAt || row.effectiveAt)}</td>
-                    <td>{row.documentNumber || '—'}</td>
-                    <td className={styles.empName}>{empName(row.employee)}</td>
-                    <td>{fmtDate(row.effectiveAt)}</td>
-                    <td>{accrualsLabel(row.oldAmount)}</td>
-                    <td>{accrualsLabel(row.newAmount)}</td>
-                    <td>
-                      {isPosted(row) ? (
-                        <span className={styles.postedYes}>Да</span>
-                      ) : (
-                        <span className={styles.postedNo}>
-                          {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={8}>
-                        <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
-                          {row.status === 'draft' ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(row, 'post')}
-                            >
-                              Провести
-                            </button>
-                          ) : null}
-                          {row.status === 'draft' ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(row, 'cancel')}
-                            >
-                              Отменить
-                            </button>
-                          ) : null}
-                          {row.status === 'draft' ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => openEdit(row)}
-                            >
-                              Изменить
-                            </button>
-                          ) : null}
-                          <Link href={`/employees/${row.employeeId}`}>Карточка</Link>
-                          {row.status !== 'posted' ? (
-                            <button
-                              type="button"
-                              className={styles.danger}
-                              disabled={busy}
-                              onClick={() => runAction(row, 'delete')}
-                            >
-                              Удалить
-                            </button>
-                          ) : null}
-                        </div>
+            </thead>
+            <tbody>
+              {loading && pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {pageRows.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.documentNumber || row.id}`}
+                        />
+                      </td>
+                      <td>{fmtDate(row.createdAt || row.effectiveAt)}</td>
+                      <td>{row.documentNumber || '—'}</td>
+                      <td className={styles.empName}>{empName(row.employee)}</td>
+                      <td>{fmtDate(row.effectiveAt)}</td>
+                      <td>{accrualsLabel(row.oldAmount)}</td>
+                      <td>{accrualsLabel(row.newAmount)}</td>
+                      <td>
+                        {isPosted(row) ? (
+                          <span className={styles.postedYes}>Да</span>
+                        ) : (
+                          <span className={styles.postedNo}>
+                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                          </span>
+                        )}
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            {row.status === 'draft' ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runAction(row, 'post')}
+                              >
+                                <i className="fas fa-check" aria-hidden />
+                                Провести
+                              </button>
+                            ) : null}
+                            {row.status === 'draft' ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runAction(row, 'cancel')}
+                              >
+                                <i className="fas fa-ban" aria-hidden />
+                                Отменить
+                              </button>
+                            ) : null}
+                            {row.status === 'draft' ? (
+                              <button type="button" disabled={busy} onClick={() => openEdit(row)}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </button>
+                            ) : null}
+                            <Link href={`/employees/${row.employeeId}`}>
+                              <i className="fas fa-id-card" aria-hidden />
+                              Карточка
+                            </Link>
+                            {row.status !== 'posted' ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runAction(row, 'delete')}
+                              >
+                                <i className="fas fa-trash" aria-hidden />
+                                Удалить
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано{' '}
+            <strong>
+              {rangeFrom}–{rangeTo}
+            </strong>{' '}
+            из <strong>{filtered.length}</strong>
+          </p>
+          <div className={styles.footerPager}>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Предыдущая страница"
+            >
+              ‹
+            </button>
+            <span className={styles.countBadge}>
+              {page}/{totalPages}
+            </span>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Следующая страница"
+            >
+              ›
+            </button>
+            <select
+              aria-label="Размер страницы"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className={styles.pageSize}
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -590,13 +813,7 @@ function WageChangesPageInner() {
 
 export default function WageChangesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <WageChangesPageInner />
     </Suspense>
   );

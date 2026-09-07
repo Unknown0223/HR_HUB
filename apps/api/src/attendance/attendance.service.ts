@@ -1,16 +1,24 @@
-import { randomBytes, randomUUID } from 'crypto';
-import { BadRequestException, BadGatewayException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { createHash, randomBytes, randomUUID } from 'crypto';
+import { BadRequestException, BadGatewayException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   DayStatus,
   FaceSyncStatus,
   ProdCalendarDayType,
   PunchDirection,
   Prisma,
+  Role,
   WorkScheduleKind,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DeviceGwClient } from '../device-gw/device-gw.client';
 import { StorageService } from '../storage/storage.service';
+import { DeviceCredentialVaultService } from './device-credential-vault.service';
+import {
+  DeviceCredentialAuditService,
+  type AuditActor,
+} from './device-credential-audit.service';
+import type { PairingAuthContext } from './pairing-token.guard';
 import {
   CreateDeviceDto,
   CreateLocationDto,
@@ -19,9 +27,13 @@ import {
   CreateScheduleDto,
   ApplyMarkSettingsDto,
   BulkDeviceIdsDto,
+  CreateProvisionSessionDto,
+  DetectDeviceStateDto,
   DeviceIgnoreDto,
   GpsPunchDto,
   IngestPunchDto,
+  OfficeLinkDevicePasswordDto,
+  PatchProvisionProgressDto,
   QrPunchDto,
   UpdateDeviceDto,
   UpdateLocationDto,
@@ -56,11 +68,45 @@ export class AttendanceService {
     private readonly prisma: PrismaService,
     private readonly gw: DeviceGwClient,
     private readonly storage: StorageService,
+    private readonly vault: DeviceCredentialVaultService,
+    private readonly credentialAudit: DeviceCredentialAuditService,
+    private readonly config: ConfigService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
     return tenantId;
+  }
+
+  private canViewDevicePassword(role?: string | null): boolean {
+    return role === Role.platform_admin || role === Role.tenant_admin;
+  }
+
+  private redactDevicePassword<T extends { passwordEnc?: string | null }>(
+    device: T,
+    role?: string | null,
+  ): T {
+    // Internal callers omit role — keep passwordEnc for GW register/sync.
+    if (role === undefined || role === null) return device;
+    if (this.canViewDevicePassword(role)) return device;
+    return { ...device, passwordEnc: null };
+  }
+
+  private async persistDevicePassword(
+    tenantId: string,
+    deviceId: string,
+    password: string,
+    updatedById?: string | null,
+  ) {
+    try {
+      await this.vault.setPassword(tenantId, deviceId, password, updatedById);
+    } catch (e) {
+      this.logger.warn(
+        `Vault setPassword failed for device ${deviceId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
   }
 
   private gwHttpException(e: unknown, fallback: string) {
@@ -398,7 +444,7 @@ export class AttendanceService {
     },
   } as const;
 
-  listDevices(tenantId: string, filter?: string) {
+  async listDevices(tenantId: string, filter?: string, role?: string | null) {
     const where: { tenantId: string; lastSeenAt?: null; status?: string | { in: string[] } } = {
       tenantId,
     };
@@ -408,20 +454,34 @@ export class AttendanceService {
       where.lastSeenAt = null;
       where.status = { in: ['new', 'registered'] };
     }
-    return this.prisma.device.findMany({
+    const rows = await this.prisma.device.findMany({
       where,
       include: this.deviceInclude,
       orderBy: { createdAt: 'desc' },
     });
+    return rows.map((d) => this.redactDevicePassword(d, role));
   }
 
-  async getDevice(tenantId: string, id: string) {
+  async getDevice(
+    tenantId: string,
+    id: string,
+    role?: string | null,
+    actor?: AuditActor,
+  ) {
     const device = await this.prisma.device.findFirst({
       where: { id, tenantId },
       include: this.deviceInclude,
     });
     if (!device) throw new NotFoundException('Device not found');
-    return device;
+    const out = this.redactDevicePassword(device, role);
+    if (
+      role != null &&
+      this.canViewDevicePassword(role) &&
+      Boolean(device.passwordEnc)
+    ) {
+      await this.credentialAudit.record(tenantId, id, 'view', actor);
+    }
+    return out;
   }
 
   async createDevice(tenantId: string, dto: CreateDeviceDto) {
@@ -470,6 +530,9 @@ export class AttendanceService {
     if (saved.locationId) {
       this.scheduleLocationPersonsSync(tenantId, saved.id);
     }
+    if (dto.password) {
+      await this.persistDevicePassword(tenantId, saved.id, dto.password);
+    }
     return saved;
   }
 
@@ -512,10 +575,18 @@ export class AttendanceService {
     if (locationChanged && updated.locationId) {
       this.scheduleLocationPersonsSync(tenantId, updated.id);
     }
+    if (dto.password) {
+      await this.persistDevicePassword(tenantId, updated.id, dto.password);
+    }
     return updated;
   }
 
-  async changeDevicePassword(tenantId: string, id: string, newPassword: string) {
+  async changeDevicePassword(
+    tenantId: string,
+    id: string,
+    newPassword: string,
+    actor?: AuditActor,
+  ) {
     const device = await this.prisma.device.findFirst({ where: { id, tenantId } });
     if (!device) throw new NotFoundException('Device not found');
     const ref = device.gatewayRef || device.id;
@@ -529,12 +600,19 @@ export class AttendanceService {
       data: { passwordEnc: newPassword },
       include: this.deviceInclude,
     });
+    await this.persistDevicePassword(tenantId, id, newPassword, actor?.userId);
+    await this.credentialAudit.record(tenantId, id, 'change', actor);
     await this.gw.registerFromDevice(updated);
     return { ok: true, id };
   }
 
   /** Save the password currently set on the terminal (after a local change) into the DB. */
-  async syncDevicePassword(tenantId: string, id: string, password: string) {
+  async syncDevicePassword(
+    tenantId: string,
+    id: string,
+    password: string,
+    actor?: AuditActor,
+  ) {
     const device = await this.prisma.device.findFirst({ where: { id, tenantId } });
     if (!device) throw new NotFoundException('Device not found');
     const ref = device.gatewayRef || device.id;
@@ -563,6 +641,8 @@ export class AttendanceService {
       },
       include: this.deviceInclude,
     });
+    await this.persistDevicePassword(tenantId, id, password, actor?.userId);
+    await this.credentialAudit.record(tenantId, id, 'sync', actor);
     await this.gw.registerFromDevice(updated);
     return { ok: true, id, saved: true };
   }
@@ -1969,7 +2049,9 @@ export class AttendanceService {
       serialNumber?: string;
       name?: string;
       model?: string;
+      locationId?: string;
     },
+    opts?: { provisionSessionId?: string },
   ) {
     const tenant = await this.resolveTenantByCode(tenantCode);
     const host = dto.host.trim();
@@ -1979,6 +2061,17 @@ export class AttendanceService {
     const serial =
       (dto.serialNumber || '').trim() || `lan-${host.replace(/\./g, '-')}`;
     const name = (dto.name || '').trim() || serial;
+    const locationId = (dto.locationId || '').trim() || null;
+
+    if (locationId) {
+      const loc = await this.prisma.location.findFirst({
+        where: { id: locationId, tenantId: tenant.id },
+        select: { id: true },
+      });
+      if (!loc) {
+        throw new BadRequestException('Локация не найдена для этого тенанта');
+      }
+    }
 
     let device = await this.prisma.device.findFirst({
       where: { tenantId: tenant.id, serialNumber: serial },
@@ -1989,6 +2082,11 @@ export class AttendanceService {
       });
     }
     if (!device) {
+      if (!locationId) {
+        throw new BadRequestException(
+          'locationId обязателен при создании нового устройства',
+        );
+      }
       device = await this.prisma.device.create({
         data: {
           tenantId: tenant.id,
@@ -2000,6 +2098,7 @@ export class AttendanceService {
           port,
           username,
           passwordEnc: password,
+          locationId,
           isActive: true,
           status: 'registered',
         },
@@ -2017,9 +2116,30 @@ export class AttendanceService {
           username,
           passwordEnc: password,
           isActive: true,
+          ...(locationId ? { locationId } : {}),
         },
       });
     }
+
+    await this.persistDevicePassword(tenant.id, device.id, password);
+    await this.credentialAudit.record(tenant.id, device.id, 'vault_write');
+
+    const meta = this.asMeta(device.meta);
+    const prevAuth =
+      meta.auth && typeof meta.auth === 'object' && !Array.isArray(meta.auth)
+        ? { ...(meta.auth as Record<string, unknown>) }
+        : {};
+    meta.auth = {
+      ...prevAuth,
+      passwordOutOfSync: false,
+      ownedByPlatform: true,
+      passwordRotatedOnProvision: true,
+      provisionedAt: new Date().toISOString(),
+    };
+    device = await this.prisma.device.update({
+      where: { id: device.id },
+      data: { meta: meta as Prisma.InputJsonValue },
+    });
 
     const reg = await this.gw.registerFromDevice(device);
     if (reg?.id) {
@@ -2033,6 +2153,35 @@ export class AttendanceService {
       });
     }
 
+    if (device.locationId) {
+      this.scheduleLocationPersonsSync(tenant.id, device.id);
+    }
+
+    const provisionSessionId = (opts?.provisionSessionId || '').trim();
+    if (provisionSessionId) {
+      const prev = await this.prisma.deviceProvisionSession.findFirst({
+        where: { id: provisionSessionId, tenantId: tenant.id },
+        select: { meta: true },
+      });
+      const prevMeta = this.asMeta(prev?.meta);
+      await this.prisma.deviceProvisionSession.updateMany({
+        where: { id: provisionSessionId, tenantId: tenant.id },
+        data: {
+          deviceId: device.id,
+          host: device.host,
+          serial: device.serialNumber,
+          status: 'linked',
+          step: 'linked',
+          percent: 100,
+          meta: {
+            ...prevMeta,
+            message: 'Ulandi',
+            linkedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
+
     return {
       ok: true,
       device: {
@@ -2040,10 +2189,273 @@ export class AttendanceService {
         name: device.name,
         serialNumber: device.serialNumber,
         host: device.host,
+        locationId: device.locationId,
         status: device.status,
         gatewayRef: device.gatewayRef,
       },
     };
+  }
+
+  async officeLinkLocations(tenantCode: string) {
+    const tenant = await this.resolveTenantByCode(tenantCode);
+    const rows = await this.prisma.location.findMany({
+      where: { tenantId: tenant.id, isActive: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        address: true,
+        timezone: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    return { ok: true, tenantCode: tenant.code, locations: rows };
+  }
+
+  async createPairingToken(
+    tenantId: string,
+    createdById: string,
+    ttlSec?: number,
+  ) {
+    const defaultTtl = Number(
+      this.config.get<string>('PAIRING_TOKEN_TTL_SEC') ?? '900',
+    );
+    const ttl =
+      typeof ttlSec === 'number' && ttlSec > 0
+        ? Math.min(ttlSec, 3600)
+        : Number.isFinite(defaultTtl) && defaultTtl > 0
+          ? defaultTtl
+          : 900;
+    const token = randomBytes(32).toString('hex');
+    const pairingTokenHash = createHash('sha256')
+      .update(token, 'utf8')
+      .digest('hex');
+    const expiresAt = new Date(Date.now() + ttl * 1000);
+    const session = await this.prisma.deviceProvisionSession.create({
+      data: {
+        tenantId,
+        createdById,
+        status: 'scanning',
+        step: 'awaiting_client',
+        percent: 0,
+        pairingTokenHash,
+        expiresAt,
+      },
+    });
+    const qrPayload = JSON.stringify({
+      v: 1,
+      token,
+      sessionId: session.id,
+      expiresAt: expiresAt.toISOString(),
+    });
+    return {
+      token,
+      expiresAt: expiresAt.toISOString(),
+      sessionId: session.id,
+      qrPayload,
+    };
+  }
+
+  listProvisionSessions(tenantId: string) {
+    return this.prisma.deviceProvisionSession.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        status: true,
+        step: true,
+        percent: true,
+        host: true,
+        serial: true,
+        deviceId: true,
+        expiresAt: true,
+        meta: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  getOfficeLinkDownload() {
+    const url = (this.config.get<string>('OFFICE_LINK_DOWNLOAD_URL') ?? '').trim();
+    const version =
+      (this.config.get<string>('OFFICE_LINK_VERSION') ?? '').trim() || null;
+    if (!url) {
+      return { url: null, version, message: 'OFFICE_LINK_DOWNLOAD_URL sozlanmagan' };
+    }
+    return { url, version };
+  }
+
+  /** Field credential for GW punch ingest (same as DEVICE_LINK_KEY / PUNCH_INGEST_API_KEY). */
+  private fieldLinkKey(): string {
+    return (
+      (this.config.get<string>('DEVICE_LINK_KEY') ?? '').trim() ||
+      (this.config.get<string>('PUNCH_INGEST_API_KEY') ?? '').trim()
+    );
+  }
+
+  async createOrRefreshProvisionSession(
+    pairing: PairingAuthContext,
+    dto: CreateProvisionSessionDto,
+  ) {
+    const meta =
+      dto.meta !== undefined
+        ? (dto.meta as Prisma.InputJsonValue)
+        : undefined;
+    const session = await this.prisma.deviceProvisionSession.update({
+      where: { id: pairing.sessionId },
+      data: {
+        status: 'scanning',
+        step: 'session_bound',
+        percent: 5,
+        ...(dto.host !== undefined ? { host: dto.host } : {}),
+        ...(dto.serial !== undefined ? { serial: dto.serial } : {}),
+        ...(meta !== undefined ? { meta } : {}),
+      },
+    });
+    // Hand field link key to client over pairing channel (HTTPS + short TTL).
+    // Operator never sees ADMIN-PAROL; GW still needs the punch key locally.
+    const linkKey = this.fieldLinkKey() || undefined;
+    return {
+      ok: true,
+      sessionId: session.id,
+      status: session.status,
+      step: session.step,
+      percent: session.percent,
+      expiresAt: pairing.expiresAt?.toISOString() ?? null,
+      ...(linkKey ? { linkKey } : {}),
+    };
+  }
+
+  async patchProvisionProgress(
+    pairing: PairingAuthContext,
+    sessionId: string,
+    dto: PatchProvisionProgressDto,
+  ) {
+    const existing = await this.prisma.deviceProvisionSession.findFirst({
+      where: { id: sessionId, tenantId: pairing.tenantId },
+    });
+    if (!existing) throw new NotFoundException('Provision session not found');
+
+    const prevMeta = this.asMeta(existing.meta);
+    const nextMeta: Record<string, unknown> = { ...prevMeta };
+    if (dto.message !== undefined) nextMeta.message = dto.message;
+
+    const session = await this.prisma.deviceProvisionSession.update({
+      where: { id: sessionId },
+      data: {
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
+        ...(dto.step !== undefined ? { step: dto.step } : {}),
+        ...(dto.percent !== undefined ? { percent: dto.percent } : {}),
+        ...(dto.host !== undefined ? { host: dto.host } : {}),
+        ...(dto.serial !== undefined ? { serial: dto.serial } : {}),
+        ...(dto.deviceId !== undefined ? { deviceId: dto.deviceId } : {}),
+        meta: nextMeta as Prisma.InputJsonValue,
+      },
+    });
+    return {
+      ok: true,
+      sessionId: session.id,
+      status: session.status,
+      step: session.step,
+      percent: session.percent,
+    };
+  }
+
+  async recordDeviceDetect(
+    pairing: PairingAuthContext,
+    dto: DetectDeviceStateDto,
+  ) {
+    const state = dto.state ?? 'configured';
+    const prev = await this.prisma.deviceProvisionSession.findFirst({
+      where: { id: pairing.sessionId, tenantId: pairing.tenantId },
+    });
+    if (!prev) throw new NotFoundException('Provision session not found');
+    const prevMeta = this.asMeta(prev.meta);
+    const meta = {
+      ...prevMeta,
+      detect: {
+        state,
+        host: dto.host ?? null,
+        port: dto.port ?? null,
+        ...(dto.meta ?? {}),
+        at: new Date().toISOString(),
+      },
+    };
+    await this.prisma.deviceProvisionSession.update({
+      where: { id: pairing.sessionId },
+      data: {
+        status: 'configuring',
+        step: `detect_${state}`,
+        percent: 15,
+        ...(dto.host !== undefined ? { host: dto.host } : {}),
+        meta: meta as Prisma.InputJsonValue,
+      },
+    });
+    return { ok: true, state, sessionId: pairing.sessionId };
+  }
+
+  async officeLinkSetDevicePassword(
+    pairing: PairingAuthContext,
+    dto: OfficeLinkDevicePasswordDto,
+  ) {
+    const device = await this.prisma.device.findFirst({
+      where: { id: dto.deviceId, tenantId: pairing.tenantId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
+    const meta = this.asMeta(device.meta);
+    const prevAuth =
+      meta.auth && typeof meta.auth === 'object' && !Array.isArray(meta.auth)
+        ? { ...(meta.auth as Record<string, unknown>) }
+        : {};
+    meta.auth = {
+      ...prevAuth,
+      passwordOutOfSync: false,
+      provisionedAt: new Date().toISOString(),
+    };
+
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        passwordEnc: dto.password,
+        ...(dto.username ? { username: dto.username } : {}),
+        meta: meta as Prisma.InputJsonValue,
+      },
+    });
+    await this.vault.setPassword(
+      pairing.tenantId,
+      device.id,
+      dto.password,
+    );
+    await this.credentialAudit.record(pairing.tenantId, device.id, 'vault_write', {
+      userId: pairing.createdById ?? null,
+    });
+
+    if (dto.provisionSessionId || pairing.sessionId) {
+      const sid = dto.provisionSessionId || pairing.sessionId;
+      await this.prisma.deviceProvisionSession.updateMany({
+        where: { id: sid, tenantId: pairing.tenantId },
+        data: {
+          deviceId: device.id,
+          step: 'password_stored',
+          percent: 70,
+          ...(dto.host ? { host: dto.host } : {}),
+          ...(dto.serial ? { serial: dto.serial } : {}),
+        },
+      });
+    }
+
+    return { ok: true, deviceId: device.id };
+  }
+
+  listDeviceCredentialAudits(
+    tenantId: string,
+    deviceId: string,
+    limit?: number,
+  ) {
+    return this.credentialAudit.listForDevice(tenantId, deviceId, limit);
   }
 
   // --- Schedules ---
@@ -4086,8 +4498,39 @@ export class AttendanceService {
     return { occurredAt, extra };
   }
 
+  /** Body tenantId cannot attach a device that already belongs to another company. */
+  private async rejectIngestDeviceTenantMismatch(dto: IngestPunchDto) {
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const or: Prisma.DeviceWhereInput[] = [];
+    if (dto.deviceId) {
+      if (uuidRe.test(dto.deviceId)) or.push({ id: dto.deviceId });
+      or.push({ gatewayRef: dto.deviceId });
+    }
+    if (dto.gatewayRef) or.push({ gatewayRef: dto.gatewayRef });
+    if (dto.serialNumber) or.push({ serialNumber: dto.serialNumber });
+    if (!or.length) return;
+
+    const foreign = await this.prisma.device.findFirst({
+      where: { tenantId: { not: dto.tenantId }, OR: or },
+      select: { id: true },
+    });
+    if (foreign) {
+      throw new ForbiddenException('Device does not belong to tenant');
+    }
+  }
+
   async ingestPunch(dto: IngestPunchDto) {
     const tenantId = dto.tenantId;
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, isActive: true },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new BadRequestException('Unknown or inactive tenant');
+    }
+    await this.rejectIngestDeviceTenantMismatch(dto);
+
     let deviceId: string | null = null;
 
     if (dto.deviceId) {

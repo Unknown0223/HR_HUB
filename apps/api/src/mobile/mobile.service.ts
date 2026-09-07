@@ -3,6 +3,7 @@ import { DayStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/current-user.decorator';
 import { MeService } from '../me/me.service';
+import { sanitizeNewsHtml } from '../news/news-html';
 
 const NEWS_DICTIONARY_CODE = 'news_feed';
 
@@ -188,7 +189,8 @@ export class MobileService {
         id: item.id,
         code: item.code,
         title: item.name,
-        body: typeof meta.body === 'string' ? meta.body : null,
+        body:
+          typeof meta.body === 'string' ? sanitizeNewsHtml(meta.body) : null,
         publishedAt:
           typeof meta.publishedAt === 'string' ? meta.publishedAt : null,
       };

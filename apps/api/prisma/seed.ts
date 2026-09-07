@@ -853,6 +853,68 @@ async function main() {
     },
   });
 
+  const fineMonth = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+  await prisma.finePolicy.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.finePolicy.createMany({
+    data: [
+      {
+        tenantId: tenant.id,
+        scope: 'company',
+        month: fineMonth,
+        name: 'Общая политика штрафов',
+        isActive: true,
+        rules: {
+          late: [{ id: '1', type: 'amount', value: 50000, timeFrom: 1 }],
+          early: [{ id: '2', type: 'amount', value: 30000, timeFrom: 1 }],
+          absence: [{ id: '3', type: 'amount', value: 100000 }],
+          missed_day: [],
+          missed_mark: [],
+        },
+      },
+      {
+        tenantId: tenant.id,
+        scope: 'division',
+        month: fineMonth,
+        name: 'Штрафы IT DEPARTMENT',
+        isActive: true,
+        divisionId: it.id,
+        rules: {
+          late: [{ id: '1', type: 'amount', value: 1000, timeFrom: 5 }],
+          early: [],
+          absence: [{ id: '2', type: 'amount', value: 150000 }],
+          missed_day: [],
+          missed_mark: [],
+        },
+      },
+    ],
+  });
+
+  await prisma.allowancePolicy.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.allowancePolicy.createMany({
+    data: [
+      {
+        tenantId: tenant.id,
+        scope: 'company',
+        month: fineMonth,
+        name: 'Ночные / сверхурочные (компания)',
+        isActive: true,
+        rules: [
+          { id: '1', startTime: '22:00', endTime: '06:00', coefficient: 1.5 },
+          { id: '2', startTime: '18:00', endTime: '22:00', coefficient: 1.25 },
+        ],
+      },
+      {
+        tenantId: tenant.id,
+        scope: 'schedule',
+        month: fineMonth,
+        name: 'Доплата NIGHT график',
+        isActive: true,
+        scheduleId: night.id,
+        rules: [{ id: '1', startTime: '00:00', endTime: '08:00', coefficient: 2 }],
+      },
+    ],
+  });
+
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const period = await prisma.payrollPeriod.upsert({

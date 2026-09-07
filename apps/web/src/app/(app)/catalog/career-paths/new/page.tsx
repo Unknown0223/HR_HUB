@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense } from 'react';
-import { CareerPathForm } from '../CareerPathForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewCareerPathPage() {
-  return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <CareerPathForm mode="create" />
-    </Suspense>
-  );
+/** Legacy /new → list with create modal */
+export default function NewCareerPathRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/career-paths?create=1');
+  }, [router]);
+  return null;
 }

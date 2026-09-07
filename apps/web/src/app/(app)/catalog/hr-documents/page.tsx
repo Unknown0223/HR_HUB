@@ -4,9 +4,12 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch, PageResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { confirm } from '@/lib/dialogs';
 import { downloadXlsxViaApi } from '@/lib/excel';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -41,6 +44,7 @@ type Position = { id: string; name: string };
 
 const FILTER_KEYS = ['q', 'type', 'status', 'posted', 'from', 'to'] as const;
 const PAGE_SIZES = [25, 50, 100] as const;
+const COL_COUNT = 6;
 
 const DOC_TYPES = [
   { value: 'hire', label: 'Прием на работу' },
@@ -100,6 +104,7 @@ function HrDocumentsPageInner() {
   const [dismissalReasons, setDismissalReasons] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [cancelTarget, setCancelTarget] = useState<DocRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
@@ -126,6 +131,32 @@ function HrDocumentsPageInner() {
     p.set('limit', String(pageSize));
     return `?${p.toString()}`;
   }, [q, type, status, posted, from, to, page, pageSize]);
+
+  const checkedIds = useMemo(
+    () => Object.keys(checked).filter((id) => checked[id]),
+    [checked],
+  );
+
+  const allPageChecked = rows.length > 0 && rows.every((r) => checked[r.id]);
+  const somePageChecked = rows.some((r) => checked[r.id]) && !allPageChecked;
+
+  const rangeFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, total);
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleAllPage(on: boolean) {
+    setChecked((prev) => {
+      const next = { ...prev };
+      for (const r of rows) {
+        if (on) next[r.id] = true;
+        else delete next[r.id];
+      }
+      return next;
+    });
+  }
 
   async function load() {
     setLoading(true);
@@ -163,6 +194,10 @@ function HrDocumentsPageInner() {
   useEffect(() => {
     setSearchDraft(q);
   }, [q]);
+
+  useEffect(() => {
+    setChecked({});
+  }, [query]);
 
   useEffect(() => {
     if (searchParams.get('type') === 'transfer') {
@@ -306,9 +341,74 @@ function HrDocumentsPageInner() {
       await apiFetch(`/api/hr/documents/${row.id}/${action}`, { method: 'POST' });
       setCancelTarget(null);
       setSelectedId(null);
+      setChecked((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка действия');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBulk(action: 'post' | 'unpost' | 'cancel') {
+    if (checkedIds.length === 0) return;
+    const targets = rows.filter((r) => checked[r.id]);
+    if (targets.length === 0) return;
+
+    if (action === 'cancel') {
+      if (
+        !(await confirm(`Отменить выбранные документы (${targets.length} шт.)?`))
+      ) {
+        return;
+      }
+    } else if (action === 'post') {
+      if (targets.every((r) => r.status !== 'draft')) {
+        setError('Нет черновиков среди выбранных');
+        return;
+      }
+    } else if (action === 'unpost') {
+      if (targets.every((r) => r.status !== 'posted')) {
+        setError('Нет проведённых документов среди выбранных');
+        return;
+      }
+    }
+
+    setBusy(true);
+    setError('');
+    let failed = 0;
+    try {
+      for (const row of targets) {
+        try {
+          if (action === 'cancel') {
+            if (row.status === 'cancelled') continue;
+            await apiFetch(`/api/hr/documents/${row.id}/cancel`, {
+              method: 'POST',
+            });
+          } else if (action === 'post') {
+            if (row.status !== 'draft') continue;
+            await apiFetch(`/api/hr/documents/${row.id}/post`, {
+              method: 'POST',
+            });
+          } else {
+            if (row.status !== 'posted') continue;
+            await apiFetch(`/api/hr/documents/${row.id}/unpost`, {
+              method: 'POST',
+            });
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+      setChecked({});
+      setSelectedId(null);
+      await load();
+      if (failed > 0) {
+        setError(`Часть операций не выполнена: ${failed}`);
+      }
     } finally {
       setBusy(false);
     }
@@ -355,6 +455,31 @@ function HrDocumentsPageInner() {
     <div className={styles.wrap}>
       <PageSubnav groupKey="hr-documents" />
 
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
+          <i className="fas fa-file-alt" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Все кадровые документы</h1>
+          <p className={shared.pageSubtitle}>Приказы, заявления и кадровые документы организации</p>
+        </div>
+        <div className={shared.pageHeaderActions}>
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applySearch();
+              }}
+              aria-label="Поиск"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <div className={styles.createWrap} ref={menuRef}>
@@ -363,7 +488,8 @@ function HrDocumentsPageInner() {
               className={styles.createBtn}
               onClick={() => setMenuOpen((v) => !v)}
             >
-              Создать +
+              <i className="fas fa-plus" aria-hidden />
+              Создать
             </button>
             {menuOpen ? (
               <div className={styles.createMenu}>
@@ -403,80 +529,128 @@ function HrDocumentsPageInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySearch();
-            }}
-          />
-          <button type="button" className={styles.toolBtn} onClick={applySearch}>
-            Найти
-          </button>
-          <button type="button" className={styles.exportBtn} onClick={exportCsv}>
-            CSV
+          <span className={styles.countBadge}>
+            {rows.length} / {total}
+          </span>
+          <button
+            type="button"
+            className={
+              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
           </button>
           <button
             type="button"
-            className={styles.exportBtn}
+            className={styles.iconBtn}
+            onClick={exportCsv}
+            title="CSV"
+            aria-label="Экспорт CSV"
+          >
+            <i className="fas fa-file-csv" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
+            title="Excel"
+            aria-label="Экспорт Excel"
           >
-            {exportBusy ? 'Excel…' : 'Excel'}
+            <i className="fas fa-file-excel" aria-hidden />
           </button>
-          <button type="button" className={styles.toolBtn} onClick={() => load()}>
-            Обновить
-          </button>
-          <span className={styles.pagerMeta}>
-            {pageSize} / {total}
-          </span>
           <button
             type="button"
-            className={styles.pagerBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
           >
-            ‹
+            <i className="fas fa-sync-alt" aria-hidden />
           </button>
-          <span className={styles.pagerMeta}>
-            {page}/{totalPages}
-          </span>
-          <button
-            type="button"
-            className={styles.pagerBtn}
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            ›
-          </button>
-          <select
-            aria-label="Размер страницы"
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            className={styles.search}
-            style={{ minWidth: 72, width: 72 }}
-          >
-            {PAGE_SIZES.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {error ? <p className={styles.error}>{error}</p> : null}
+      {error && panel === 'none' ? <p className={styles.error}>{error}</p> : null}
 
-      {panel === 'create' ? (
-        <form className={styles.panel} onSubmit={onCreate}>
-          <h2 className={styles.panelTitle}>
-            Создать: {typeLabel(createType)}
-          </h2>
-          <div className={styles.formGrid}>
-            <label>
-              Тип
+      {checkedIds.length > 0 ? (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkMeta}>
+            Выбрано: <strong>{checkedIds.length}</strong>
+          </span>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('post')}
+          >
+            <i className="fas fa-check" aria-hidden />
+            Провести
+          </button>
+          <button
+            type="button"
+            className={styles.bulkBtn}
+            disabled={busy}
+            onClick={() => void runBulk('unpost')}
+          >
+            <i className="fas fa-undo" aria-hidden />
+            Отменить проведение
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.bulkDanger}`}
+            disabled={busy}
+            onClick={() => void runBulk('cancel')}
+          >
+            <i className="fas fa-ban" aria-hidden />
+            Отменить
+          </button>
+          <button
+            type="button"
+            className={styles.bulkGhost}
+            disabled={busy}
+            onClick={() => setChecked({})}
+          >
+            Снять выделение
+          </button>
+        </div>
+      ) : null}
+
+      <FormModal
+        open={panel === 'create'}
+        title={`Создать: ${typeLabel(createType)}`}
+        onClose={() => setPanel('none')}
+        width="lg"
+        footer={
+          <>
+            <button
+              type="submit"
+              form="hr-doc-create-form"
+              className={modal.btnPrimary}
+              disabled={saving}
+            >
+              {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => setPanel('none')}
+            >
+              Отмена
+            </button>
+          </>
+        }
+      >
+        {error && panel === 'create' ? (
+          <p className={modal.error}>{error}</p>
+        ) : null}
+        <form id="hr-doc-create-form" className={modal.fields} onSubmit={onCreate}>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Тип</span>
               <select
                 name="type"
                 value={createType}
@@ -490,8 +664,10 @@ function HrDocumentsPageInner() {
                 ))}
               </select>
             </label>
-            <label>
-              Дата *
+            <label className={modal.field}>
+              <span>
+                Дата <em className={modal.req}>*</em>
+              </span>
               <input
                 name="documentDate"
                 type="date"
@@ -499,12 +675,16 @@ function HrDocumentsPageInner() {
                 defaultValue={new Date().toISOString().slice(0, 10)}
               />
             </label>
-            <label>
-              Номер
+          </div>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Номер</span>
               <input name="number" placeholder="авто" />
             </label>
-            <label>
-              Сотрудник *
+            <label className={modal.field}>
+              <span>
+                Сотрудник <em className={modal.req}>*</em>
+              </span>
               <select name="employeeId" required defaultValue="">
                 <option value="">— выберите —</option>
                 {employees.map((e) => (
@@ -514,30 +694,32 @@ function HrDocumentsPageInner() {
                 ))}
               </select>
             </label>
-            <label>
-              Заголовок
-              <input name="title" defaultValue={typeLabel(createType)} key={createType} />
-            </label>
-            {(createType === 'hire' || createType === 'transfer') && (
-              <>
-                {createType === 'transfer' ? (
-                  <>
-                    <label>
-                      Перевод с
-                      <input
-                        name="transferFrom"
-                        type="date"
-                        defaultValue={new Date().toISOString().slice(0, 10)}
-                      />
-                    </label>
-                    <label>
-                      Перевод по
-                      <input name="transferTo" type="date" />
-                    </label>
-                  </>
-                ) : null}
-                <label>
-                  Подразделение
+          </div>
+          <label className={modal.field}>
+            <span>Заголовок</span>
+            <input name="title" defaultValue={typeLabel(createType)} key={createType} />
+          </label>
+          {createType === 'transfer' ? (
+            <div className={modal.row2}>
+              <label className={modal.field}>
+                <span>Перевод с</span>
+                <input
+                  name="transferFrom"
+                  type="date"
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                />
+              </label>
+              <label className={modal.field}>
+                <span>Перевод по</span>
+                <input name="transferTo" type="date" />
+              </label>
+            </div>
+          ) : null}
+          {createType === 'hire' || createType === 'transfer' ? (
+            <>
+              <div className={modal.row2}>
+                <label className={modal.field}>
+                  <span>Подразделение</span>
                   <select name="divisionId" defaultValue="">
                     <option value="">—</option>
                     {divisions.map((d) => (
@@ -547,8 +729,8 @@ function HrDocumentsPageInner() {
                     ))}
                   </select>
                 </label>
-                <label>
-                  Должность
+                <label className={modal.field}>
+                  <span>Должность</span>
                   <select name="positionId" defaultValue="">
                     <option value="">—</option>
                     {positions.map((p) => (
@@ -558,175 +740,239 @@ function HrDocumentsPageInner() {
                     ))}
                   </select>
                 </label>
-                <label>
-                  Оклад
-                  <input name="baseSalary" type="number" min={0} step="0.01" />
-                </label>
-              </>
-            )}
-            {createType === 'dismiss' ? (
-              <label>
-                Причина увольнения *
-                <select name="dismissalReasonId" required defaultValue="">
-                  <option value="">— выберите —</option>
-                  {dismissalReasons.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
+              </div>
+              <label className={modal.field}>
+                <span>Оклад</span>
+                <input name="baseSalary" type="number" min={0} step="0.01" />
               </label>
-            ) : null}
-            {createType === 'name_change' ? (
-              <>
-                <label>
-                  Новая фамилия *
+            </>
+          ) : null}
+          {createType === 'dismiss' ? (
+            <label className={modal.field}>
+              <span>
+                Причина увольнения <em className={modal.req}>*</em>
+              </span>
+              <select name="dismissalReasonId" required defaultValue="">
+                <option value="">— выберите —</option>
+                {dismissalReasons.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {createType === 'name_change' ? (
+            <>
+              <div className={modal.row2}>
+                <label className={modal.field}>
+                  <span>
+                    Новая фамилия <em className={modal.req}>*</em>
+                  </span>
                   <input name="newLastName" required />
                 </label>
-                <label>
-                  Новое имя *
+                <label className={modal.field}>
+                  <span>
+                    Новое имя <em className={modal.req}>*</em>
+                  </span>
                   <input name="newFirstName" required />
                 </label>
-                <label>
-                  Новое отчество
-                  <input name="newMiddleName" />
-                </label>
-              </>
-            ) : null}
-            {createType === 'wage_change' ? (
-              <label>
-                Новая сумма *
-                <input name="newAmount" type="number" min={0} step="0.01" required />
+              </div>
+              <label className={modal.field}>
+                <span>Новое отчество</span>
+                <input name="newMiddleName" />
               </label>
-            ) : null}
-            <label>
-              Примечание
-              <input name="note" />
+            </>
+          ) : null}
+          {createType === 'wage_change' ? (
+            <label className={modal.field}>
+              <span>
+                Новая сумма <em className={modal.req}>*</em>
+              </span>
+              <input name="newAmount" type="number" min={0} step="0.01" required />
             </label>
-          </div>
-          <div className={styles.panelActions}>
-            <button type="submit" className={styles.primary} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={styles.ghost}
-              onClick={() => setPanel('none')}
-            >
-              Закрыть
-            </button>
-          </div>
+          ) : null}
+          <label className={modal.field}>
+            <span>Примечание</span>
+            <input name="note" />
+          </label>
         </form>
-      ) : null}
+      </FormModal>
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.checkCol} />
-              <th>Дата ↑</th>
-              <th>Номер</th>
-              <th>Тип документа</th>
-              <th>Сотрудники</th>
-              <th>Проведен</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && rows.length === 0 ? (
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Загрузка…
-                </td>
+                <th className={styles.checkCol}>
+                  <input
+                    type="checkbox"
+                    checked={allPageChecked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageChecked;
+                    }}
+                    onChange={(e) => toggleAllPage(e.target.checked)}
+                    aria-label="Выбрать все"
+                  />
+                </th>
+                <th>Дата</th>
+                <th>Номер</th>
+                <th>Тип документа</th>
+                <th>Сотрудники</th>
+                <th>Проведен</th>
               </tr>
-            ) : null}
-            {!loading && rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className={styles.empty}>
-                  Нет данных — нажмите «Создать»
-                </td>
-              </tr>
-            ) : null}
-            {rows.map((row) => {
-              const open = selectedId === row.id;
-              return (
-                <Fragment key={row.id}>
-                  <tr
-                    className={open ? styles.rowSelected : undefined}
-                    onClick={() => setSelectedId(open ? null : row.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={open}
-                        onChange={() => setSelectedId(open ? null : row.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td>{fmtDate(row.documentDate)}</td>
-                    <td>{row.number || '—'}</td>
-                    <td>{typeLabel(row.type)}</td>
-                    <td className={styles.empName}>{empFull(row.employee)}</td>
-                    <td>
-                      {row.status === 'posted' ? (
-                        <span className={styles.postedYes}>Да</span>
-                      ) : (
-                        <span className={styles.postedNo}>
-                          {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                  {open ? (
-                    <tr className={styles.actionsRow}>
-                      <td colSpan={6}>
-                        <div className={styles.rowActions}>
-                          <Link href={docViewHref(row)}>Просмотреть</Link>
-                          {row.status === 'draft' ? (
-                            <Link href={`${docViewHref(row)}?mode=edit`}>
-                              Изменить
-                            </Link>
-                          ) : null}
-                          {row.status === 'draft' ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(row, 'post')}
-                            >
-                              Провести
-                            </button>
-                          ) : null}
-                          {row.status === 'posted' ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(row, 'unpost')}
-                            >
-                              Отменить проведение
-                            </button>
-                          ) : null}
-                          {row.status !== 'cancelled' ? (
-                            <button
-                              type="button"
-                              className={styles.danger}
-                              disabled={busy}
-                              onClick={() => setCancelTarget(row)}
-                            >
-                              Отменить
-                            </button>
-                          ) : null}
-                          <Link href={`${docViewHref(row)}?side=history`}>
-                            История изменений
-                          </Link>
-                        </div>
+            </thead>
+            <tbody>
+              {loading && rows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && rows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className={styles.empty}>
+                    Нет данных — нажмите «Создать»
+                  </td>
+                </tr>
+              ) : null}
+              {rows.map((row) => {
+                const open = selectedId === row.id;
+                const isChecked = Boolean(checked[row.id]);
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={open || isChecked ? styles.rowSelected : undefined}
+                      onClick={() => setSelectedId(open ? null : row.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className={styles.checkCol}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheck(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Выбрать ${row.number || row.id}`}
+                        />
+                      </td>
+                      <td>{fmtDate(row.documentDate)}</td>
+                      <td>{row.number || '—'}</td>
+                      <td>{typeLabel(row.type)}</td>
+                      <td className={styles.empName}>{empFull(row.employee)}</td>
+                      <td>
+                        {row.status === 'posted' ? (
+                          <span className={styles.postedYes}>Да</span>
+                        ) : (
+                          <span className={styles.postedNo}>
+                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                          </span>
+                        )}
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.actionsRow}>
+                        <td colSpan={COL_COUNT}>
+                          <div className={styles.rowActions}>
+                            <Link href={docViewHref(row)}>
+                              <i className="fas fa-eye" aria-hidden />
+                              Просмотреть
+                            </Link>
+                            {row.status === 'draft' ? (
+                              <Link href={`${docViewHref(row)}?mode=edit`}>
+                                <i className="fas fa-pen" aria-hidden />
+                                Изменить
+                              </Link>
+                            ) : null}
+                            {row.status === 'draft' ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runAction(row, 'post')}
+                              >
+                                <i className="fas fa-check" aria-hidden />
+                                Провести
+                              </button>
+                            ) : null}
+                            {row.status === 'posted' ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void runAction(row, 'unpost')}
+                              >
+                                <i className="fas fa-undo" aria-hidden />
+                                Отменить проведение
+                              </button>
+                            ) : null}
+                            {row.status !== 'cancelled' ? (
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => setCancelTarget(row)}
+                              >
+                                <i className="fas fa-ban" aria-hidden />
+                                Отменить
+                              </button>
+                            ) : null}
+                            <Link href={`${docViewHref(row)}?side=history`}>
+                              <i className="fas fa-history" aria-hidden />
+                              История изменений
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.footer}>
+          <p>
+            Показано{' '}
+            <strong>
+              {rangeFrom}–{rangeTo}
+            </strong>{' '}
+            из <strong>{total}</strong>
+          </p>
+          <div className={styles.footerPager}>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Предыдущая страница"
+            >
+              ‹
+            </button>
+            <span className={styles.countBadge}>
+              {page}/{totalPages}
+            </span>
+            <button
+              type="button"
+              className={styles.pagerBtn}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Следующая страница"
+            >
+              ›
+            </button>
+            <select
+              aria-label="Размер страницы"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className={styles.pageSize}
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {cancelTarget ? (
@@ -741,7 +987,7 @@ function HrDocumentsPageInner() {
                 type="button"
                 className={styles.modalYes}
                 disabled={busy}
-                onClick={() => runAction(cancelTarget, 'cancel')}
+                onClick={() => void runAction(cancelTarget, 'cancel')}
               >
                 Да
               </button>

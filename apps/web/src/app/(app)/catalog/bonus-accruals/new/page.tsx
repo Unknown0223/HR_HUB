@@ -1,12 +1,23 @@
 'use client';
 
-import { Suspense } from 'react';
-import { BonusAccrualForm } from '../BonusAccrualForm';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function NewBonusAccrualPage() {
+function RedirectInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const kind = searchParams.get('kind') === 'kpi' ? 'kpi' : 'fact';
+    router.replace(`/catalog/bonus-accruals?create=1&kind=${kind}`);
+  }, [router, searchParams]);
+  return null;
+}
+
+/** Legacy /new → list with create modal */
+export default function NewBonusAccrualRedirect() {
   return (
-    <Suspense fallback={<p>Загрузка…</p>}>
-      <BonusAccrualForm />
+    <Suspense fallback={null}>
+      <RedirectInner />
     </Suspense>
   );
 }

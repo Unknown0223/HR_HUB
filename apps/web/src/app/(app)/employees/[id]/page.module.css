@@ -222,7 +222,7 @@
 
 .menuGear:hover {
   background: var(--surface-muted);
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .nameRow {
@@ -349,7 +349,7 @@
 .roleLine {
   margin: 0.3rem 0 0.55rem;
   text-align: center;
-  color: #1bc5bd;
+  color: #0a85e2;
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.35;
@@ -360,7 +360,7 @@
   margin: 0 auto 0.95rem;
   padding: 0.22rem 0.85rem;
   border-radius: 999px;
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
   font-size: 0.72rem;
   font-weight: 600;
@@ -382,7 +382,7 @@
 }
 
 .sideIcon {
-  color: #3699ff;
+  color: #0a85e2;
   width: 26px;
   height: 26px;
   display: inline-flex;
@@ -422,7 +422,7 @@
 
 .sideLink {
   display: block;
-  color: #3699ff;
+  color: #0a85e2;
   cursor: pointer;
   text-decoration: none;
   background: none;
@@ -503,14 +503,14 @@
 
 .tabActive,
 .moreBtnActive {
-  color: #3699ff;
-  border-bottom-color: #3699ff;
+  color: #0a85e2;
+  border-bottom-color: #0a85e2;
   font-weight: 600;
 }
 
 .tabActive .tabIcon {
   opacity: 1;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .moreWrap {
@@ -615,7 +615,7 @@
 
 .btn {
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
 }
 
@@ -763,7 +763,7 @@ button.calCell {
 }
 
 .calCellToday {
-  box-shadow: inset 0 0 0 1px #3699ff;
+  box-shadow: inset 0 0 0 1px #0a85e2;
 }
 
 .calDayNum {
@@ -776,7 +776,7 @@ button.calCell {
 }
 
 .calDayNumToday {
-  color: #3699ff;
+  color: #0a85e2;
   font-weight: 700;
 }
 
@@ -913,7 +913,7 @@ button.calCell {
   padding: 0.2rem 0.55rem;
   border-radius: 4px;
   background: #e1f0ff;
-  color: #3699ff;
+  color: #0a85e2;
   font-size: 0.68rem;
   font-weight: 600;
 }
@@ -1134,7 +1134,7 @@ button.calCell {
 }
 
 .historyDotEdit {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .statsBox {
@@ -1199,10 +1199,10 @@ button.calCell {
   background: var(--ok);
 }
 .statsSegLate {
-  background: #94a3b8;
+  background: #8ca0b8;
 }
 .statsSegEarly {
-  background: #64748b;
+  background: #64788f;
 }
 .statsSegAbsent {
   background: #cbd5e1;
@@ -1241,10 +1241,10 @@ button.calCell {
   background: var(--ok);
 }
 .dotLate {
-  background: #94a3b8;
+  background: #8ca0b8;
 }
 .dotEarly {
-  background: #64748b;
+  background: #64788f;
 }
 .dotAbsent {
   background: #cbd5e1;
@@ -1414,8 +1414,8 @@ button.calCell {
 }
 
 .dayMarksChipActive {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
   color: #fff;
 }
 
@@ -1512,7 +1512,7 @@ button.calCell {
 
 .dayKindWork {
   background: #e8f3ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .dayKindOff {
@@ -1548,8 +1548,8 @@ button.calCell {
 }
 
 .dayModalTabActive {
-  color: #3699ff;
-  border-bottom-color: #3699ff;
+  color: #0a85e2;
+  border-bottom-color: #0a85e2;
 }
 
 .dayWarn {
@@ -1634,7 +1634,7 @@ button.calCell {
 .modalField textarea:focus,
 .modalField select:focus {
   outline: none;
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .modalField textarea {
@@ -1683,7 +1683,7 @@ button.calCell {
 }
 
 .toggleOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .toggle::after {
@@ -1753,7 +1753,7 @@ button.calCell {
 }
 
 .fileDropPanelActive {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   background: #eef6ff;
 }
 
@@ -1786,7 +1786,7 @@ button.calCell {
 .btnCreate {
   appearance: none;
   border: none;
-  background: #1bc5bd;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.82rem;
@@ -1833,8 +1833,8 @@ button.calCell {
 
 .invIconBtn:hover,
 .invIconBtnActive {
-  border-color: #3699ff;
-  color: #3699ff;
+  border-color: #0a85e2;
+  color: #0a85e2;
   background: #eef6ff;
 }
 
@@ -1953,7 +1953,7 @@ button.calCell {
 }
 
 .fpFieldBtn:hover {
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .fpEditIcon {
@@ -2008,18 +2008,18 @@ button.calCell {
 }
 
 .fpFinger:hover {
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .fpFingerActive {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.15);
 }
 
 .fpFingerDone {
   background: #e8fff3;
-  color: #1bc5bd;
-  border-color: #1bc5bd;
+  color: #0a85e2;
+  border-color: #0a85e2;
 }
 
 .fpFingerIcon {
@@ -2075,8 +2075,8 @@ button.calCell {
 }
 
 .fpStepActive {
-  background: #3699ff;
-  border-color: #3699ff;
+  background: #0a85e2;
+  border-color: #0a85e2;
   color: #fff;
 }
 
@@ -2089,7 +2089,7 @@ button.calCell {
 }
 
 .fpDriverLink {
-  color: #3699ff;
+  color: #0a85e2;
   font-size: 0.84rem;
   font-weight: 600;
   text-decoration: none;
@@ -2290,7 +2290,7 @@ button.calCell {
 
 .usCheck input {
   margin-top: 0.15rem;
-  accent-color: #3699ff;
+  accent-color: #0a85e2;
 }
 
 .errorText {
@@ -2333,7 +2333,7 @@ button.calCell {
 
 .tabSettingsBtn:hover {
   background: #f3f6f9;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .tabSettingsMenu {
@@ -2366,7 +2366,7 @@ button.calCell {
 
 .tabSettingsItem:hover {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .tabArrangeList {
@@ -2403,7 +2403,7 @@ button.calCell {
 
 .tabArrangeBadge {
   font-size: 0.72rem;
-  color: #3699ff;
+  color: #0a85e2;
   background: #eef6ff;
   padding: 0.2rem 0.45rem;
   border-radius: 4px;
@@ -2461,10 +2461,10 @@ button.calCell {
   align-items: center;
   gap: 0.35rem;
   padding: 0.45rem 0.85rem;
-  border: 1px solid #3699ff;
+  border: 1px solid #0a85e2;
   border-radius: 6px;
   background: #fff;
-  color: #3699ff;
+  color: #0a85e2;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -2518,7 +2518,7 @@ button.calCell {
 
 .docTypeOption:hover {
   background: #eef6ff;
-  color: #3699ff;
+  color: #0a85e2;
 }
 
 .docModalFields {
@@ -2531,7 +2531,7 @@ button.calCell {
   appearance: none;
   border: none;
   background: transparent;
-  color: #3699ff;
+  color: #0a85e2;
   font: inherit;
   font-size: 0.84rem;
   font-weight: 600;
@@ -2603,9 +2603,9 @@ button.calCell {
 
 .btnAdd {
   appearance: none;
-  border: 1px solid #1bc5bd;
+  border: 1px solid #0a85e2;
   background: #fff;
-  color: #1bc5bd;
+  color: #0a85e2;
   border-radius: 6px;
   font: inherit;
   font-size: 0.8rem;
@@ -2680,7 +2680,7 @@ button.calCell {
 }
 
 .tableLink {
-  color: #3699ff;
+  color: #0a85e2;
   text-decoration: none;
   font-weight: 500;
   background: none;
@@ -3612,9 +3612,9 @@ button.calCell {
 
 .marksAddBtn {
   appearance: none;
-  border: 1px solid #1bc5bd;
+  border: 1px solid #0a85e2;
   background: #fff;
-  color: #1bc5bd;
+  color: #0a85e2;
   border-radius: 4px;
   font: inherit;
   font-size: 0.8125rem;
@@ -3645,7 +3645,7 @@ button.calCell {
 }
 
 .markDotIn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .markDotOut {
@@ -3690,7 +3690,7 @@ button.calCell {
 .markSaveBtn {
   appearance: none;
   border: none;
-  background: #3699ff;
+  background: #0a85e2;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -3773,7 +3773,7 @@ button.calCell {
 
 .markInput:focus,
 .markTextarea:focus {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
 }
 
@@ -3880,7 +3880,7 @@ button.calCell {
 }
 
 .markRadio input:checked + .markRadioDot {
-  border-color: #3699ff;
+  border-color: #0a85e2;
 }
 
 .markRadio input:checked + .markRadioDot::after {
@@ -3888,7 +3888,7 @@ button.calCell {
   position: absolute;
   inset: 3px;
   border-radius: 50%;
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .markDrop {
@@ -3908,7 +3908,7 @@ button.calCell {
 }
 
 .markDrop:hover {
-  border-color: #3699ff;
+  border-color: #0a85e2;
   color: #7e8299;
   background: #f8fbff;
 }
@@ -3948,7 +3948,7 @@ button.calCell {
 }
 
 .markSwitchOn {
-  background: #3699ff;
+  background: #0a85e2;
 }
 
 .markSwitchKnob {

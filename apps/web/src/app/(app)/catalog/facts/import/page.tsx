@@ -2,9 +2,10 @@
 
 import { Suspense, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageSubnav } from '@/components/PageSubnav';
 import { apiDownload, apiFetch } from '@/lib/api';
 import { mapMatrixToObjects, parseXlsxFile } from '@/lib/parse-xlsx';
-import styles from '../../../attendance/marks/import/page.module.css';
+import styles from './import.module.css';
 import shared from '../../../../page-shared.module.css';
 
 type PreviewRow = {
@@ -66,15 +67,8 @@ function FactsImportInner() {
     setErrors([]);
     try {
       const { rows } = await parseXlsxFile(f, ['Факты', 'Facts', 'facts']);
-      // detect header row with person_name
       let startRow = 2;
       const header = (rows[0] || []).map((c) => c.toLowerCase());
-      if (
-        header.some((h) => h.includes('person') || h.includes('сотрудник'))
-      ) {
-        startRow = 2;
-      }
-      // map by header if present
       let map = { ...DEFAULT_MAP };
       if (header.length) {
         const findCol = (...names: string[]) => {
@@ -141,20 +135,31 @@ function FactsImportInner() {
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.topBar}>
-        <h1>Импорт фактов</h1>
-        <div className={styles.actions}>
+      <PageSubnav groupKey="facts" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
+          <i className="fas fa-file-import" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Импорт фактов</h1>
+          <p className={shared.pageSubtitle}>
+            Загрузка фактов из Excel-шаблона
+          </p>
+        </div>
+        <div className={shared.pageHeaderActions}>
           <button
             type="button"
-            className={styles.btnBlue}
+            className={styles.btnPrimary}
             disabled={!preview.length || busy}
             onClick={() => void runImport()}
           >
+            <i className="fas fa-upload" aria-hidden />
             Импорт
           </button>
           <button
             type="button"
-            className={styles.btnBlue}
+            className={styles.btnGhost}
             onClick={() =>
               void apiDownload(
                 '/api/catalog/facts/import/template.xlsx',
@@ -162,6 +167,7 @@ function FactsImportInner() {
               )
             }
           >
+            <i className="fas fa-download" aria-hidden />
             Шаблон
           </button>
           <button
@@ -191,7 +197,7 @@ function FactsImportInner() {
             }}
           />
           <div
-            className={styles.drop}
+            className={`${styles.drop} ${drag ? styles.dropActive : ''}`}
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
@@ -204,7 +210,6 @@ function FactsImportInner() {
               const f = e.dataTransfer.files?.[0];
               if (f) void onFile(f);
             }}
-            style={drag ? { borderColor: '#3699ff', background: '#f3f9ff' } : undefined}
           >
             {file ? (
               <strong>{file.name}</strong>
@@ -300,13 +305,7 @@ function FactsImportInner() {
 
 export default function FactsImportPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={shared.page}>
-          <p>Загрузка…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <FactsImportInner />
     </Suspense>
   );

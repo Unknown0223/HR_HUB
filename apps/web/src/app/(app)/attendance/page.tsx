@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FilterPanel, type FilterFieldDef } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { StatusBadge } from '@/components/StatusBadge';
-import { apiFetch, PageResult } from '@/lib/api';
+import { apiFetch, getSession, PageResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { useUrlParam } from '@/lib/use-url-state';
 import styles from '../../page-shared.module.css';
@@ -43,6 +43,47 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'approved', label: 'Утверждён' },
   { value: 'rejected', label: 'Отклонён' },
 ];
+
+const REQUEST_TYPE_OPTIONS = [
+  { value: 'hr_change', label: 'Кадровые' },
+  { value: 'schedule_change', label: 'График' },
+  { value: 'roster_change', label: 'Расписание' },
+  { value: 'overtime', label: 'Сверхурочные' },
+  { value: 'location', label: 'Локация' },
+  { value: 'absence', label: 'Отсутствие' },
+] as const;
+
+const REQUEST_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  REQUEST_TYPE_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+const VISIBILITY_LABELS: Record<string, string> = {
+  shared: 'Общие',
+  personal: 'Личные',
+  inbox: 'Входящие',
+  mine: 'Мои',
+};
+
+const DIRECTION_LABELS: Record<string, string> = {
+  IN: 'Вход',
+  OUT: 'Выход',
+  AUTO: 'Авто',
+};
+
+function requestTypeLabel(type: unknown): string {
+  const key = String(type ?? '');
+  return REQUEST_TYPE_LABELS[key] || key || '—';
+}
+
+function visibilityLabel(v: unknown): string {
+  const key = String(v ?? 'shared');
+  return VISIBILITY_LABELS[key] || key;
+}
+
+function directionLabel(d: unknown): string {
+  const key = String(d ?? '');
+  return DIRECTION_LABELS[key] || key || '—';
+}
 
 function rowMatchesSearch(row: Record<string, unknown>, q: string): boolean {
   const needle = q.trim().toLowerCase();
@@ -328,7 +369,7 @@ export default function AttendancePage() {
         if (lat) lat.value = String(pos.coords.latitude);
         if (lon) lon.value = String(pos.coords.longitude);
       },
-      () => setError('GPS ruxsat berilmadi'),
+      () => setError('Доступ к GPS запрещён'),
     );
   }
 
@@ -477,7 +518,7 @@ export default function AttendancePage() {
   }
 
   async function ingestDemoPunch() {
-    const session = JSON.parse(localStorage.getItem('hrhub_session') || '{}');
+    const session = getSession();
     const tenantId = session?.tenant?.id;
     if (!tenantId) {
       setError('Tenant не найден — войдите снова');
@@ -606,12 +647,7 @@ export default function AttendancePage() {
           {(
             [
               ['', 'Все типы'],
-              ['hr_change', 'Кадровые'],
-              ['schedule_change', 'График'],
-              ['roster_change', 'Расписание'],
-              ['overtime', 'Сверхурочные'],
-              ['location', 'Локация'],
-              ['absence', 'Отсутствие'],
+              ...REQUEST_TYPE_OPTIONS.map((o) => [o.value, o.label] as const),
             ] as const
           ).map(([k, label]) => (
             <button
@@ -953,9 +989,9 @@ export default function AttendancePage() {
               <label>
                 Направление
                 <select name="direction" defaultValue="IN">
-                  <option value="IN">IN</option>
-                  <option value="OUT">OUT</option>
-                  <option value="AUTO">AUTO</option>
+                  <option value="IN">Вход</option>
+                  <option value="OUT">Выход</option>
+                  <option value="AUTO">Авто</option>
                 </select>
               </label>
               <button className={styles.btn} type="submit">
@@ -1032,8 +1068,8 @@ export default function AttendancePage() {
               <label>
                 Направление
                 <select name="direction" defaultValue="IN">
-                  <option value="IN">IN</option>
-                  <option value="OUT">OUT</option>
+                  <option value="IN">Вход</option>
+                  <option value="OUT">Выход</option>
                 </select>
               </label>
               <button className={styles.btn} type="submit">
@@ -1067,12 +1103,11 @@ export default function AttendancePage() {
             <label>
               Тип
               <select name="type" defaultValue={reqType || 'hr_change'} key={reqType || 'hr_change'}>
-                <option value="absence">absence</option>
-                <option value="overtime">overtime</option>
-                <option value="schedule_change">schedule_change</option>
-                <option value="roster_change">roster_change</option>
-                <option value="location">location</option>
-                <option value="hr_change">hr_change</option>
+                {REQUEST_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -1203,7 +1238,7 @@ export default function AttendancePage() {
                     <td>
                       {emp ? `${emp.lastName} ${emp.firstName}` : String(r.employeeExternalId ?? '—')}
                     </td>
-                    <td>{String(r.direction)}</td>
+                    <td>{directionLabel(r.direction)}</td>
                     <td>{String(r.source)}</td>
                     <td>{device?.name ?? '—'}</td>
                   </tr>
@@ -1295,7 +1330,7 @@ export default function AttendancePage() {
                     <td>{loc?.name ?? '—'}</td>
                     <td>
                       <span className={r.isActive ? styles.badgeOk : styles.badge}>
-                        {r.isActive ? 'active' : 'off'}
+                        {r.isActive ? 'Активный' : 'Выкл'}
                       </span>
                     </td>
                     <td>
@@ -1329,8 +1364,8 @@ export default function AttendancePage() {
                 return (
                   <tr key={id}>
                     <td>{String(r.title)}</td>
-                    <td>{String(r.type)}</td>
-                    <td>{String(r.visibility ?? 'shared')}</td>
+                    <td>{requestTypeLabel(r.type)}</td>
+                    <td>{visibilityLabel(r.visibility)}</td>
                     <td>{emp ? `${emp.lastName} ${emp.firstName}` : '—'}</td>
                     <td>
                       <StatusBadge status={String(r.status)} />
@@ -1339,10 +1374,10 @@ export default function AttendancePage() {
                       {r.status === 'pending' ? (
                         <span className={styles.rowActions}>
                           <button type="button" className={styles.btnSecondary} onClick={() => review(id, 'approved')}>
-                            OK
+                            Утвердить
                           </button>
                           <button type="button" className={styles.btnGhost} onClick={() => review(id, 'rejected')}>
-                            Rad
+                            Отклонить
                           </button>
                           <button type="button" className={styles.btnGhost} onClick={() => cancelRequest(id)}>
                             Отмена
@@ -1379,14 +1414,14 @@ export default function AttendancePage() {
                             className={styles.btnSecondary}
                             onClick={() => reviewAbsence(id, 'approved')}
                           >
-                            OK
+                            Утвердить
                           </button>
                           <button
                             type="button"
                             className={styles.btnGhost}
                             onClick={() => reviewAbsence(id, 'rejected')}
                           >
-                            Rad
+                            Отклонить
                           </button>
                         </span>
                       ) : null}

@@ -4,6 +4,8 @@ import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FormModal } from '@/components/FormModal';
+import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { SearchLookup } from '@/app/(app)/catalog/avg-salaries/SearchLookup';
 import { apiFetch } from '@/lib/api';
@@ -20,6 +22,7 @@ import formStyles from '../../catalog/report-templates/form.module.css';
 import local from '../../catalog/document-types/page.module.css';
 import extra from '../../catalog/cashboxes/page.module.css';
 import ui from './page.module.css';
+import shared from '../../../page-shared.module.css';
 
 type Dict = { id: string; code: string; name: string; items?: OrgItem[] };
 type Opt = { id: string; label: string };
@@ -351,7 +354,7 @@ function OrganizationsInner() {
     return <div className={local.readonly}>{value || '—'}</div>;
   }
 
-  if (mode !== 'list') {
+  if (mode === 'view') {
     return (
       <div className={styles.wrap}>
         <PageSubnav group={{ title, siblings: [] }} />
@@ -536,21 +539,41 @@ function OrganizationsInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav group={{ title: 'Организации', siblings: [] }} />
+      <PageSubnav groupKey="settings-admin" />
+
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
+          <i className="fas fa-building" aria-hidden />
+        </div>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Организации</h1>
+          <p className={shared.pageSubtitle}>
+            Организации тенанта и реквизиты
+          </p>
+        </div>
+      </div>
+
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.toolbar}>
         <div className={styles.leftActions}>
           <button type="button" className={styles.createBtn} onClick={openCreate}>
+            <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          <button
-            type="button"
-            className={styles.toolBtn}
-            onClick={() => void load()}
-            aria-label="Обновить"
-          >
-            ↻
-          </button>
+          <FilterPanel
+            inline
+            urlSync
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            fields={[
+              { type: 'text', key: 'inn', label: 'ИНН', placeholder: 'Поиск...' },
+              { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+              { type: 'text', key: 'phone', label: 'Телефон', placeholder: 'Поиск...' },
+              { type: 'text', key: 'email', label: 'Email', placeholder: 'Поиск...' },
+              { type: 'isActive', key: 'isActive', label: 'Статус' },
+            ]}
+          />
           {selected.size > 0 ? (
             <>
               <div className={extra.statusWrap}>
@@ -560,6 +583,7 @@ function OrganizationsInner() {
                   disabled={busy}
                   onClick={() => setStatusOpen((v) => !v)}
                 >
+                  <i className="fas fa-toggle-on" aria-hidden />
                   Изменить статус
                 </button>
                 {statusOpen ? (
@@ -585,6 +609,7 @@ function OrganizationsInner() {
                 disabled={busy}
                 onClick={() => void deleteIds(Array.from(selected))}
               >
+                <i className="fas fa-trash-alt" aria-hidden />
                 Удалить {selected.size}
               </button>
             </>
@@ -599,20 +624,7 @@ function OrganizationsInner() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') applySearch();
             }}
-          />
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'inn', label: 'ИНН', placeholder: 'Поиск...' },
-              { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
-              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
-              { type: 'text', key: 'phone', label: 'Телефон', placeholder: 'Поиск...' },
-              { type: 'text', key: 'email', label: 'Email', placeholder: 'Поиск...' },
-              { type: 'isActive', key: 'isActive', label: 'Статус' },
-            ]}
+            aria-label="Поиск"
           />
           <button
             type="button"
@@ -633,7 +645,9 @@ function OrganizationsInner() {
                 }),
               )
             }
+            title="Экспорт Excel"
           >
+            <i className="fas fa-file-excel" aria-hidden />
             Excel
           </button>
           <span className={styles.pagerMeta}>
@@ -644,6 +658,7 @@ function OrganizationsInner() {
             className={styles.toolBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
           >
             ‹
           </button>
@@ -653,6 +668,7 @@ function OrganizationsInner() {
             className={styles.toolBtn}
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
+            aria-label="Следующая страница"
           >
             ›
           </button>
@@ -660,9 +676,11 @@ function OrganizationsInner() {
             type="button"
             className={styles.toolBtn}
             onClick={() => void load()}
+            title="Обновить"
             aria-label="Обновить"
           >
-            ↻
+            <i className="fas fa-sync-alt" aria-hidden />
+            Обновить
           </button>
         </div>
       </div>
@@ -783,6 +801,143 @@ function OrganizationsInner() {
           </tbody>
         </table>
       </div>
+
+      <FormModal
+        open={mode === 'create' || mode === 'edit'}
+        title={
+          mode === 'edit' ? 'Организация (изменение)' : 'Организация (создание)'
+        }
+        width="lg"
+        onClose={() => {
+          setMode('list');
+          setError('');
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className={modal.btnPrimary}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              className={modal.btnGhost}
+              onClick={() => {
+                setMode('list');
+                setError('');
+              }}
+            >
+              Закрыть
+            </button>
+          </>
+        }
+      >
+        {error ? <p className={modal.error}>{error}</p> : null}
+        <div className={modal.row2}>
+          <div className={modal.field}>
+            <label>
+              Название <span className={modal.req}>*</span>
+            </label>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>
+              Юридическое лицо <span className={modal.req}>*</span>
+            </label>
+            <SearchLookup
+              value={legalEntityId}
+              options={legalEntities}
+              onChange={setLegalEntityId}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>
+              Базовая валюта <span className={modal.req}>*</span>
+            </label>
+            <SearchLookup
+              value={currencyId}
+              options={currencies}
+              onChange={setCurrencyId}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>Альтернативное название</label>
+            <input value={altName} onChange={(e) => setAltName(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>Часовой пояс</label>
+            <SearchLookup
+              value={timezone}
+              options={TZ_OPTS}
+              allowClear
+              onChange={setTimezone}
+            />
+          </div>
+          <div className={modal.field}>
+            <label>НДС</label>
+            <label className={formStyles.toggleRow}>
+              <button
+                type="button"
+                className={`${formStyles.toggle} ${vatPayer ? formStyles.toggleOn : ''}`}
+                onClick={() => setVatPayer((v) => !v)}
+                aria-pressed={vatPayer}
+              />
+              <span>
+                {vatPayer
+                  ? 'Является плательщиком НДС'
+                  : 'Не является плательщиком НДС'}
+              </span>
+            </label>
+            {vatPayer ? (
+              <div className={modal.field} style={{ marginTop: '0.5rem' }}>
+                <label>
+                  Ставка НДС (%) <span className={modal.req}>*</span>
+                </label>
+                <input
+                  value={vatRate}
+                  inputMode="decimal"
+                  onChange={(e) => setVatRate(e.target.value)}
+                />
+              </div>
+            ) : null}
+          </div>
+          <div className={modal.field}>
+            <label>Порядковый номер</label>
+            <input value={seq} onChange={(e) => setSeq(e.target.value)} />
+          </div>
+          <div className={modal.field}>
+            <label>Акциз</label>
+            <label className={formStyles.toggleRow}>
+              <button
+                type="button"
+                className={`${formStyles.toggle} ${excisePayer ? formStyles.toggleOn : ''}`}
+                onClick={() => setExcisePayer((v) => !v)}
+                aria-pressed={excisePayer}
+              />
+              <span>
+                {excisePayer
+                  ? 'Является плательщиком акцизов'
+                  : 'Не является плательщиком акцизов'}
+              </span>
+            </label>
+          </div>
+          <div className={modal.field}>
+            <span>Статус</span>
+            <label className={formStyles.toggleRow}>
+              <button
+                type="button"
+                className={`${formStyles.toggle} ${active ? formStyles.toggleOn : ''}`}
+                onClick={() => setActive((v) => !v)}
+                aria-pressed={active}
+              />
+              <span>{active ? 'Активный' : 'Неактивный'}</span>
+            </label>
+          </div>
+        </div>
+      </FormModal>
     </div>
   );
 }

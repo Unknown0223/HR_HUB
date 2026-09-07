@@ -6,7 +6,8 @@ import { pickSearchText, toPickItem, type EmployeePickItem } from '@/components/
 import pick from '@/components/employee-pick.module.css';
 import { apiFetch } from '@/lib/api';
 import { downloadSectionedXlsx } from '@/lib/xlsx-download';
-import layout from '../staffing/page.module.css';
+import shared from '../../../../page-shared.module.css';
+import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
 import treeS from '../dismissals-by-reason/page.module.css';
 import s from './page.module.css';
@@ -909,17 +910,17 @@ export default function MovementStaffReportPage() {
     w.document.getElementById('btnExcel')?.addEventListener('click', () => void exportExcel(data));
   }
 
-  const exportBtns = (ghost = false) => (
-    <div className={ghost ? layout.exportBtns : s.exportRow}>
-      <button type="button" className={ghost ? s.viewExport : s.exportBtn} disabled={busy} onClick={() => void openHtml()}>
+  const exportBtns = (
+    <>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void openHtml()}>
         HTML
       </button>
-      <button type="button" className={ghost ? s.viewExport : s.exportBtn} disabled={busy} onClick={() => void exportExcel()}>
+      <button type="button" className={arena.exportBtn} disabled={busy} onClick={() => void exportExcel()}>
         Excel
       </button>
       <button
         type="button"
-        className={ghost ? s.viewExport : s.exportBtn}
+        className={arena.exportBtn}
         disabled={busy}
         onClick={() => void ensureReport().then((d) => d && exportCsv(d))}
       >
@@ -927,13 +928,13 @@ export default function MovementStaffReportPage() {
       </button>
       <button
         type="button"
-        className={ghost ? s.viewExport : s.exportBtn}
+        className={arena.exportBtn}
         disabled={busy}
         onClick={() => void ensureReport().then((d) => d && exportXml(d))}
       >
         XML
       </button>
-    </div>
+    </>
   );
 
   function toggleKind(k: Kind) {
@@ -944,36 +945,59 @@ export default function MovementStaffReportPage() {
   }
 
   return (
-    <div className={s.wrap}>
-      <h1 className={s.title}>Отчет по движению сотрудников (штаты)</h1>
-      <div className={s.toolbar}>
-        <button type="button" className={tab === 'filter' ? s.tabOn : s.tab} onClick={() => setTab('filter')}>
-          Фильтр
-        </button>
-        <button
-          type="button"
-          className={tab === 'view' ? s.tabOn : s.tab}
-          onClick={() => {
-            setTab('view');
-            if (!report) void generate();
-          }}
-        >
-          Просмотреть
-        </button>
+    <div className={arena.page}>
+      <div className={arena.toolbar}>
+        <div className={arena.tabsTrack}>
+          <button
+            type="button"
+            className={tab === 'filter' ? arena.tabOn : arena.tab}
+            onClick={() => setTab('filter')}
+          >
+            Фильтр
+          </button>
+          <button
+            type="button"
+            className={tab === 'view' ? arena.tabOn : arena.tab}
+            onClick={() => {
+              setTab('view');
+              if (!report || loadedQs !== queryQs) void load();
+            }}
+          >
+            Просмотр
+          </button>
+        </div>
         {tab === 'view' ? (
           <>
-            <button type="button" className={s.refresh} disabled={busy} aria-label="Обновить" onClick={() => void load()}>
+            <button
+              type="button"
+              className={arena.iconBtn}
+              disabled={busy}
+              aria-label="Обновить"
+              onClick={() => void load()}
+            >
               <i className="fas fa-sync-alt" aria-hidden />
             </button>
-            {exportBtns(true)}
+            <div className={arena.exportBtns}>{exportBtns}</div>
           </>
         ) : null}
       </div>
-      {error ? <p className={layout.error}>{error}</p> : null}
+
+      <div className={shared.pageHeader}>
+        <span className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`} aria-hidden>
+          <i className="fas fa-people-arrows" />
+        </span>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Отчет по движению сотрудников (штаты)</h1>
+          <p className={shared.pageSubtitle}>
+            Приёмы, увольнения, перемещения и повторные приёмы за период
+          </p>
+        </div>
+      </div>
+      {error ? <p className={arena.error}>{error}</p> : null}
 
       {tab === 'filter' ? (
-        <form className={s.filterCard} onSubmit={(e) => void generate(e)}>
-          <div className={layout.field}>
+        <form className={arena.settingsCard} onSubmit={(e) => void generate(e)}>
+          <div className={arena.field}>
             <label>Период</label>
             <PeriodRangePicker
               from={from}
@@ -984,93 +1008,119 @@ export default function MovementStaffReportPage() {
               }}
             />
           </div>
-          <div className={s.checks}>
-            {ALL_KINDS.map((k) => (
-              <label key={k} className={s.check}>
-                <input type="checkbox" checked={kinds.has(k)} onChange={() => toggleKind(k)} />
-                <span className={s.checkBody}>
-                  <span className={s.checkTitle}>{KIND_META[k].label}</span>
-                  <span className={s.hint}>{KIND_META[k].hint}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-          <div className={s.fields}>
-            <div className={layout.field}>
-              <label>Группа подразделений</label>
-              <div className={s.lookup}>
-                <SearchLookup
-                  value={divisionGroupId}
-                  options={divisionGroups}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setDivisionGroupId}
-                />
-              </div>
-            </div>
-            <div className={layout.field}>
-              <label>Группа позиций</label>
-              <div className={s.lookup}>
-                <SearchLookup
-                  value={positionGroupId}
-                  options={positionGroups}
-                  placeholder="Поиск..."
-                  allowClear
-                  onChange={setPositionGroupId}
-                />
-              </div>
-            </div>
-            <div className={layout.field}>
-              <label>Подразделения</label>
-              <DivisionTree nodes={tree} selected={selectedDiv} onChange={setSelectedDiv} />
-            </div>
-            <div className={layout.field}>
-              <label>Должности</label>
-              <div className={s.lookup}>
-                <CheckLookup
-                  options={positions}
-                  selected={selectedPos}
-                  onChange={setSelectedPos}
-                  searchText={(o) => o.label.toLowerCase()}
-                  renderRow={(o) => <span>{o.label}</span>}
-                />
-              </div>
-            </div>
-            <div className={`${layout.field} ${s.span2}`}>
-              <label>Сотрудники</label>
-              <div className={s.lookup}>
-                <CheckLookup
-                  options={employees}
-                  selected={selectedEmp}
-                  onChange={setSelectedEmp}
-                  searchText={(o) => pickSearchText(o)}
-                  columns={['Табельный номер', 'Сотрудник', 'Вид занятости']}
-                  renderRow={(o) => (
-                    <>
-                      <span className={pick.dropTab}>{o.tabNumber || '—'}</span>
-                      <span className={pick.dropName}>{o.name}</span>
-                      <span>{empTypeLabel(o.employmentType)}</span>
-                    </>
-                  )}
-                />
-              </div>
+          <div className={`${arena.field} ${s.checksWide}`}>
+            <label>Виды движения</label>
+            <div className={s.checks}>
+              {ALL_KINDS.map((k) => (
+                <label key={k} className={s.check}>
+                  <input type="checkbox" checked={kinds.has(k)} onChange={() => toggleKind(k)} />
+                  <span className={s.checkBody}>
+                    <span className={s.checkTitle}>{KIND_META[k].label}</span>
+                    <span className={s.hint}>{KIND_META[k].hint}</span>
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
-          <div className={s.actions}>
-            <button type="submit" className={layout.primary} disabled={busy}>
+          <div className={arena.field}>
+            <label>Группа подразделений</label>
+            <div className={s.lookup}>
+              <SearchLookup
+                value={divisionGroupId}
+                options={divisionGroups}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setDivisionGroupId}
+              />
+            </div>
+          </div>
+          <div className={arena.field}>
+            <label>Группа позиций</label>
+            <div className={s.lookup}>
+              <SearchLookup
+                value={positionGroupId}
+                options={positionGroups}
+                placeholder="Поиск..."
+                allowClear
+                onChange={setPositionGroupId}
+              />
+            </div>
+          </div>
+          <div className={arena.field}>
+            <label>Подразделения</label>
+            <DivisionTree nodes={tree} selected={selectedDiv} onChange={setSelectedDiv} />
+          </div>
+          <div className={arena.field}>
+            <label>Должности</label>
+            <div className={s.lookup}>
+              <CheckLookup
+                options={positions}
+                selected={selectedPos}
+                onChange={setSelectedPos}
+                searchText={(o) => o.label.toLowerCase()}
+                renderRow={(o) => <span>{o.label}</span>}
+              />
+            </div>
+          </div>
+          <div className={`${arena.field} ${s.span2}`}>
+            <label>Сотрудники</label>
+            <div className={s.lookup}>
+              <CheckLookup
+                options={employees}
+                selected={selectedEmp}
+                onChange={setSelectedEmp}
+                searchText={(o) => pickSearchText(o)}
+                columns={['Табельный номер', 'Сотрудник', 'Вид занятости']}
+                renderRow={(o) => (
+                  <>
+                    <span className={pick.dropTab}>{o.tabNumber || '—'}</span>
+                    <span className={pick.dropName}>{o.name}</span>
+                    <span>{empTypeLabel(o.employmentType)}</span>
+                  </>
+                )}
+              />
+            </div>
+          </div>
+          <div className={arena.actions}>
+            <button type="submit" className={arena.primary} disabled={busy}>
               {busy ? 'Формирование…' : 'Составить отчет'}
             </button>
-            {exportBtns(false)}
+            {exportBtns}
           </div>
         </form>
       ) : (
-        <div className={s.view}>
+        <div className={arena.viewCard}>
           {busy && !report ? (
-            <p className={layout.muted}>Загрузка…</p>
+            <p className={arena.muted}>Загрузка…</p>
           ) : !report ? (
-            <p className={layout.muted}>Сначала составьте отчёт на вкладке «Фильтр»</p>
+            <div className={arena.emptyState}>
+              <i className="fas fa-file-alt" aria-hidden />
+              <strong>Отчёт ещё не сформирован</strong>
+              <span>Откройте вкладку «Фильтр» и нажмите «Составить отчет»</span>
+            </div>
           ) : (
             <>
+              <div className={arena.viewMeta}>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-day" aria-hidden />
+                  С: {fmtRu(report.from)}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-calendar-check" aria-hidden />
+                  По: {fmtRu(report.to)}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-users" aria-hidden />
+                  {KPI_LABEL}: {report.headcount.toLocaleString('ru-RU')}
+                </span>
+                <span className={arena.metaPill}>
+                  <i className="fas fa-layer-group" aria-hidden />
+                  Разделов: {report.sections.length}
+                </span>
+                {report.generatedAt ? (
+                  <span className={arena.metaMuted}>Сформирован: {fmtGen(report.generatedAt)}</span>
+                ) : null}
+              </div>
               <div className={s.kpiBox}>
                 <div className={s.kpiHead}>
                   <span>{KPI_LABEL}</span>

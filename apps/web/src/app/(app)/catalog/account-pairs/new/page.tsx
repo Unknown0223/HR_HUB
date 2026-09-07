@@ -1,7 +1,13 @@
 'use client';
 
-import { AccountPairForm } from '../AccountPairForm';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function NewAccountPairPage() {
-  return <AccountPairForm />;
+/** Legacy /new → list with create modal */
+export default function NewAccountPairRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/catalog/account-pairs?create=1');
+  }, [router]);
+  return null;
 }

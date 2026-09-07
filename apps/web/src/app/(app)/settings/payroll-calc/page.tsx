@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { PageSubnav } from '@/components/PageSubnav';
 import styles from './page.module.css';
 
 type TaxBlock = {
@@ -240,15 +241,34 @@ export default function PayrollCalcSettingsPage() {
   }
 
   if (!s) {
-    return <p className={styles.muted}>Загрузка…</p>;
+    return (
+      <>
+        <PageSubnav groupKey="settings-main" />
+        <p className={styles.muted} style={{ margin: '1.25rem 1.5rem' }}>
+          Загрузка…
+        </p>
+      </>
+    );
   }
 
   const p = s.personnel;
 
   return (
-    <div className={styles.page}>
+    <>
+      <PageSubnav groupKey="settings-main" />
+      <div className={styles.page}>
       <div className={styles.topBar}>
-        <h1 className={styles.title}>Расчет зарплаты</h1>
+        <div className={styles.topBarLeft}>
+          <span className={styles.iconBadge} aria-hidden="true">
+            <i className="fas fa-calculator" />
+          </span>
+          <div className={styles.titleBlock}>
+            <h1 className={styles.title}>Расчет зарплаты</h1>
+            <p className={styles.subtitle}>
+              Счета начислений, удержаний и налоговых отчислений
+            </p>
+          </div>
+        </div>
         <button
           type="button"
           className={styles.btnSave}
@@ -345,5 +365,6 @@ export default function PayrollCalcSettingsPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
