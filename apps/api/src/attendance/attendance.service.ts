@@ -2198,8 +2198,13 @@ export class AttendanceService {
 
   async officeLinkLocations(tenantCode: string) {
     const tenant = await this.resolveTenantByCode(tenantCode);
+    return this.officeLinkLocationsForTenant(tenant.id, tenant.code);
+  }
+
+  /** Prefer pairing-session tenant over query tenantCode (config may say demo). */
+  async officeLinkLocationsForTenant(tenantId: string, tenantCode?: string) {
     const rows = await this.prisma.location.findMany({
-      where: { tenantId: tenant.id, isActive: true },
+      where: { tenantId, isActive: true },
       select: {
         id: true,
         code: true,
@@ -2209,7 +2214,15 @@ export class AttendanceService {
       },
       orderBy: { name: 'asc' },
     });
-    return { ok: true, tenantCode: tenant.code, locations: rows };
+    let code = (tenantCode || '').trim();
+    if (!code) {
+      const t = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { code: true },
+      });
+      code = t?.code || '';
+    }
+    return { ok: true, tenantCode: code, locations: rows };
   }
 
   async createPairingToken(

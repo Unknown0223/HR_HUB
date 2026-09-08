@@ -100,10 +100,13 @@ class OfficeLinkApp:
             loc_row,
             textvariable=self.location_var,
             state="readonly",
-            width=32,
+            width=36,
         )
-        self.location_combo.pack(side=tk.LEFT, padx=8)
+        self.location_combo.pack(side=tk.LEFT, padx=8, fill=tk.X, expand=True)
         self.location_combo.bind("<<ComboboxSelected>>", self._on_location_selected)
+        ttk.Button(loc_row, text="Yangilash", command=self._load_locations).pack(
+            side=tk.LEFT, padx=(4, 0)
+        )
 
         ttk.Label(frm, text="Hozirgi admin paroli (bir marta)").pack(anchor="w", padx=16, pady=(12, 2))
         self.pwd_var = tk.StringVar()
@@ -172,7 +175,12 @@ class OfficeLinkApp:
         if not key and not pairing:
             self.location_combo["values"] = []
             self.location_var.set("")
+            self.lock_var.set(
+                "Avval pairing tokenni Saqlash qiling — keyin lokatsiyalar yuklanadi."
+            )
             return
+
+        self.lock_var.set("Lokatsiyalar yuklanmoqda...")
 
         def worker() -> None:
             try:
@@ -184,14 +192,15 @@ class OfficeLinkApp:
                     self.session.tenant,
                     pairing_token=pairing or None,
                 )
-            except Exception:
-                code, data = 0, None
+            except Exception as exc:
+                code, data = 0, {"error": str(exc)[:160]}
             self.root.after(0, lambda: self._locations_done(code, data))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _locations_done(self, code: int, data) -> None:
         items: list[dict] = []
+        err_detail = ""
         if code == 200:
             raw = data
             if isinstance(data, dict):
@@ -205,19 +214,39 @@ class OfficeLinkApp:
                         continue
                     name = str(row.get("name") or row.get("title") or lid).strip()
                     items.append({"id": lid, "name": name})
+        elif isinstance(data, dict):
+            err_detail = str(data.get("message") or data.get("error") or "")[:160]
+        elif code == 0:
+            err_detail = "Tarmoq xatosi (API ga ulanib bo‘lmadi)"
+        else:
+            err_detail = f"HTTP {code}"
+
         self._locations = items
-        labels = [f"{x['name']} ({x['id'][:8]}…)" if len(x["id"]) > 8 else x["name"] for x in items]
+        labels = [
+            f"{x['name']} ({x['id'][:8]}…)" if len(x["id"]) > 8 else x["name"]
+            for x in items
+        ]
         self._location_labels = labels
         self._label_to_id = {labels[i]: items[i]["id"] for i in range(len(items))}
         self.location_combo["values"] = labels
-        if labels and not self.location_var.get():
-            self.location_var.set(labels[0])
-            self.session.set_location_id(items[0]["id"])
-        elif not labels:
+        if labels:
+            if not self.location_var.get() or self.location_var.get() not in labels:
+                self.location_var.set(labels[0])
+                self.session.set_location_id(items[0]["id"])
+            self.lock_var.set(f"Lokatsiyalar: {len(labels)} ta. Ro‘yxatdan tanlang.")
+        else:
             self.location_var.set("")
             self.session.set_location_id(None)
-            if self.session.has_credentials() and not self.lock_var.get():
-                self.lock_var.set("Lokatsiyalar yuklanmadi. Token / API ni tekshiring.")
+            if code != 200:
+                self.lock_var.set(
+                    "Lokatsiyalar yuklanmadi: "
+                    + (err_detail or "token / API ni tekshiring. Qayta Saqlash bosing.")
+                )
+            else:
+                self.lock_var.set(
+                    "Lokatsiya yo‘q. Web → Устройства → Локации da yarating, "
+                    "keyin tokenni qayta Saqlash qiling."
+                )
 
     def _on_location_selected(self, _event=None) -> None:
         label = self.location_var.get()

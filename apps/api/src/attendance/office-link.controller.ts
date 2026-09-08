@@ -60,9 +60,15 @@ export class OfficeLinkController {
     });
   }
 
-  /** Locations for office-link GUI (tenantCode query). */
+  /** Locations for office-link GUI (pairing tenant wins over tenantCode query). */
   @Get('locations')
-  locations(@Query('tenantCode') tenantCode?: string) {
+  locations(
+    @Query('tenantCode') tenantCode?: string,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    if (auth?.pairing?.tenantId) {
+      return this.attendance.officeLinkLocationsForTenant(auth.pairing.tenantId);
+    }
     return this.attendance.officeLinkLocations(tenantCode || 'demo');
   }
 }
