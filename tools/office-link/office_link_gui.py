@@ -389,10 +389,10 @@ class OfficeLinkApp:
             hint,
             text=(
                 "Web → Связь с офисом dan pairing token oling. "
-                "«Admin bor»: hozirgi admin parolini bir marta yozing — Ulash: "
-                "(1) terminalda YANGI parol o‘rnatadi, (2) serverga yozadi, "
-                "(3) ulanishni mustahkamlaydi. Yangi parol ekranda KO‘RSATILMAYDI. "
-                "Keyin sozlash va yuz sync faqat Web dan."
+                "«Admin bor»: hozirgi admin parolini bir marta yozing "
+                "(Ko‘rsat tugmasi bilan tekshiring). Ulash: "
+                "(1) terminalda YANGI parol o‘rnatadi, (2) serverga yuboradi, "
+                "(3) mustahkamlaydi. Yangi parolni Web → Устройства da ko‘rasiz."
             ),
             style="Hint.TLabel",
             wraplength=480,
