@@ -53,6 +53,7 @@ export class OfficeLinkController {
   }
 
   @Post('device')
+  @HttpCode(200)
   device(
     @Body() dto: OfficeLinkDeviceDto,
     @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
