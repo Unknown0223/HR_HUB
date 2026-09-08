@@ -679,23 +679,39 @@ class ProvisionEngine:
             session.services = bundle
             session.password = ""
             sealed = bool(isinstance(linked, dict) and linked.get("sealed"))
+            needs_confirm = bool(
+                isinstance(linked, dict) and linked.get("needsAdminConfirm")
+            )
+            # New flow: always wait for web admin confirm after password push.
+            if needs_confirm or not sealed:
+                needs_confirm = True
+                sealed = False
             dev = linked.get("device") if isinstance(linked, dict) else {}
             device_id = (dev or {}).get("id")
             _progress(
                 session,
-                status="linked",
-                step="sealed" if sealed else "linked",
-                percent=100,
+                status="configuring" if needs_confirm else "linked",
+                step="awaiting_admin_confirm" if needs_confirm else ("sealed" if sealed else "linked"),
+                percent=90 if needs_confirm else 100,
                 message=(
-                    "Ulanish mustahkamlandi"
-                    if sealed
-                    else "Ulandi — boshqaruv Webda"
+                    "Web admindan tasdiq kutilmoqda"
+                    if needs_confirm
+                    else (
+                        "Ulanish mustahkamlandi"
+                        if sealed
+                        else "Ulandi — boshqaruv Webda"
+                    )
                 ),
                 device_id=device_id,
             )
 
             name = (dev or {}).get("name") or session.verified.get("name")
-            if sealed:
+            if needs_confirm:
+                _emit(
+                    on_status,
+                    "4/4 Parol terminalga o‘rnatildi va Webga yuborildi — admin bildirishnomasidan tasdiqlasin",
+                )
+            elif sealed:
                 _emit(
                     on_status,
                     "4/4 Ulanish mustahkamlandi: parol serverda saqlandi va GW orqali tasdiqlandi",
@@ -708,10 +724,16 @@ class ProvisionEngine:
             return SubmitResult(
                 kind="linked",
                 message=(
-                    "Ulanish mustahkamlandi. Keyingi sozlash faqat Web dan. "
-                    "Yangi admin parol operatorga ko‘rsatilmaydi."
-                    if sealed
-                    else "Ulandi. Yangi admin parol operatorga ko‘rsatilmaydi."
+                    "Parol o‘rnatildi va Webga yuborildi. "
+                    "Tenant admin bildirishnomada tasdiqlagach, "
+                    "yuzlar va qurilma to‘liq sinxronlanadi."
+                    if needs_confirm
+                    else (
+                        "Ulanish mustahkamlandi. Keyingi sozlash faqat Web dan. "
+                        "Yangi admin parol operatorga ko‘rsatilmaydi."
+                        if sealed
+                        else "Ulandi. Yangi admin parol operatorga ko‘rsatilmaydi."
+                    )
                 ),
                 device={
                     "name": name,
@@ -719,6 +741,7 @@ class ProvisionEngine:
                     "tunnel": url,
                     "locationId": location_id,
                     "sealed": sealed,
+                    "needsAdminConfirm": needs_confirm,
                     "id": device_id,
                     "ownedByPlatform": True,
                 },

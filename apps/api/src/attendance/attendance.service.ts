@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   DayStatus,
   FaceSyncStatus,
+  NotificationKind,
   ProdCalendarDayType,
   PunchDirection,
   Prisma,
@@ -18,6 +19,7 @@ import {
   DeviceCredentialAuditService,
   type AuditActor,
 } from './device-credential-audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { PairingAuthContext } from './pairing-token.guard';
 import {
   CreateDeviceDto,
@@ -71,6 +73,7 @@ export class AttendanceService {
     private readonly vault: DeviceCredentialVaultService,
     private readonly credentialAudit: DeviceCredentialAuditService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
@@ -2163,59 +2166,43 @@ export class AttendanceService {
       meta.auth && typeof meta.auth === 'object' && !Array.isArray(meta.auth)
         ? { ...(meta.auth as Record<string, unknown>) }
         : {};
+    // Password is on the terminal + vault, but link stays pending until
+    // a tenant admin confirms in the web UI (notification inbox).
     meta.auth = {
       ...prevAuth,
       passwordOutOfSync: false,
       ownedByPlatform: true,
       passwordRotatedOnProvision: true,
+      pendingAdminConfirm: true,
       provisionedAt: new Date().toISOString(),
     };
     device = await this.prisma.device.update({
       where: { id: device.id },
-      data: { meta: meta as Prisma.InputJsonValue },
+      data: {
+        meta: meta as Prisma.InputJsonValue,
+        status: 'pending_confirm',
+      },
     });
 
-    // Always push vault plaintext to office GW so face sync / remote work.
     const plainForGw =
       (await this.passwordForGw(tenant.id, device.id, password)) || password;
     const reg = await this.gw.registerFromDevice({
       ...device,
       passwordEnc: plainForGw,
     });
-    let sealed = false;
+    let gwOk = false;
     if (reg?.id) {
       device = await this.prisma.device.update({
         where: { id: device.id },
         data: {
           gatewayRef: reg.id,
-          status: reg.status || 'online',
           lastSeenAt: new Date(),
+          status: 'pending_confirm',
         },
       });
       try {
         await this.gw.verifyPassword(reg.id, plainForGw);
-        sealed = true;
-        const sealedMeta = this.asMeta(device.meta);
-        const sealedAuth =
-          sealedMeta.auth &&
-          typeof sealedMeta.auth === 'object' &&
-          !Array.isArray(sealedMeta.auth)
-            ? { ...(sealedMeta.auth as Record<string, unknown>) }
-            : {};
-        sealedMeta.auth = {
-          ...sealedAuth,
-          passwordOutOfSync: false,
-          ownedByPlatform: true,
-          linkSealedAt: new Date().toISOString(),
-        };
-        device = await this.prisma.device.update({
-          where: { id: device.id },
-          data: {
-            meta: sealedMeta as Prisma.InputJsonValue,
-            status: 'online',
-            lastSeenAt: new Date(),
-          },
-        });
+        gwOk = true;
       } catch (e) {
         this.logger.warn(
           `Office-link GW verify after register failed for ${device.id}: ${
@@ -2225,10 +2212,31 @@ export class AttendanceService {
       }
     }
 
-    if (device.locationId) {
-      this.scheduleLocationPersonsSync(tenant.id, device.id);
+    const href = `/catalog/devices/${device.id}`;
+    const hostLabel = device.host || '—';
+    try {
+      await this.notifications.notifyTenantAdmins(tenant.id, {
+        kind: NotificationKind.approval,
+        title: `Подтвердите привязку терминала: ${device.name}`,
+        body:
+          `Office-link установил новый пароль на устройстве ${hostLabel} ` +
+          `(${device.serialNumber || 'без S/N'}) и отправил его на сервер.\n\n` +
+          `Пароль терминала: ${plainForGw}\n\n` +
+          `Откройте карточку устройства и нажмите «Подтвердить привязку» — ` +
+          `после этого синхронизация лиц и полный контроль будут включены.`,
+        entity: 'device',
+        entityId: device.id,
+        href,
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Notify tenant admins failed for device ${device.id}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
     }
 
+    // Persons sync waits for admin confirm (confirmDeviceLink).
     const provisionSessionId = (opts?.provisionSessionId || '').trim();
     if (provisionSessionId) {
       const prev = await this.prisma.deviceProvisionSession.findFirst({
@@ -2242,16 +2250,15 @@ export class AttendanceService {
           deviceId: device.id,
           host: device.host,
           serial: device.serialNumber,
-          status: 'linked',
-          step: sealed ? 'sealed' : 'linked',
-          percent: 100,
+          status: 'configuring',
+          step: 'awaiting_admin_confirm',
+          percent: 90,
           meta: {
             ...prevMeta,
-            message: sealed
-              ? 'Ulandi — parol server va terminalda tasdiqlandi'
-              : 'Ulandi',
-            linkedAt: new Date().toISOString(),
-            sealed,
+            message: 'Parol o‘rnatildi — Web admindan tasdiq kutilmoqda',
+            pendingAdminConfirm: true,
+            gwVerified: gwOk,
+            at: new Date().toISOString(),
           } as Prisma.InputJsonValue,
         },
       });
@@ -2259,7 +2266,9 @@ export class AttendanceService {
 
     return {
       ok: true,
-      sealed,
+      sealed: false,
+      needsAdminConfirm: true,
+      gwVerified: gwOk,
       device: {
         id: device.id,
         name: device.name,
@@ -2270,6 +2279,114 @@ export class AttendanceService {
         gatewayRef: device.gatewayRef,
       },
     };
+  }
+
+  /**
+   * Tenant admin confirms office-link binding: accept vault password,
+   * clear pending flag, seal link, and start persons sync.
+   */
+  async confirmDeviceLink(
+    tenantId: string,
+    id: string,
+    actor?: AuditActor,
+  ) {
+    const device = await this.prisma.device.findFirst({
+      where: { id, tenantId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
+    const plain =
+      (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) || '';
+    if (!plain) {
+      throw new BadRequestException(
+        'На сервере нет пароля терминала — сначала выполните Ulash или сохраните пароль',
+      );
+    }
+
+    const meta = this.asMeta(device.meta);
+    const prevAuth =
+      meta.auth && typeof meta.auth === 'object' && !Array.isArray(meta.auth)
+        ? { ...(meta.auth as Record<string, unknown>) }
+        : {};
+    meta.auth = {
+      ...prevAuth,
+      pendingAdminConfirm: false,
+      passwordOutOfSync: false,
+      ownedByPlatform: true,
+      linkSealedAt: new Date().toISOString(),
+      confirmedByUserId: actor?.userId ?? null,
+      confirmedAt: new Date().toISOString(),
+    };
+
+    let gatewayRef = device.gatewayRef;
+    const reg = await this.gw.registerFromDevice({
+      ...device,
+      passwordEnc: plain,
+    });
+    if (reg?.id) gatewayRef = reg.id;
+
+    let gwOk = false;
+    if (gatewayRef) {
+      try {
+        await this.gw.verifyPassword(gatewayRef, plain);
+        gwOk = true;
+      } catch (e) {
+        this.logger.warn(
+          `confirmDeviceLink GW verify failed for ${id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+
+    const updated = await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        meta: meta as Prisma.InputJsonValue,
+        status: gwOk ? 'online' : device.status === 'pending_confirm' ? 'registered' : device.status,
+        gatewayRef: gatewayRef || device.gatewayRef,
+        lastSeenAt: new Date(),
+        isActive: true,
+      },
+      include: this.deviceInclude,
+    });
+
+    await this.credentialAudit.record(tenantId, id, 'vault_write', actor);
+
+    if (updated.locationId) {
+      this.scheduleLocationPersonsSync(tenantId, updated.id);
+    }
+
+    await this.prisma.deviceProvisionSession.updateMany({
+      where: {
+        tenantId,
+        deviceId: id,
+        status: { in: ['configuring', 'scanning'] },
+      },
+      data: {
+        status: 'linked',
+        step: 'sealed',
+        percent: 100,
+      },
+    });
+
+    try {
+      await this.notifications.notifyTenantAdmins(tenantId, {
+        kind: NotificationKind.info,
+        title: `Терминал подтверждён: ${updated.name}`,
+        body:
+          `Привязка подтверждена. Синхронизация сотрудников запущена` +
+          (updated.host ? ` (${updated.host})` : '') +
+          '.',
+        entity: 'device',
+        entityId: updated.id,
+        href: `/catalog/devices/${updated.id}`,
+      });
+    } catch {
+      /* ignore */
+    }
+
+    return this.getDevice(tenantId, id, Role.tenant_admin, actor);
   }
 
   async officeLinkLocations(tenantCode: string) {

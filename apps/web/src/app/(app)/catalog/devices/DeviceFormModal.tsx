@@ -42,6 +42,16 @@ export function passwordOutOfSync(meta?: DeviceMeta | null, status?: string | nu
   return (auth as Record<string, unknown>).passwordOutOfSync === true;
 }
 
+export function pendingAdminConfirm(
+  meta?: DeviceMeta | null,
+  status?: string | null,
+): boolean {
+  if (status === 'pending_confirm') return true;
+  const auth = meta?.auth;
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) return false;
+  return (auth as Record<string, unknown>).pendingAdminConfirm === true;
+}
+
 export type DeviceFormValues = {
   name: string;
   serialNumber: string;

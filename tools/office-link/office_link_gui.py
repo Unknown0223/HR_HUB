@@ -782,8 +782,16 @@ class OfficeLinkApp:
             self._show_alert(result.message)
         elif kind == "linked" or (linked and kind == "linked"):
             sealed = bool((result.device or {}).get("sealed"))
-            self.status_var.set("Ulanish mustahkamlandi" if sealed else "Ulandi")
-            self._set_badge("ULANDI", "ok")
+            needs_confirm = bool((result.device or {}).get("needsAdminConfirm"))
+            self.status_var.set(
+                "Web tasdiq kutilmoqda"
+                if needs_confirm
+                else ("Ulanish mustahkamlandi" if sealed else "Ulandi")
+            )
+            self._set_badge(
+                "TASDIQ" if needs_confirm else "ULANDI",
+                "warn" if needs_confirm else "ok",
+            )
             self._hide_alert()
             host = (result.device or {}).get("host") or ""
             name = (result.device or {}).get("name") or ""
@@ -793,29 +801,49 @@ class OfficeLinkApp:
                 self.session.write_service_handoff()
                 svc_note = (
                     " Service: data\\service.json yozildi. "
-                    "install-service.bat ni ADMIN qilib ishga tushiring (SERVICE.txt). "
-                    "Keyin oynani yopishingiz mumkin."
+                    "install-service.bat ni ADMIN qilib ishga tushiring (SERVICE.txt)."
                 )
             except Exception:
                 svc_note = " Oyna ochiq tursin (yoki SERVICE.txt)."
             extra = f" Web: {web}." if web else ""
-            seal_note = (
-                " Parol terminalda almashtirildi va Web serverda mustahkamlandi."
-                if sealed
-                else " Parol serverga yozildi."
-            )
-            self.note.configure(
-                text=(
-                    "Ulandi. Qurilma boshqaruvi Webga topshirildi."
-                    + seal_note
-                    + " Yangi admin parolni Web → Устройства sahifasida "
-                    "(Показать / Копировать) ko‘ring. "
-                    "Keyin Webdan yuzlarni sinxronlang."
-                    + extra
-                    + svc_note
+            if needs_confirm:
+                self._show_alert(
+                    "Parol terminalga o‘rnatildi va serverga yuborildi. "
+                    "Web → bildirishnoma / Устройства → «Подтвердить привязку»."
                 )
-            )
-            if sealed or kind == "linked":
+                self.note.configure(
+                    text=(
+                        "Keyingi qadam: Webda tenant admin bildirishnomani ochib "
+                        "parolni tekshirsin va «Подтвердить привязку» bossin. "
+                        "Shundan keyin yuzlar va qurilma to‘liq sinxronlanadi."
+                        + extra
+                        + svc_note
+                    )
+                )
+                messagebox.showinfo(
+                    "Tasdiq kutilmoqda",
+                    "Parol qurilmaga o‘rnatildi va Webga yuborildi.\n\n"
+                    "Tenant admin Webdagi bildirishnomada (qo‘ng‘iroqcha) "
+                    "yoki Устройства kartasida «Подтвердить привязку» ni bosishi kerak.\n"
+                    "Tasdiqdan keyin yuzlar sinxroni avtomatik boshlanadi.",
+                )
+            else:
+                seal_note = (
+                    " Parol terminalda almashtirildi va Web serverda mustahkamlandi."
+                    if sealed
+                    else " Parol serverga yozildi."
+                )
+                self.note.configure(
+                    text=(
+                        "Ulandi. Qurilma boshqaruvi Webga topshirildi."
+                        + seal_note
+                        + " Yangi admin parolni Web → Устройства sahifasida "
+                        "(Показать / Копировать) ko‘ring. "
+                        "Keyin Webdan yuzlarni sinxronlang."
+                        + extra
+                        + svc_note
+                    )
+                )
                 messagebox.showinfo(
                     "Ulandi",
                     "Yangi admin parol Web serverga yuborildi.\n"

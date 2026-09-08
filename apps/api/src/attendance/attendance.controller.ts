@@ -267,6 +267,26 @@ export class AttendanceController {
 
   @ApiBearerAuth()
   @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin)
+  @Post('devices/:id/confirm-link')
+  confirmDeviceLink(
+    @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    return this.attendance.confirmDeviceLink(
+      this.attendance.requireTenant(tenantId),
+      id,
+      {
+        userId: user?.userId,
+        ip: DeviceCredentialAuditService.clientIp(req),
+      },
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Post('devices/:id/sync-password')
   syncDevicePassword(

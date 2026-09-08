@@ -46,6 +46,42 @@ export class NotificationsService {
     return users;
   }
 
+  /** Tenant admins only (e.g. device password / link confirmation). */
+  async notifyTenantAdmins(
+    tenantId: string,
+    data: {
+      kind?: NotificationKind;
+      title: string;
+      body?: string;
+      entity?: string;
+      entityId?: string;
+      href?: string;
+    },
+  ) {
+    const users = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        role: { in: [Role.tenant_admin, Role.platform_admin] },
+      },
+      select: { id: true },
+    });
+    if (!users.length) return [];
+    await this.prisma.notification.createMany({
+      data: users.map((u) => ({
+        tenantId,
+        userId: u.id,
+        kind: data.kind ?? NotificationKind.approval,
+        title: data.title,
+        body: data.body,
+        entity: data.entity,
+        entityId: data.entityId,
+        href: data.href,
+      })),
+    });
+    return users;
+  }
+
   async notifyAllUsers(
     tenantId: string,
     data: {

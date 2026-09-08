@@ -12,6 +12,7 @@ import {
   DeviceFormModal,
   punchLockActive,
   passwordOutOfSync,
+  pendingAdminConfirm,
   type DeviceFormValues,
   type DeviceMeta,
 } from '../DeviceFormModal';
@@ -189,6 +190,8 @@ function DeviceDetailInner() {
   const [bannerPwdBusy, setBannerPwdBusy] = useState(false);
   const [showServerPwd, setShowServerPwd] = useState(false);
   const [copiedPwd, setCopiedPwd] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmMsg, setConfirmMsg] = useState('');
   const setTab = useCallback(
     (next: Tab) => {
       router.replace(`/catalog/devices/${id}?tab=${next}`);
@@ -494,6 +497,9 @@ function DeviceDetailInner() {
             {passwordOutOfSync(device.meta, device.status) ? (
               <span className={styles.badgeLocked}>Пароль</span>
             ) : null}
+            {pendingAdminConfirm(device.meta, device.status) ? (
+              <span className={styles.badgeLocked}>Подтверждение</span>
+            ) : null}
           </div>
           <nav className={styles.nav}>
             {TABS.map((t) => (
@@ -519,6 +525,75 @@ function DeviceDetailInner() {
                   включатся после выхода в сеть и синхронизации с сервером. Пароль
                   терминала перезаписывается на сервер, чтобы устройство не осталось
                   под контролем другого сотрудника.
+                </div>
+              ) : null}
+              {pendingAdminConfirm(device.meta, device.status) ? (
+                <div className={styles.lockBanner}>
+                  <p style={{ margin: '0 0 10px' }}>
+                    <strong>Требуется подтверждение привязки.</strong> Office-link установил
+                    пароль на терминале и отправил его на сервер. Проверьте пароль и нажмите
+                    «Подтвердить привязку» — после этого запустится полная синхронизация лиц и
+                    устройство будет полностью связано с Web.
+                  </p>
+                  {device.passwordEnc ? (
+                    <div className={styles.pwdRevealRow} style={{ marginBottom: 10 }}>
+                      <code className={styles.pwdRevealValue}>
+                        {showServerPwd ? device.passwordEnc : '••••••••••••'}
+                      </code>
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        onClick={() => setShowServerPwd((v) => !v)}
+                      >
+                        {showServerPwd ? 'Скрыть' : 'Показать пароль'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(device.passwordEnc || '');
+                            setCopiedPwd(true);
+                            window.setTimeout(() => setCopiedPwd(false), 1600);
+                          } catch {
+                            setCopiedPwd(false);
+                          }
+                        }}
+                      >
+                        {copiedPwd ? 'Скопировано' : 'Копировать'}
+                      </button>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.btnPrimary}
+                    disabled={confirmBusy || busy}
+                    onClick={async () => {
+                      setConfirmMsg('');
+                      setConfirmBusy(true);
+                      try {
+                        await apiFetch(`/api/attendance/devices/${id}/confirm-link`, {
+                          method: 'POST',
+                        });
+                        setConfirmMsg(
+                          'Привязка подтверждена. Синхронизация сотрудников запущена.',
+                        );
+                        await loadDevice();
+                        await loadTabData();
+                      } catch (e) {
+                        setConfirmMsg(
+                          e instanceof Error ? e.message : 'Не удалось подтвердить привязку',
+                        );
+                      } finally {
+                        setConfirmBusy(false);
+                      }
+                    }}
+                  >
+                    {confirmBusy ? 'Подтверждение…' : 'Подтвердить привязку'}
+                  </button>
+                  {confirmMsg ? (
+                    <p style={{ margin: '8px 0 0', fontWeight: 650 }}>{confirmMsg}</p>
+                  ) : null}
                 </div>
               ) : null}
               {passwordOutOfSync(device.meta, device.status) ? (
