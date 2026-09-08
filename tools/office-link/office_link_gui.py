@@ -201,7 +201,7 @@ class OfficeLinkApp:
     def _locations_done(self, code: int, data) -> None:
         items: list[dict] = []
         err_detail = ""
-        if code == 200:
+        if 200 <= code < 300:
             raw = data
             if isinstance(data, dict):
                 raw = data.get("locations") or data.get("items") or data.get("data") or []
@@ -237,7 +237,7 @@ class OfficeLinkApp:
         else:
             self.location_var.set("")
             self.session.set_location_id(None)
-            if code != 200:
+            if not (200 <= code < 300):
                 self.lock_var.set(
                     "Lokatsiyalar yuklanmadi: "
                     + (err_detail or "token / API ni tekshiring. Qayta Saqlash bosing.")

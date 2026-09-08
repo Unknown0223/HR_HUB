@@ -46,7 +46,7 @@ def main() -> int:
     from getpass import getpass
 
     code, _ping = ping(args.api, key, args.tenant)
-    if code != 200:
+    if not (200 <= code < 300):
         print("Platformaga ulanmadi. Internet yoki admin kalitini tekshiring.")
         return 1
 
@@ -104,12 +104,12 @@ def main() -> int:
 
     if args.tunnel:
         code, _ann = announce(args.api, key, args.tenant, args.tunnel)
-        if code != 200:
+        if not (200 <= code < 300):
             print("Tunnel platformaga yozilmadi.")
             return 1
 
     code, linked = register_device(args.api, key, args.tenant, chosen, args.user, password)
-    if code != 200:
+    if not (200 <= code < 300):
         print("Qurilma platformaga yozilmadi.")
         return 1
     dev = linked.get("device") if isinstance(linked, dict) else {}

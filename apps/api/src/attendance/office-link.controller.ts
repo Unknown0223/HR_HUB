@@ -4,6 +4,7 @@ import {
   createParamDecorator,
   ExecutionContext,
   Get,
+  HttpCode,
   Post,
   Query,
   UseGuards,
@@ -43,6 +44,7 @@ export class OfficeLinkController {
   }
 
   @Post('announce')
+  @HttpCode(200)
   announce(@Body() dto: OfficeLinkAnnounceDto) {
     return this.attendance.officeLinkAnnounce(
       dto.tenantCode || 'demo',

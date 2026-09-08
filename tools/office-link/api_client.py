@@ -10,6 +10,11 @@ from urllib.parse import urlencode
 from discovery import split_host
 
 
+def is_success(code: int) -> bool:
+    """Nest POST often returns 201 Created — treat any 2xx as OK."""
+    return 200 <= int(code or 0) < 300
+
+
 def api_req(
     api: str,
     method: str,

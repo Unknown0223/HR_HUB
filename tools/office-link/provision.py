@@ -579,7 +579,7 @@ class ProvisionEngine:
             code, _ping = api_client.ping(
                 session.api_url, key, session.tenant, pairing_token=pairing or None
             )
-            if code != 200:
+            if not api_client.is_success(code):
                 bundle.stop()
                 _progress(
                     session,
@@ -608,7 +608,7 @@ class ProvisionEngine:
                 url,
                 pairing_token=pairing or None,
             )
-            if code != 200:
+            if not api_client.is_success(code):
                 bundle.stop()
                 _progress(
                     session,
@@ -617,7 +617,10 @@ class ProvisionEngine:
                     percent=75,
                     message="Tunnel yozilmadi",
                 )
-                return SubmitResult(kind="api", message="Tunnel platformaga yozilmadi.")
+                return SubmitResult(
+                    kind="api",
+                    message=f"Tunnel platformaga yozilmadi (HTTP {code}).",
+                )
 
             _emit(on_status, "Qurilma + parol serverga yozilmoqda...")
             _progress(
@@ -637,7 +640,7 @@ class ProvisionEngine:
                 location_id=location_id,
                 pairing_token=pairing or None,
             )
-            if code != 200:
+            if not api_client.is_success(code):
                 bundle.stop()
                 _progress(
                     session,
@@ -646,7 +649,10 @@ class ProvisionEngine:
                     percent=90,
                     message="Register xato",
                 )
-                return SubmitResult(kind="api", message="Qurilma platformaga yozilmadi.")
+                return SubmitResult(
+                    kind="api",
+                    message=f"Qurilma platformaga yozilmadi (HTTP {code}).",
+                )
 
             session.services = bundle
             session.password = ""

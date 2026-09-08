@@ -133,7 +133,7 @@ class OfficeLinkSession:
             host=host,
             serial=serial,
         )
-        if code != 200 or not isinstance(data, dict):
+        if code < 200 or code >= 300 or not isinstance(data, dict):
             msg = ""
             if isinstance(data, dict):
                 msg = str(data.get("message") or data.get("error") or "")
