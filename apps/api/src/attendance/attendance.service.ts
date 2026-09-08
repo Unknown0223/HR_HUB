@@ -733,16 +733,37 @@ export class AttendanceService {
         ? { ...(meta.auth as Record<string, unknown>) }
         : {};
     if (dto.authFailed) {
+      const streak = Number(prevAuth.authFailStreak || 0) + 1;
+      // Transient Digest / alertStream blips must not flip the device into
+      // passwordOutOfSync — require a short streak of confirmed failures.
+      if (streak >= 3) {
+        meta.auth = {
+          ...prevAuth,
+          authFailStreak: streak,
+          passwordOutOfSync: true,
+          lastError: 'Пароль на терминале не совпадает с сервером',
+          failedAt: nowIso,
+        };
+      } else {
+        meta.auth = {
+          ...prevAuth,
+          authFailStreak: streak,
+          lastError: prevAuth.lastError ?? null,
+        };
+      }
+    } else if (prevAuth.passwordOutOfSync === true && dto.authFailed === false) {
       meta.auth = {
         ...prevAuth,
-        passwordOutOfSync: true,
-        lastError: 'Пароль на терминале не совпадает с сервером',
-        failedAt: nowIso,
+        authFailStreak: 0,
+        passwordOutOfSync: false,
+        lastError: null,
       };
-    } else if (prevAuth.passwordOutOfSync === true && dto.authFailed === false) {
-      meta.auth = { ...prevAuth, passwordOutOfSync: false, lastError: null };
+    } else if (Number(prevAuth.authFailStreak || 0) > 0 && dto.authFailed === false) {
+      meta.auth = { ...prevAuth, authFailStreak: 0 };
     }
-    const nextStatus = dto.authFailed
+    const authHardFail =
+      dto.authFailed === true && Number((meta.auth as Record<string, unknown>).authFailStreak || 0) >= 3;
+    const nextStatus = authHardFail
       ? 'auth_failed'
       : punchLock.active
         ? 'locked'
@@ -828,7 +849,7 @@ export class AttendanceService {
         status: 'completed',
       });
     }
-    if (dto.authFailed) {
+    if (authHardFail) {
       const existingAuth = await this.prisma.problemMark.findFirst({
         where: {
           tenantId: dto.tenantId,

@@ -205,11 +205,21 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             return False
         return True
 
-    def _note_auth_response(self, resp: httpx.Response) -> None:
-        """Parse Hikvision 401 lockStatus/unlockTime to avoid hammering lockouts."""
+    def _note_auth_response(
+        self,
+        resp: httpx.Response,
+        *,
+        mark_auth_failed: bool = True,
+    ) -> None:
+        """Parse Hikvision 401 lockStatus/unlockTime to avoid hammering lockouts.
+
+        alertStream often returns 401 while deviceInfo Digest auth still works —
+        do not flip passwordOutOfSync from that path (mark_auth_failed=False).
+        """
         if resp.status_code != 401:
             return
-        self.auth_failed = True
+        if mark_auth_failed:
+            self.auth_failed = True
         text = resp.text or ""
         if "<lockStatus>lock</lockStatus>" not in text and "lockStatus>lock" not in text:
             return
@@ -270,6 +280,10 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             last_status, last_body, last_path = resp.status_code, resp.text[:500], path
             if resp.status_code < 400:
                 logger.info("%s via %s %s", ok_log, method, path)
+                return True
+            # Face already present on terminal — enroll is effectively done.
+            if "deviceUserAlreadyExistFace" in (resp.text or ""):
+                logger.info("%s already on device via %s %s", ok_log, method, path)
                 return True
             logger.warning(
                 "%s %s -> %s %s", method, path, resp.status_code, resp.text[:400]
@@ -367,6 +381,27 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             logger.error("face image base64 decode failed: %s", exc)
             return False
 
+        # Oversized JPEGs disconnect some Hikvision terminals mid-upload.
+        if len(raw) > 100_000:
+            try:
+                from io import BytesIO
+
+                from PIL import Image  # type: ignore
+
+                img = Image.open(BytesIO(raw)).convert("RGB")
+                img.thumbnail((480, 480))
+                buf = BytesIO()
+                img.save(buf, format="JPEG", quality=85)
+                raw = buf.getvalue()
+                b64 = base64.b64encode(raw).decode("ascii")
+                logger.info(
+                    "face image resized for employeeNo=%s -> %s bytes",
+                    emp_no,
+                    len(raw),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("face image resize skipped: %s", exc)
+
         json_attempts: list[tuple[str, str, dict[str, Any]]] = [
             (
                 "POST",
@@ -396,10 +431,18 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
                 files=files,
             )
+            body = resp.text or ""
+            # Already enrolled on terminal — treat as success so sync is not marked failed.
+            if "deviceUserAlreadyExistFace" in body:
+                logger.info(
+                    "Face already on device employeeNo=%s — treating enroll as ok",
+                    emp_no,
+                )
+                return True
             logger.warning(
                 "multipart FaceDataRecord -> %s %s",
                 resp.status_code,
-                resp.text[:400],
+                body[:400],
             )
             if resp.status_code < 400:
                 logger.info("Face enroll multipart ok employeeNo=%s", emp_no)
@@ -1209,7 +1252,8 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                     async with stream_client.stream("GET", url) as resp:
                         if resp.status_code >= 400:
                             self.realtime_connected = False
-                            self._note_auth_response(resp)
+                            # Never mark platform password out-of-sync from alertStream.
+                            self._note_auth_response(resp, mark_auth_failed=False)
                             logger.warning(
                                 "alertStream %s status %s", url, resp.status_code
                             )
