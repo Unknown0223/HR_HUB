@@ -36,19 +36,31 @@ class PunchPublisher:
         return self.status in ("connected", "http")
 
     async def connect(self) -> None:
-        try:
-            import nats
-
-            self._nc = await nats.connect(self.url, connect_timeout=2)
-            self.status = "connected"
-            logger.info("NATS connected: %s subject=%s", self.url, self.subject)
-        except Exception as exc:  # noqa: BLE001
+        url = (self.url or "").strip()
+        skip_nats = url.lower() in ("", "off", "disabled", "none", "nats://127.0.0.1:1")
+        if skip_nats:
             self._nc = None
             self.status = "unavailable"
-            logger.warning(
-                "NATS unavailable (%s) — will use HTTP ingest if configured",
-                exc,
-            )
+            logger.info("NATS skipped (url=%r) — HTTP ingest only", url or "")
+        else:
+            try:
+                import nats
+
+                self._nc = await nats.connect(
+                    url,
+                    connect_timeout=1,
+                    max_reconnect_attempts=0,
+                    allow_reconnect=False,
+                )
+                self.status = "connected"
+                logger.info("NATS connected: %s subject=%s", url, self.subject)
+            except Exception as exc:  # noqa: BLE001
+                self._nc = None
+                self.status = "unavailable"
+                logger.warning(
+                    "NATS unavailable (%s) — will use HTTP ingest if configured",
+                    exc,
+                )
 
         if self.api_url:
             if self.status != "connected":

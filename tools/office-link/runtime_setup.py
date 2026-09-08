@@ -62,6 +62,34 @@ def _run_hidden(
     )
 
 
+def _clean_child_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Drop PyInstaller / parent Python vars so portable python starts cleanly."""
+    env = dict(base if base is not None else os.environ)
+    for key in (
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "PYTHONSTARTUP",
+        "PYTHONEXECUTABLE",
+        "PYTHONNOUSERSITE",
+        "__PYVENV_LAUNCHER__",
+        "VIRTUAL_ENV",
+        "_MEIPASS",
+    ):
+        env.pop(key, None)
+    return env
+
+
+def _tail_text(path: Path, limit: int = 800) -> str:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
 def _popen_hidden(
     args: list[str],
     *,
@@ -257,29 +285,51 @@ def start_gateway(
     old = _read_pid(rt / "gw.pid")
     if old:
         _kill_pid(old)
-    env = os.environ.copy()
+    if not py.is_file():
+        raise RuntimeError("Portable Python yo‘q — avval runtime o‘rnating.")
+    if not (gwd / "main.py").is_file():
+        raise RuntimeError("Gateway kodlari yo‘q (gw/main.py).")
+
+    env = _clean_child_env()
     env.update(
         {
             "DEVICE_GW_PORT": str(GW_PORT),
             "DEVICE_GW_HOST": "127.0.0.1",
             "DEVICE_GW_API_URL": api_url,
             "DEVICE_GW_PUNCH_KEY": punch_key,
-            "DEVICE_GW_NATS_URL": "nats://127.0.0.1:1",
+            # Skip NATS in office-link — HTTP ingest to Railway is enough.
+            "DEVICE_GW_NATS_URL": "disabled",
             "DEFAULT_ADAPTER": "hikvision_isapi",
         }
     )
+    log_path = rt / "gw.log"
     _status(cb, "Gateway yoqilmoqda...")
-    proc = _popen_hidden(
-        [str(py), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(GW_PORT)],
-        cwd=gwd,
-        env=env,
-    )
+    # Never use PIPE here — uvicorn logs fill the buffer and freeze the child.
+    log_f = open(log_path, "a", encoding="utf-8", errors="replace")
+    try:
+        log_f.write(f"\n--- gateway start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        log_f.flush()
+        proc = _popen_hidden(
+            [str(py), "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(GW_PORT)],
+            cwd=gwd,
+            env=env,
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
+        )
+    except Exception:
+        log_f.close()
+        raise
     _write_pid(rt / "gw.pid", proc.pid)
     import http.client
 
-    for _ in range(40):
+    for _ in range(50):
         if proc.poll() is not None:
-            raise RuntimeError("Gateway ochilmadi.")
+            try:
+                log_f.flush()
+            except Exception:
+                pass
+            detail = _tail_text(log_path) or f"exit={proc.returncode}"
+            raise RuntimeError(f"Gateway ochilmadi. {detail[:220]}")
         try:
             conn = http.client.HTTPConnection("127.0.0.1", GW_PORT, timeout=2)
             conn.request("GET", "/health")
@@ -291,7 +341,11 @@ def start_gateway(
         except OSError:
             pass
         time.sleep(0.4)
-    raise RuntimeError("Gateway ochilmadi.")
+    detail = _tail_text(log_path)
+    raise RuntimeError(
+        "Gateway ochilmadi (health timeout)."
+        + (f" {detail[:180]}" if detail else "")
+    )
 
 
 def start_named_tunnel(
@@ -313,15 +367,30 @@ def start_named_tunnel(
             "Named tunnel uchun namedTunnelUrl / tunnelPublicUrl kerak."
         )
     _status(cb, "Named tunnel ochilmoqda...")
-    proc = _popen_hidden(
-        [str(exe), "tunnel", "run", "--token", token.strip()],
-        cwd=rt,
-    )
+    log_path = rt / "tunnel.log"
+    log_f = open(log_path, "a", encoding="utf-8", errors="replace")
+    try:
+        log_f.write(f"\n--- named tunnel start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        log_f.flush()
+        proc = _popen_hidden(
+            [str(exe), "tunnel", "run", "--token", token.strip()],
+            cwd=rt,
+            env=_clean_child_env(),
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
+        )
+    except Exception:
+        log_f.close()
+        raise
     _write_pid(rt / "tunnel.pid", proc.pid)
     # Named tunnels do not print trycloudflare URLs; wait briefly for process health.
     for _ in range(15):
         if proc.poll() is not None:
-            raise RuntimeError("Named tunnel ochilmadi (token / cloudflared).")
+            detail = _tail_text(log_path)
+            raise RuntimeError(
+                "Named tunnel ochilmadi (token / cloudflared)."
+                + (f" {detail[:180]}" if detail else "")
+            )
         time.sleep(0.3)
     return proc, url
 
@@ -337,9 +406,12 @@ def start_quick_tunnel(
     if old:
         _kill_pid(old)
     _status(cb, "Internet tunnel ochilmoqda...")
+    env = _clean_child_env()
+    # Keep PIPE so we can parse trycloudflare URL; drain aggressively below.
     proc = _popen_hidden(
         [str(exe), "tunnel", "--url", f"http://127.0.0.1:{GW_PORT}"],
         cwd=rt,
+        env=env,
     )
     _write_pid(rt / "tunnel.pid", proc.pid)
     buf: list[str] = []
