@@ -6,8 +6,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { TimeTypeFormModal } from './TimeTypeForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -29,13 +35,37 @@ type TimeTypeRow = {
 };
 
 const FILTER_KEYS = ['q', 'status', 'planLoad'] as const;
-const COL_COUNT = 8;
 
 const PLAN_LOADS: { value: string; label: string }[] = [
   { value: 'partial', label: 'Частичная' },
   { value: 'full', label: 'Полная' },
   { value: 'unplanned', label: 'Внеплановая' },
 ];
+
+const timeTypeListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.time-types.v1',
+  title: 'Виды рабочего времени',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'parent', label: 'Родитель' },
+    { key: 'letterCode', label: 'Буквенный код' },
+    { key: 'digitalCode', label: 'Цифровой код' },
+    { key: 'planLoad', label: 'Нагрузка на план' },
+    { key: 'color', label: 'Цвет' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'name',
+    'parent',
+    'letterCode',
+    'digitalCode',
+    'planLoad',
+    'color',
+    'isActive',
+  ],
+  defaultSearchKeys: ['name', 'letterCode', 'digitalCode'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 function planLoadLabel(v?: string | null) {
   return PLAN_LOADS.find((p) => p.value === v)?.label || v || '—';
@@ -48,10 +78,32 @@ function letterOf(row: TimeTypeRow) {
   return c ? c.slice(0, 1) : '';
 }
 
+function timeTypeCell(row: TimeTypeRow, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'parent':
+      return row.parent?.name || '';
+    case 'letterCode':
+      return letterOf(row);
+    case 'digitalCode':
+      return row.digitalCode || '';
+    case 'planLoad':
+      return planLoadLabel(row.planLoad);
+    case 'color':
+      return row.color || '';
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
+
 function TimeTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(timeTypeListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
   const planFilter = filters.planLoad;
@@ -68,6 +120,11 @@ function TimeTypesPageInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : timeTypeListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -95,13 +152,21 @@ function TimeTypesPageInner() {
     return list;
   }, [rows, q, statusFilter, planFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, timeTypeCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -110,7 +175,7 @@ function TimeTypesPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -211,7 +276,7 @@ function TimeTypesPageInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -270,20 +335,17 @@ function TimeTypesPageInner() {
   function exportCsv() {
     downloadCsv(
       `time-types-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        Родитель: r.parent?.name || '',
-        'Буквенный код': letterOf(r),
-        'Цифровой код': r.digitalCode || '',
-        'Нагрузка на план': planLoadLabel(r.planLoad),
-        Цвет: r.color || '',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = timeTypeCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="time-types" />
 
       <div className={shared.pageHeader}>
@@ -362,21 +424,13 @@ function TimeTypesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -441,31 +495,27 @@ function TimeTypesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Родитель</th>
-                <th>Буквенный код</th>
-                <th>Цифровой код</th>
-                <th>Нагрузка на план</th>
-                <th>Цвет</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const hex = row.color || '';
@@ -486,35 +536,55 @@ function TimeTypesPageInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td>{row.parent?.name || '—'}</td>
-                      <td className={styles.codeCell}>{letterOf(row) || '—'}</td>
-                      <td className={styles.codeCell}>{row.digitalCode || '—'}</td>
-                      <td>{planLoadLabel(row.planLoad)}</td>
-                      <td>
-                        {hex ? (
-                          <span className={styles.colorSwatch}>
-                            <span
-                              className={styles.colorBox}
-                              style={{ background: hex }}
-                            />
-                            <span className={styles.colorHex}>{hex}</span>
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        {active ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'letterCode' || key === 'digitalCode') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {timeTypeCell(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'color') {
+                          return (
+                            <td key={key}>
+                              {hex ? (
+                                <span className={styles.colorSwatch}>
+                                  <span
+                                    className={styles.colorBox}
+                                    style={{ background: hex }}
+                                  />
+                                  <span className={styles.colorHex}>{hex}</span>
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {active ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{timeTypeCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openEdit(row.id)}>
                               <i className="fas fa-pen" aria-hidden />
@@ -552,7 +622,7 @@ function TimeTypesPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

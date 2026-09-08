@@ -182,6 +182,7 @@ export class DashboardService {
 
     type Row = {
       employeeId: string;
+      id: string;
       fullName: string;
       lastName: string;
       firstName: string;
@@ -194,6 +195,32 @@ export class DashboardService {
       note?: string;
       email: string | null;
       phone: string | null;
+      position: string | null;
+      division: string | null;
+      grade: string | null;
+      region: string | null;
+      schedule: string | null;
+      manager: string | null;
+      hiredAt: string | null;
+      birthDate: string | null;
+      gender: string | null;
+      pinfl: string | null;
+      inn: string | null;
+      inps: string | null;
+      code: string | null;
+      addressResidence: string | null;
+      addressPostal: string | null;
+      bankAccount: string | null;
+      employmentType: string | null;
+      workStatus: string | null;
+      login: string | null;
+      telegram: string | null;
+      fax: string | null;
+      site: string | null;
+      fingerprints: string | null;
+      accessLevel: string | null;
+      arrivalLocation: string | null;
+      distanceKm: number | null;
     };
 
     const onTime: Row[] = [];
@@ -213,8 +240,58 @@ export class DashboardService {
         tabNumber: true,
         email: true,
         phone: true,
-        schedule: { select: { endTime: true } },
+        status: true,
+        employmentType: true,
+        hiredAt: true,
+        schedule: { select: { name: true, endTime: true } },
+        position: { select: { name: true } },
+        division: {
+          select: {
+            name: true,
+            manager: {
+              select: { firstName: true, lastName: true, middleName: true },
+            },
+          },
+        },
+        grade: { select: { name: true } },
+        region: { select: { name: true } },
+        person: {
+          select: {
+            birthDate: true,
+            gender: true,
+            pinfl: true,
+            inn: true,
+            inps: true,
+            code: true,
+            addressResidence: true,
+            addressRegistration: true,
+          },
+        },
+        bankAccounts: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 1,
+          select: { accountNumber: true },
+        },
+        documents: {
+          where: { type: 'other', number: 'PROFILE_EXTRAS' },
+          take: 1,
+          select: { payload: true },
+        },
+        accessGrants: {
+          where: { isActive: true, accessType: 'access_level' },
+          take: 1,
+          select: { resource: true },
+        },
         faceProfile: { select: { photoUrl: true, photoKey: true } },
+        marks: {
+          where: { occurredAt: { gte: today, lt: nextDay } },
+          orderBy: { occurredAt: 'asc' },
+          take: 1,
+          select: {
+            device: { select: { location: { select: { name: true } } } },
+          },
+        },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
@@ -234,17 +311,55 @@ export class DashboardService {
       day_off: 0,
     };
 
+    const employmentTypeLabel = (t: string | null | undefined) => {
+      if (t === 'gph') return 'ГПХ';
+      if (t === 'staff') return 'Штатный';
+      return t || null;
+    };
+    const workStatusLabel = (s: string | null | undefined) => {
+      if (s === 'active') return 'Работает';
+      if (s === 'dismissed') return 'Уволен';
+      if (s === 'leave') return 'В отпуске';
+      return s || null;
+    };
+    const genderLabel = (g: string | null | undefined) => {
+      if (!g) return null;
+      const low = g.toLowerCase();
+      if (low === 'm' || low === 'male' || low === 'муж' || low === 'мужской') return 'Мужской';
+      if (low === 'f' || low === 'female' || low === 'жен' || low === 'женский') return 'Женский';
+      return g;
+    };
+    const readExtras = (payload: unknown) => {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return {} as Record<string, unknown>;
+      }
+      return payload as Record<string, unknown>;
+    };
+
     for (const emp of employees) {
       const d = dayByEmp.get(emp.id);
       const status = (d?.status as DayStatus | undefined) ?? missingStatus;
+      const extras = readExtras(emp.documents[0]?.payload);
+      const userSettings =
+        extras.userSettings && typeof extras.userSettings === 'object' && !Array.isArray(extras.userSettings)
+          ? (extras.userSettings as Record<string, unknown>)
+          : {};
+      const fps = Array.isArray(extras.fingerprints)
+        ? (extras.fingerprints as unknown[])
+            .map((n) => Number(n))
+            .filter((n) => Number.isInteger(n) && n >= 0 && n <= 9)
+        : [];
+      const firstMark = emp.marks[0];
+      const mgr = emp.division?.manager;
       const row: Row = {
         employeeId: emp.id,
+        id: emp.id,
         fullName: fullName(emp),
         lastName: emp.lastName,
         firstName: emp.firstName,
         middleName: emp.middleName,
         tabNumber: emp.tabNumber,
-        email: emp.email || null,
+        email: emp.email || (typeof extras.emailCorp === 'string' ? extras.emailCorp : null) || null,
         phone: emp.phone || null,
         photoUrl: this.storage.mediaUrl(
           emp.faceProfile?.photoKey,
@@ -253,6 +368,38 @@ export class DashboardService {
         firstIn: fmtTime(d?.firstInAt),
         lastOut: fmtTime(d?.lastOutAt),
         status,
+        position: emp.position?.name || null,
+        division: emp.division?.name || null,
+        grade: emp.grade?.name || null,
+        region: emp.region?.name || null,
+        schedule: emp.schedule?.name || null,
+        manager: mgr ? fullName(mgr) : null,
+        hiredAt: emp.hiredAt ? toLocalYmd(emp.hiredAt) : null,
+        birthDate: emp.person?.birthDate ? toLocalYmd(emp.person.birthDate) : null,
+        gender: genderLabel(emp.person?.gender),
+        pinfl: emp.person?.pinfl || null,
+        inn: emp.person?.inn || (typeof extras.inn === 'string' ? extras.inn : null) || null,
+        inps: emp.person?.inps || (typeof extras.inps === 'string' ? extras.inps : null) || null,
+        code: emp.person?.code || (typeof extras.extraCode === 'string' ? extras.extraCode : null) || null,
+        addressResidence:
+          emp.person?.addressResidence ||
+          (typeof extras.address === 'string' ? extras.address : null) ||
+          null,
+        addressPostal:
+          emp.person?.addressRegistration ||
+          (typeof extras.registeredAddress === 'string' ? extras.registeredAddress : null) ||
+          null,
+        bankAccount: emp.bankAccounts[0]?.accountNumber || null,
+        employmentType: employmentTypeLabel(emp.employmentType),
+        workStatus: workStatusLabel(emp.status),
+        login: typeof userSettings.login === 'string' ? userSettings.login || null : null,
+        telegram: typeof extras.telegram === 'string' ? extras.telegram : null,
+        fax: typeof extras.fax === 'string' ? extras.fax : null,
+        site: typeof extras.site === 'string' ? extras.site : null,
+        fingerprints: fps.length ? String(fps.length) : null,
+        accessLevel: emp.accessGrants[0]?.resource || null,
+        arrivalLocation: firstMark?.device?.location?.name || null,
+        distanceKm: null,
       };
 
       const endHm = emp.schedule?.endTime ?? d?.employee.schedule?.endTime ?? '18:00';

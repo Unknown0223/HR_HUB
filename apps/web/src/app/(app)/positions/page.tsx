@@ -8,7 +8,15 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { useUrlParam } from '@/lib/use-url-state';
 import { PositionForm } from './PositionForm';
 import list from './list.module.css';
@@ -26,6 +34,42 @@ const POS_FILTER_KEYS = [
   'to',
   'status',
 ] as const;
+
+const POSITION_COLUMNS: ColumnDef[] = [
+  { key: 'code', label: 'Код' },
+  { key: 'name', label: 'Название' },
+  { key: 'positionGroup', label: 'Группа должностей' },
+  { key: 'createdBy', label: 'Создал' },
+  { key: 'createdAt', label: 'Дата создания' },
+  { key: 'isActive', label: 'Статус' },
+];
+
+const POSITION_GROUP_COLUMNS: ColumnDef[] = [
+  { key: 'code', label: 'Код' },
+  { key: 'name', label: 'Название' },
+  { key: 'positionsCount', label: 'Кол-во должностей' },
+  { key: 'createdBy', label: 'Создал' },
+  { key: 'createdAt', label: 'Дата создания' },
+  { key: 'isActive', label: 'Статус' },
+];
+
+const positionPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.positions.v1',
+  title: 'Должности',
+  columns: POSITION_COLUMNS,
+  defaultColumns: POSITION_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+const positionGroupPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.position-groups.v1',
+  title: 'Группы должностей',
+  columns: POSITION_GROUP_COLUMNS,
+  defaultColumns: POSITION_GROUP_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 type Position = {
   id: string;
@@ -61,6 +105,44 @@ function fmtCreated(iso?: string) {
   return d.toLocaleString('ru-RU');
 }
 
+function positionCell(row: Position, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return row.name || '';
+    case 'positionGroup':
+      return row.positionGroup?.name || '';
+    case 'createdBy':
+      return row.createdByLabel || 'Admin';
+    case 'createdAt':
+      return fmtCreated(row.createdAt);
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    default:
+      return '';
+  }
+}
+
+function positionGroupCell(row: PositionGroupRow, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return row.name || '';
+    case 'positionsCount':
+      return String(row._count?.positions ?? 0);
+    case 'createdBy':
+      return 'Admin';
+    case 'createdAt':
+      return fmtCreated(row.createdAt);
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    default:
+      return '';
+  }
+}
+
 const CREATE_FORM_ID = 'position-create-form';
 
 function PositionsPageInner() {
@@ -69,6 +151,9 @@ function PositionsPageInner() {
   const searchParams = useSearchParams();
   const [tab] = useUrlParam('tab', 'positions', TABS);
   const filters = useFilterFromUrl(POS_FILTER_KEYS);
+  const posPrefs = useTablePrefs(positionPrefsCfg);
+  const groupPrefs = useTablePrefs(positionGroupPrefsCfg);
+  const prefs = tab === 'groups' ? groupPrefs : posPrefs;
   const [positions, setPositions] = useState<Position[]>([]);
   const [groups, setGroups] = useState<PositionGroupRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -242,6 +327,26 @@ function PositionsPageInner() {
     });
   }, [groups, search, filters]);
 
+  const displayPositions = useMemo(
+    () => posPrefs.applySortToRows(filteredPositions, positionCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredPositions, posPrefs.state.sort],
+  );
+  const displayGroups = useMemo(
+    () => groupPrefs.applySortToRows(filteredGroups, positionGroupCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredGroups, groupPrefs.state.sort],
+  );
+
+  const visiblePosCols = posPrefs.columns.length
+    ? posPrefs.columns
+    : positionPrefsCfg.defaultColumns;
+  const visibleGroupCols = groupPrefs.columns.length
+    ? groupPrefs.columns
+    : positionGroupPrefsCfg.defaultColumns;
+  const posColCount = 1 + visiblePosCols.length;
+  const groupColCount = 1 + visibleGroupCols.length;
+
   const groupFilterOptions = useMemo(
     () => groups.map((g) => ({ value: g.id, label: g.name })),
     [groups],
@@ -257,14 +362,14 @@ function PositionsPageInner() {
   );
 
   const allPosChecked =
-    filteredPositions.length > 0 && filteredPositions.every((d) => checkedPos[d.id]);
+    displayPositions.length > 0 && displayPositions.every((d) => checkedPos[d.id]);
   const somePosChecked =
-    filteredPositions.some((d) => checkedPos[d.id]) && !allPosChecked;
+    displayPositions.some((d) => checkedPos[d.id]) && !allPosChecked;
 
   const allGroupChecked =
-    filteredGroups.length > 0 && filteredGroups.every((g) => checkedGroup[g.id]);
+    displayGroups.length > 0 && displayGroups.every((g) => checkedGroup[g.id]);
   const someGroupChecked =
-    filteredGroups.some((g) => checkedGroup[g.id]) && !allGroupChecked;
+    displayGroups.some((g) => checkedGroup[g.id]) && !allGroupChecked;
 
   useEffect(() => {
     setCheckedPos({});
@@ -288,7 +393,7 @@ function PositionsPageInner() {
   function toggleAllPos(on: boolean) {
     setCheckedPos((prev) => {
       const next = { ...prev };
-      for (const d of filteredPositions) {
+      for (const d of displayPositions) {
         if (on) next[d.id] = true;
         else delete next[d.id];
       }
@@ -303,12 +408,35 @@ function PositionsPageInner() {
   function toggleAllGroup(on: boolean) {
     setCheckedGroup((prev) => {
       const next = { ...prev };
-      for (const g of filteredGroups) {
+      for (const g of displayGroups) {
         if (on) next[g.id] = true;
         else delete next[g.id];
       }
       return next;
     });
+  }
+
+  function exportTableCsv() {
+    if (tab === 'groups') {
+      downloadCsv(
+        `position-groups-${new Date().toISOString().slice(0, 10)}.csv`,
+        displayGroups.map((r) => {
+          const obj: Record<string, string> = {};
+          for (const k of visibleGroupCols)
+            obj[groupPrefs.labelOf(k)] = positionGroupCell(r, k);
+          return obj;
+        }),
+      );
+      return;
+    }
+    downloadCsv(
+      `positions-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayPositions.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visiblePosCols) obj[posPrefs.labelOf(k)] = positionCell(r, k);
+        return obj;
+      }),
+    );
   }
 
   async function deletePosition(id: string) {
@@ -420,6 +548,7 @@ function PositionsPageInner() {
 
   return (
     <div className={list.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="positions" />
 
       <div className={shared.pageHeader}>
@@ -548,6 +677,7 @@ function PositionsPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportTableCsv} />
         </div>
       </div>
 
@@ -656,16 +786,13 @@ function PositionsPageInner() {
                       aria-label="Выбрать все"
                     />
                   </th>
-                  <th>Код</th>
-                  <th>Название</th>
-                  <th>Группа должностей</th>
-                  <th>Создал</th>
-                  <th>Дата создания</th>
-                  <th>Статус</th>
+                  {visiblePosCols.map((key) => (
+                    <th key={key}>{posPrefs.labelOf(key)}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredPositions.map((d) => {
+                {displayPositions.map((d) => {
                   const open = selectedId === d.id;
                   const isChecked = Boolean(checkedPos[d.id]);
                   return (
@@ -684,18 +811,29 @@ function PositionsPageInner() {
                             aria-label={`Выбрать ${d.code || d.name}`}
                           />
                         </td>
-                        <td>{d.code || '—'}</td>
-                        <td className={list.nameCell}>{d.name}</td>
-                        <td>{d.positionGroup?.name || '—'}</td>
-                        <td>{d.createdByLabel || 'Admin'}</td>
-                        <td>{fmtCreated(d.createdAt)}</td>
-                        <td>
-                          <StatusBadge active={d.isActive} />
-                        </td>
+                        {visiblePosCols.map((key) => {
+                          if (key === 'name') {
+                            return (
+                              <td key={key} className={list.nameCell}>
+                                {d.name}
+                              </td>
+                            );
+                          }
+                          if (key === 'isActive') {
+                            return (
+                              <td key={key}>
+                                <StatusBadge active={d.isActive} />
+                              </td>
+                            );
+                          }
+                          return (
+                            <td key={key}>{positionCell(d, key) || '—'}</td>
+                          );
+                        })}
                       </tr>
                       {open ? (
                         <tr className={list.actionsRow}>
-                          <td colSpan={7}>
+                          <td colSpan={posColCount}>
                             <div className={list.rowActions}>
                               <Link href={`/positions/${d.id}/edit`}>
                                 <i className="fas fa-pen" aria-hidden />
@@ -749,9 +887,9 @@ function PositionsPageInner() {
                     </Fragment>
                   );
                 })}
-                {filteredPositions.length === 0 ? (
+                {displayPositions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className={list.empty}>
+                    <td colSpan={posColCount} className={list.empty}>
                       Нет данных
                     </td>
                   </tr>
@@ -788,16 +926,13 @@ function PositionsPageInner() {
                       aria-label="Выбрать все"
                     />
                   </th>
-                  <th>Код</th>
-                  <th>Название</th>
-                  <th>Кол-во должностей</th>
-                  <th>Создал</th>
-                  <th>Дата создания</th>
-                  <th>Статус</th>
+                  {visibleGroupCols.map((key) => (
+                    <th key={key}>{groupPrefs.labelOf(key)}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredGroups.map((g) => {
+                {displayGroups.map((g) => {
                   const open = selectedGroupId === g.id;
                   const isChecked = Boolean(checkedGroup[g.id]);
                   return (
@@ -816,18 +951,29 @@ function PositionsPageInner() {
                             aria-label={`Выбрать ${g.code || g.name}`}
                           />
                         </td>
-                        <td>{g.code || '—'}</td>
-                        <td className={list.nameCell}>{g.name}</td>
-                        <td>{g._count?.positions ?? 0}</td>
-                        <td>Admin</td>
-                        <td>{fmtCreated(g.createdAt)}</td>
-                        <td>
-                          <StatusBadge active={g.isActive} />
-                        </td>
+                        {visibleGroupCols.map((key) => {
+                          if (key === 'name') {
+                            return (
+                              <td key={key} className={list.nameCell}>
+                                {g.name}
+                              </td>
+                            );
+                          }
+                          if (key === 'isActive') {
+                            return (
+                              <td key={key}>
+                                <StatusBadge active={g.isActive} />
+                              </td>
+                            );
+                          }
+                          return (
+                            <td key={key}>{positionGroupCell(g, key) || '—'}</td>
+                          );
+                        })}
                       </tr>
                       {open ? (
                         <tr className={list.actionsRow}>
-                          <td colSpan={7}>
+                          <td colSpan={groupColCount}>
                             <div className={list.rowActions}>
                               <button type="button" onClick={() => openGroupForm(g)}>
                                 <i className="fas fa-pen" aria-hidden />
@@ -895,9 +1041,9 @@ function PositionsPageInner() {
                     </Fragment>
                   );
                 })}
-                {filteredGroups.length === 0 ? (
+                {displayGroups.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className={list.empty}>
+                    <td colSpan={groupColCount} className={list.empty}>
                       Нет данных
                     </td>
                   </tr>

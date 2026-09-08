@@ -5,13 +5,46 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'from', 'to', 'q'] as const;
-const COL_COUNT = 9;
+
+const scheduleShiftsListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.schedule-shifts.v1',
+  title: 'Смены по графику',
+  columns: [
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'workDate', label: 'Дата' },
+    { key: 'number', label: '№' },
+    { key: 'shift', label: 'Смена' },
+    { key: 'status', label: 'Статус' },
+    { key: 'replaced', label: 'Заменено' },
+    { key: 'source', label: 'Источник' },
+    { key: 'schedule', label: 'График работы' },
+  ],
+  defaultColumns: [
+    'employee',
+    'workDate',
+    'number',
+    'shift',
+    'status',
+    'replaced',
+    'source',
+    'schedule',
+  ],
+  defaultSearchKeys: ['employee', 'shift', 'schedule', 'source'],
+  defaultSort: [{ key: 'workDate', dir: 'desc' }],
+  searchableKeys: ['employee', 'shift', 'schedule', 'source', 'status', 'replaced'],
+});
 
 type Emp = {
   id: string;
@@ -74,6 +107,40 @@ function sourceLabel(source: string) {
   return source || '—';
 }
 
+function shiftText(row: Row) {
+  return row.shift
+    ? `${row.shift.code ? `${row.shift.code} — ` : ''}${row.shift.name}`
+    : row.shiftLabel;
+}
+
+function replacedText(row: Row) {
+  if (row.replaced || row.replacedBy) return empName(row.replacedBy) || 'Да';
+  return '';
+}
+
+function cellOf(row: Row, key: string): string {
+  switch (key) {
+    case 'employee':
+      return empName(row.employee);
+    case 'workDate':
+      return fmtDate(row.workDate);
+    case 'number':
+      return row.number != null ? String(row.number) : '';
+    case 'shift':
+      return shiftText(row);
+    case 'status':
+      return statusLabel(row.status, row.replaced).text;
+    case 'replaced':
+      return replacedText(row);
+    case 'source':
+      return sourceLabel(row.source);
+    case 'schedule':
+      return row.schedule?.name || '';
+    default:
+      return '';
+  }
+}
+
 function monthBounds(d = new Date()) {
   const y = d.getFullYear();
   const m = d.getMonth();
@@ -86,6 +153,7 @@ function monthBounds(d = new Date()) {
 function ScheduleShiftsInner() {
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(scheduleShiftsListPrefs);
   const defaults = monthBounds();
   const from = filters.from || searchParams.get('from') || defaults.from;
   const to = filters.to || searchParams.get('to') || defaults.to;
@@ -149,12 +217,24 @@ function ScheduleShiftsInner() {
     );
   }, [rows, searchDraft]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : scheduleShiftsListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -163,7 +243,7 @@ function ScheduleShiftsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -225,23 +305,20 @@ function ScheduleShiftsInner() {
   function exportCsv() {
     downloadCsv(
       `schedule-shifts-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Сотрудник: empName(r.employee),
-        Дата: fmtDate(r.workDate),
-        '№': r.number != null ? String(r.number) : '',
-        Смена: r.shift
-          ? `${r.shift.code ? `${r.shift.code} — ` : ''}${r.shift.name}`
-          : r.shiftLabel,
-        Статус: statusLabel(r.status, r.replaced).text,
-        Источник: sourceLabel(r.source),
-        'График работы': r.schedule?.name || '',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="schedule-shifts" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
@@ -334,6 +411,7 @@ function ScheduleShiftsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -405,42 +483,34 @@ function ScheduleShiftsInner() {
                       if (el) el.indeterminate = somePageChecked;
                     }}
                     onChange={(e) => toggleAllPage(e.target.checked)}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Сотрудник</th>
-                <th>Дата</th>
-                <th>№</th>
-                <th>Смена</th>
-                <th>Статус</th>
-                <th>Заменено</th>
-                <th>Источник</th>
-                <th>График работы</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && !filtered.length ? (
+              {loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && !filtered.length ? (
+              {!loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Обновить из расписаний»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const st = statusLabel(row.status, row.replaced);
-                const shiftText = row.shift
-                  ? `${row.shift.code ? `${row.shift.code} — ` : ''}${row.shift.name}`
-                  : row.shiftLabel;
                 return (
                   <Fragment key={row.id}>
                     <tr
@@ -457,24 +527,59 @@ function ScheduleShiftsInner() {
                           aria-label={`Выбрать ${empName(row.employee)}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{empName(row.employee)}</td>
-                      <td className={styles.codeCell}>{fmtDate(row.workDate)}</td>
-                      <td className={styles.numCell}>{row.number ?? '—'}</td>
-                      <td>{shiftText}</td>
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
-                      <td>
-                        {row.replaced || row.replacedBy
-                          ? empName(row.replacedBy) || 'Да'
-                          : '—'}
-                      </td>
-                      <td>{sourceLabel(row.source)}</td>
-                      <td>{row.schedule?.name || '—'}</td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {empName(row.employee)}
+                            </td>
+                          );
+                        }
+                        if (key === 'workDate') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {fmtDate(row.workDate)}
+                            </td>
+                          );
+                        }
+                        if (key === 'number') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {row.number ?? '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'shift') {
+                          return <td key={key}>{shiftText(row)}</td>;
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={st.cls}>{st.text}</span>
+                            </td>
+                          );
+                        }
+                        if (key === 'replaced') {
+                          return (
+                            <td key={key}>
+                              {row.replaced || row.replacedBy
+                                ? empName(row.replacedBy) || 'Да'
+                                : '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'source') {
+                          return <td key={key}>{sourceLabel(row.source)}</td>;
+                        }
+                        if (key === 'schedule') {
+                          return <td key={key}>{row.schedule?.name || '—'}</td>;
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button
                               type="button"

@@ -6,8 +6,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { PositionTemplateFormModal } from './PositionTemplateForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -31,12 +37,54 @@ type PositionTemplateRow = {
 };
 
 const FILTER_KEYS = ['q', 'status'] as const;
-const COL_COUNT = 7;
+
+const positionTemplateListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.position-templates.v1',
+  title: 'Шаблоны должностей',
+  columns: [
+    { key: 'division', label: 'Подразделение' },
+    { key: 'position', label: 'Должность' },
+    { key: 'grade', label: 'Разряд' },
+    { key: 'schedule', label: 'График работы' },
+    { key: 'tariffGroup', label: 'Тарифная группа' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'division',
+    'position',
+    'grade',
+    'schedule',
+    'tariffGroup',
+    'isActive',
+  ],
+  defaultSearchKeys: ['division', 'position'],
+  defaultSort: [{ key: 'division', dir: 'asc' }],
+});
+
+function positionTemplateCell(row: PositionTemplateRow, key: string): string {
+  switch (key) {
+    case 'division':
+      return row.division?.name || '';
+    case 'position':
+      return row.position?.name || '';
+    case 'grade':
+      return row.grade?.name || '';
+    case 'schedule':
+      return row.schedule?.name || '';
+    case 'tariffGroup':
+      return row.tariffGroup?.name || '';
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
 
 function PositionTemplatesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(positionTemplateListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
 
@@ -50,6 +98,11 @@ function PositionTemplatesPageInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : positionTemplateListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -75,13 +128,21 @@ function PositionTemplatesPageInner() {
     return list;
   }, [rows, q, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, positionTemplateCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -90,7 +151,7 @@ function PositionTemplatesPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -195,7 +256,7 @@ function PositionTemplatesPageInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -258,19 +319,17 @@ function PositionTemplatesPageInner() {
   function exportCsv() {
     downloadCsv(
       `position-templates-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Подразделение: r.division?.name || '',
-        Должность: r.position?.name || '',
-        Разряд: r.grade?.name || '',
-        'График работы': r.schedule?.name || '',
-        'Тарифная группа': r.tariffGroup?.name || '',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = positionTemplateCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="position-templates" />
 
       <div className={shared.pageHeader}>
@@ -343,21 +402,13 @@ function PositionTemplatesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -422,30 +473,27 @@ function PositionTemplatesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Подразделение</th>
-                <th>Должность</th>
-                <th>Разряд</th>
-                <th>График работы</th>
-                <th>Тарифная группа</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const active = row.isActive !== false;
@@ -465,22 +513,33 @@ function PositionTemplatesPageInner() {
                           aria-label={`Выбрать ${row.position?.name || row.code}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.division?.name || '—'}</td>
-                      <td>{row.position?.name || '—'}</td>
-                      <td>{row.grade?.name || '—'}</td>
-                      <td>{row.schedule?.name || '—'}</td>
-                      <td>{row.tariffGroup?.name || '—'}</td>
-                      <td>
-                        {active ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'division') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.division?.name || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {active ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={key}>{positionTemplateCell(row, key) || '—'}</td>
+                        );
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openEdit(row.id)}>
                               <i className="fas fa-pen" aria-hidden />
@@ -518,7 +577,7 @@ function PositionTemplatesPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

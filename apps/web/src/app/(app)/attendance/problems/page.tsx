@@ -2,7 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../marks/page.module.css';
 
 type Problem = {
@@ -13,6 +20,29 @@ type Problem = {
   resolved?: boolean;
 };
 
+const problemsListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.attendance-problems.v1',
+  title: 'Проблемные отметки',
+  columns: [
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'device', label: 'Устройство' },
+    { key: 'deviceType', label: 'Тип устройства' },
+    { key: 'markType', label: 'Тип отметки' },
+    { key: 'reason', label: 'Причина' },
+    { key: 'createdAt', label: 'Время' },
+  ],
+  defaultColumns: [
+    'employee',
+    'device',
+    'deviceType',
+    'markType',
+    'reason',
+    'createdAt',
+  ],
+  defaultSearchKeys: ['employee', 'device', 'reason'],
+  defaultSort: [{ key: 'createdAt', dir: 'desc' }],
+});
+
 function reasonLabel(reason: string) {
   if (reason === 'device_clock_skew') return 'Сдвиг часов терминала';
   if (reason === 'device_clock_rollback') return 'Часы терминала откатили назад';
@@ -22,11 +52,45 @@ function reasonLabel(reason: string) {
   return reason;
 }
 
+function payloadField(p: Record<string, unknown>, keys: string[]) {
+  for (const k of keys) {
+    const v = p[k];
+    if (typeof v === 'string' && v.trim()) return v;
+  }
+  return '';
+}
+
+function problemCell(r: Problem, key: string): string {
+  const p = r.payload || {};
+  switch (key) {
+    case 'employee':
+      return payloadField(p, ['employeeName', 'fullName', 'employeeExternalId']);
+    case 'device':
+      return payloadField(p, ['deviceName', 'serialNumber']);
+    case 'deviceType':
+      return payloadField(p, ['deviceType', 'adapterType']);
+    case 'markType':
+      return payloadField(p, ['markType', 'direction']);
+    case 'reason':
+      return reasonLabel(r.reason);
+    case 'createdAt':
+      return new Date(r.createdAt).toLocaleString('ru-RU');
+    default:
+      return '';
+  }
+}
+
 function ProblemsInner() {
+  const prefs = useTablePrefs(problemsListPrefs);
   const [rows, setRows] = useState<Problem[]>([]);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : problemsListPrefs.defaultColumns;
+  const colCount = visibleCols.length + 1;
 
   async function load() {
     setError('');
@@ -50,6 +114,12 @@ function ProblemsInner() {
     );
   }, [rows, q]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, problemCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   async function resolve(id: string) {
     setBusy(true);
     try {
@@ -62,16 +132,20 @@ function ProblemsInner() {
     }
   }
 
-  function payloadField(p: Record<string, unknown>, keys: string[]) {
-    for (const k of keys) {
-      const v = p[k];
-      if (typeof v === 'string' && v.trim()) return v;
-    }
-    return '—';
+  function exportCsv() {
+    downloadCsv(
+      `attendance-problems-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = problemCell(r, k);
+        return obj;
+      }),
+    );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="marks" titleOverride="Список проблемных отметок" />
       <div className={styles.toolbar}>
         <div className={styles.rightTools}>
@@ -82,11 +156,12 @@ function ProblemsInner() {
             onChange={(e) => setQ(e.target.value)}
           />
           <span className={styles.pagerMeta}>
-            {filtered.length}/{rows.length}
+            {displayRows.length}/{rows.length}
           </span>
           <button type="button" className={styles.btnGhost} onClick={() => void load()}>
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -94,52 +169,37 @@ function ProblemsInner() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Сотрудник</th>
-              <th>Устройство</th>
-              <th>Тип устройства</th>
-              <th>Тип отметки</th>
-              <th>Причина</th>
-              <th>Время</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
               <th />
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {displayRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => {
-                const p = r.payload || {};
-                return (
-                  <tr key={r.id}>
-                    <td>
-                      {payloadField(p, [
-                        'employeeName',
-                        'fullName',
-                        'employeeExternalId',
-                      ])}
-                    </td>
-                    <td>{payloadField(p, ['deviceName', 'serialNumber'])}</td>
-                    <td>{payloadField(p, ['deviceType', 'adapterType'])}</td>
-                    <td>{payloadField(p, ['markType', 'direction'])}</td>
-                    <td>{reasonLabel(r.reason)}</td>
-                    <td>{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.btnBlue}
-                        disabled={busy}
-                        onClick={() => void resolve(r.id)}
-                      >
-                        Решить
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
+              displayRows.map((r) => (
+                <tr key={r.id}>
+                  {visibleCols.map((key) => (
+                    <td key={key}>{problemCell(r, key) || '—'}</td>
+                  ))}
+                  <td>
+                    <button
+                      type="button"
+                      className={styles.btnBlue}
+                      disabled={busy}
+                      onClick={() => void resolve(r.id)}
+                    >
+                      Решить
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

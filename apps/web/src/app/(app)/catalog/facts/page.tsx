@@ -5,8 +5,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { FactFormModal } from './FactFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -34,7 +40,31 @@ type FactRow = {
 };
 
 const FILTER_KEYS = ['q', 'status'] as const;
-const COL_COUNT = 8;
+
+const factListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.facts.v1',
+  title: 'Факты',
+  columns: [
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'factType', label: 'Тип' },
+    { key: 'value', label: 'Значение факта' },
+    { key: 'factDate', label: 'Дата' },
+    { key: 'employmentSource', label: 'Источник занятости' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'employee',
+    'division',
+    'factType',
+    'value',
+    'factDate',
+    'employmentSource',
+    'status',
+  ],
+  defaultSearchKeys: ['employee', 'division', 'factType', 'value'],
+  defaultSort: [{ key: 'factDate', dir: 'desc' }],
+});
 
 function empName(e?: Emp | null) {
   if (!e) return '—';
@@ -54,10 +84,32 @@ function isActiveStatus(status?: string | null) {
   return !status || status === 'active';
 }
 
+function factCell(row: FactRow, key: string): string {
+  switch (key) {
+    case 'employee':
+      return empName(row.employee);
+    case 'division':
+      return row.division?.name || '';
+    case 'factType':
+      return row.factType?.name || '';
+    case 'value':
+      return row.value || '';
+    case 'factDate':
+      return fmtDate(row.factDate);
+    case 'employmentSource':
+      return row.employmentSource || '';
+    case 'status':
+      return isActiveStatus(row.status) ? 'Активный' : row.status || 'Неактивный';
+    default:
+      return '';
+  }
+}
+
 function FactsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(factListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
 
@@ -70,6 +122,11 @@ function FactsPageInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : factListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -98,13 +155,21 @@ function FactsPageInner() {
     return list;
   }, [rows, q, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, factCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -113,7 +178,7 @@ function FactsPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -194,7 +259,7 @@ function FactsPageInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -235,20 +300,17 @@ function FactsPageInner() {
   function exportCsv() {
     downloadCsv(
       `facts-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Сотрудник: empName(r.employee),
-        Подразделение: r.division?.name || '',
-        Тип: r.factType?.name || '',
-        'Значение факта': r.value,
-        Дата: fmtDate(r.factDate),
-        'Источник занятости': r.employmentSource || '',
-        Статус: isActiveStatus(r.status) ? 'Активный' : r.status || 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = factCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="facts" />
 
       <div className={shared.pageHeader}>
@@ -329,21 +391,13 @@ function FactsPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -408,31 +462,27 @@ function FactsPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Сотрудник</th>
-                <th>Подразделение</th>
-                <th>Тип</th>
-                <th>Значение факта</th>
-                <th>Дата</th>
-                <th>Источник занятости</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const active = isActiveStatus(row.status);
@@ -452,25 +502,33 @@ function FactsPageInner() {
                           aria-label={`Выбрать ${row.value}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{empName(row.employee)}</td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td>{row.factType?.name || '—'}</td>
-                      <td>{row.value}</td>
-                      <td>{fmtDate(row.factDate)}</td>
-                      <td>{row.employmentSource || '—'}</td>
-                      <td>
-                        {active ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>
-                            {row.status || 'Неактивный'}
-                          </span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {empName(row.employee)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              {active ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>
+                                  {row.status || 'Неактивный'}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{factCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button
                               type="button"
@@ -493,7 +551,7 @@ function FactsPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

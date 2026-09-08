@@ -7,22 +7,61 @@ import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { fmtDt, type SettlementDoc } from '@/lib/settlements';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { SettlementFormModal } from './SettlementFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/settlements';
 const PAGE_SIZE = 50;
-const COL_COUNT = 6;
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to'] as const;
+
+const settlementsListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.settlements.v1',
+  title: 'Взаиморасчеты',
+  columns: [
+    { key: 'number', label: 'Номер взаиморасчета' },
+    { key: 'docDate', label: 'Дата взаиморасчета' },
+    { key: 'createdBy', label: 'Создал' },
+    { key: 'createdAt', label: 'Дата создания' },
+    { key: 'note', label: 'Примечание' },
+  ],
+  defaultColumns: ['number', 'docDate', 'createdBy', 'createdAt', 'note'],
+  defaultSearchKeys: ['number', 'createdBy', 'note'],
+  defaultSort: [{ key: 'docDate', dir: 'desc' }],
+  searchableKeys: ['number', 'createdBy', 'note'],
+});
+
+function cellOf(row: SettlementDoc, key: string): string {
+  switch (key) {
+    case 'number':
+      return row.number || '';
+    case 'docDate':
+      return fmtDt(row.docDate);
+    case 'createdBy':
+      return row.createdByName || '';
+    case 'createdAt':
+      return fmtDt(row.createdAt);
+    case 'note':
+      return row.note || '';
+    default:
+      return '';
+  }
+}
 
 function SettlementsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(settlementsListPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<SettlementDoc[]>([]);
@@ -76,8 +115,19 @@ function SettlementsInner() {
     });
   }, [rows, q, filters]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : settlementsListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
+  const paged = displayRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const pageIds = paged.map((r) => r.id);
   const allPageChecked = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const somePageChecked = pageIds.some((id) => selected.has(id)) && !allPageChecked;
@@ -157,19 +207,20 @@ function SettlementsInner() {
   function exportCsv() {
     downloadCsv(
       `settlements-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Номер: r.number || '',
-        Дата: fmtDt(r.docDate),
-        Создал: r.createdByName || '',
-        'Дата создания': fmtDt(r.createdAt),
-        Примечание: r.note || '',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="settlements" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
@@ -282,6 +333,7 @@ function SettlementsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -354,24 +406,22 @@ function SettlementsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Номер взаиморасчета</th>
-                <th>Дата взаиморасчета</th>
-                <th>Создал</th>
-                <th>Дата создания</th>
-                <th>Примечание</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && paged.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
               {!loading && paged.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
@@ -399,15 +449,41 @@ function SettlementsInner() {
                           aria-label={`Выбрать ${row.number || 'документ'}`}
                         />
                       </td>
-                      <td className={styles.docNumber}>{row.number || '—'}</td>
-                      <td className={styles.dateCell}>{fmtDt(row.docDate)}</td>
-                      <td className={styles.nameCell}>{row.createdByName || '—'}</td>
-                      <td className={styles.dateCell}>{fmtDt(row.createdAt)}</td>
-                      <td className={styles.noteCell}>{row.note || '—'}</td>
+                      {visibleCols.map((key) => {
+                        if (key === 'number') {
+                          return (
+                            <td key={key} className={styles.docNumber}>
+                              {row.number || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'docDate' || key === 'createdAt') {
+                          return (
+                            <td key={key} className={styles.dateCell}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'createdBy') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.createdByName || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'note') {
+                          return (
+                            <td key={key} className={styles.noteCell}>
+                              {row.note || '—'}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`${PATH}/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

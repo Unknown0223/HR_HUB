@@ -8,10 +8,16 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
 import { formatMonthRu } from '@/lib/fine-policies';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -59,12 +65,27 @@ type ServiceRow = {
 type DivisionOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'contractId', 'divisionId', 'status', 'month'] as const;
-const COL_COUNT = 6;
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Черновик',
   posted: 'Проведен',
   cancelled: 'Отменен',
 };
+
+const gphServicesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.gph-services.v1',
+  title: 'Услуги ГПХ',
+  columns: [
+    { key: 'contractNumber', label: 'Номер договора' },
+    { key: 'month', label: 'Месяц' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'person', label: 'Физическое лицо' },
+    { key: 'status', label: 'Состояние' },
+  ],
+  defaultColumns: ['contractNumber', 'month', 'division', 'person', 'status'],
+  defaultSearchKeys: ['contractNumber', 'person', 'division'],
+  defaultSort: [{ key: 'month', dir: 'asc' }],
+  searchableKeys: ['contractNumber', 'person', 'division', 'status'],
+});
 
 function personName(p?: PersonRef | null) {
   if (!p) return '';
@@ -118,10 +139,34 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function cellOf(row: ServiceRow, key: string): string {
+  switch (key) {
+    case 'contractNumber':
+      return row.contract?.number || '';
+    case 'month': {
+      const monthIso = rowMonthIso(row);
+      return monthIso ? formatMonthRu(monthIso) : '';
+    }
+    case 'division':
+      return rowDivision(row) === '—' ? '' : rowDivision(row);
+    case 'person': {
+      const p = rowPerson(row);
+      return p === '—' ? '' : p;
+    }
+    case 'status': {
+      const st = rowStatus(row);
+      return STATUS_LABEL[st] || st;
+    }
+    default:
+      return '';
+  }
+}
+
 function GphServicesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(gphServicesListPrefs);
   const q = filters.q;
   const numberFilter = filters.number;
   const contractIdFromUrl =
@@ -147,7 +192,6 @@ function GphServicesPageInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [exportBusy, setExportBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -193,13 +237,7 @@ function GphServicesPageInner() {
       const ym = monthValue(monthFilter);
       list = list.filter((r) => monthValue(rowMonthIso(r)) === ym);
     }
-    const dir = sortDir === 'asc' ? 1 : -1;
-    return [...list].sort((a, b) => {
-      const am = rowMonthIso(a) || '9999-12-31';
-      const bm = rowMonthIso(b) || '9999-12-31';
-      if (am !== bm) return am < bm ? -dir : dir;
-      return String(a.contract?.number || '').localeCompare(String(b.contract?.number || ''), 'ru');
-    });
+    return list;
   }, [
     rows,
     q,
@@ -208,15 +246,26 @@ function GphServicesPageInner() {
     divisionIdFilter,
     statusFilter,
     monthFilter,
-    sortDir,
   ]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : gphServicesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -225,7 +274,7 @@ function GphServicesPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -399,7 +448,7 @@ function GphServicesPageInner() {
   }
 
   async function runBulkDelete() {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (!targets.length) return;
     if (!(await confirm(`Удалить выбранные услуги (${targets.length})?`))) return;
     setBusy(true);
@@ -425,15 +474,13 @@ function GphServicesPageInner() {
   function exportCsv() {
     downloadCsv(
       `gph-services-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        'Номер договора': r.contract?.number || '',
-        Месяц: rowMonthIso(r) ? formatMonthRu(rowMonthIso(r)) : '',
-        Подразделение: rowDivision(r),
-        'Физическое лицо': rowPerson(r),
-        Состояние: STATUS_LABEL[rowStatus(r)] || rowStatus(r),
-        Наименование: r.name,
-        Код: r.code,
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
@@ -461,6 +508,7 @@ function GphServicesPageInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="gph-services" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
@@ -590,6 +638,7 @@ function GphServicesPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -736,42 +785,30 @@ function GphServicesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Номер договора</th>
-                <th>
-                  <button
-                    type="button"
-                    className={styles.sortBtn}
-                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  >
-                    Месяц
-                    <span className={styles.sortMark}>{sortDir === 'asc' ? '↑' : '↓'}</span>
-                  </button>
-                </th>
-                <th>Подразделение</th>
-                <th>Физическое лицо</th>
-                <th>Состояние</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const st = rowStatus(row);
-                const monthIso = rowMonthIso(row);
                 return (
                   <Fragment key={row.id}>
                     <tr
@@ -788,27 +825,44 @@ function GphServicesPageInner() {
                           aria-label={`Выбрать ${row.contract?.number || row.code}`}
                         />
                       </td>
-                      <td className={styles.numberCell}>{row.contract?.number || '—'}</td>
-                      <td>{monthIso ? formatMonthRu(monthIso) : '—'}</td>
-                      <td>{rowDivision(row)}</td>
-                      <td className={styles.empName}>{rowPerson(row)}</td>
-                      <td>
-                        <span
-                          className={
-                            st === 'posted'
-                              ? styles.statusPosted
-                              : st === 'cancelled'
-                                ? styles.statusCancelled
-                                : styles.statusDraft
-                          }
-                        >
-                          {STATUS_LABEL[st] || st}
-                        </span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'contractNumber') {
+                          return (
+                            <td key={key} className={styles.numberCell}>
+                              {row.contract?.number || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'person') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {rowPerson(row)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={
+                                  st === 'posted'
+                                    ? styles.statusPosted
+                                    : st === 'cancelled'
+                                      ? styles.statusCancelled
+                                      : styles.statusDraft
+                                }
+                              >
+                                {STATUS_LABEL[st] || st}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" disabled={busy} onClick={() => openEdit(row)}>
                               <i className="fas fa-pen" aria-hidden />

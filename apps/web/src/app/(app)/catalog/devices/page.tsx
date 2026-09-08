@@ -8,8 +8,14 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   blankDeviceForm,
   DeviceFormModal,
@@ -37,7 +43,28 @@ type Device = {
 };
 
 const FILTER_KEYS = ['q', 'status', 'location', 'active'] as const;
-const COL_COUNT = 7;
+
+const deviceListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.devices.v1',
+  title: 'Устройства',
+  columns: [
+    { key: 'name', label: 'Устройство' },
+    { key: 'location', label: 'Локация' },
+    { key: 'zone', label: 'Зона' },
+    { key: 'status', label: 'Статус' },
+    { key: 'activity', label: 'Активность' },
+    { key: 'battery', label: 'Батарея' },
+    { key: 'serialNumber', label: 'Серийный номер' },
+    { key: 'model', label: 'Модель' },
+    { key: 'deviceType', label: 'Тип' },
+    { key: 'isActive', label: 'Активен' },
+    { key: 'host', label: 'Host' },
+  ],
+  defaultColumns: ['name', 'location', 'zone', 'status', 'activity', 'battery'],
+  defaultSearchKeys: ['name', 'serialNumber', 'location', 'deviceType'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+  searchableKeys: ['name', 'serialNumber', 'location', 'deviceType', 'model', 'host'],
+});
 
 function fmtDt(iso?: string | null) {
   if (!iso) return '—';
@@ -76,6 +103,43 @@ function statusLabel(status: string, isActive: boolean, locked?: boolean) {
   return status;
 }
 
+function zoneOf(d: Device) {
+  return (
+    (typeof d.meta?.timezone === 'string' && d.meta.timezone) ||
+    d.location?.timezone ||
+    ''
+  );
+}
+
+function deviceCell(d: Device, key: string): string {
+  switch (key) {
+    case 'name':
+      return d.name || '';
+    case 'location':
+      return d.location?.name || '';
+    case 'zone':
+      return zoneOf(d);
+    case 'status':
+      return statusLabel(d.status, d.isActive, punchLockActive(d.meta));
+    case 'activity':
+      return d.lastSeenAt ? fmtDt(d.lastSeenAt) : '';
+    case 'battery':
+      return typeof d.meta?.battery === 'number' ? `${d.meta.battery}%` : '';
+    case 'serialNumber':
+      return d.serialNumber || '';
+    case 'model':
+      return d.model || '';
+    case 'deviceType':
+      return deviceTypeLabel(d);
+    case 'isActive':
+      return d.isActive ? 'Да' : 'Нет';
+    case 'host':
+      return d.host || '';
+    default:
+      return '';
+  }
+}
+
 function toForm(d: Device): DeviceFormValues {
   const meta = { ...blankDeviceForm().meta, ...(d.meta || {}) };
   return {
@@ -98,6 +162,7 @@ function DevicesInner() {
   const searchParams = useSearchParams();
   const filterNew = searchParams.get('filter') === 'new';
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(deviceListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
   const locationFilter = filters.location;
@@ -193,12 +258,24 @@ function DevicesInner() {
     return list;
   }, [rows, q, statusFilter, locationFilter, activeFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, deviceCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : deviceListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   const editing = editId ? rows.find((r) => r.id === editId) || null : null;
 
@@ -209,7 +286,7 @@ function DevicesInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -408,14 +485,13 @@ function DevicesInner() {
   function exportCsv() {
     downloadCsv(
       `devices-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((d) => ({
-        Название: d.name,
-        'Серийный номер': d.serialNumber || '',
-        Тип: deviceTypeLabel(d),
-        Локация: d.location?.name || '',
-        Статус: statusLabel(d.status, d.isActive, punchLockActive(d.meta)),
-        Активность: d.lastSeenAt || '',
-      })),
+      displayRows.map((d) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = deviceCell(d, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
@@ -449,6 +525,7 @@ function DevicesInner() {
         groupKey="devices"
         titleOverride={filterNew ? 'Новые устройства' : 'Устройства'}
       />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}>
@@ -567,6 +644,7 @@ function DevicesInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -631,30 +709,27 @@ function DevicesInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Устройство</th>
-                <th>Локация</th>
-                <th>Зона</th>
-                <th>Статус</th>
-                <th>Активность</th>
-                <th>Батарея</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     {filterNew ? 'Нет новых устройств' : 'Нет данных — нажмите «Создать»'}
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((d) => {
+              {displayRows.map((d) => {
                 const online = d.isActive && d.status.toLowerCase() === 'online';
                 const open = selectedId === d.id;
                 const isChecked = Boolean(checked[d.id]);
@@ -674,51 +749,68 @@ function DevicesInner() {
                           aria-label={`Выбрать ${d.name}`}
                         />
                       </td>
-                      <td>
-                        <div className={styles.deviceCell}>
-                          <span
-                            className={`${styles.deviceIcon} ${
-                              online ? styles.deviceIconOn : styles.deviceIconOff
-                            }`}
-                            aria-hidden
-                          >
-                            <i className="fas fa-desktop" />
-                          </span>
-                          <div>
-                            <div className={styles.nameCell}>{d.name}</div>
-                            <div className={styles.metaCell}>
-                              {deviceTypeLabel(d)}
-                              {d.serialNumber ? ` · ${d.serialNumber}` : ''}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{d.location?.name || '—'}</td>
-                      <td className={styles.mono}>
-                        {(typeof d.meta?.timezone === 'string' && d.meta.timezone) ||
-                          d.location?.timezone ||
-                          '—'}
-                      </td>
-                      <td>
-                        <span
-                          className={`${styles.statusChip} ${statusClass(
-                            d.status,
-                            punchLockActive(d.meta),
-                          )}`}
-                        >
-                          {statusLabel(d.status, d.isActive, punchLockActive(d.meta))}
-                        </span>
-                      </td>
-                      <td className={styles.mono}>{fmtDt(d.lastSeenAt)}</td>
-                      <td>
-                        {typeof d.meta?.battery === 'number'
-                          ? `${d.meta.battery}%`
-                          : '—'}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key}>
+                              <div className={styles.deviceCell}>
+                                <span
+                                  className={`${styles.deviceIcon} ${
+                                    online ? styles.deviceIconOn : styles.deviceIconOff
+                                  }`}
+                                  aria-hidden
+                                >
+                                  <i className="fas fa-desktop" />
+                                </span>
+                                <div>
+                                  <div className={styles.nameCell}>{d.name}</div>
+                                  <div className={styles.metaCell}>
+                                    {deviceTypeLabel(d)}
+                                    {d.serialNumber ? ` · ${d.serialNumber}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        }
+                        if (key === 'zone') {
+                          return (
+                            <td key={key} className={styles.mono}>
+                              {zoneOf(d) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={`${styles.statusChip} ${statusClass(
+                                  d.status,
+                                  punchLockActive(d.meta),
+                                )}`}
+                              >
+                                {statusLabel(
+                                  d.status,
+                                  d.isActive,
+                                  punchLockActive(d.meta),
+                                )}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'activity') {
+                          return (
+                            <td key={key} className={styles.mono}>
+                              {fmtDt(d.lastSeenAt)}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{deviceCell(d, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/devices/${d.id}`}>
                               <i className="fas fa-eye" aria-hidden />

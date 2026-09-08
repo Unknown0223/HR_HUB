@@ -4,10 +4,16 @@ import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'r
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { confirm } from '@/lib/dialogs';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { ClearanceSheetFormModal } from './ClearanceSheetFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -49,7 +55,6 @@ type ClearanceRow = {
 type EmpOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'status', 'employeeId', 'from', 'to'] as const;
-const COL_COUNT = 6;
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Открыт',
@@ -57,6 +62,21 @@ const STATUS_LABEL: Record<string, string> = {
   completed: 'Завершён',
   cancelled: 'Отменён',
 };
+
+const clearanceListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.clearance-sheets.v1',
+  title: 'Обходные листы',
+  columns: [
+    { key: 'number', label: 'Номер' },
+    { key: 'documentDate', label: 'Дата' },
+    { key: 'owner', label: 'Владелец' },
+    { key: 'signedCount', label: 'Количество подписаний' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: ['number', 'documentDate', 'owner', 'signedCount', 'status'],
+  defaultSearchKeys: ['number', 'owner'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -82,10 +102,28 @@ function statusClass(status: string) {
   return styles.badgeOpen;
 }
 
+function clearanceCell(row: ClearanceRow, key: string): string {
+  switch (key) {
+    case 'number':
+      return row.number || '';
+    case 'documentDate':
+      return fmtDate(row.documentDate || row.createdAt);
+    case 'owner':
+      return empName(row.employee);
+    case 'signedCount':
+      return `${signedCount(row)} / ${(row.items || []).length}`;
+    case 'status':
+      return STATUS_LABEL[row.status] || row.status;
+    default:
+      return '';
+  }
+}
+
 function ClearanceSheetsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(clearanceListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
   const employeeIdFilter = filters.employeeId;
@@ -105,6 +143,11 @@ function ClearanceSheetsPageInner() {
   const [exportBusy, setExportBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : clearanceListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -139,12 +182,19 @@ function ClearanceSheetsPageInner() {
     return list;
   }, [rows, q, statusFilter, employeeIdFilter, from, to]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, clearanceCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const someChecked = filtered.some((r) => checked[r.id]) && !allChecked;
+  const allChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const someChecked = displayRows.some((r) => checked[r.id]) && !allChecked;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -207,7 +257,7 @@ function ClearanceSheetsPageInner() {
   function toggleAll(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -247,7 +297,7 @@ function ClearanceSheetsPageInner() {
 
   async function runBulk(action: 'complete' | 'cancel' | 'delete') {
     if (checkedIds.length === 0) return;
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     const eligible =
@@ -312,14 +362,11 @@ function ClearanceSheetsPageInner() {
   function exportCsv() {
     downloadCsv(
       `clearance-sheets-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Номер: r.number || '',
-        Дата: fmtDate(r.documentDate || r.createdAt),
-        Владелец: empName(r.employee),
-        Шаблон: r.template?.name || '',
-        'Количество подписаний': `${signedCount(r)} / ${(r.items || []).length}`,
-        Статус: STATUS_LABEL[r.status] || r.status,
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = clearanceCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -340,6 +387,7 @@ function ClearanceSheetsPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="clearance-sheets" />
 
       <div className={shared.pageHeader}>
@@ -423,15 +471,6 @@ function ClearanceSheetsPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
             title="Excel"
@@ -448,6 +487,7 @@ function ClearanceSheetsPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -505,7 +545,7 @@ function ClearanceSheetsPageInner() {
                   <input
                     type="checkbox"
                     checked={allChecked}
-                    disabled={filtered.length === 0}
+                    disabled={displayRows.length === 0}
                     ref={(el) => {
                       if (el) el.indeterminate = someChecked;
                     }}
@@ -513,29 +553,27 @@ function ClearanceSheetsPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Номер</th>
-                <th>Дата</th>
-                <th>Владелец</th>
-                <th>Количество подписаний</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const total = (row.items || []).length;
@@ -556,23 +594,38 @@ function ClearanceSheetsPageInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{row.number || '—'}</td>
-                      <td>{fmtDate(row.documentDate || row.createdAt)}</td>
-                      <td className={styles.empName}>{empName(row.employee)}</td>
-                      <td>
-                        <span className={styles.countPill}>
-                          {signed} / {total}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={statusClass(row.status)}>
-                          {STATUS_LABEL[row.status] || row.status}
-                        </span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'owner') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {empName(row.employee)}
+                            </td>
+                          );
+                        }
+                        if (key === 'signedCount') {
+                          return (
+                            <td key={key}>
+                              <span className={styles.countPill}>
+                                {signed} / {total}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={statusClass(row.status)}>
+                                {STATUS_LABEL[row.status] || row.status}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{clearanceCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.detailBlock}>
                             <div className={styles.rowActions}>
                               {row.status !== 'completed' && row.status !== 'cancelled' ? (
@@ -660,7 +713,7 @@ function ClearanceSheetsPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

@@ -7,8 +7,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { CareerPathFormModal } from './CareerPathForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -24,16 +30,45 @@ type CareerPath = {
 };
 
 const FILTER_KEYS = ['q', 'name', 'code', 'status'] as const;
-const COL_COUNT = 5;
+
+const careerPathListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.career-paths.v1',
+  title: 'Карьерный путь',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'code', label: 'Код' },
+    { key: 'stepCount', label: 'Кол-во должностей' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['name', 'code', 'stepCount', 'isActive'],
+  defaultSearchKeys: ['name', 'code'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 function stepCount(row: CareerPath) {
   return row._count?.steps ?? row.steps?.length ?? 0;
+}
+
+function careerPathCell(row: CareerPath, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'code':
+      return row.code || '';
+    case 'stepCount':
+      return String(stepCount(row));
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    default:
+      return '';
+  }
 }
 
 function CareerPathsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(careerPathListPrefs);
   const q = filters.q;
   const nameFilter = filters.name;
   const codeFilter = filters.code;
@@ -51,6 +86,11 @@ function CareerPathsInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : careerPathListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -70,13 +110,21 @@ function CareerPathsInner() {
     return list;
   }, [rows, q, nameFilter, codeFilter, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, careerPathCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -85,7 +133,7 @@ function CareerPathsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -179,7 +227,7 @@ function CareerPathsInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -235,18 +283,17 @@ function CareerPathsInner() {
   function exportCsv() {
     downloadCsv(
       `career-paths-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        Код: r.code || '',
-        'Кол-во должностей': String(stepCount(r)),
-        'Порядковый номер': r.sortOrder != null ? String(r.sortOrder) : '',
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = careerPathCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="career-paths" />
 
       <div className={shared.pageHeader}>
@@ -321,21 +368,13 @@ function CareerPathsInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -400,28 +439,27 @@ function CareerPathsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Код</th>
-                <th>Кол-во должностей</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -440,20 +478,45 @@ function CareerPathsInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td className={styles.codeCell}>{row.code || '—'}</td>
-                      <td className={styles.numCell}>{stepCount(row)}</td>
-                      <td>
-                        {row.isActive ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'code') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {row.code || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'stepCount') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {stepCount(row)}
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {row.isActive ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{careerPathCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openEdit(row.id)}>
                               <i className="fas fa-pen" aria-hidden />
@@ -495,7 +558,7 @@ function CareerPathsInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

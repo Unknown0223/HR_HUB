@@ -4,6 +4,8 @@
  * Order + Russian labels must match the captured screens.
  */
 
+import { COLUMN_LABEL_OVERRIDES } from './employee-fields';
+
 export type ColumnDef = {
   /** flattenRow / API field path */
   key: string;
@@ -11,10 +13,10 @@ export type ColumnDef = {
   label: string;
 };
 
-/** Общие label map for common keys */
+/** Общие label map for common keys (Verifix employee fields merged in). */
 export const COLUMN_LABELS: Record<string, string> = {
-  tabNumber: 'Таб. №',
-  employee_number: 'Таб. №',
+  tabNumber: 'Табельный номер',
+  employee_number: 'Табельный номер',
   photo_sha: 'Фото',
   gender: 'Пол',
   name: 'ФИО',
@@ -29,8 +31,8 @@ export const COLUMN_LABELS: Record<string, string> = {
   'position.name': 'Должность',
   rank_name: 'Разряд',
   'grade.name': 'Разряд',
-  status: 'Статус',
-  status_name: 'Статус',
+  status: 'Статус на работе',
+  status_name: 'Статус на работе',
   isActive: 'Активен',
   code: 'Код',
   title: 'Наименование',
@@ -42,7 +44,7 @@ export const COLUMN_LABELS: Record<string, string> = {
   employee_names: 'Сотрудники',
   'employee.lastName': 'Фамилия',
   'employee.firstName': 'Имя',
-  'employee.tabNumber': 'Таб. №',
+  'employee.tabNumber': 'Табельный номер',
   posted: 'Проведён',
   posted_name: 'Проведение',
   postedAt: 'Дата проведения',
@@ -57,9 +59,11 @@ export const COLUMN_LABELS: Record<string, string> = {
   begin_date: 'Начало',
   end_date: 'Окончание',
   workDate: 'Дата',
-  phone: 'Телефон',
-  email: 'Email',
+  phone: 'Номер телефона',
+  email: 'E-mail',
   pinfl: 'ПИНФЛ',
+  inn: 'ИНН',
+  inps: 'ИНПС',
   birthDate: 'Дата рождения',
   level: 'Уровень',
   headcount: 'Штат',
@@ -82,7 +86,10 @@ export const COLUMN_LABELS: Record<string, string> = {
   creditAccount: 'Кредит',
   unitPrice: 'Цена',
   unit: 'Ед.',
-  address: 'Адрес',
+  address: 'Адрес места проживания',
+  addressResidence: 'Адрес места проживания',
+  addressRegistration: 'Почтовый адрес',
+  addressPostal: 'Почтовый адрес',
   startTime: 'Начало',
   endTime: 'Окончание',
   weekday: 'День недели',
@@ -124,13 +131,30 @@ export const COLUMN_LABELS: Record<string, string> = {
   'policy.name': 'Политика',
   'staffPosition.title': 'Позиция',
   'location.name': 'Локация',
-  'schedule.name': 'График',
+  'schedule.name': 'График работы',
   'contract.number': 'Договор',
   'trip.title': 'Командировка',
   employmentType: 'Тип занятости',
-  hireDate: 'Дата приёма',
+  hireDate: 'Дата приема на работу',
+  hiredAt: 'Дата приема на работу',
   dismissDate: 'Дата увольнения',
   faceIdStatus: 'Face ID',
+  login: 'Логин',
+  telegram: 'Телеграм',
+  fax: 'Факс',
+  site: 'Сайт',
+  bankAccount: 'Расчетный счет',
+  manager: 'Руководитель',
+  accessLevel: 'Уровень доступа',
+  workStatus: 'Статус на работе',
+  dayState: 'Состояние',
+  arrival: 'Приход',
+  departure: 'Уход',
+  arrivalLocation: 'Локация прихода',
+  distanceKm: 'Общее расстояние (км)',
+  fingerprints: 'Отпечатки',
+  id: 'ИД',
+  ...COLUMN_LABEL_OVERRIDES,
 };
 
 export function labelFor(key: string): string {
@@ -148,9 +172,15 @@ export const RESOURCE_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'middleName', label: 'Отчество' },
     { key: 'gender', label: 'Пол' },
     { key: 'pinfl', label: 'ПИНФЛ' },
-    { key: 'phone', label: 'Телефон' },
-    { key: 'email', label: 'Email' },
-    { key: 'isActive', label: 'Статус' },
+    { key: 'inn', label: 'ИНН' },
+    { key: 'inps', label: 'ИНПС' },
+    { key: 'code', label: 'Код' },
+    { key: 'birthDate', label: 'Дата рождения' },
+    { key: 'phone', label: 'Номер телефона' },
+    { key: 'email', label: 'E-mail' },
+    { key: 'addressResidence', label: 'Адрес места проживания' },
+    { key: 'addressRegistration', label: 'Почтовый адрес' },
+    { key: 'isActive', label: 'Статус на работе' },
   ],
   'hr-documents': [
     { key: 'documentDate', label: 'Дата' },

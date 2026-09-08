@@ -8,9 +8,16 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -40,7 +47,25 @@ type EmpOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'employeeId'] as const;
 const PAGE_SIZES = [25, 50, 100] as const;
-const COL_COUNT = 8;
+
+const WAGE_CHANGE_COLUMNS: ColumnDef[] = [
+  { key: 'documentDate', label: 'Дата документа' },
+  { key: 'number', label: 'Номер документа' },
+  { key: 'employee', label: 'Сотрудник' },
+  { key: 'effectiveAt', label: 'Дата' },
+  { key: 'oldAccruals', label: 'Начисления (до изменения)' },
+  { key: 'newAccruals', label: 'Начисления' },
+  { key: 'posted', label: 'Проведен' },
+];
+
+const wageChangePrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.wage-changes.v1',
+  title: 'Изменения в оплате труда',
+  columns: WAGE_CHANGE_COLUMNS,
+  defaultColumns: WAGE_CHANGE_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['number', 'employee'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -70,10 +95,34 @@ function accrualsLabel(amount?: number | string | null) {
   return `Оклад: ${fmtMoney(amount)}`;
 }
 
+function cellOf(row: WageChangeRow, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(row.createdAt || row.effectiveAt);
+    case 'number':
+      return row.documentNumber || '';
+    case 'employee':
+      return empName(row.employee);
+    case 'effectiveAt':
+      return fmtDate(row.effectiveAt);
+    case 'oldAccruals':
+      return accrualsLabel(row.oldAmount);
+    case 'newAccruals':
+      return accrualsLabel(row.newAmount);
+    case 'posted':
+      if (isPosted(row)) return 'Да';
+      if (row.status === 'cancelled') return 'Отм.';
+      return 'Нет';
+    default:
+      return '';
+  }
+}
+
 function WageChangesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(wageChangePrefsCfg);
   const q = filters.q;
   const from = filters.from;
   const to = filters.to;
@@ -143,14 +192,25 @@ function WageChangesPageInner() {
     return list;
   }, [rows, q, numberFilter, employeeIdFilter, postedFilter, from, to]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : wageChangePrefsCfg.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
+  const sorted = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageRows = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, page, pageSize]);
 
-  const rangeFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeTo = Math.min(page * pageSize, filtered.length);
+  const rangeFrom = sorted.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, sorted.length);
 
   const checkedIds = useMemo(() => Object.keys(checked).filter((id) => checked[id]), [checked]);
   const allPageChecked = pageRows.length > 0 && pageRows.every((r) => checked[r.id]);
@@ -365,15 +425,11 @@ function WageChangesPageInner() {
   function exportCsv() {
     downloadCsv(
       `wage-changes-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        'Дата документа': fmtDate(r.createdAt || r.effectiveAt),
-        'Номер документа': r.documentNumber || '',
-        Сотрудник: empName(r.employee),
-        Дата: fmtDate(r.effectiveAt),
-        'Начисления (до изменения)': accrualsLabel(r.oldAmount),
-        Начисления: accrualsLabel(r.newAmount),
-        Проведен: isPosted(r) ? 'Да' : 'Нет',
-      })),
+      sorted.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -394,6 +450,7 @@ function WageChangesPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="wage-changes" />
 
       <div className={shared.pageHeader}>
@@ -461,7 +518,7 @@ function WageChangesPageInner() {
 
         <div className={styles.rightTools}>
           <span className={styles.countBadge}>
-            {pageRows.length} / {filtered.length}
+            {pageRows.length} / {sorted.length}
           </span>
           <button
             type="button"
@@ -471,15 +528,6 @@ function WageChangesPageInner() {
             aria-label="Фильтр"
           >
             <i className="fas fa-filter" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
           </button>
           <button
             type="button"
@@ -500,6 +548,7 @@ function WageChangesPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -648,26 +697,22 @@ function WageChangesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата документа</th>
-                <th>Номер документа</th>
-                <th>Сотрудник</th>
-                <th>Дата</th>
-                <th>Начисления (до изменения)</th>
-                <th>Начисления</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
               {!loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
@@ -691,25 +736,33 @@ function WageChangesPageInner() {
                           aria-label={`Выбрать ${row.documentNumber || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.createdAt || row.effectiveAt)}</td>
-                      <td>{row.documentNumber || '—'}</td>
-                      <td className={styles.empName}>{empName(row.employee)}</td>
-                      <td>{fmtDate(row.effectiveAt)}</td>
-                      <td>{accrualsLabel(row.oldAmount)}</td>
-                      <td>{accrualsLabel(row.newAmount)}</td>
-                      <td>
-                        {isPosted(row) ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>
-                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                          </span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {isPosted(row) ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>
+                                  {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             {row.status === 'draft' ? (
                               <button
@@ -768,7 +821,7 @@ function WageChangesPageInner() {
             <strong>
               {rangeFrom}–{rangeTo}
             </strong>{' '}
-            из <strong>{filtered.length}</strong>
+            из <strong>{sorted.length}</strong>
           </p>
           <div className={styles.footerPager}>
             <button

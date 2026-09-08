@@ -6,8 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from './page.module.css';
@@ -36,6 +42,18 @@ const DICT_CODE = 'doc_types';
 
 type Mode = 'list' | 'create' | 'edit' | 'view';
 
+const documentTypesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.document-types.v1',
+  title: 'Типы документов',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Название' },
+  ],
+  defaultColumns: ['code', 'name'],
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
 function displayName(row: DictItem) {
   let n = row.name;
   if (row.meta?.isHireDocument && !/\(по умолчанию\)/i.test(n)) {
@@ -44,9 +62,21 @@ function displayName(row: DictItem) {
   return n;
 }
 
+function documentTypeCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return displayName(row);
+    default:
+      return '';
+  }
+}
+
 function DocumentTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(documentTypesListPrefs);
   const q = searchParams?.get('q') || '';
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -67,6 +97,11 @@ function DocumentTypesPageInner() {
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : documentTypesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return rows;
@@ -74,6 +109,12 @@ function DocumentTypesPageInner() {
       [r.code, r.name, displayName(r)].join(' ').toLowerCase().includes(qq),
     );
   }, [rows, q]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, documentTypeCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
 
   async function load() {
     setLoading(true);
@@ -291,13 +332,11 @@ function DocumentTypesPageInner() {
   function exportCsv() {
     downloadCsv(
       `document-types-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: r.code,
-        Название: r.name,
-        'Документ при приеме': r.meta?.isHireDocument ? 'Да' : 'Нет',
-        Обязательный: r.meta?.isMandatory ? 'Да' : 'Нет',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = documentTypeCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -383,6 +422,7 @@ function DocumentTypesPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav group={{ title: 'Типы документов', siblings }} />
 
       <div className={shared.pageHeader}>
@@ -434,10 +474,6 @@ function DocumentTypesPageInner() {
             }}
             aria-label="Поиск"
           />
-          <button type="button" className={styles.exportBtn} onClick={exportCsv} title="Экспорт Excel">
-            <i className="fas fa-file-excel" aria-hidden />
-            Excel
-          </button>
           <span className={styles.pagerMeta} title="Показано / всего">
             {filtered.length} / {rows.length}
           </span>
@@ -451,6 +487,7 @@ function DocumentTypesPageInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -464,35 +501,36 @@ function DocumentTypesPageInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                 />
               </th>
-              <th>Код</th>
-              <th>Название</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   нет данных
                 </td>
               </tr>
             ) : null}
-            {filtered.map((row) => {
+            {displayRows.map((row) => {
               const open = focusId === row.id;
               return (
                 <tr
@@ -515,40 +553,51 @@ function DocumentTypesPageInner() {
                       }}
                     />
                   </td>
-                  <td>{row.code}</td>
-                  <td className={styles.nameCell}>
-                    <span className={styles.nameText}>{displayName(row)}</span>
-                    {open ? (
-                      <div
-                        className={`${styles.inlineActions} ${styles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button type="button" onClick={() => openView(row)}>
-                          Просмотреть
-                        </button>
-                        <button type="button" onClick={() => openEdit(row)}>
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || row.meta?.isMandatory}
-                          onClick={() =>
-                            void patchMeta(row, { isMandatory: true })
-                          }
-                        >
-                          Сделать обязательным
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.danger}
-                          disabled={busy}
-                          onClick={() => void runDelete(row)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
+                  {visibleCols.map((key) => {
+                    if (key === 'code') {
+                      return <td key={key}>{row.code}</td>;
+                    }
+                    if (key === 'name') {
+                      return (
+                        <td key={key} className={styles.nameCell}>
+                          <span className={styles.nameText}>{displayName(row)}</span>
+                          {open ? (
+                            <div
+                              className={`${styles.inlineActions} ${styles.rowActions}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button type="button" onClick={() => openView(row)}>
+                                Просмотреть
+                              </button>
+                              <button type="button" onClick={() => openEdit(row)}>
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy || row.meta?.isMandatory}
+                                onClick={() =>
+                                  void patchMeta(row, { isMandatory: true })
+                                }
+                              >
+                                Сделать обязательным
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runDelete(row)}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={key}>{documentTypeCell(row, key) || '—'}</td>
+                    );
+                  })}
                 </tr>
               );
             })}

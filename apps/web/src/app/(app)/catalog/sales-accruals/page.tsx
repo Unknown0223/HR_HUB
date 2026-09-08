@@ -6,8 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   fmtDate,
   money,
@@ -20,12 +26,59 @@ import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/sales-accruals';
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to'] as const;
-const COL_COUNT = 8;
+
+const salesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.sales-accruals.v1',
+  title: 'Начисление % от продаж',
+  columns: [
+    { key: 'docDate', label: 'Дата' },
+    { key: 'number', label: 'Номер' },
+    { key: 'periodFrom', label: 'Дата начала' },
+    { key: 'periodTo', label: 'Дата окончания' },
+    { key: 'paymentType', label: 'Тип начисление' },
+    { key: 'totalAmount', label: 'Сумма' },
+    { key: 'posted', label: 'Проведен' },
+  ],
+  defaultColumns: [
+    'docDate',
+    'number',
+    'periodFrom',
+    'periodTo',
+    'paymentType',
+    'totalAmount',
+    'posted',
+  ],
+  defaultSearchKeys: ['number', 'paymentType'],
+  defaultSort: [{ key: 'docDate', dir: 'asc' }],
+  searchableKeys: ['number', 'paymentType'],
+});
+
+function cellOf(row: SalesAccrualDoc, key: string): string {
+  switch (key) {
+    case 'docDate':
+      return fmtDate(row.docDate);
+    case 'number':
+      return row.number || '';
+    case 'periodFrom':
+      return fmtDate(row.periodFrom);
+    case 'periodTo':
+      return fmtDate(row.periodTo);
+    case 'paymentType':
+      return payTypeLabel(row.paymentType);
+    case 'totalAmount':
+      return money(row.totalAmount);
+    case 'posted':
+      return row.status === 'posted' ? 'Да' : 'Нет';
+    default:
+      return '';
+  }
+}
 
 function Inner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(salesListPrefs);
   const q = filters.q;
   const [rows, setRows] = useState<SalesAccrualDoc[]>([]);
   const [error, setError] = useState('');
@@ -37,7 +90,6 @@ function Inner() {
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(filters.number || filters.posted || filters.from || filters.to),
   );
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [modalOpen, setModalOpen] = useState(false);
 
   async function load() {
@@ -67,7 +119,7 @@ function Inner() {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    return rows.filter((r) => {
       if (filters.number && !String(r.number || '').includes(filters.number.trim())) return false;
       if (filters.posted === 'yes' && r.status !== 'posted') return false;
       if (filters.posted === 'no' && r.status === 'posted') return false;
@@ -78,15 +130,18 @@ function Inner() {
       const blob = [r.number, r.title, payTypeLabel(r.paymentType), r.note].join(' ').toLowerCase();
       return blob.includes(qq);
     });
-    const dir = sortDir === 'asc' ? 1 : -1;
-    list = [...list].sort((a, b) => {
-      const ad = String(a.docDate || '');
-      const bd = String(b.docDate || '');
-      if (ad !== bd) return ad < bd ? -dir : dir;
-      return String(a.number).localeCompare(String(b.number));
-    });
-    return list;
-  }, [rows, q, filters.number, filters.posted, filters.from, filters.to, sortDir]);
+  }, [rows, q, filters.number, filters.posted, filters.from, filters.to]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : salesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
@@ -96,8 +151,9 @@ function Inner() {
     () => filtered.filter((r) => checked[r.id]),
     [filtered, checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -106,7 +162,7 @@ function Inner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -135,6 +191,19 @@ function Inner() {
   function closeModal() {
     setModalOpen(false);
     if (searchParams.get('create') === '1') patchUrl({ create: null });
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `sales-accruals.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
+    );
   }
 
   async function runBulk(kind: 'post' | 'unpost' | 'delete') {
@@ -211,6 +280,7 @@ function Inner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="sales-accruals" />
 
       <div className={shared.pageHeader}>
@@ -274,20 +344,7 @@ function Inner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={() =>
-              downloadCsv(
-                `sales-accruals.csv`,
-                filtered.map((r) => ({
-                  Дата: fmtDate(r.docDate),
-                  Номер: r.number,
-                  'Дата начала': fmtDate(r.periodFrom),
-                  'Дата окончания': fmtDate(r.periodTo),
-                  'Тип начисление': payTypeLabel(r.paymentType),
-                  Сумма: r.totalAmount,
-                  Проведен: r.status === 'posted' ? 'Да' : 'Нет',
-                })),
-              )
-            }
+            onClick={exportCsv}
             title="CSV"
             aria-label="Экспорт CSV"
           >
@@ -302,6 +359,7 @@ function Inner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -366,39 +424,29 @@ function Inner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>
-                  <button
-                    type="button"
-                    className={styles.sortBtn}
-                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  >
-                    Дата {sortDir === 'asc' ? '↑' : '↓'}
-                  </button>
-                </th>
-                <th>Номер</th>
-                <th>Дата начала</th>
-                <th>Дата окончания</th>
-                <th>Тип начисление</th>
-                <th className={styles.numCol}>Сумма</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key} className={key === 'totalAmount' ? styles.numCol : undefined}>
+                    {prefs.labelOf(key)}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = focusId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -417,23 +465,38 @@ function Inner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.docDate)}</td>
-                      <td className={styles.numberCell}>{row.number || '—'}</td>
-                      <td>{fmtDate(row.periodFrom)}</td>
-                      <td>{fmtDate(row.periodTo)}</td>
-                      <td>{payTypeLabel(row.paymentType)}</td>
-                      <td className={styles.numCol}>{money(row.totalAmount)}</td>
-                      <td>
-                        {row.status === 'posted' ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>Нет</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'number') {
+                          return (
+                            <td key={key} className={styles.numberCell}>
+                              {row.number || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'totalAmount') {
+                          return (
+                            <td key={key} className={styles.numCol}>
+                              {money(row.totalAmount)}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {row.status === 'posted' ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>Нет</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`${PATH}/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

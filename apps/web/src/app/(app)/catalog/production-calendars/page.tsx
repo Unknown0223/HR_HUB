@@ -7,7 +7,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { ProductionCalendarForm } from './ProductionCalendarForm';
 import styles from './page.module.css';
 
@@ -22,10 +29,37 @@ type Row = {
   _count?: { days: number };
 };
 
+const productionCalendarListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.production-calendars.v1',
+  title: 'Производственные календари',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'code', label: 'Код' },
+    { key: 'year', label: 'Год' },
+  ],
+  defaultColumns: ['name', 'code', 'year'],
+  defaultSearchKeys: ['name', 'code'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function productionCalendarCell(row: Row, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'code':
+      return row.code || '';
+    case 'year':
+      return String(row.year ?? '');
+    default:
+      return '';
+  }
+}
+
 function ProductionCalendarsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
+  const prefs = useTablePrefs(productionCalendarListPrefs);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,6 +68,11 @@ function ProductionCalendarsInner() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : productionCalendarListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   async function load() {
     setLoading(true);
@@ -85,6 +124,12 @@ function ProductionCalendarsInner() {
     });
   }, [rows, search, filters]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, productionCalendarCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   async function remove(row: Row) {
     if (!(await confirm(`Удалить календарь «${row.name}»?`))) return;
     setBusy(true);
@@ -101,8 +146,20 @@ function ProductionCalendarsInner() {
     }
   }
 
+  function exportCsv() {
+    downloadCsv(
+      `production-calendars-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = productionCalendarCell(r, k);
+        return obj;
+      }),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="production-calendars" />
 
       <div className={styles.toolbar}>
@@ -138,6 +195,7 @@ function ProductionCalendarsInner() {
           <button type="button" className={styles.toolBtn} onClick={() => void load()}>
             ↻
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
           <span className={styles.pagerMeta}>
             {filtered.length}/{rows.length}
           </span>
@@ -151,27 +209,27 @@ function ProductionCalendarsInner() {
           <thead>
             <tr>
               <th className={styles.checkCol} />
-              <th>Название</th>
-              <th>Код</th>
-              <th>Год</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && !filtered.length ? (
+            {loading && !displayRows.length ? (
               <tr>
-                <td colSpan={4} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && !filtered.length ? (
+            {!loading && !displayRows.length ? (
               <tr>
-                <td colSpan={4} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
             ) : null}
-            {filtered.map((row) => {
+            {displayRows.map((row) => {
               const open = selectedId === row.id;
               return (
                 <Fragment key={row.id}>
@@ -188,13 +246,13 @@ function ProductionCalendarsInner() {
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td>{row.name}</td>
-                    <td>{row.code || '—'}</td>
-                    <td>{row.year}</td>
+                    {visibleCols.map((key) => (
+                      <td key={key}>{productionCalendarCell(row, key) || '—'}</td>
+                    ))}
                   </tr>
                   {open ? (
                     <tr className={styles.actionsRow}>
-                      <td colSpan={4}>
+                      <td colSpan={colCount}>
                         <div className={styles.rowActions}>
                           <Link href={`/catalog/production-calendars/${row.id}`}>
                             Изменить

@@ -6,8 +6,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { ReportTemplateFormModal } from './ReportTemplateForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -29,7 +35,31 @@ type ReportTemplateRow = {
 };
 
 const FILTER_KEYS = ['q', 'status'] as const;
-const COL_COUNT = 8;
+
+const reportTemplateListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.report-templates.v1',
+  title: 'Шаблоны отчетов',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'source', label: 'Источник' },
+    { key: 'sourceType', label: 'Тип источника' },
+    { key: 'fileName', label: 'Файл' },
+    { key: 'createdBy', label: 'Создал' },
+    { key: 'createdAt', label: 'Дата' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'name',
+    'source',
+    'sourceType',
+    'fileName',
+    'createdBy',
+    'createdAt',
+    'isActive',
+  ],
+  defaultSearchKeys: ['name', 'source', 'fileName'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 function fmtDate(v?: string | null) {
   if (!v) return '—';
@@ -46,10 +76,32 @@ function fmtDate(v?: string | null) {
   }
 }
 
+function reportTemplateCell(row: ReportTemplateRow, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'source':
+      return row.source || '';
+    case 'sourceType':
+      return row.sourceType || '';
+    case 'fileName':
+      return row.fileName || '';
+    case 'createdBy':
+      return row.createdBy || 'System';
+    case 'createdAt':
+      return fmtDate(row.createdAt);
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
+
 function ReportTemplatesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(reportTemplateListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
 
@@ -63,6 +115,11 @@ function ReportTemplatesPageInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : reportTemplateListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -90,13 +147,21 @@ function ReportTemplatesPageInner() {
     return list;
   }, [rows, q, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, reportTemplateCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -105,7 +170,7 @@ function ReportTemplatesPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -208,7 +273,7 @@ function ReportTemplatesPageInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -271,20 +336,17 @@ function ReportTemplatesPageInner() {
   function exportCsv() {
     downloadCsv(
       `report-templates-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        Источник: r.source || '',
-        'Тип источника': r.sourceType || '',
-        Файл: r.fileName || '',
-        Создал: r.createdBy || '',
-        Дата: fmtDate(r.createdAt),
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = reportTemplateCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="report-templates" />
 
       <div className={shared.pageHeader}>
@@ -357,21 +419,13 @@ function ReportTemplatesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -436,31 +490,27 @@ function ReportTemplatesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Источник</th>
-                <th>Тип источника</th>
-                <th>Файл</th>
-                <th>Создал</th>
-                <th>Дата</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const active = row.isActive !== false;
@@ -480,23 +530,43 @@ function ReportTemplatesPageInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td>{row.source || '—'}</td>
-                      <td>{row.sourceType || '—'}</td>
-                      <td>{row.fileName || '—'}</td>
-                      <td>{row.createdBy || 'System'}</td>
-                      <td className={styles.codeCell}>{fmtDate(row.createdAt)}</td>
-                      <td>
-                        {active ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'createdBy') {
+                          return <td key={key}>{row.createdBy || 'System'}</td>;
+                        }
+                        if (key === 'createdAt') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {fmtDate(row.createdAt)}
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {active ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={key}>{reportTemplateCell(row, key) || '—'}</td>
+                        );
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openEdit(row.id)}>
                               <i className="fas fa-pen" aria-hidden />
@@ -534,7 +604,7 @@ function ReportTemplatesPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

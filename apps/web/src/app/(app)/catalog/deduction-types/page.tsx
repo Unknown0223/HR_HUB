@@ -7,8 +7,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
@@ -29,7 +35,6 @@ export type DeductionTypeRow = {
   account?: string | null;
 };
 
-const COL_COUNT = 6;
 const PURPOSES = [
   'Штраф',
   'Алименты',
@@ -39,9 +44,42 @@ const PURPOSES = [
   'Прочее',
 ];
 
+const deductionTypeListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.deduction-types.v1',
+  title: 'Удержания',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'sortOrder', label: 'Порядковый номер' },
+    { key: 'name', label: 'Название' },
+    { key: 'shortName', label: 'Краткое название' },
+    { key: 'description', label: 'Описание' },
+  ],
+  defaultColumns: ['code', 'sortOrder', 'name', 'shortName', 'description'],
+  defaultSearchKeys: ['code', 'name', 'shortName'],
+  defaultSort: [{ key: 'sortOrder', dir: 'asc' }],
+});
+
+function deductionTypeCell(row: DeductionTypeRow, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'sortOrder':
+      return row.sortOrder != null ? String(row.sortOrder) : '';
+    case 'name':
+      return row.name || '';
+    case 'shortName':
+      return row.shortName || '';
+    case 'description':
+      return row.description || '';
+    default:
+      return '';
+  }
+}
+
 function DeductionTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(deductionTypeListPrefs);
   const q = searchParams?.get('q') || '';
 
   const [rows, setRows] = useState<DeductionTypeRow[]>([]);
@@ -63,6 +101,11 @@ function DeductionTypesPageInner() {
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : deductionTypeListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return rows;
@@ -75,9 +118,15 @@ function DeductionTypesPageInner() {
     });
   }, [rows, q]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, deductionTypeCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const allChecked =
-    filtered.length > 0 && filtered.every((r) => selected.has(r.id));
-  const someChecked = filtered.some((r) => selected.has(r.id)) && !allChecked;
+    displayRows.length > 0 && displayRows.every((r) => selected.has(r.id));
+  const someChecked = displayRows.some((r) => selected.has(r.id)) && !allChecked;
 
   async function load() {
     setLoading(true);
@@ -225,7 +274,7 @@ function DeductionTypesPageInner() {
       setSelected(new Set());
       return;
     }
-    setSelected(new Set(filtered.map((r) => r.id)));
+    setSelected(new Set(displayRows.map((r) => r.id)));
   }
 
   function toggleOne(id: string, checked: boolean) {
@@ -285,19 +334,17 @@ function DeductionTypesPageInner() {
   function exportCsv() {
     downloadCsv(
       `deductions-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: r.code,
-        'Порядковый номер': r.sortOrder ?? '',
-        Название: r.name,
-        'Краткое название': r.shortName || '',
-        Описание: r.description || '',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = deductionTypeCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="deduction-types" />
 
       <div className={shared.pageHeader}>
@@ -349,21 +396,13 @@ function DeductionTypesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -410,29 +449,27 @@ function DeductionTypesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Код</th>
-                <th>Порядковый номер</th>
-                <th>Название</th>
-                <th>Краткое название</th>
-                <th>Описание</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     нет данных
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = focusId === row.id;
                 const isChecked = selected.has(row.id);
                 return (
@@ -451,15 +488,20 @@ function DeductionTypesPageInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td>{row.code || ''}</td>
-                      <td>{row.sortOrder ?? ''}</td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td>{row.shortName || ''}</td>
-                      <td>{row.description || ''}</td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{deductionTypeCell(row, key)}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/deduction-types/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />
@@ -494,7 +536,7 @@ function DeductionTypesPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из{' '}
+            Показано <strong>{displayRows.length}</strong> из{' '}
             <strong>{rows.length}</strong>
           </p>
         </div>

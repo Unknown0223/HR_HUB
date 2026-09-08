@@ -7,6 +7,11 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -19,6 +24,7 @@ import {
   type CashboxMeta,
   type CashboxRef,
 } from '@/lib/cashboxes';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { MultiLookup } from './MultiLookup';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
@@ -49,6 +55,39 @@ const PAGE_SIZE = 50;
 const LIST_FILTER_KEYS = ['q', 'code', 'name', 'isActive'] as const;
 const HIST_FILTER_KEYS = ['q', 'from', 'to', 'user', 'event', 'product'] as const;
 
+const cashboxesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.cashboxes.v1',
+  title: 'Кассы',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Название' },
+    { key: 'balance', label: 'Баланс' },
+    { key: 'responsible', label: 'Материально ответственное лицо' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['code', 'name', 'balance', 'responsible', 'isActive'],
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function cashboxCell(row: DictItem, key: string): string {
+  const meta = asCashboxMeta(row.meta);
+  switch (key) {
+    case 'code':
+      return displayCode(row.code);
+    case 'name':
+      return row.name || '';
+    case 'balance':
+      return formatBalance(meta.balance) || '';
+    case 'responsible':
+      return labelsOf(meta.responsible) || '';
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
+
 function refsFrom(ids: string[], options: Opt[]): CashboxRef[] {
   return ids
     .map((id) => options.find((o) => o.id === id))
@@ -63,6 +102,7 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
     ...LIST_FILTER_KEYS,
     ...HIST_FILTER_KEYS,
   ]);
+  const prefs = useTablePrefs(cashboxesListPrefs);
   const q = filters.q;
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -106,6 +146,11 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
     ),
   );
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : cashboxesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const codeF = (filters.code || '').trim().toLowerCase();
@@ -132,11 +177,17 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
     });
   }, [rows, q, filters.code, filters.name, filters.isActive]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cashboxCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const p = Math.min(page, pageCount);
-    return filtered.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
-  }, [filtered, page, pageCount]);
+    return displayRows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  }, [displayRows, page, pageCount]);
 
   async function load() {
     setLoading(true);
@@ -340,15 +391,10 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
   function exportCsv() {
     downloadCsv(
       `cashboxes-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => {
-        const meta = asCashboxMeta(r.meta);
-        return {
-          Код: displayCode(r.code),
-          Название: r.name,
-          Баланс: formatBalance(meta.balance),
-          'Материально ответственное лицо': labelsOf(meta.responsible),
-          Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-        };
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cashboxCell(r, k);
+        return obj;
       }),
     );
   }
@@ -539,47 +585,72 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
             aria-label={`Выбрать ${row.name}`}
           />
         </td>
-        <td>{displayCode(row.code)}</td>
-        <td className={styles.nameCell}>
-          <span className={styles.nameText}>{row.name}</span>
-          {open ? (
-            <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-              <button type="button" onClick={() => openEdit(row)}>
-                Изменить
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void setActiveIds([row.id], row.isActive === false)
-                }
-              >
-                {row.isActive === false ? 'Активный' : 'Неактивный'}
-              </button>
-              <button
-                type="button"
-                className={styles.danger}
-                disabled={busy}
-                onClick={() => void deleteIds([row.id])}
-              >
-                Удалить
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td>{formatBalance(meta.balance) || '—'}</td>
-        <td>{labelsOf(meta.responsible) || '—'}</td>
-        <td>
-          <span className={row.isActive === false ? extra.badgeOff : extra.badge}>
-            {row.isActive === false ? 'Неактивный' : 'Активный'}
-          </span>
-        </td>
+        {visibleCols.map((key) => {
+          if (key === 'code') {
+            return <td key={key}>{displayCode(row.code)}</td>;
+          }
+          if (key === 'name') {
+            return (
+              <td key={key} className={styles.nameCell}>
+                <span className={styles.nameText}>{row.name}</span>
+                {open ? (
+                  <div
+                    className={styles.rowActions}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button type="button" onClick={() => openEdit(row)}>
+                      Изменить
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void setActiveIds([row.id], row.isActive === false)
+                      }
+                    >
+                      {row.isActive === false ? 'Активный' : 'Неактивный'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.danger}
+                      disabled={busy}
+                      onClick={() => void deleteIds([row.id])}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
+              </td>
+            );
+          }
+          if (key === 'balance') {
+            return <td key={key}>{formatBalance(meta.balance) || '—'}</td>;
+          }
+          if (key === 'responsible') {
+            return <td key={key}>{labelsOf(meta.responsible) || '—'}</td>;
+          }
+          if (key === 'isActive') {
+            return (
+              <td key={key}>
+                <span
+                  className={
+                    row.isActive === false ? extra.badgeOff : extra.badge
+                  }
+                >
+                  {row.isActive === false ? 'Неактивный' : 'Активный'}
+                </span>
+              </td>
+            );
+          }
+          return <td key={key}>{cashboxCell(row, key) || '—'}</td>;
+        })}
       </tr>
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: 'Кассы',
@@ -699,15 +770,6 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="Excel"
-            aria-label="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Предыдущая страница"
@@ -735,6 +797,7 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -746,34 +809,32 @@ function CashboxesInner({ historyMode }: { historyMode?: boolean }) {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Код</th>
-              <th>Название</th>
-              <th>Баланс</th>
-              <th>Материально ответственное лицо</th>
-              <th>Статус</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>

@@ -6,21 +6,60 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { fmtDate, travelStatusLabel, type TravelDoc } from '@/lib/travel-expenses';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { TravelExpenseFormModal } from './TravelExpenseForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/travel-expenses';
 const FILTER_KEYS = ['q', 'number', 'status', 'from', 'to'] as const;
-const COL_COUNT = 6;
+
+const travelExpensesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.travel-expenses.v1',
+  title: 'Авансовые отчёты',
+  columns: [
+    { key: 'docDate', label: 'Дата' },
+    { key: 'number', label: 'Номер' },
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'trip', label: 'Номер документа командировки' },
+    { key: 'status', label: 'Состояние' },
+  ],
+  defaultColumns: ['docDate', 'number', 'employee', 'trip', 'status'],
+  defaultSearchKeys: ['number', 'employee', 'trip'],
+  defaultSort: [{ key: 'docDate', dir: 'asc' }],
+  searchableKeys: ['number', 'employee', 'trip', 'status'],
+});
+
+function cellOf(row: TravelDoc, key: string): string {
+  switch (key) {
+    case 'docDate':
+      return fmtDate(row.docDate);
+    case 'number':
+      return row.number || '';
+    case 'employee':
+      return row.employee?.label || '';
+    case 'trip':
+      return row.tripNumber || row.trip?.title || '';
+    case 'status':
+      return travelStatusLabel(row.status);
+    default:
+      return '';
+  }
+}
 
 function TravelExpensesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(travelExpensesListPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<TravelDoc[]>([]);
@@ -34,7 +73,6 @@ function TravelExpensesInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   async function load() {
     setLoading(true);
@@ -63,7 +101,7 @@ function TravelExpensesInner() {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    return rows.filter((r) => {
       if (filters.number && !String(r.number || '').includes(filters.number.trim())) return false;
       if (filters.status && r.status !== filters.status) return false;
       const d = String(r.docDate || '').slice(0, 10);
@@ -73,29 +111,33 @@ function TravelExpensesInner() {
       const blob = [r.number, r.employee?.label, r.tripNumber, r.trip?.title].join(' ').toLowerCase();
       return blob.includes(qq);
     });
-    const dir = sortDir === 'asc' ? 1 : -1;
-    list = [...list].sort((a, b) => {
-      const ad = String(a.docDate || '');
-      const bd = String(b.docDate || '');
-      if (ad !== bd) return ad < bd ? -dir : dir;
-      return String(a.number).localeCompare(String(b.number));
-    });
-    return list;
-  }, [rows, q, filters.number, filters.status, filters.from, filters.to, sortDir]);
+  }, [rows, q, filters.number, filters.status, filters.from, filters.to]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : travelExpensesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
   const selectedRows = useMemo(
-    () => filtered.filter((r) => checked[r.id]),
-    [filtered, checked],
+    () => displayRows.filter((r) => checked[r.id]),
+    [displayRows, checked],
   );
   const completeCount = selectedRows.filter((r) => r.status !== 'approved').length;
   const deleteCount = selectedRows.filter((r) => r.status !== 'approved').length;
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -104,7 +146,7 @@ function TravelExpensesInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -191,19 +233,20 @@ function TravelExpensesInner() {
   function exportCsv() {
     downloadCsv(
       `travel-expenses-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(r.docDate),
-        Номер: r.number,
-        Сотрудник: r.employee?.label || '',
-        'Номер документа командировки': r.tripNumber || r.trip?.title || '',
-        Состояние: travelStatusLabel(r.status),
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="travel-expenses" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
@@ -282,6 +325,7 @@ function TravelExpensesInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -331,37 +375,27 @@ function TravelExpensesInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>
-                  <button
-                    type="button"
-                    style={{ all: 'unset', cursor: 'pointer' }}
-                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  >
-                    Дата {sortDir === 'asc' ? '↑' : '↓'}
-                  </button>
-                </th>
-                <th>Номер</th>
-                <th>Сотрудник</th>
-                <th>Номер документа командировки</th>
-                <th>Состояние</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -380,19 +414,33 @@ function TravelExpensesInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.docDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td className={styles.empName}>{row.employee?.label || '—'}</td>
-                      <td>{row.tripNumber || row.trip?.title || '—'}</td>
-                      <td>
-                        <span className={row.status === 'approved' ? styles.statusOk : styles.statusMuted}>
-                          {travelStatusLabel(row.status)}
-                        </span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {row.employee?.label || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={
+                                  row.status === 'approved' ? styles.statusOk : styles.statusMuted
+                                }
+                              >
+                                {travelStatusLabel(row.status)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`${PATH}/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

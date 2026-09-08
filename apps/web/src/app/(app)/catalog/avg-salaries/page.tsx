@@ -7,6 +7,11 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -17,6 +22,7 @@ import {
   positionLabel,
   type AvgSalaryMeta,
 } from '@/lib/avg-salaries';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { SearchLookup } from './SearchLookup';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
@@ -58,6 +64,35 @@ const DICT_CODE = 'avg_salary';
 const PAGE_SIZE = 50;
 const FILTER_KEYS = ['q', 'positionId', 'gradeId', 'isActive'] as const;
 
+const avgSalariesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.avg-salaries.v1',
+  title: 'Средние зарплаты',
+  columns: [
+    { key: 'position', label: 'Должность' },
+    { key: 'grade', label: 'Разряд' },
+    { key: 'valueFrom', label: 'От' },
+    { key: 'valueTo', label: 'До' },
+  ],
+  defaultColumns: ['position', 'grade', 'valueFrom', 'valueTo'],
+  defaultSearchKeys: ['position', 'grade'],
+  defaultSort: [{ key: 'position', dir: 'asc' }],
+});
+
+function avgSalaryCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'position':
+      return positionLabel(row.name, row.meta);
+    case 'grade':
+      return gradeLabel(row.meta) || '';
+    case 'valueFrom':
+      return formatMoney(row.meta?.valueFrom) || '';
+    case 'valueTo':
+      return formatMoney(row.meta?.valueTo) || '';
+    default:
+      return '';
+  }
+}
+
 function fmtDateTime(iso?: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -76,6 +111,7 @@ function AvgSalariesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(avgSalariesListPrefs);
   const q = filters.q;
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -106,6 +142,11 @@ function AvgSalariesPageInner() {
   const [valueTo, setValueTo] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : avgSalariesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const posF = filters.positionId;
@@ -128,11 +169,17 @@ function AvgSalariesPageInner() {
     });
   }, [rows, q, filters.positionId, filters.gradeId, filters.isActive]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, avgSalaryCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const p = Math.min(page, pageCount);
-    return filtered.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
-  }, [filtered, page, pageCount]);
+    return displayRows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  }, [displayRows, page, pageCount]);
 
   async function load() {
     setLoading(true);
@@ -331,12 +378,11 @@ function AvgSalariesPageInner() {
   function exportCsv() {
     downloadCsv(
       `avg-salaries-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Должность: positionLabel(r.name, r.meta),
-        Разряд: gradeLabel(r.meta),
-        От: r.meta?.valueFrom ?? '',
-        До: r.meta?.valueTo ?? '',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = avgSalaryCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -629,33 +675,47 @@ function AvgSalariesPageInner() {
             aria-label={`Выбрать ${positionLabel(row.name, row.meta)}`}
           />
         </td>
-        <td className={styles.nameCell}>
-          <span className={styles.nameText}>
-            {positionLabel(row.name, row.meta)}
-          </span>
-          {open ? (
-            <div
-              className={`${styles.inlineActions} ${styles.rowActions}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button type="button" onClick={() => void openView(row)}>
-                Просмотреть
-              </button>
-              <button type="button" onClick={() => openEdit(row)}>
-                Изменить
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td>{gradeLabel(row.meta) || '—'}</td>
-        <td>{formatMoney(row.meta?.valueFrom) || '—'}</td>
-        <td>{formatMoney(row.meta?.valueTo) || '—'}</td>
+        {visibleCols.map((key) => {
+          if (key === 'position') {
+            return (
+              <td key={key} className={styles.nameCell}>
+                <span className={styles.nameText}>
+                  {positionLabel(row.name, row.meta)}
+                </span>
+                {open ? (
+                  <div
+                    className={`${styles.inlineActions} ${styles.rowActions}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button type="button" onClick={() => void openView(row)}>
+                      Просмотреть
+                    </button>
+                    <button type="button" onClick={() => openEdit(row)}>
+                      Изменить
+                    </button>
+                  </div>
+                ) : null}
+              </td>
+            );
+          }
+          if (key === 'grade') {
+            return <td key={key}>{gradeLabel(row.meta) || '—'}</td>;
+          }
+          if (key === 'valueFrom') {
+            return <td key={key}>{formatMoney(row.meta?.valueFrom) || '—'}</td>;
+          }
+          if (key === 'valueTo') {
+            return <td key={key}>{formatMoney(row.meta?.valueTo) || '—'}</td>;
+          }
+          return <td key={key}>{avgSalaryCell(row, key) || '—'}</td>;
+        })}
       </tr>
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav group={{ title: 'Средние зарплаты', siblings: [] }} />
 
       <div className={shared.pageHeader}>
@@ -747,15 +807,6 @@ function AvgSalariesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="Excel"
-            aria-label="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Предыдущая страница"
@@ -783,6 +834,7 @@ function AvgSalariesPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -796,33 +848,32 @@ function AvgSalariesPageInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Должность</th>
-              <th>Разряд</th>
-              <th>От</th>
-              <th>До</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>

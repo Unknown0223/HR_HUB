@@ -7,10 +7,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -57,7 +63,33 @@ type PersonOpt = { id: string; label: string };
 type DivisionOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'status', 'posted', 'from', 'to', 'employeeId', 'divisionId'] as const;
-const COL_COUNT = 9;
+
+const gphListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.gph-contracts.v1',
+  title: 'Договоры ГПХ',
+  columns: [
+    { key: 'number', label: 'Номер договора' },
+    { key: 'startDate', label: 'Дата начала' },
+    { key: 'title', label: 'Наименование' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'person', label: 'Физическое лицо' },
+    { key: 'amount', label: 'Сумма' },
+    { key: 'allowAddService', label: 'Доступ на добавление услуги' },
+    { key: 'posted', label: 'Проведен' },
+  ],
+  defaultColumns: [
+    'number',
+    'startDate',
+    'title',
+    'division',
+    'person',
+    'amount',
+    'allowAddService',
+    'posted',
+  ],
+  defaultSearchKeys: ['number', 'title', 'person', 'division'],
+  defaultSort: [{ key: 'startDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -95,10 +127,35 @@ function rowDivision(row: GphRow) {
   return row.division?.name || row.employee?.division?.name || '—';
 }
 
+function gphCell(row: GphRow, key: string): string {
+  switch (key) {
+    case 'number':
+      return row.number || '';
+    case 'startDate':
+      return fmtDate(row.startDate);
+    case 'title':
+      return row.title || '';
+    case 'division':
+      return rowDivision(row) === '—' ? '' : rowDivision(row);
+    case 'person':
+      return rowPerson(row);
+    case 'amount':
+      return fmtAmount(row.amount);
+    case 'allowAddService':
+      return row.allowAddService === false ? 'Нет' : 'Да';
+    case 'posted':
+      if (row.status === 'posted') return 'Да';
+      return row.status === 'cancelled' ? 'Отм.' : 'Нет';
+    default:
+      return '';
+  }
+}
+
 function GphContractsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(gphListPrefs);
   const q = filters.q;
   const status = filters.status;
   const from = filters.from;
@@ -126,6 +183,11 @@ function GphContractsPageInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [exportBusy, setExportBusy] = useState(false);
   const [searchDraft, setSearchDraft] = useState(q);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : gphListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -191,13 +253,21 @@ function GphContractsPageInner() {
     to,
   ]);
 
-  const checkedRows = useMemo(
-    () => filtered.filter((r) => checked[r.id]),
-    [filtered, checked],
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, gphCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const checkedRows = useMemo(
+    () => displayRows.filter((r) => checked[r.id]),
+    [displayRows, checked],
+  );
+
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -206,7 +276,7 @@ function GphContractsPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -436,18 +506,11 @@ function GphContractsPageInner() {
   function exportCsv() {
     downloadCsv(
       `gph-contracts-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        'Номер договора': r.number,
-        'Дата начала': fmtDate(r.startDate),
-        Подразделение: rowDivision(r),
-        'Физическое лицо': rowPerson(r),
-        'Доступ на добавление услуги':
-          r.allowAddService === false ? 'Нет' : 'Да',
-        Проведен: r.status === 'posted' ? 'Да' : 'Нет',
-        Наименование: r.title,
-        Сумма: r.amount ?? '',
-        Активен: r.isActive ? 'Да' : 'Нет',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = gphCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -468,6 +531,7 @@ function GphContractsPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="gph-contracts" />
 
       <div className={shared.pageHeader}>
@@ -543,7 +607,7 @@ function GphContractsPageInner() {
 
         <div className={styles.rightTools}>
           <span className={styles.countBadge}>
-            {filtered.length} / {rows.length}
+            {displayRows.length} / {rows.length}
           </span>
           <button
             type="button"
@@ -555,15 +619,6 @@ function GphContractsPageInner() {
             aria-label="Фильтр"
           >
             <i className="fas fa-filter" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
           </button>
           <button
             type="button"
@@ -584,6 +639,7 @@ function GphContractsPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -782,32 +838,27 @@ function GphContractsPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Номер договора</th>
-                <th>Дата начала ↑</th>
-                <th>Наименование</th>
-                <th>Подразделение</th>
-                <th>Физическое лицо</th>
-                <th className={styles.numCol}>Сумма</th>
-                <th>Доступ на добавление услуги</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -826,32 +877,58 @@ function GphContractsPageInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td className={styles.numberCell}>{row.number}</td>
-                      <td>{fmtDate(row.startDate)}</td>
-                      <td>{row.title || '—'}</td>
-                      <td>{rowDivision(row)}</td>
-                      <td className={styles.empName}>{rowPerson(row)}</td>
-                      <td className={styles.numCol}>{fmtAmount(row.amount)}</td>
-                      <td>
-                        {row.allowAddService === false ? (
-                          <span className={styles.postedNo}>Нет</span>
-                        ) : (
-                          <span className={styles.postedYes}>Да</span>
-                        )}
-                      </td>
-                      <td>
-                        {row.status === 'posted' ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>
-                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                          </span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'number') {
+                          return (
+                            <td key={key} className={styles.numberCell}>
+                              {row.number}
+                            </td>
+                          );
+                        }
+                        if (key === 'person') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {rowPerson(row)}
+                            </td>
+                          );
+                        }
+                        if (key === 'amount') {
+                          return (
+                            <td key={key} className={styles.numCol}>
+                              {fmtAmount(row.amount)}
+                            </td>
+                          );
+                        }
+                        if (key === 'allowAddService') {
+                          return (
+                            <td key={key}>
+                              {row.allowAddService === false ? (
+                                <span className={styles.postedNo}>Нет</span>
+                              ) : (
+                                <span className={styles.postedYes}>Да</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {row.status === 'posted' ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>
+                                  {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{gphCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             {row.status === 'draft' ? (
                               <button
@@ -929,10 +1006,11 @@ function GphContractsPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>
+
     </div>
   );
 }

@@ -6,9 +6,15 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { IncidentFormModal } from './IncidentFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -35,7 +41,6 @@ type IncidentRow = {
 
 const FILTER_KEYS = ['q', 'status', 'from', 'to'] as const;
 const PAGE_SIZES = [25, 50, 100] as const;
-const COL_COUNT = 8;
 
 const ACTION_LABEL: Record<string, string> = {
   verbal_warning: 'Устное предупреждение',
@@ -54,6 +59,31 @@ const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({
   value,
   label,
 }));
+
+const incidentListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.incidents.v1',
+  title: 'Инциденты',
+  columns: [
+    { key: 'number', label: 'Номер инцидента' },
+    { key: 'occurredAt', label: 'Дата инцидента' },
+    { key: 'person', label: 'Физическое лицо' },
+    { key: 'incidentType', label: 'Тип инцидента' },
+    { key: 'damageAmount', label: 'Сумма ущерба' },
+    { key: 'action', label: 'Действие' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'number',
+    'occurredAt',
+    'person',
+    'incidentType',
+    'damageAmount',
+    'action',
+    'status',
+  ],
+  defaultSearchKeys: ['number', 'person', 'incidentType'],
+  defaultSort: [{ key: 'occurredAt', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -89,10 +119,32 @@ function isOpenish(row: IncidentRow) {
   return s === 'open' || s === 'investigating';
 }
 
+function incidentCell(row: IncidentRow, key: string): string {
+  switch (key) {
+    case 'number':
+      return row.number || row.title || '';
+    case 'occurredAt':
+      return fmtDate(row.occurredAt);
+    case 'person':
+      return empName(row.employee);
+    case 'incidentType':
+      return row.incidentType?.name || '';
+    case 'damageAmount':
+      return money(row.damageAmount);
+    case 'action':
+      return ACTION_LABEL[row.action] || row.action || '';
+    case 'status':
+      return STATUS_LABEL[row.status || 'open'] || row.status || '';
+    default:
+      return '';
+  }
+}
+
 function IncidentsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(incidentListPrefs);
   const q = filters.q;
   const status = filters.status;
   const from = filters.from;
@@ -110,6 +162,11 @@ function IncidentsInner() {
   const [exportBusy, setExportBusy] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : incidentListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -139,10 +196,16 @@ function IncidentsInner() {
     });
   }, [rows, q, from, to]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const sorted = useMemo(
+    () => prefs.applySortToRows(filtered, incidentCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageRows = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize],
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize],
   );
 
   const checkedIds = useMemo(
@@ -150,15 +213,15 @@ function IncidentsInner() {
     [checked],
   );
   const checkedRows = useMemo(
-    () => filtered.filter((r) => checked[r.id]),
-    [filtered, checked],
+    () => sorted.filter((r) => checked[r.id]),
+    [sorted, checked],
   );
 
   const allPageChecked = pageRows.length > 0 && pageRows.every((r) => checked[r.id]);
   const somePageChecked = pageRows.some((r) => checked[r.id]) && !allPageChecked;
 
-  const rangeFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeTo = Math.min(page * pageSize, filtered.length);
+  const rangeFrom = sorted.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, sorted.length);
 
   function toggleCheck(id: string) {
     setChecked((prev) => {
@@ -350,15 +413,11 @@ function IncidentsInner() {
   function exportCsv() {
     downloadCsv(
       `incidents-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        'Номер инцидента': r.number || r.title,
-        'Дата инцидента': fmtDate(r.occurredAt),
-        'Физическое лицо': empName(r.employee),
-        'Тип инцидента': r.incidentType?.name || '',
-        'Сумма ущерба': money(r.damageAmount),
-        Действие: ACTION_LABEL[r.action] || r.action,
-        Статус: STATUS_LABEL[r.status || 'open'] || r.status || '',
-      })),
+      sorted.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = incidentCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -382,6 +441,7 @@ function IncidentsInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="incidents" />
 
       <div className={shared.pageHeader}>
@@ -436,7 +496,7 @@ function IncidentsInner() {
 
         <div className={styles.rightTools}>
           <span className={styles.countBadge}>
-            {filtered.length} / {rows.length}
+            {sorted.length} / {rows.length}
           </span>
           <button
             type="button"
@@ -448,15 +508,6 @@ function IncidentsInner() {
             aria-label="Фильтр"
           >
             <i className="fas fa-filter" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
           </button>
           <button
             type="button"
@@ -477,6 +528,7 @@ function IncidentsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -547,26 +599,22 @@ function IncidentsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Номер инцидента</th>
-                <th>Дата инцидента</th>
-                <th>Физическое лицо</th>
-                <th>Тип инцидента</th>
-                <th>Сумма ущерба</th>
-                <th>Действие</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
               {!loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать инцидент»
                   </td>
                 </tr>
@@ -591,19 +639,34 @@ function IncidentsInner() {
                           aria-label={`Выбрать ${row.number || row.title}`}
                         />
                       </td>
-                      <td>{row.number || row.title}</td>
-                      <td>{fmtDate(row.occurredAt)}</td>
-                      <td className={styles.empName}>{empName(row.employee)}</td>
-                      <td>{row.incidentType?.name || '—'}</td>
-                      <td className={styles.num}>{money(row.damageAmount)}</td>
-                      <td>{ACTION_LABEL[row.action] || row.action}</td>
-                      <td>
-                        <span className={badge.cls}>{badge.text}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'person') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {empName(row.employee)}
+                            </td>
+                          );
+                        }
+                        if (key === 'damageAmount') {
+                          return (
+                            <td key={key} className={styles.num}>
+                              {money(row.damageAmount)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={badge.cls}>{badge.text}</span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{incidentCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/incidents/${row.id}`}>
                               <i className="fas fa-pen" aria-hidden />
@@ -654,7 +717,7 @@ function IncidentsInner() {
             <strong>
               {rangeFrom}–{rangeTo}
             </strong>{' '}
-            из <strong>{filtered.length}</strong>
+            из <strong>{sorted.length}</strong>
           </p>
           <div className={styles.footerPager}>
             <button

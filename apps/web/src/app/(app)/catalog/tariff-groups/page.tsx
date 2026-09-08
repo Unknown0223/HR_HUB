@@ -5,10 +5,15 @@ import { confirm } from '@/lib/dialogs';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { TariffGroupFormModal } from './TariffGroupForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -26,7 +31,24 @@ type TariffGroup = {
 };
 
 const FILTER_KEYS = ['q', 'name', 'fullName', 'status'] as const;
-const COL_COUNT = 8;
+
+const tariffGroupListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.tariff-groups.v1',
+  title: 'Тарифные группы',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'fullName', label: 'Полное название' },
+    { key: 'code', label: 'Код' },
+    { key: 'grade', label: 'Разряд' },
+    { key: 'baseRate', label: 'Ставка' },
+    { key: 'status', label: 'Статус' },
+    { key: 'updatedAt', label: 'Изменено' },
+  ],
+  defaultColumns: ['name', 'fullName', 'code', 'grade', 'baseRate', 'status', 'updatedAt'],
+  defaultSearchKeys: ['name', 'fullName', 'code', 'grade'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+  searchableKeys: ['name', 'fullName', 'code', 'grade', 'status'],
+});
 
 function fmtDate(iso?: string) {
   if (!iso) return '—';
@@ -45,10 +67,32 @@ function fmtRate(value?: string | number | null) {
   });
 }
 
+function cellOf(row: TariffGroup, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'fullName':
+      return row.fullName || row.name || '';
+    case 'code':
+      return row.code || '';
+    case 'grade':
+      return row.grade?.name || '';
+    case 'baseRate':
+      return fmtRate(row.baseRate);
+    case 'status':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    case 'updatedAt':
+      return fmtDate(row.updatedAt);
+    default:
+      return '';
+  }
+}
+
 function TariffGroupsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(tariffGroupListPrefs);
   const q = filters.q;
   const nameFilter = filters.name;
   const fullNameFilter = filters.fullName;
@@ -93,13 +137,25 @@ function TariffGroupsInner() {
     return list;
   }, [rows, q, nameFilter, fullNameFilter, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : tariffGroupListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -108,7 +164,7 @@ function TariffGroupsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -263,21 +319,20 @@ function TariffGroupsInner() {
   function exportCsv() {
     downloadCsv(
       `tariff-groups-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        'Полное название': r.fullName || r.name || '',
-        Код: r.code || '',
-        Разряд: r.grade?.name || '',
-        Ставка: fmtRate(r.baseRate),
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-        Изменено: fmtDate(r.updatedAt),
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="tariff-groups" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
@@ -371,6 +426,7 @@ function TariffGroupsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -435,31 +491,27 @@ function TariffGroupsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Полное название</th>
-                <th>Код</th>
-                <th>Разряд</th>
-                <th>Ставка</th>
-                <th>Статус</th>
-                <th>Изменено</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -478,25 +530,66 @@ function TariffGroupsInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td className={styles.fullNameCell}>
-                        {row.fullName || row.name || '—'}
-                      </td>
-                      <td className={styles.codeCell}>{row.code || '—'}</td>
-                      <td className={styles.gradeCell}>{row.grade?.name || '—'}</td>
-                      <td className={styles.rateCell}>{fmtRate(row.baseRate)}</td>
-                      <td>
-                        {row.isActive ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
-                      <td className={styles.dateCell}>{fmtDate(row.updatedAt)}</td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'fullName') {
+                          return (
+                            <td key={key} className={styles.fullNameCell}>
+                              {row.fullName || row.name || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'code') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {row.code || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'grade') {
+                          return (
+                            <td key={key} className={styles.gradeCell}>
+                              {row.grade?.name || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'baseRate') {
+                          return (
+                            <td key={key} className={styles.rateCell}>
+                              {fmtRate(row.baseRate)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              {row.isActive ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        if (key === 'updatedAt') {
+                          return (
+                            <td key={key} className={styles.dateCell}>
+                              {fmtDate(row.updatedAt)}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openEdit(row.id)}>
                               <i className="fas fa-pen" aria-hidden />

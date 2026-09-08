@@ -6,8 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   fmtDate,
   moneyOrder,
@@ -20,7 +26,23 @@ import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/payment-orders';
 const FILTER_KEYS = ['q', 'accrualName', 'status', 'from', 'to'] as const;
-const COL_COUNT = 7;
+
+const paymentOrdersListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.payment-orders.v1',
+  title: 'Поручения',
+  columns: [
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'accrual', label: 'Начисление' },
+    { key: 'amount', label: 'Сумма поручения' },
+    { key: 'startDate', label: 'Дата начала' },
+    { key: 'endDate', label: 'Дата окончания' },
+    { key: 'status', label: 'Состояние' },
+  ],
+  defaultColumns: ['employee', 'accrual', 'amount', 'startDate', 'endDate', 'status'],
+  defaultSearchKeys: ['employee', 'accrual'],
+  defaultSort: [{ key: 'startDate', dir: 'desc' }],
+  searchableKeys: ['employee', 'accrual'],
+});
 
 function isNew(s: string) {
   return s === 'new' || s === 'open';
@@ -32,10 +54,30 @@ function statusCls(s: string) {
   return styles.statusMuted;
 }
 
+function cellOf(row: PaymentOrderRow, key: string): string {
+  switch (key) {
+    case 'employee':
+      return row.employee?.label || '';
+    case 'accrual':
+      return row.accrualName || row.title || '';
+    case 'amount':
+      return moneyOrder(row.amount);
+    case 'startDate':
+      return fmtDate(row.startDate);
+    case 'endDate':
+      return fmtDate(row.endDate);
+    case 'status':
+      return orderStatusLabel(row.status);
+    default:
+      return '';
+  }
+}
+
 function PaymentOrdersInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(paymentOrdersListPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<PaymentOrderRow[]>([]);
@@ -99,6 +141,17 @@ function PaymentOrdersInner() {
     });
   }, [rows, q, filters.accrualName, filters.status, filters.from, filters.to]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : paymentOrdersListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
@@ -111,8 +164,9 @@ function PaymentOrdersInner() {
   const payCount = selectedRows.filter((r) => r.status === 'sent').length;
   const deleteCount = selectedRows.filter((r) => isNew(r.status)).length;
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -121,7 +175,7 @@ function PaymentOrdersInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -210,19 +264,19 @@ function PaymentOrdersInner() {
   function exportCsv() {
     downloadCsv(
       `payment-orders-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Сотрудник: r.employee?.label || '',
-        Начисление: r.accrualName || r.title || '',
-        'Сумма поручения': r.amount,
-        'Дата начала': fmtDate(r.startDate),
-        'Дата окончания': fmtDate(r.endDate),
-        Состояние: orderStatusLabel(r.status),
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="payment-orders" />
 
       <div className={shared.pageHeader}>
@@ -303,6 +357,7 @@ function PaymentOrdersInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -358,30 +413,27 @@ function PaymentOrdersInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Сотрудник</th>
-                <th>Начисление</th>
-                <th>Сумма поручения</th>
-                <th>Дата начала</th>
-                <th>Дата окончания</th>
-                <th>Состояние</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -400,18 +452,36 @@ function PaymentOrdersInner() {
                           aria-label={`Выбрать ${row.employee?.label || row.id}`}
                         />
                       </td>
-                      <td className={styles.empName}>{row.employee?.label || '—'}</td>
-                      <td>{row.accrualName || row.title || '—'}</td>
-                      <td className={styles.moneyCell}>{moneyOrder(row.amount)}</td>
-                      <td>{fmtDate(row.startDate)}</td>
-                      <td>{fmtDate(row.endDate)}</td>
-                      <td>
-                        <span className={statusCls(row.status)}>{orderStatusLabel(row.status)}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {row.employee?.label || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'amount') {
+                          return (
+                            <td key={key} className={styles.moneyCell}>
+                              {moneyOrder(row.amount)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={statusCls(row.status)}>
+                                {orderStatusLabel(row.status)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`${PATH}/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

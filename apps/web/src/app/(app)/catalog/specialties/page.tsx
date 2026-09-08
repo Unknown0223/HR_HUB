@@ -6,8 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
@@ -32,6 +38,19 @@ type DictItem = {
 
 const DICT_CODE = 'specialties';
 
+const specialtiesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.specialties.v1',
+  title: 'Специальности',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Название' },
+    { key: 'type', label: 'Тип' },
+  ],
+  defaultColumns: ['code', 'name', 'type'],
+  defaultSearchKeys: ['code', 'name', 'type'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
 function itemKind(row: DictItem): ItemKind {
   return row.meta?.kind === 'group' ? 'group' : 'specialty';
 }
@@ -40,9 +59,23 @@ function kindLabel(kind: ItemKind) {
   return kind === 'group' ? 'Группа' : 'Специальность';
 }
 
+function specialtyCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return row.name || '';
+    case 'type':
+      return kindLabel(itemKind(row));
+    default:
+      return '';
+  }
+}
+
 function SpecialtiesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(specialtiesListPrefs);
   const q = searchParams?.get('q') || '';
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -64,6 +97,11 @@ function SpecialtiesPageInner() {
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : specialtiesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return rows;
@@ -74,6 +112,12 @@ function SpecialtiesPageInner() {
       return blob.includes(qq);
     });
   }, [rows, q]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, specialtyCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
 
   async function load() {
     setLoading(true);
@@ -205,7 +249,7 @@ function SpecialtiesPageInner() {
       setSelected(new Set());
       return;
     }
-    setSelected(new Set(filtered.map((r) => r.id)));
+    setSelected(new Set(displayRows.map((r) => r.id)));
   }
 
   function toggleOne(id: string, checked: boolean) {
@@ -220,12 +264,11 @@ function SpecialtiesPageInner() {
   function exportCsv() {
     downloadCsv(
       `specialties-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: r.code,
-        Название: r.name,
-        Тип: kindLabel(itemKind(r)),
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = specialtyCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -250,6 +293,7 @@ function SpecialtiesPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: 'Специальности',
@@ -302,15 +346,6 @@ function SpecialtiesPageInner() {
             }}
             aria-label="Поиск"
           />
-          <button
-            type="button"
-            className={styles.exportBtn}
-            onClick={exportCsv}
-            title="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-            Excel
-          </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
@@ -324,6 +359,7 @@ function SpecialtiesPageInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -337,36 +373,35 @@ function SpecialtiesPageInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Код</th>
-              <th>Название</th>
-              <th>Тип</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   нет данных
                 </td>
               </tr>
             ) : null}
-            {filtered.map((row) => {
+            {displayRows.map((row) => {
               const open = focusId === row.id;
-              const kind = itemKind(row);
               return (
                 <tr
                   key={row.id}
@@ -382,29 +417,42 @@ function SpecialtiesPageInner() {
                       aria-label={`Выбрать ${row.name}`}
                     />
                   </td>
-                  <td>{row.code}</td>
-                  <td className={styles.nameCell}>
-                    <span className={styles.nameText}>{row.name}</span>
-                    {open ? (
-                      <div
-                        className={`${styles.inlineActions} ${styles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button type="button" onClick={() => openEdit(row)}>
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.danger}
-                          disabled={busy}
-                          onClick={() => void runDelete(row)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{kindLabel(kind)}</td>
+                  {visibleCols.map((key) => {
+                    if (key === 'code') {
+                      return <td key={key}>{row.code}</td>;
+                    }
+                    if (key === 'name') {
+                      return (
+                        <td key={key} className={styles.nameCell}>
+                          <span className={styles.nameText}>{row.name}</span>
+                          {open ? (
+                            <div
+                              className={`${styles.inlineActions} ${styles.rowActions}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button type="button" onClick={() => openEdit(row)}>
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runDelete(row)}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    if (key === 'type') {
+                      return <td key={key}>{kindLabel(itemKind(row))}</td>;
+                    }
+                    return (
+                      <td key={key}>{specialtyCell(row, key) || '—'}</td>
+                    );
+                  })}
                 </tr>
               );
             })}

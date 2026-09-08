@@ -6,14 +6,19 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { RosterFormModal } from './RosterFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['q', 'status', 'from', 'to'] as const;
-const COL_COUNT = 7;
 
 type DocRow = {
   id: string;
@@ -26,6 +31,22 @@ type DocRow = {
   verified?: boolean;
   schedule?: { id: string; name: string; code: string } | null;
 };
+
+const rosterListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.rosters.v1',
+  title: 'Расписания',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'documentDate', label: 'Дата' },
+    { key: 'number', label: 'Номер' },
+    { key: 'month', label: 'Месяц' },
+    { key: 'schedule', label: 'График работы' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: ['name', 'documentDate', 'number', 'month', 'schedule', 'status'],
+  defaultSearchKeys: ['name', 'number', 'schedule'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -49,10 +70,30 @@ function statusLabel(row: DocRow) {
   return { text: 'Черновик', cls: styles.badgeDraft };
 }
 
+function rosterCell(row: DocRow, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'documentDate':
+      return fmtDate(row.documentDate);
+    case 'number':
+      return row.number || '';
+    case 'month':
+      return fmtMonth(row.month);
+    case 'schedule':
+      return row.schedule?.name || '';
+    case 'status':
+      return statusLabel(row).text;
+    default:
+      return '';
+  }
+}
+
 function RostersInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(rosterListPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<DocRow[]>([]);
@@ -65,6 +106,11 @@ function RostersInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : rosterListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   async function load() {
     setLoading(true);
@@ -125,12 +171,20 @@ function RostersInner() {
     return list;
   }, [rows, q, filters.status, filters.from, filters.to]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, rosterCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -139,7 +193,7 @@ function RostersInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -202,7 +256,7 @@ function RostersInner() {
   }
 
   async function runBulk(action: 'delete') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (!targets.length) return;
     if (!(await confirm(`Удалить выбранные расписания (${targets.length} шт.)?`))) return;
     setBusy(true);
@@ -232,19 +286,17 @@ function RostersInner() {
   function exportCsv() {
     downloadCsv(
       `rosters-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        Дата: fmtDate(r.documentDate),
-        Номер: r.number || '',
-        Месяц: fmtMonth(r.month),
-        'График работы': r.schedule?.name || '',
-        Статус: statusLabel(r).text,
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = rosterCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="rosters" />
 
       <div className={shared.pageHeader}>
@@ -319,15 +371,6 @@ function RostersInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={loading}
             onClick={() => void load()}
             title="Обновить"
@@ -335,6 +378,7 @@ function RostersInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -378,34 +422,31 @@ function RostersInner() {
                       if (el) el.indeterminate = somePageChecked;
                     }}
                     onChange={(e) => toggleAllPage(e.target.checked)}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Месяц</th>
-                <th>График работы</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && !filtered.length ? (
+              {loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && !filtered.length ? (
+              {!loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const st = statusLabel(row);
@@ -425,18 +466,42 @@ function RostersInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td className={styles.codeCell}>{fmtDate(row.documentDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td className={styles.monthCell}>{fmtMonth(row.month)}</td>
-                      <td>{row.schedule?.name || '—'}</td>
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'documentDate') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {fmtDate(row.documentDate)}
+                            </td>
+                          );
+                        }
+                        if (key === 'month') {
+                          return (
+                            <td key={key} className={styles.monthCell}>
+                              {fmtMonth(row.month)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={st.cls}>{st.text}</span>
+                            </td>
+                          );
+                        }
+                        const text = rosterCell(row, key);
+                        return <td key={key}>{text || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/rosters/${row.id}`}>
                               <i className="fas fa-table" aria-hidden />
@@ -473,7 +538,7 @@ function RostersInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

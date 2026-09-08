@@ -7,8 +7,14 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
@@ -59,6 +65,32 @@ const GROUP_DICT_CODE = 'indicator_groups';
 const PAGE_SIZE = 50;
 const FILTER_KEYS = ['q', 'name', 'code', 'group', 'isActive'] as const;
 
+const indicatorsListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.indicators.v1',
+  title: 'Показатели',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'code', label: 'Идентификатор' },
+    { key: 'description', label: 'Описание' },
+  ],
+  defaultColumns: ['name', 'code', 'description'],
+  defaultSearchKeys: ['name', 'code'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function indicatorCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'code':
+      return row.code || '';
+    case 'description':
+      return row.meta?.description || '';
+    default:
+      return '';
+  }
+}
+
 function toIdentifier(name: string) {
   return name.replace(/\s+/g, '').replace(/[^0-9A-Za-zА-Яа-яЁё]/g, '');
 }
@@ -85,6 +117,7 @@ function IndicatorsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(indicatorsListPrefs);
   const q = filters.q;
   const groupFilter = filters.group;
 
@@ -118,6 +151,11 @@ function IndicatorsPageInner() {
   const [saving, setSaving] = useState(false);
   const [identTouched, setIdentTouched] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : indicatorsListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     return rows.filter((r) => {
@@ -136,11 +174,17 @@ function IndicatorsPageInner() {
     });
   }, [rows, q, groupFilter, filters.name, filters.code, filters.isActive]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, indicatorCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const p = Math.min(page, pageCount);
-    return filtered.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
-  }, [filtered, page, pageCount]);
+    return displayRows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  }, [displayRows, page, pageCount]);
 
   async function load() {
     setLoading(true);
@@ -345,14 +389,11 @@ function IndicatorsPageInner() {
   function exportCsv() {
     downloadCsv(
       `indicators-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        'Краткое название': r.meta?.shortName || '',
-        Идентификатор: r.code,
-        Группа: groupOf(r),
-        Описание: r.meta?.description || '',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = indicatorCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -655,30 +696,42 @@ function IndicatorsPageInner() {
             }}
           />
         </td>
-        <td className={styles.nameCell}>
-          <span className={styles.nameText}>{row.name}</span>
-          {open ? (
-            <div
-              className={`${styles.inlineActions} ${styles.rowActions}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button type="button" onClick={() => void openView(row)}>
-                Просмотреть
-              </button>
-              <button type="button" onClick={() => openEdit(row)}>
-                Изменить
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td>{row.code}</td>
-        <td>{row.meta?.description || ''}</td>
+        {visibleCols.map((key) => {
+          if (key === 'name') {
+            return (
+              <td key={key} className={styles.nameCell}>
+                <span className={styles.nameText}>{row.name}</span>
+                {open ? (
+                  <div
+                    className={`${styles.inlineActions} ${styles.rowActions}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button type="button" onClick={() => void openView(row)}>
+                      Просмотреть
+                    </button>
+                    <button type="button" onClick={() => openEdit(row)}>
+                      Изменить
+                    </button>
+                  </div>
+                ) : null}
+              </td>
+            );
+          }
+          if (key === 'code') {
+            return <td key={key}>{row.code}</td>;
+          }
+          if (key === 'description') {
+            return <td key={key}>{row.meta?.description || ''}</td>;
+          }
+          return <td key={key}>{indicatorCell(row, key) || '—'}</td>;
+        })}
       </tr>
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav group={{ title: 'Показатели', siblings: [] }} />
 
       <div className={shared.pageHeader}>
@@ -765,15 +818,6 @@ function IndicatorsPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="Excel"
-            aria-label="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Предыдущая страница"
@@ -801,6 +845,7 @@ function IndicatorsPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -814,32 +859,32 @@ function IndicatorsPageInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Название</th>
-              <th>Идентификатор</th>
-              <th>Описание</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>

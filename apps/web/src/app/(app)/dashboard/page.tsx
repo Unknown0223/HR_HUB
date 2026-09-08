@@ -9,27 +9,24 @@ import {
   PhotoThumb,
   usePhotoLightbox,
 } from '@/components/PhotoLightbox';
+import {
+  ATTENDANCE_DEFAULT_COLUMNS,
+  ATTENDANCE_DEFAULT_SEARCH,
+  ATTENDANCE_SEARCH_FIELDS,
+  EMPLOYEE_FIELDS,
+  EMPLOYEE_FIELD_LABELS,
+  columnFields,
+  type EmployeeFieldKey,
+  type SortDir,
+  type SortRule,
+} from '@/lib/employee-fields';
+import { applySortRules, cellValue } from '@/lib/dashboard-fields';
+import type { AttRowLike } from '@/lib/dashboard-row';
 import css from './page.module.css';
 
 /* ================= Real API contracts ================= */
 
-type AttRow = {
-  employeeId: string;
-  fullName: string;
-  lastName?: string;
-  firstName?: string;
-  middleName?: string | null;
-  tabNumber: string;
-  photoUrl?: string | null;
-  firstIn: string | null;
-  lastOut: string | null;
-  status: string;
-  note?: string;
-  email?: string | null;
-  phone?: string | null;
-  position?: string | null;
-  division?: string | null;
-};
+type AttRow = AttRowLike;
 
 type Birthday = {
   employeeId: string;
@@ -128,7 +125,28 @@ type ExtraKey =
   | 'arrivalLocation'
   | 'tabNumber'
   | 'email'
-  | 'firstName';
+  | 'firstName'
+  | 'lastName'
+  | 'middleName'
+  | 'phone'
+  | 'inn'
+  | 'inps'
+  | 'pinfl'
+  | 'position'
+  | 'division'
+  | 'grade'
+  | 'region'
+  | 'schedule'
+  | 'manager'
+  | 'hiredAt'
+  | 'birthDate'
+  | 'gender'
+  | 'addressResidence'
+  | 'addressPostal'
+  | 'bankAccount'
+  | 'employmentType'
+  | 'site'
+  | 'fax';
 
 type GridState = {
   fio: string;
@@ -149,8 +167,13 @@ type GridTplStored = {
 
 const FILTER_TPL_KEY = 'hrhub.dashboard.filter_templates.v1';
 const GRID_TPL_KEY = 'hrhub.dashboard.grid-filter-templates';
+const TABLE_COLS_KEY = 'hrhub.dashboard.table_columns.v1';
+const TABLE_SEARCH_KEY = 'hrhub.dashboard.table_search.v1';
+const TABLE_SORT_KEY = 'hrhub.dashboard.table_sort.v1';
 
 const EMPTY_GRID: GridState = { fio: '', statuses: [], params: {}, added: [] };
+
+const DEFAULT_SORT: SortRule[] = [{ key: 'fullName', dir: 'asc' }];
 
 const BUCKET_LEGEND: { id: Exclude<QuickFilterId, 'all'>; label: string }[] = [
   { id: 'on_time', label: 'Вовремя' },
@@ -197,17 +220,38 @@ const EXTRA_PARAMS: {
   type: 'text' | 'number' | 'select' | 'location';
   options?: { v: string; l: string }[];
 }[] = [
-  { key: 'login', label: 'Логин', type: 'text' },
-  { key: 'telegram', label: 'Telegram', type: 'text' },
-  { key: 'fingerprints', label: 'Отпечатки пальцев', type: 'select', options: [{ v: 'yes', l: 'Есть' }, { v: 'no', l: 'Нет' }] },
-  { key: 'code', label: 'Код', type: 'text' },
-  { key: 'distance', label: 'Расстояние, км (не более)', type: 'number' },
-  { key: 'accessLevel', label: 'Уровень доступа', type: 'select', options: [{ v: 'Полный', l: 'Полный' }, { v: 'Стандарт', l: 'Стандарт' }, { v: 'Гость', l: 'Гость' }] },
-  { key: 'workStatus', label: 'Статус работы', type: 'select', options: [{ v: 'Штатный', l: 'Штатный' }, { v: 'Удаленный', l: 'Удаленный' }, { v: 'Стажер', l: 'Стажер' }] },
-  { key: 'arrivalLocation', label: 'Локация прихода', type: 'location' },
-  { key: 'tabNumber', label: 'Табельный номер', type: 'text' },
-  { key: 'email', label: 'E-mail', type: 'text' },
-  { key: 'firstName', label: 'Имя', type: 'text' },
+  { key: 'login', label: EMPLOYEE_FIELD_LABELS.login, type: 'text' },
+  { key: 'telegram', label: EMPLOYEE_FIELD_LABELS.telegram, type: 'text' },
+  { key: 'fingerprints', label: EMPLOYEE_FIELD_LABELS.fingerprints, type: 'select', options: [{ v: 'yes', l: 'Есть' }, { v: 'no', l: 'Нет' }] },
+  { key: 'code', label: EMPLOYEE_FIELD_LABELS.code, type: 'text' },
+  { key: 'distance', label: EMPLOYEE_FIELD_LABELS.distanceKm, type: 'number' },
+  { key: 'accessLevel', label: EMPLOYEE_FIELD_LABELS.accessLevel, type: 'text' },
+  { key: 'workStatus', label: EMPLOYEE_FIELD_LABELS.workStatus, type: 'text' },
+  { key: 'arrivalLocation', label: EMPLOYEE_FIELD_LABELS.arrivalLocation, type: 'location' },
+  { key: 'tabNumber', label: EMPLOYEE_FIELD_LABELS.tabNumber, type: 'text' },
+  { key: 'email', label: EMPLOYEE_FIELD_LABELS.email, type: 'text' },
+  { key: 'firstName', label: EMPLOYEE_FIELD_LABELS.firstName, type: 'text' },
+  { key: 'lastName', label: EMPLOYEE_FIELD_LABELS.lastName, type: 'text' },
+  { key: 'middleName', label: EMPLOYEE_FIELD_LABELS.middleName, type: 'text' },
+  { key: 'phone', label: EMPLOYEE_FIELD_LABELS.phone, type: 'text' },
+  { key: 'inn', label: EMPLOYEE_FIELD_LABELS.inn, type: 'text' },
+  { key: 'inps', label: EMPLOYEE_FIELD_LABELS.inps, type: 'text' },
+  { key: 'pinfl', label: EMPLOYEE_FIELD_LABELS.pinfl, type: 'text' },
+  { key: 'position', label: EMPLOYEE_FIELD_LABELS.position, type: 'text' },
+  { key: 'division', label: EMPLOYEE_FIELD_LABELS.division, type: 'text' },
+  { key: 'grade', label: EMPLOYEE_FIELD_LABELS.grade, type: 'text' },
+  { key: 'region', label: EMPLOYEE_FIELD_LABELS.region, type: 'text' },
+  { key: 'schedule', label: EMPLOYEE_FIELD_LABELS.schedule, type: 'text' },
+  { key: 'manager', label: EMPLOYEE_FIELD_LABELS.manager, type: 'text' },
+  { key: 'hiredAt', label: EMPLOYEE_FIELD_LABELS.hiredAt, type: 'text' },
+  { key: 'birthDate', label: EMPLOYEE_FIELD_LABELS.birthDate, type: 'text' },
+  { key: 'gender', label: EMPLOYEE_FIELD_LABELS.gender, type: 'text' },
+  { key: 'addressResidence', label: EMPLOYEE_FIELD_LABELS.addressResidence, type: 'text' },
+  { key: 'addressPostal', label: EMPLOYEE_FIELD_LABELS.addressPostal, type: 'text' },
+  { key: 'bankAccount', label: EMPLOYEE_FIELD_LABELS.bankAccount, type: 'text' },
+  { key: 'employmentType', label: EMPLOYEE_FIELD_LABELS.employmentType, type: 'text' },
+  { key: 'site', label: EMPLOYEE_FIELD_LABELS.site, type: 'text' },
+  { key: 'fax', label: EMPLOYEE_FIELD_LABELS.fax, type: 'text' },
 ];
 
 const chipClass: Record<ChipId, string> = {
@@ -240,6 +284,33 @@ function saveJSON(key: string, value: unknown) {
   } catch {
     /* storage unavailable */
   }
+}
+
+function loadColumns(): EmployeeFieldKey[] {
+  const raw = loadJSON<string[]>(TABLE_COLS_KEY, [...ATTENDANCE_DEFAULT_COLUMNS]);
+  const allowed = new Set(EMPLOYEE_FIELDS.map((f) => f.key));
+  const cols = (Array.isArray(raw) ? raw : []).filter((k): k is EmployeeFieldKey =>
+    allowed.has(k as EmployeeFieldKey),
+  );
+  return cols.length ? cols : [...ATTENDANCE_DEFAULT_COLUMNS];
+}
+
+function loadSearchKeys(): EmployeeFieldKey[] {
+  const raw = loadJSON<string[]>(TABLE_SEARCH_KEY, [...ATTENDANCE_DEFAULT_SEARCH]);
+  const allowed = new Set(ATTENDANCE_SEARCH_FIELDS);
+  const keys = (Array.isArray(raw) ? raw : []).filter((k): k is EmployeeFieldKey =>
+    allowed.has(k as EmployeeFieldKey),
+  );
+  return keys.length ? keys : [...ATTENDANCE_DEFAULT_SEARCH];
+}
+
+function loadSortRules(): SortRule[] {
+  const raw = loadJSON<SortRule[]>(TABLE_SORT_KEY, DEFAULT_SORT);
+  if (!Array.isArray(raw) || !raw.length) return DEFAULT_SORT.map((r) => ({ ...r }));
+  const allowed = new Set(EMPLOYEE_FIELDS.map((f) => f.key));
+  return raw
+    .filter((r) => r && allowed.has(r.key) && (r.dir === 'asc' || r.dir === 'desc' || r.dir === 'none'))
+    .map((r) => ({ key: r.key, dir: r.dir }));
 }
 
 function todayLocalISO() {
@@ -320,18 +391,70 @@ function filterStatusId(r: AttRow) {
 
 function extraField(r: AttRow, id: ExtraKey) {
   switch (id) {
+    case 'distance':
+      return r.distanceKm != null ? String(r.distanceKm) : '';
+    case 'fingerprints':
+      return r.fingerprints ? 'yes' : 'no';
+    case 'workStatus':
+      return r.workStatus || '';
     case 'login':
-    case 'email':
-      return r.email || '';
+      return r.login || '';
     case 'telegram':
-      return r.phone || '';
+      return r.telegram || '';
     case 'code':
+      return r.code || '';
+    case 'accessLevel':
+      return r.accessLevel || '';
+    case 'arrivalLocation':
+      return r.arrivalLocation || '';
     case 'tabNumber':
       return r.tabNumber || '';
+    case 'email':
+      return r.email || '';
     case 'firstName':
       return r.firstName || '';
-    case 'workStatus':
-      return STATUS_LABELS[filterStatusId(r)] || r.status;
+    case 'lastName':
+      return r.lastName || '';
+    case 'middleName':
+      return r.middleName || '';
+    case 'phone':
+      return r.phone || '';
+    case 'inn':
+      return r.inn || '';
+    case 'inps':
+      return r.inps || '';
+    case 'pinfl':
+      return r.pinfl || '';
+    case 'position':
+      return r.position || '';
+    case 'division':
+      return r.division || '';
+    case 'grade':
+      return r.grade || '';
+    case 'region':
+      return r.region || '';
+    case 'schedule':
+      return r.schedule || '';
+    case 'manager':
+      return r.manager || '';
+    case 'hiredAt':
+      return r.hiredAt || '';
+    case 'birthDate':
+      return r.birthDate || '';
+    case 'gender':
+      return r.gender || '';
+    case 'addressResidence':
+      return r.addressResidence || '';
+    case 'addressPostal':
+      return r.addressPostal || '';
+    case 'bankAccount':
+      return r.bankAccount || '';
+    case 'employmentType':
+      return r.employmentType || '';
+    case 'site':
+      return r.site || '';
+    case 'fax':
+      return r.fax || '';
     default:
       return '';
   }
@@ -352,10 +475,19 @@ function matchesGrid(r: AttRow, g: GridState) {
     const v = String(raw ?? '').trim().toLowerCase();
     if (!v) continue;
     const k = key as ExtraKey;
-    const field = extraField(r, k).toLowerCase();
-    if (k === 'fingerprints' || k === 'distance' || k === 'accessLevel' || k === 'arrivalLocation') {
+    if (k === 'fingerprints') {
+      const has = Boolean(r.fingerprints);
+      if (v === 'yes' && !has) return false;
+      if (v === 'no' && has) return false;
       continue;
     }
+    if (k === 'distance') {
+      const max = Number(v);
+      if (!Number.isFinite(max)) continue;
+      if (r.distanceKm == null || r.distanceKm > max) return false;
+      continue;
+    }
+    const field = extraField(r, k).toLowerCase();
     if (!field.includes(v)) return false;
   }
   return true;
@@ -854,7 +986,22 @@ export default function DashboardPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [tableSettingsOpen, setTableSettingsOpen] = useState(false);
   const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const [tableColumns, setTableColumns] = useState<EmployeeFieldKey[]>([
+    ...ATTENDANCE_DEFAULT_COLUMNS,
+  ]);
+  const [searchFields, setSearchFields] = useState<EmployeeFieldKey[]>([
+    ...ATTENDANCE_DEFAULT_SEARCH,
+  ]);
+  const [sortRules, setSortRules] = useState<SortRule[]>(() =>
+    DEFAULT_SORT.map((r) => ({ ...r })),
+  );
+  const [draftColumns, setDraftColumns] = useState<EmployeeFieldKey[]>([]);
+  const [draftSearch, setDraftSearch] = useState<EmployeeFieldKey[]>([]);
+  const [draftSort, setDraftSort] = useState<SortRule[]>([]);
+  const [confirmDefault, setConfirmDefault] = useState(false);
 
   const [templates, setTemplates] = useState<FilterTemplate[]>([]);
   const [tplSelected, setTplSelected] = useState('');
@@ -918,6 +1065,9 @@ export default function DashboardPage() {
     setTemplates(Array.isArray(rawTpl) ? rawTpl.filter((t) => t?.name && t?.filters) : []);
     const rawGrid = loadJSON<GridTplStored[]>(GRID_TPL_KEY, []);
     setGridTemplates(Array.isArray(rawGrid) ? rawGrid : []);
+    setTableColumns(loadColumns());
+    setSearchFields(loadSearchKeys());
+    setSortRules(loadSortRules());
     fetchOptions();
   }, [fetchOptions]);
 
@@ -937,16 +1087,23 @@ export default function DashboardPage() {
   }, [openDrop]);
 
   useEffect(() => {
-    document.body.style.overflow = modalOpen ? 'hidden' : '';
+    document.body.style.overflow =
+      modalOpen || sortOpen || tableSettingsOpen || confirmDefault ? 'hidden' : '';
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setModalOpen(false);
+      if (e.key !== 'Escape') return;
+      if (confirmDefault) setConfirmDefault(false);
+      else if (sortOpen) setSortOpen(false);
+      else if (tableSettingsOpen) setTableSettingsOpen(false);
+      else if (modalOpen) setModalOpen(false);
     }
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [modalOpen]);
+  }, [modalOpen, sortOpen, tableSettingsOpen, confirmDefault]);
+
+  const statusLabelFn = useCallback((status: string) => STATUS_LABELS[status] || status, []);
 
   const a = stats?.attendance;
   const counts = {
@@ -966,9 +1123,7 @@ export default function DashboardPage() {
     const notStarted = stats?.lists?.notStarted ?? [];
     const dayOff = stats?.lists?.dayOff ?? [];
     const leave = stats?.lists?.leave ?? [];
-    return [...onTime, ...late, ...absent, ...notStarted, ...dayOff, ...leave].sort((x, y) =>
-      x.fullName.localeCompare(y.fullName, 'ru'),
-    );
+    return [...onTime, ...late, ...absent, ...notStarted, ...dayOff, ...leave];
   }, [stats]);
 
   const filtered = useMemo(() => {
@@ -976,16 +1131,14 @@ export default function DashboardPage() {
     if (quickFilter !== 'all') arr = arr.filter((r) => rowBucket(r) === quickFilter);
     const q = search.trim().toLowerCase();
     if (q) {
-      arr = arr.filter(
-        (r) =>
-          r.fullName.toLowerCase().includes(q) ||
-          (r.tabNumber ?? '').toLowerCase().includes(q) ||
-          (r.position ?? '').toLowerCase().includes(q),
-      );
+      arr = arr.filter((r) => {
+        const keys = searchFields.length ? searchFields : (['fullName'] as EmployeeFieldKey[]);
+        return keys.some((k) => cellValue(r, k, statusLabelFn).toLowerCase().includes(q));
+      });
     }
     if (isGridActive(gridApplied)) arr = arr.filter((r) => matchesGrid(r, gridApplied));
-    return arr;
-  }, [allRows, quickFilter, search, gridApplied]);
+    return applySortRules(arr, sortRules, statusLabelFn) as AttRow[];
+  }, [allRows, quickFilter, search, gridApplied, sortRules, searchFields, statusLabelFn]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageSafe = Math.min(page, pageCount);
@@ -1041,9 +1194,11 @@ export default function DashboardPage() {
   const gridIsActive = isGridActive(gridApplied);
 
   const exportCsv = () => {
-    const head = ['ФИО', 'Приход', 'Уход', 'Состояние'];
+    const cols = tableColumns.length ? tableColumns : ATTENDANCE_DEFAULT_COLUMNS;
+    const head = cols.map((k) => EMPLOYEE_FIELD_LABELS[k]);
     const lines = filtered.map((r) =>
-      [r.fullName, r.firstIn ?? '—', r.lastOut ?? '—', rowChips(r).map((c) => STATUS_LABELS[c]).join(' / ')]
+      cols
+        .map((k) => cellValue(r, k, statusLabelFn) || '—')
         .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
         .join(';'),
     );
@@ -1058,6 +1213,60 @@ export default function DashboardPage() {
     aEl.remove();
     URL.revokeObjectURL(url);
   };
+
+  const openSortModal = () => {
+    const base = columnFields().map((f) => {
+      const existing = sortRules.find((r) => r.key === f.key);
+      return { key: f.key, dir: (existing?.dir ?? 'none') as SortDir };
+    });
+    // Keep active rules first in their order
+    const active = sortRules.filter((r) => r.dir !== 'none');
+    const rest = base.filter((r) => !active.some((a) => a.key === r.key));
+    setDraftSort([...active, ...rest]);
+    setSortOpen(true);
+  };
+
+  const openTableSettings = () => {
+    setDraftColumns([...tableColumns]);
+    setDraftSearch([...searchFields]);
+    setTableSettingsOpen(true);
+  };
+
+  const applySort = () => {
+    const next = draftSort.filter((r) => r.dir !== 'none');
+    const rules = next.length ? next : DEFAULT_SORT.map((r) => ({ ...r }));
+    setSortRules(rules);
+    saveJSON(TABLE_SORT_KEY, rules);
+    setSortOpen(false);
+  };
+
+  const applyTableSettings = () => {
+    const cols = draftColumns.length ? draftColumns : [...ATTENDANCE_DEFAULT_COLUMNS];
+    const search = draftSearch.length ? draftSearch : [...ATTENDANCE_DEFAULT_SEARCH];
+    setTableColumns(cols);
+    setSearchFields(search);
+    saveJSON(TABLE_COLS_KEY, cols);
+    saveJSON(TABLE_SEARCH_KEY, search);
+    setTableSettingsOpen(false);
+  };
+
+  const resetTableDefaults = () => {
+    const cols = [...ATTENDANCE_DEFAULT_COLUMNS];
+    const search = [...ATTENDANCE_DEFAULT_SEARCH];
+    const sort = DEFAULT_SORT.map((r) => ({ ...r }));
+    setTableColumns(cols);
+    setSearchFields(search);
+    setSortRules(sort);
+    setDraftColumns(cols);
+    setDraftSearch(search);
+    saveJSON(TABLE_COLS_KEY, cols);
+    saveJSON(TABLE_SEARCH_KEY, search);
+    saveJSON(TABLE_SORT_KEY, sort);
+    setConfirmDefault(false);
+  };
+
+  const visibleColumns = tableColumns.length ? tableColumns : ATTENDANCE_DEFAULT_COLUMNS;
+  const unusedColumns = columnFields().filter((f) => !draftColumns.includes(f.key));
 
   const saveSidebarTemplate = (mode: 'new' | 'overwrite') => {
     if (mode === 'overwrite' && tplSelected) {
@@ -1375,11 +1584,31 @@ export default function DashboardPage() {
                         className={css.menuItem}
                         onClick={() => {
                           setMenuOpen(false);
+                          openSortModal();
+                        }}
+                      >
+                        Сортировка
+                      </button>
+                      <button
+                        type="button"
+                        className={css.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          openTableSettings();
+                        }}
+                      >
+                        Настройка таблицы
+                      </button>
+                      <button
+                        type="button"
+                        className={css.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
                           exportCsv();
                         }}
                       >
                         {I.download}
-                        Экспорт CSV
+                        Скачать в Excel
                       </button>
                       <button
                         type="button"
@@ -1432,11 +1661,11 @@ export default function DashboardPage() {
                 <table className={css.table}>
                   <thead>
                     <tr>
-                      <th className={css.tableTh}>ФИО</th>
-                      <th className={css.tableTh}>Табельный №</th>
-                      <th className={css.tableTh}>Приход</th>
-                      <th className={css.tableTh}>Уход</th>
-                      {viewMode === 'chart' && <th className={css.tableTh}>Состояние</th>}
+                      {visibleColumns.map((key) => (
+                        <th key={key} className={css.tableTh}>
+                          {EMPLOYEE_FIELD_LABELS[key]}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -1447,93 +1676,122 @@ export default function DashboardPage() {
                       const bucket = rowBucket(emp);
                       return (
                         <tr key={emp.employeeId} className={css.tableRow}>
-                          <td className={css.tableTd}>
-                            <div className={css.nameCell}>
-                              {src ? (
-                                <PhotoThumb
-                                  className={css.avatarImg}
-                                  src={src}
-                                  alt={emp.fullName}
-                                  lightbox={photos}
-                                  slides={photoSlides}
-                                  index={idx < 0 ? 0 : idx}
-                                  fallback={
-                                    <button
-                                      type="button"
-                                      className={css.avatarBtn}
-                                      style={{ background: hueFromId(emp.employeeId) }}
-                                      aria-label={`Фото: ${emp.fullName}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openInitialsPreview(
-                                          photos.open,
-                                          emp.fullName,
-                                          emp.employeeId,
-                                        );
-                                      }}
+                          {visibleColumns.map((key) => {
+                            if (key === 'fullName') {
+                              return (
+                                <td key={key} className={css.tableTd}>
+                                  <div className={css.nameCell}>
+                                    {src ? (
+                                      <PhotoThumb
+                                        className={css.avatarImg}
+                                        src={src}
+                                        alt={emp.fullName}
+                                        lightbox={photos}
+                                        slides={photoSlides}
+                                        index={idx < 0 ? 0 : idx}
+                                        fallback={
+                                          <button
+                                            type="button"
+                                            className={css.avatarBtn}
+                                            style={{ background: hueFromId(emp.employeeId) }}
+                                            aria-label={`Фото: ${emp.fullName}`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openInitialsPreview(
+                                                photos.open,
+                                                emp.fullName,
+                                                emp.employeeId,
+                                              );
+                                            }}
+                                          >
+                                            {initialsOf(emp.fullName)}
+                                          </button>
+                                        }
+                                      />
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className={css.avatarBtn}
+                                        style={{ background: hueFromId(emp.employeeId) }}
+                                        aria-label={`Фото: ${emp.fullName}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openInitialsPreview(
+                                            photos.open,
+                                            emp.fullName,
+                                            emp.employeeId,
+                                          );
+                                        }}
+                                      >
+                                        {initialsOf(emp.fullName)}
+                                      </button>
+                                    )}
+                                    <div className={css.nameMain}>
+                                      <Link
+                                        href={`/employees/${emp.employeeId}`}
+                                        className={css.nameLink}
+                                      >
+                                        {emp.fullName}
+                                      </Link>
+                                      {emp.position ? (
+                                        <span className={css.nameSub}>{emp.position}</span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            }
+                            if (key === 'dayState') {
+                              return (
+                                <td key={key} className={css.tableTd}>
+                                  <StatusChips chips={chips} />
+                                </td>
+                              );
+                            }
+                            if (key === 'arrival') {
+                              return (
+                                <td key={key} className={`${css.tableTd} ${css.timeCell}`}>
+                                  {emp.firstIn ? (
+                                    <span className={bucket === 'late' ? css.timeLate : css.timeOk}>
+                                      {emp.firstIn}
+                                    </span>
+                                  ) : (
+                                    <span className={css.timeEmpty}>—</span>
+                                  )}
+                                </td>
+                              );
+                            }
+                            if (key === 'departure') {
+                              return (
+                                <td key={key} className={`${css.tableTd} ${css.timeCell}`}>
+                                  {emp.lastOut ? (
+                                    <span
+                                      className={
+                                        chips.includes('early_leave') ? css.timeLate : css.timeOk
+                                      }
                                     >
-                                      {initialsOf(emp.fullName)}
-                                    </button>
-                                  }
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  className={css.avatarBtn}
-                                  style={{ background: hueFromId(emp.employeeId) }}
-                                  aria-label={`Фото: ${emp.fullName}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openInitialsPreview(
-                                      photos.open,
-                                      emp.fullName,
-                                      emp.employeeId,
-                                    );
-                                  }}
-                                >
-                                  {initialsOf(emp.fullName)}
-                                </button>
-                              )}
-                              <div className={css.nameMain}>
-                                <Link href={`/employees/${emp.employeeId}`} className={css.nameLink}>
-                                  {emp.fullName}
-                                </Link>
-                                {emp.position ? (
-                                  <span className={css.nameSub}>{emp.position}</span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </td>
-                          <td className={`${css.tableTd} ${css.tabCell}`}>
-                            {emp.tabNumber || '—'}
-                          </td>
-                          <td className={`${css.tableTd} ${css.timeCell}`}>
-                            {emp.firstIn ? (
-                              <span className={bucket === 'late' ? css.timeLate : css.timeOk}>
-                                {emp.firstIn}
-                              </span>
-                            ) : (
-                              <span className={css.timeEmpty}>—</span>
-                            )}
-                          </td>
-                          <td className={`${css.tableTd} ${css.timeCell}`}>
-                            {emp.lastOut ? (
-                              <span
-                                className={
-                                  chips.includes('early_leave') ? css.timeLate : css.timeOk
-                                }
-                              >
-                                {emp.lastOut}
-                              </span>
-                            ) : (
-                              <span className={css.timeEmpty}>—</span>
-                            )}
-                          </td>
-                          {viewMode === 'chart' && (
-                            <td className={css.tableTd}>
-                              <StatusChips chips={chips} />
-                            </td>
-                          )}
+                                      {emp.lastOut}
+                                    </span>
+                                  ) : (
+                                    <span className={css.timeEmpty}>—</span>
+                                  )}
+                                </td>
+                              );
+                            }
+                            if (key === 'tabNumber') {
+                              return (
+                                <td key={key} className={`${css.tableTd} ${css.tabCell}`}>
+                                  {emp.tabNumber || '—'}
+                                </td>
+                              );
+                            }
+                            const val = cellValue(emp, key, statusLabelFn);
+                            return (
+                              <td key={key} className={css.tableTd}>
+                                {val || '—'}
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
@@ -2005,6 +2263,206 @@ export default function DashboardPage() {
                 }}
               >
                 Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sortOpen && (
+        <div className={css.overlay} onClick={() => setSortOpen(false)}>
+          <div
+            className={`${css.modal} ${css.modalWide}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Сортировка"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={css.modalHead}>
+              <h2 className={css.modalTitle}>Сортировка</h2>
+              <div className={css.modalHeadActions}>
+                <button
+                  type="button"
+                  className={css.ghostBtnSm}
+                  onClick={() => {
+                    setDraftSort(
+                      columnFields().map((f) => ({
+                        key: f.key,
+                        dir: (f.key === 'fullName' ? 'asc' : 'none') as SortDir,
+                      })),
+                    );
+                  }}
+                >
+                  По умолчанию
+                </button>
+                <button
+                  type="button"
+                  className={css.modalClose}
+                  onClick={() => setSortOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  {I.x}
+                </button>
+              </div>
+            </div>
+            <div className={css.modalBody}>
+              <ul className={css.sortList}>
+                {draftSort.map((rule, idx) => (
+                  <li key={rule.key} className={css.sortRow}>
+                    <span className={css.sortLabel}>{EMPLOYEE_FIELD_LABELS[rule.key]}</span>
+                    <select
+                      className={css.mSelect}
+                      value={rule.dir}
+                      onChange={(e) => {
+                        const dir = e.target.value as SortDir;
+                        setDraftSort((rows) =>
+                          rows.map((r, i) => (i === idx ? { ...r, dir } : r)),
+                        );
+                      }}
+                    >
+                      <option value="none">нет действий</option>
+                      <option value="asc">по возрастанию</option>
+                      <option value="desc">по убыванию</option>
+                    </select>
+                    <span className={css.sortHandle} aria-hidden="true">
+                      ⋮⋮
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={css.modalFoot}>
+              <button type="button" className={css.showAllBtn} onClick={() => setSortOpen(false)}>
+                Отменить
+              </button>
+              <button type="button" className={css.applyPrimary} onClick={applySort}>
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tableSettingsOpen && (
+        <div className={css.overlay} onClick={() => setTableSettingsOpen(false)}>
+          <div
+            className={`${css.modal} ${css.modalWide}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Настройка таблицы"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={css.modalHead}>
+              <h2 className={css.modalTitle}>Настройка таблицы: Статистика посещений сотрудников</h2>
+              <button
+                type="button"
+                className={css.modalClose}
+                onClick={() => setTableSettingsOpen(false)}
+                aria-label="Закрыть"
+              >
+                {I.x}
+              </button>
+            </div>
+            <div className={css.modalBody}>
+              <div className={css.settingsActions}>
+                <button type="button" className={css.applyPrimary} onClick={applyTableSettings}>
+                  Сохранить
+                </button>
+                <button
+                  type="button"
+                  className={css.ghostBtnSm}
+                  onClick={() => setConfirmDefault(true)}
+                >
+                  По умолчанию
+                </button>
+                <button
+                  type="button"
+                  className={css.ghostBtnSm}
+                  onClick={() => setTableSettingsOpen(false)}
+                >
+                  Закрыть
+                </button>
+              </div>
+
+              <h3 className={css.settingsSectionTitle}>Настройка полей</h3>
+              <div className={css.fieldChips}>
+                {draftColumns.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${css.fieldChip} ${css.fieldChipActive}`}
+                    onClick={() =>
+                      setDraftColumns((cols) => cols.filter((k) => k !== key))
+                    }
+                    title="Убрать из таблицы"
+                  >
+                    {EMPLOYEE_FIELD_LABELS[key]}
+                    <span aria-hidden="true">×</span>
+                  </button>
+                ))}
+              </div>
+
+              <h3 className={css.settingsSectionTitle}>Дополнительные поля</h3>
+              <div className={css.fieldChips}>
+                {unusedColumns.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    className={`${css.fieldChip} ${css.fieldChipExtra}`}
+                    onClick={() => setDraftColumns((cols) => [...cols, f.key])}
+                    title="Добавить в таблицу"
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <h3 className={css.settingsSectionTitle}>Настройка поиска</h3>
+              <div className={css.searchToggles}>
+                {ATTENDANCE_SEARCH_FIELDS.map((key) => (
+                  <label key={key} className={css.searchToggleRow}>
+                    <span>{EMPLOYEE_FIELD_LABELS[key]}</span>
+                    <input
+                      type="checkbox"
+                      checked={draftSearch.includes(key)}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setDraftSearch((keys) =>
+                          on ? [...keys, key] : keys.filter((k) => k !== key),
+                        );
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDefault && (
+        <div className={css.overlay} onClick={() => setConfirmDefault(false)}>
+          <div
+            className={css.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Установить по умолчанию"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420 }}
+          >
+            <div className={css.modalHead}>
+              <h2 className={css.modalTitle}>Установить по умолчанию?</h2>
+            </div>
+            <div className={css.modalFoot}>
+              <button
+                type="button"
+                className={css.showAllBtn}
+                onClick={() => setConfirmDefault(false)}
+              >
+                Нет
+              </button>
+              <button type="button" className={css.applyPrimary} onClick={resetTableDefaults}>
+                Да
               </button>
             </div>
           </div>

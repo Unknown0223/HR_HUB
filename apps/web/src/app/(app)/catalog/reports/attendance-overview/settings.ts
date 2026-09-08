@@ -172,9 +172,27 @@ export const DEFAULT_SETTINGS: AttSettings = {
 };
 
 export const EMP_DYN_FIELDS = [
-  { id: 'phone', label: 'Телефон' },
-  { id: 'email', label: 'Email' },
-  { id: 'employmentType', label: 'Вид занятости' },
+  { id: 'phone', label: 'Номер телефона' },
+  { id: 'email', label: 'E-mail' },
+  { id: 'employmentType', label: 'Тип занятости' },
+  { id: 'inn', label: 'ИНН' },
+  { id: 'inps', label: 'ИНПС' },
+  { id: 'code', label: 'Код' },
+  { id: 'login', label: 'Логин' },
+  { id: 'telegram', label: 'Телеграм' },
+  { id: 'fax', label: 'Факс' },
+  { id: 'site', label: 'Сайт' },
+  { id: 'addressResidence', label: 'Адрес места проживания' },
+  { id: 'addressPostal', label: 'Почтовый адрес' },
+  { id: 'bankAccount', label: 'Расчетный счет' },
+  { id: 'birthDate', label: 'Дата рождения' },
+  { id: 'gender', label: 'Пол' },
+  { id: 'firstName', label: 'Имя' },
+  { id: 'lastName', label: 'Фамилия' },
+  { id: 'middleName', label: 'Отчество' },
+  { id: 'accessLevel', label: 'Уровень доступа' },
+  { id: 'workStatus', label: 'Статус на работе' },
+  { id: 'fingerprints', label: 'Отпечатки' },
 ];
 export const DIV_DYN_FIELDS = [
   { id: 'divisionCode', label: 'Код подразделения' },
@@ -266,7 +284,7 @@ export function identityCols(s: AttSettings): InfoCol[] {
   if (s.department) cols.push({ key: 'department', label: 'Отдел' });
   if (s.pinfl) cols.push({ key: 'pinfl', label: 'ПИНФЛ' });
   if (s.grade) cols.push({ key: 'grade', label: 'Разряд' });
-  if (s.hireDate) cols.push({ key: 'hiredAt', label: 'Дата приема' });
+  if (s.hireDate) cols.push({ key: 'hiredAt', label: 'Дата приема на работу' });
   if (s.altName) cols.push({ key: 'altName', label: 'Альт. имя' });
   if (s.schedule) cols.push({ key: 'schedule', label: 'График работы' });
   if (s.manager) cols.push({ key: 'manager', label: 'Руководитель' });

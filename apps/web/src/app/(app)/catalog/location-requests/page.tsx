@@ -5,7 +5,15 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   LocationRequestFormModal,
   type LocationKind,
@@ -15,6 +23,25 @@ import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
+
+const LOCATION_REQ_COLUMNS: ColumnDef[] = [
+  { key: 'employee', label: 'Сотрудник' },
+  { key: 'requestDate', label: 'Дата запроса' },
+  { key: 'location', label: 'Локация' },
+  { key: 'time', label: 'Время' },
+  { key: 'note', label: 'Примечание' },
+  { key: 'managerNote', label: 'Примечание руководителя' },
+  { key: 'status', label: 'Статус' },
+];
+
+const locationReqPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.location-requests.v1',
+  title: 'Запросы на локацию',
+  columns: LOCATION_REQ_COLUMNS,
+  defaultColumns: LOCATION_REQ_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['employee', 'location', 'note', 'status'],
+  defaultSort: [{ key: 'requestDate', dir: 'desc' }],
+});
 
 type Emp = {
   id: string;
@@ -120,11 +147,33 @@ function toFormValues(row: Row): LocationRequestFormValues {
   };
 }
 
+function cellOf(row: Row, key: string): string {
+  switch (key) {
+    case 'employee':
+      return empName(row.employee);
+    case 'requestDate':
+      return fmtDt(row.createdAt);
+    case 'location':
+      return locationOf(row);
+    case 'time':
+      return timeLabel(row);
+    case 'note':
+      return noteOf(row);
+    case 'managerNote':
+      return managerNoteOf(row);
+    case 'status':
+      return statusLabel(row.status).text;
+    default:
+      return '';
+  }
+}
+
 function LocationRequestsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope = searchParams.get('scope') === 'available' ? 'available' : 'mine';
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(locationReqPrefsCfg);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -180,22 +229,38 @@ function LocationRequestsInner() {
     );
   }, [rows, search]);
 
+  const scopeKeys =
+    scope === 'available'
+      ? ['employee', 'requestDate', 'location', 'time', 'note', 'status']
+      : ['requestDate', 'location', 'time', 'note', 'managerNote', 'status'];
+  const visibleCols = (prefs.columns.length
+    ? prefs.columns
+    : locationReqPrefsCfg.defaultColumns
+  ).filter((k) => scopeKeys.includes(k));
+  const colCount = 1 + visibleCols.length;
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
-  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
+    displayRows.length > 0 && displayRows.every((r) => checked.has(r.id));
+  const someFilteredChecked = displayRows.some((r) => checked.has(r.id));
   const selectedIds = useMemo(() => [...checked], [checked]);
 
   function toggleAll() {
     if (allFilteredChecked) {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
+        displayRows.forEach((r) => next.delete(r.id));
         return next;
       });
     } else {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
+        displayRows.forEach((r) => next.add(r.id));
         return next;
       });
     }
@@ -272,10 +337,20 @@ function LocationRequestsInner() {
     router.push(`/catalog/location-requests?${p}`);
   }
 
-  const colCount = 7;
+  function exportCsv() {
+    downloadCsv(
+      `location-requests-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
+    );
+  }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="location-requests" />
 
       <div className={shared.pageHeader}>
@@ -374,6 +449,7 @@ function LocationRequestsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -437,18 +513,14 @@ function LocationRequestsInner() {
                         el.indeterminate = someFilteredChecked && !allFilteredChecked;
                     }}
                     onChange={toggleAll}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     title="Выбрать все"
                     aria-label="Выбрать все"
                   />
                 </th>
-                {scope === 'available' ? <th>Сотрудник</th> : null}
-                <th>Дата запроса</th>
-                <th>Локация</th>
-                <th>Время</th>
-                <th>Примечание</th>
-                {scope === 'mine' ? <th>Примечание руководителя</th> : null}
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -458,14 +530,14 @@ function LocationRequestsInner() {
                     Загрузка…
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : displayRows.length === 0 ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : (
-                filtered.map((row) => {
+                displayRows.map((row) => {
                   const st = statusLabel(row.status);
                   const isChecked = checked.has(row.id);
                   const expanded = expandedId === row.id;
@@ -487,17 +559,23 @@ function LocationRequestsInner() {
                             aria-label={`Выбрать ${empName(row.employee)}`}
                           />
                         </td>
-                        {scope === 'available' ? (
-                          <td className={styles.empName}>{empName(row.employee)}</td>
-                        ) : null}
-                        <td>{fmtDt(row.createdAt)}</td>
-                        <td>{locationOf(row)}</td>
-                        <td>{timeLabel(row)}</td>
-                        <td>{noteOf(row)}</td>
-                        {scope === 'mine' ? <td>{managerNoteOf(row)}</td> : null}
-                        <td>
-                          <span className={st.cls}>{st.text}</span>
-                        </td>
+                        {visibleCols.map((key) => {
+                          if (key === 'employee') {
+                            return (
+                              <td key={key} className={styles.empName}>
+                                {cellOf(row, key) || '—'}
+                              </td>
+                            );
+                          }
+                          if (key === 'status') {
+                            return (
+                              <td key={key}>
+                                <span className={st.cls}>{st.text}</span>
+                              </td>
+                            );
+                          }
+                          return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                        })}
                       </tr>
                       {expanded ? (
                         <tr className={styles.actionsRow}>

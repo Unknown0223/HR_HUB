@@ -27,11 +27,12 @@ type Row = {
   gender: string;
   region: string;
   inps: string;
-  pinfl: string;
   inn: string;
+  pinfl: string;
   birthDate: string;
   address: string;
   phone: string;
+  email: string;
   schedule: string;
   passport: string;
   passportIssuer: string;
@@ -70,7 +71,7 @@ const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const FILE_BASE = 'Отчет-по-сотрудникам';
 const SETTINGS_KEY = 'hr-hub-employees-report-settings';
 const SETTINGS_FIELDS: { id: string; label: string }[] = [
-  { id: 'hiredAt', label: 'Дата приема' },
+  { id: 'hiredAt', label: 'Дата приема на работу' },
   { id: 'code', label: 'Код' },
   { id: 'divisionGroup', label: 'Группа подразделений' },
   { id: 'division', label: 'Подразделение' },
@@ -80,11 +81,13 @@ const SETTINGS_FIELDS: { id: string; label: string }[] = [
   { id: 'grade', label: 'Разряд' },
   { id: 'gender', label: 'Пол' },
   { id: 'region', label: 'Регион' },
-  { id: 'inps', label: 'ИНН' },
+  { id: 'inn', label: 'ИНН' },
+  { id: 'inps', label: 'ИНПС' },
   { id: 'pinfl', label: 'ПИНФЛ' },
   { id: 'birthDate', label: 'Дата рождения' },
-  { id: 'address', label: 'Адрес' },
+  { id: 'address', label: 'Адрес места проживания' },
   { id: 'phone', label: 'Номер телефона' },
+  { id: 'email', label: 'E-mail' },
   { id: 'schedule', label: 'График работы' },
   { id: 'passport', label: 'Серия документа' },
   { id: 'passportIssuer', label: 'Паспорт выдан' },
@@ -92,7 +95,7 @@ const SETTINGS_FIELDS: { id: string; label: string }[] = [
   { id: 'family', label: 'Семья' },
 ];
 const COL_LEAVES: Leaf[] = [
-  { id: 'hiredAt', key: 'hiredAt', label: 'Дата приема' },
+  { id: 'hiredAt', key: 'hiredAt', label: 'Дата приема на работу' },
   { id: 'code', key: 'code', label: 'Код' },
   { id: 'divisionGroup', key: 'divisionGroup', label: 'Группа подразделений' },
   { id: 'division', key: 'division', label: 'Подразделение' },
@@ -102,11 +105,13 @@ const COL_LEAVES: Leaf[] = [
   { id: 'grade', key: 'grade', label: 'Разряд' },
   { id: 'gender', key: 'gender', label: 'Пол' },
   { id: 'region', key: 'region', label: 'Регион' },
+  { id: 'inn', key: 'inn', label: 'ИНН' },
   { id: 'inps', key: 'inps', label: 'ИНПС' },
   { id: 'pinfl', key: 'pinfl', label: 'ПИНФЛ' },
   { id: 'birthDate', key: 'birthDate', label: 'Дата рождения' },
-  { id: 'address', key: 'address', label: 'Адрес' },
+  { id: 'address', key: 'address', label: 'Адрес места проживания' },
   { id: 'phone', key: 'phone', label: 'Номер телефона' },
+  { id: 'email', key: 'email', label: 'E-mail' },
   { id: 'schedule', key: 'schedule', label: 'График работы' },
   { id: 'passport', key: 'passport', label: 'Серия и номер паспорта' },
   { id: 'passportIssuer', key: 'passportIssuer', label: 'Паспорт выдан' },

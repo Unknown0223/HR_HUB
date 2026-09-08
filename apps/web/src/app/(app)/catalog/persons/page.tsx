@@ -14,6 +14,12 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
+import { personListPrefs } from '@/lib/table-field-defs/catalog-lists';
 import { apiFetch, PageResult } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
@@ -105,6 +111,7 @@ function PersonsPageInner() {
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
   const attachMode = searchParams?.get('mode') === 'attach';
+  const prefs = useTablePrefs(personListPrefs);
 
   const [mode, setMode] = useState<Mode>(attachMode ? 'attach' : 'list');
   const photos = usePhotoLightbox();
@@ -126,6 +133,52 @@ function PersonsPageInner() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [extraOpen, setExtraOpen] = useState(true);
+
+  function personCell(row: PersonRow, key: string): string {
+    switch (key) {
+      case 'fullName':
+        return fio(row);
+      case 'lastName':
+        return row.lastName || '';
+      case 'firstName':
+        return row.firstName || '';
+      case 'middleName':
+        return row.middleName || '';
+      case 'gender':
+        return row.gender || '';
+      case 'birthDate':
+        return row.birthDate ? String(row.birthDate).slice(0, 10) : '';
+      case 'pinfl':
+        return row.pinfl || '';
+      case 'inn':
+        return row.inn || '';
+      case 'inps':
+        return row.inps || '';
+      case 'code':
+        return row.code || '';
+      case 'phone':
+        return row.phone || '';
+      case 'email':
+        return row.email || '';
+      case 'region':
+        return row.region?.name || '';
+      case 'addressResidence':
+        return row.addressResidence || '';
+      case 'addressPostal':
+        return row.addressRegistration || '';
+      case 'isActive':
+        return row.isActive === false ? 'Неактивен' : 'Активен';
+      case 'isBlacklisted':
+        return row.isBlacklisted ? 'Да' : 'Нет';
+      default:
+        return '';
+    }
+  }
+
+  const visiblePersonCols = prefs.columns.length
+    ? prefs.columns
+    : personListPrefs.defaultColumns;
+  const personColSpan = 2 + visiblePersonCols.length;
 
   const filterQs = useMemo(() => {
     const p = new URLSearchParams();
@@ -441,6 +494,7 @@ function PersonsPageInner() {
   return (
     <div className={`${listStyles.wrap} ${styles.layout}`}>
       <PageSubnav group={{ title: pageTitle, siblings: [] }} />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
@@ -658,6 +712,20 @@ function PersonsPageInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton
+            prefs={prefs}
+            onExport={() => {
+              const cols = visiblePersonCols;
+              downloadCsv(
+                `persons.csv`,
+                rows.map((r) => {
+                  const obj: Record<string, unknown> = {};
+                  for (const k of cols) obj[prefs.labelOf(k)] = personCell(r, k);
+                  return obj;
+                }),
+              );
+            }}
+          />
         </div>
       </div>
 
@@ -677,23 +745,22 @@ function PersonsPageInner() {
                 />
               </th>
               <th style={{ width: 48 }} />
-              <th>ФИО</th>
-              <th>ИНН</th>
-              <th>Код</th>
-              <th>В черном списке</th>
+              {visiblePersonCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className={listStyles.empty}>
+                <td colSpan={personColSpan} className={listStyles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className={listStyles.empty}>
+                <td colSpan={personColSpan} className={listStyles.empty}>
                   нет данных
                 </td>
               </tr>
@@ -741,69 +808,73 @@ function PersonsPageInner() {
                       </span>
                     )}
                   </td>
-                  <td className={listStyles.nameCell}>
-                    <span className={listStyles.nameText}>{fio(row)}</span>
-                    {open ? (
-                      <div
-                        className={`${listStyles.inlineActions} ${listStyles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {mode === 'attach' ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelected(new Set([row.id]));
-                              void bulkPin(true);
-                            }}
-                          >
-                            Прикрепить
-                          </button>
-                        ) : (
-                          <>
-                            <button type="button" onClick={() => openEdit(row)}>
-                              Изменить
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void setActiveOne(row, row.isActive === false)
-                              }
+                  {visiblePersonCols.map((key) => {
+                    if (key === 'fullName') {
+                      return (
+                        <td key={key} className={listStyles.nameCell}>
+                          <span className={listStyles.nameText}>{fio(row)}</span>
+                          {open ? (
+                            <div
+                              className={`${listStyles.inlineActions} ${listStyles.rowActions}`}
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              {row.isActive === false
-                                ? 'Активировать'
-                                : 'Деактивировать'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void apiFetch(`/api/persons/${row.id}`, {
-                                  method: 'PATCH',
-                                  body: JSON.stringify({
-                                    isPinned: !row.isPinned,
-                                  }),
-                                }).then(() => load())
-                              }
-                            >
-                              {row.isPinned ? 'Открепить' : 'Прикрепить'}
-                            </button>
-                            <button
-                              type="button"
-                              className={listStyles.danger}
-                              disabled={busy}
-                              onClick={() => void runDelete(row)}
-                            >
-                              Удалить
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{row.inn || ''}</td>
-                  <td>{row.code || ''}</td>
-                  <td>{row.isBlacklisted ? 'Да' : ''}</td>
+                              {mode === 'attach' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelected(new Set([row.id]));
+                                    void bulkPin(true);
+                                  }}
+                                >
+                                  Прикрепить
+                                </button>
+                              ) : (
+                                <>
+                                  <button type="button" onClick={() => openEdit(row)}>
+                                    Изменить
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void setActiveOne(row, row.isActive === false)
+                                    }
+                                  >
+                                    {row.isActive === false
+                                      ? 'Активировать'
+                                      : 'Деактивировать'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void apiFetch(`/api/persons/${row.id}`, {
+                                        method: 'PATCH',
+                                        body: JSON.stringify({
+                                          isPinned: !row.isPinned,
+                                        }),
+                                      }).then(() => load())
+                                    }
+                                  >
+                                    {row.isPinned ? 'Открепить' : 'Прикрепить'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={listStyles.danger}
+                                    disabled={busy}
+                                    onClick={() => void runDelete(row)}
+                                  >
+                                    Удалить
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    return <td key={key}>{personCell(row, key)}</td>;
+                  })}
                 </tr>
               );
             })}

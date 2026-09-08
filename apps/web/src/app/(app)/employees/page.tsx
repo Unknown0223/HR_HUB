@@ -6,8 +6,14 @@ import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } f
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
-import { apiDownload, apiFetch, PageResult } from '@/lib/api';
-import { downloadXlsxViaApi } from '@/lib/excel';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
+import { employeeListPrefs } from '@/lib/table-field-defs/catalog-lists';
+import { apiFetch, PageResult } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { FormModal } from '@/components/FormModal';
@@ -21,14 +27,29 @@ type Emp = {
   firstName: string;
   lastName: string;
   middleName?: string | null;
-  email: string | null;
+  email?: string | null;
+  phone?: string | null;
   status: string;
   employmentType: string;
+  hiredAt?: string | null;
   externalId?: string | null;
+  code?: string | null;
   division?: { name: string } | null;
   position?: { name: string } | null;
   region?: { name: string } | null;
-  person?: { gender?: string | null } | null;
+  grade?: { name: string } | null;
+  schedule?: { name: string; startTime?: string; endTime?: string } | null;
+  person?: {
+    gender?: string | null;
+    pinfl?: string | null;
+    birthDate?: string | null;
+    inn?: string | null;
+    inps?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    addressResidence?: string | null;
+    addressRegistration?: string | null;
+  } | null;
   faceProfile?: { photoUrl?: string | null } | null;
   profileFlags?: {
     excludeFromStats?: boolean;
@@ -65,12 +86,94 @@ function initials(lastName: string, firstName: string) {
   return `${(lastName || '?')[0] ?? ''}${(firstName || '?')[0] ?? ''}`.toUpperCase();
 }
 
+function empFio(e: Emp) {
+  return `${e.lastName} ${e.firstName}${e.middleName ? ` ${e.middleName}` : ''}`.trim();
+}
+
+function statusLabel(status?: string | null) {
+  if (!status) return '';
+  if (status === 'active') return 'Активен';
+  if (status === 'dismissed') return 'Уволен';
+  return status;
+}
+
+function employmentTypeLabel(t?: string | null) {
+  if (!t) return '';
+  if (t === 'staff') return 'Штат';
+  if (t === 'gph') return 'ГПХ';
+  return t;
+}
+
+function cellOf(row: Emp, key: string): string {
+  switch (key) {
+    case 'fullName':
+      return empFio(row);
+    case 'tabNumber':
+      return row.tabNumber || '';
+    case 'lastName':
+      return row.lastName || '';
+    case 'firstName':
+      return row.firstName || '';
+    case 'middleName':
+      return row.middleName || '';
+    case 'region':
+      return row.region?.name || '';
+    case 'division':
+      return row.division?.name || '';
+    case 'position':
+      return row.position?.name || '';
+    case 'gender':
+      return row.person?.gender ? genderLabel(row.person.gender) : '';
+    case 'email':
+      return row.email || row.person?.email || '';
+    case 'phone':
+      return row.phone || row.person?.phone || '';
+    case 'pinfl':
+      return row.person?.pinfl || '';
+    case 'inn':
+      return row.person?.inn || '';
+    case 'inps':
+      return row.person?.inps || '';
+    case 'birthDate':
+      return row.person?.birthDate
+        ? String(row.person.birthDate).slice(0, 10)
+        : '';
+    case 'employmentType':
+      return employmentTypeLabel(row.employmentType);
+    case 'status':
+    case 'workStatus':
+      return statusLabel(row.status);
+    case 'hiredAt':
+      return row.hiredAt ? String(row.hiredAt).slice(0, 10) : '';
+    case 'grade':
+      return row.grade?.name || '';
+    case 'schedule':
+      if (!row.schedule) return '';
+      if (row.schedule.name) return row.schedule.name;
+      if (row.schedule.startTime && row.schedule.endTime) {
+        return `${row.schedule.startTime}-${row.schedule.endTime}`;
+      }
+      return '';
+    case 'id':
+      return row.id;
+    case 'code':
+      return row.code || row.externalId || '';
+    case 'addressResidence':
+      return row.person?.addressResidence || '';
+    case 'addressPostal':
+      return row.person?.addressRegistration || '';
+    default:
+      return '';
+  }
+}
+
 function EmployeesPageInner() {
   const [tab] = useUrlParam('tab', 'active', TABS);
   const filters = useFilterFromUrl(FILTER_KEYS);
   const q = filters.q;
   const divisionId = filters.divisionId;
   const positionId = filters.positionId;
+  const prefs = useTablePrefs(employeeListPrefs);
   const [rows, setRows] = useState<Emp[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -124,6 +227,17 @@ function EmployeesPageInner() {
   const selectedIds = useMemo(
     () => Object.keys(selected).filter((id) => selected[id]),
     [selected],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : employeeListPrefs.defaultColumns;
+  const colSpan = 2 + visibleCols.length;
+
+  const displayed = useMemo(
+    () => prefs.applySortToRows(rows, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods stable enough via state
+    [rows, prefs.state.columns, prefs.state.sort],
   );
 
   async function load() {
@@ -217,11 +331,17 @@ function EmployeesPageInner() {
     setExpandedId((cur) => (cur === id ? null : id));
   }
 
-  async function exportCsv() {
+  async function exportVisible(filename: string) {
     setExportBusy(true);
     try {
-      const qs = exportQuery ? `?${exportQuery}` : '';
-      await apiDownload(`/api/employees/export.csv${qs}`, 'employees.csv');
+      downloadCsv(
+        filename,
+        displayed.map((r) => {
+          const obj: Record<string, unknown> = {};
+          for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+          return obj;
+        }),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка экспорта');
     } finally {
@@ -229,16 +349,12 @@ function EmployeesPageInner() {
     }
   }
 
+  async function exportCsv() {
+    await exportVisible('employees.csv');
+  }
+
   async function exportXlsx() {
-    setExportBusy(true);
-    try {
-      const qs = exportQuery ? `?${exportQuery}` : '';
-      await downloadXlsxViaApi(`/api/employees/export.xlsx${qs}`, 'employees.xlsx');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка экспорта');
-    } finally {
-      setExportBusy(false);
-    }
+    await exportVisible('employees.csv');
   }
 
   function toggleAll(checked: boolean) {
@@ -247,7 +363,7 @@ function EmployeesPageInner() {
       return;
     }
     const next: Record<string, boolean> = {};
-    for (const e of rows) next[e.id] = true;
+    for (const e of displayed) next[e.id] = true;
     setSelected(next);
   }
 
@@ -352,6 +468,7 @@ function EmployeesPageInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey={subnavKey} />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={styles.pageHeader}>
         <div className={`${styles.pageIconBadge} ${styles.pageIconBadgeHr}`}>
@@ -418,6 +535,29 @@ function EmployeesPageInner() {
           >
             Excel
           </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+            aria-pressed={filtersOpen}
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => void load()}
+            title="Обновить"
+            aria-label="Обновить"
+          >
+            <i className="fas fa-sync-alt" aria-hidden />
+          </button>
+          <TablePrefsMenuButton
+            prefs={prefs}
+            onExport={() => void exportVisible('employees.csv')}
+          />
         </div>
       </div>
 
@@ -695,24 +835,23 @@ function EmployeesPageInner() {
               <th className={styles.checkCol}>
                 <input
                   type="checkbox"
-                  checked={rows.length > 0 && selectedIds.length === rows.length}
+                  checked={
+                    displayed.length > 0 && selectedIds.length === displayed.length
+                  }
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Таб. №</th>
-              <th>ФИО</th>
-              <th>Регион</th>
-              <th>Подразделение</th>
-              <th>Должность</th>
-              <th>Пол</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
               <th aria-label="Раскрыть" />
             </tr>
           </thead>
           <tbody>
-            {rows.map((e) => {
+            {displayed.map((e) => {
               const photo = mediaSrc(e.faceProfile?.photoUrl);
-              const fio = `${e.lastName} ${e.firstName}${e.middleName ? ` ${e.middleName}` : ''}`;
+              const fio = empFio(e);
               const flags = e.profileFlags ?? {};
               const busy = flagBusyId === e.id;
               const expanded = expandedId === e.id;
@@ -744,71 +883,94 @@ function EmployeesPageInner() {
                         aria-label={`Выбрать ${e.tabNumber}`}
                       />
                     </td>
-                    <td onClick={(ev) => ev.stopPropagation()}>
-                      <Link className={styles.link} href={`/employees/${e.id}`}>
-                        {e.tabNumber}
-                      </Link>
-                    </td>
-                    <td onClick={(ev) => ev.stopPropagation()}>
-                      <Link className={styles.fioCell} href={`/employees/${e.id}`}>
-                        {photo ? (
-                          <PhotoThumb
-                            className={styles.avatar}
-                            src={photo}
-                            alt=""
-                            width={36}
-                            height={36}
-                            lightbox={photos}
-                            slides={rows
-                              .map((x) => ({
-                                src: mediaSrc(x.faceProfile?.photoUrl) || '',
-                                caption: `${x.lastName} ${x.firstName}`,
-                              }))
-                              .filter((s) => s.src)}
-                            index={Math.max(
-                              0,
-                              rows
-                                .map((x) => mediaSrc(x.faceProfile?.photoUrl) || '')
-                                .filter(Boolean)
-                                .findIndex((s) => s === photo),
-                            )}
-                          />
-                        ) : (
-                          <span className={styles.avatarFallback}>
-                            {initials(e.lastName, e.firstName)}
-                          </span>
-                        )}
-                        <span className={styles.fioUpper}>{fio}</span>
-                        {(flags.excludeFromStats ||
-                          flags.marksBlocked ||
-                          flags.systemAccessClosed) && (
-                          <span className={styles.flagDots} title="Ограничения">
-                            {flags.excludeFromStats ? (
-                              <span
-                                className={`${styles.flagDot} ${styles.flagDotMuted}`}
-                                title="Исключён из статистики"
-                              />
-                            ) : null}
-                            {flags.marksBlocked ? (
-                              <span
-                                className={`${styles.flagDot} ${styles.flagDotWarn}`}
-                                title="Отметки заблокированы"
-                              />
-                            ) : null}
-                            {flags.systemAccessClosed ? (
-                              <span
-                                className={`${styles.flagDot} ${styles.flagDotDanger}`}
-                                title="Доступ к системе закрыт"
-                              />
-                            ) : null}
-                          </span>
-                        )}
-                      </Link>
-                    </td>
-                    <td>{e.region?.name ?? '—'}</td>
-                    <td>{e.division?.name ?? '—'}</td>
-                    <td>{e.position?.name ?? '—'}</td>
-                    <td>{genderLabel(e.person?.gender)}</td>
+                    {visibleCols.map((key) => {
+                      if (key === 'tabNumber') {
+                        return (
+                          <td key={key} onClick={(ev) => ev.stopPropagation()}>
+                            <Link
+                              className={styles.link}
+                              href={`/employees/${e.id}`}
+                            >
+                              {e.tabNumber}
+                            </Link>
+                          </td>
+                        );
+                      }
+                      if (key === 'fullName') {
+                        return (
+                          <td key={key} onClick={(ev) => ev.stopPropagation()}>
+                            <Link
+                              className={styles.fioCell}
+                              href={`/employees/${e.id}`}
+                            >
+                              {photo ? (
+                                <PhotoThumb
+                                  className={styles.avatar}
+                                  src={photo}
+                                  alt=""
+                                  width={36}
+                                  height={36}
+                                  lightbox={photos}
+                                  slides={displayed
+                                    .map((x) => ({
+                                      src:
+                                        mediaSrc(x.faceProfile?.photoUrl) || '',
+                                      caption: empFio(x),
+                                    }))
+                                    .filter((s) => s.src)}
+                                  index={Math.max(
+                                    0,
+                                    displayed
+                                      .map(
+                                        (x) =>
+                                          mediaSrc(x.faceProfile?.photoUrl) ||
+                                          '',
+                                      )
+                                      .filter(Boolean)
+                                      .findIndex((s) => s === photo),
+                                  )}
+                                />
+                              ) : (
+                                <span className={styles.avatarFallback}>
+                                  {initials(e.lastName, e.firstName)}
+                                </span>
+                              )}
+                              <span className={styles.fioUpper}>{fio}</span>
+                              {(flags.excludeFromStats ||
+                                flags.marksBlocked ||
+                                flags.systemAccessClosed) && (
+                                <span
+                                  className={styles.flagDots}
+                                  title="Ограничения"
+                                >
+                                  {flags.excludeFromStats ? (
+                                    <span
+                                      className={`${styles.flagDot} ${styles.flagDotMuted}`}
+                                      title="Исключён из статистики"
+                                    />
+                                  ) : null}
+                                  {flags.marksBlocked ? (
+                                    <span
+                                      className={`${styles.flagDot} ${styles.flagDotWarn}`}
+                                      title="Отметки заблокированы"
+                                    />
+                                  ) : null}
+                                  {flags.systemAccessClosed ? (
+                                    <span
+                                      className={`${styles.flagDot} ${styles.flagDotDanger}`}
+                                      title="Доступ к системе закрыт"
+                                    />
+                                  ) : null}
+                                </span>
+                              )}
+                            </Link>
+                          </td>
+                        );
+                      }
+                      return (
+                        <td key={key}>{cellOf(e, key) || '—'}</td>
+                      );
+                    })}
                     <td className={styles.actionsCell}>
                       <button
                         type="button"
@@ -826,7 +988,7 @@ function EmployeesPageInner() {
                   </tr>
                   {expanded ? (
                     <tr className={styles.rowExpand}>
-                      <td colSpan={8}>
+                      <td colSpan={colSpan}>
                         <div
                           className={styles.rowExpandInner}
                           onClick={(ev) => ev.stopPropagation()}
@@ -936,9 +1098,9 @@ function EmployeesPageInner() {
                 </Fragment>
               );
             })}
-            {rows.length === 0 ? (
+            {displayed.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={colSpan}>
                   <div className={styles.empty}>
                     {hasActiveFilters
                       ? 'По выбранным фильтрам ничего не найдено — измените условия или нажмите «Сбросить».'

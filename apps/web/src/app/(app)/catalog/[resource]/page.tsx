@@ -4,9 +4,15 @@ import { confirm } from '@/lib/dialogs';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { RESOURCE_META, FieldDef } from '@/lib/catalog-nav';
 import { columnsForResource, labelFor, ColumnDef } from '@/lib/catalog-columns';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { CATALOG_SIBLING_KEY } from '@/lib/form-siblings';
 import { downloadCsv, flattenRow } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
@@ -687,6 +693,37 @@ export default function CatalogResourcePage() {
     return keys.slice(0, 12).map((k) => ({ key: k, label: labelFor(k) }));
   }, [filtered, meta, resource]);
 
+  const prefsCfg = useMemo(
+    () =>
+      prefsConfigFromColumns({
+        storageKey: `hrhub.table.catalog.${resource}.v1`,
+        title: title || resource,
+        columns,
+      }),
+    [resource, title, columns],
+  );
+  const prefs = useTablePrefs(prefsCfg);
+
+  const visibleColumns = useMemo(() => {
+    const byKey = new Map(columns.map((c) => [c.key, c]));
+    const keys = prefs.columns.length
+      ? prefs.columns
+      : prefsCfg.defaultColumns;
+    const picked = keys
+      .map((k) => byKey.get(k))
+      .filter((c): c is ColumnDef => Boolean(c));
+    return picked.length ? picked : columns;
+  }, [columns, prefs.columns, prefsCfg.defaultColumns]);
+
+  const displayRows = useMemo(() => {
+    return prefs.applySortToRows(filtered, (row, key) => {
+      const flat = flattenRow(row);
+      const v = flat[key];
+      return v == null ? '' : String(v);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, prefs.state.sort]);
+
   async function runLifecycleAction(endpoint: string) {
     setError('');
     try {
@@ -853,7 +890,7 @@ export default function CatalogResourcePage() {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr>
-            {columns.map((c) => (
+            {visibleColumns.map((c) => (
               <th
                 key={c.key}
                 style={{
@@ -871,19 +908,19 @@ export default function CatalogResourcePage() {
           </tr>
         </thead>
         <tbody>
-          {filtered.length === 0 ? (
+          {displayRows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length + 1} className={styles.empty}>
+              <td colSpan={visibleColumns.length + 1} className={styles.empty}>
                 Пусто — нажмите «Создать»
               </td>
             </tr>
           ) : (
-            filtered.map((row) => {
+            displayRows.map((row) => {
               const flat = flattenRow(row);
               const actions = getRowActions(resource, row);
               return (
                 <tr key={String(row.id)}>
-                  {columns.map((c) => (
+                  {visibleColumns.map((c) => (
                     <td
                       key={c.key}
                       style={{
@@ -938,6 +975,7 @@ export default function CatalogResourcePage() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       {CATALOG_SIBLING_KEY[resource] ? (
         <PageSubnav
           groupKey={CATALOG_SIBLING_KEY[resource]}
@@ -951,15 +989,15 @@ export default function CatalogResourcePage() {
           ) : null}
           <p className={styles.lead}>
             Каталог · {resource}
-            {urlType ? ` · type=${urlType}` : ''} · {filtered.length} строк
+            {urlType ? ` · type=${urlType}` : ''} · {displayRows.length} строк
           </p>
         </div>
         <div className={styles.rowActions}>
           <button
             type="button"
             className={styles.btnSecondary}
-            onClick={() => downloadCsv(resource, filtered)}
-            disabled={!filtered.length}
+            onClick={() => downloadCsv(resource, displayRows)}
+            disabled={!displayRows.length}
           >
             CSV
           </button>
@@ -988,6 +1026,13 @@ export default function CatalogResourcePage() {
             onToggle={() => setFilterOpen((v) => !v)}
             fields={filterFields}
             onApply={() => load()}
+          />
+          <TablePrefsMenuButton
+            prefs={prefs}
+            onExport={() => {
+              if (canExportExcel) void exportExcel();
+              else downloadCsv(resource, displayRows);
+            }}
           />
         </div>
       </div>

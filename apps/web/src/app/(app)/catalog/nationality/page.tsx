@@ -7,9 +7,15 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { displayCode, storeCode } from '@/lib/nationality';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
@@ -28,10 +34,37 @@ const DICT_CODE = 'nationality';
 const PAGE_SIZE = 50;
 const FILTER_KEYS = ['q', 'code', 'name', 'isActive'] as const;
 
+const nationalityListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.nationality.v1',
+  title: 'Национальность',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Название' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['code', 'name'],
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function nationalityCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'code':
+      return displayCode(row.code);
+    case 'name':
+      return row.name || '';
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
+
 function NationalityInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(nationalityListPrefs);
   const q = filters.q;
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -54,6 +87,11 @@ function NationalityInner() {
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : nationalityListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const codeF = (filters.code || '').trim().toLowerCase();
@@ -74,11 +112,17 @@ function NationalityInner() {
     });
   }, [rows, q, filters.code, filters.name, filters.isActive]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, nationalityCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const p = Math.min(page, pageCount);
-    return filtered.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
-  }, [filtered, page, pageCount]);
+    return displayRows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  }, [displayRows, page, pageCount]);
 
   async function load() {
     setLoading(true);
@@ -209,16 +253,17 @@ function NationalityInner() {
   function exportCsv() {
     downloadCsv(
       `nationality-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: displayCode(r.code),
-        Название: r.name,
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = nationalityCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav group={{ title: 'Национальность', siblings: [] }} />
 
       <div className={shared.pageHeader}>
@@ -277,15 +322,6 @@ function NationalityInner() {
             }}
             aria-label="Поиск"
           />
-          <button
-            type="button"
-            className={styles.exportBtn}
-            onClick={exportCsv}
-            title="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-            Excel
-          </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
@@ -318,6 +354,7 @@ function NationalityInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -329,31 +366,32 @@ function NationalityInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Код</th>
-              <th>Название</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
@@ -382,33 +420,55 @@ function NationalityInner() {
                         aria-label={`Выбрать ${row.name}`}
                       />
                     </td>
-                    <td>{displayCode(row.code)}</td>
-                    <td className={styles.nameCell}>
-                      <span className={styles.nameText}>{row.name}</span>
-                      {row.isActive === false ? (
-                        <span className={styles.statusMuted}>Неактивный</span>
-                      ) : null}
-                      {open ? (
-                        <div
-                          className={`${styles.inlineActions} ${styles.rowActions}`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button type="button" onClick={() => openEdit(row)}>
-                            Изменить
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.danger}
-                            disabled={busy}
-                            onClick={() =>
-                              void deleteIds([row.id], `Удалить «${row.name}»?`)
-                            }
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      ) : null}
-                    </td>
+                    {visibleCols.map((key) => {
+                      if (key === 'code') {
+                        return <td key={key}>{displayCode(row.code)}</td>;
+                      }
+                      if (key === 'name') {
+                        return (
+                          <td key={key} className={styles.nameCell}>
+                            <span className={styles.nameText}>{row.name}</span>
+                            {row.isActive === false ? (
+                              <span className={styles.statusMuted}>Неактивный</span>
+                            ) : null}
+                            {open ? (
+                              <div
+                                className={`${styles.inlineActions} ${styles.rowActions}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button type="button" onClick={() => openEdit(row)}>
+                                  Изменить
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.danger}
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void deleteIds([row.id], `Удалить «${row.name}»?`)
+                                  }
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            ) : null}
+                          </td>
+                        );
+                      }
+                      if (key === 'isActive') {
+                        return (
+                          <td key={key}>
+                            {row.isActive === false ? (
+                              <span className={styles.statusMuted}>Неактивный</span>
+                            ) : (
+                              <span className={styles.statusActive}>Активный</span>
+                            )}
+                          </td>
+                        );
+                      }
+                      return (
+                        <td key={key}>{nationalityCell(row, key) || '—'}</td>
+                      );
+                    })}
                   </tr>
                 );
               })

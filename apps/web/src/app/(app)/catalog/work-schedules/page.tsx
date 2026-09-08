@@ -6,8 +6,15 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { WorkScheduleFormModal } from './WorkScheduleFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -32,7 +39,26 @@ const KIND_LABEL: Record<ScheduleKind, string> = Object.fromEntries(
 ) as Record<ScheduleKind, string>;
 
 const FILTER_KEYS = ['q', 'name', 'code', 'kind', 'status'] as const;
-const COL_COUNT = 5;
+
+const WORK_SCHEDULE_COLUMNS: ColumnDef[] = [
+  { key: 'name', label: 'Название' },
+  { key: 'code', label: 'Код' },
+  { key: 'kind', label: 'Тип' },
+  { key: 'shiftTime', label: 'Время смены' },
+  { key: 'calendar', label: 'Календарь' },
+  { key: 'employeeCount', label: 'Сотрудники' },
+  { key: 'isActive', label: 'Статус' },
+  { key: 'updatedAt', label: 'Изменён' },
+];
+
+const workSchedulePrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.work-schedules.v1',
+  title: 'Графики работы',
+  columns: WORK_SCHEDULE_COLUMNS,
+  defaultColumns: ['name', 'code', 'kind', 'isActive'],
+  defaultSearchKeys: ['name', 'code'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 type Row = {
   id: string;
@@ -40,13 +66,61 @@ type Row = {
   code: string;
   kind?: ScheduleKind;
   isActive: boolean;
+  startTime?: string;
+  endTime?: string;
+  settings?: Record<string, unknown> | null;
   updatedAt?: string;
+  _count?: { employees?: number };
 };
+
+function cellOf(row: Row, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'code':
+      return row.code || '';
+    case 'kind': {
+      const kind = (row.kind || 'ordinary') as ScheduleKind;
+      return KIND_LABEL[kind] || kind;
+    }
+    case 'shiftTime': {
+      const start = row.startTime || '';
+      const end = row.endTime || '';
+      if (!start && !end) return '';
+      return `${start || '—'}${start || end ? '–' : ''}${end || '—'}`;
+    }
+    case 'calendar': {
+      const s = row.settings;
+      if (!s || typeof s !== 'object') return '';
+      const name =
+        (typeof s.calendarName === 'string' && s.calendarName) ||
+        (typeof s.productionCalendarName === 'string' && s.productionCalendarName) ||
+        '';
+      const id =
+        (typeof s.calendarId === 'string' && s.calendarId) ||
+        (typeof s.productionCalendarId === 'string' && s.productionCalendarId) ||
+        '';
+      return name || id || '';
+    }
+    case 'employeeCount':
+      return String(row._count?.employees ?? 0);
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    case 'updatedAt': {
+      if (!row.updatedAt) return '';
+      const d = new Date(row.updatedAt);
+      return Number.isNaN(d.getTime()) ? row.updatedAt : d.toLocaleString('ru-RU');
+    }
+    default:
+      return '';
+  }
+}
 
 function WorkSchedulesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(workSchedulePrefs);
   const q = filters.q;
   const nameFilter = filters.name;
   const codeFilter = filters.code;
@@ -66,6 +140,11 @@ function WorkSchedulesInner() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [createKind, setCreateKind] = useState<ScheduleKind>('ordinary');
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : workSchedulePrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   async function load() {
     setLoading(true);
@@ -123,12 +202,19 @@ function WorkSchedulesInner() {
     return list;
   }, [rows, q, nameFilter, codeFilter, kindFilter, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -137,7 +223,7 @@ function WorkSchedulesInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -261,17 +347,17 @@ function WorkSchedulesInner() {
   function exportCsv() {
     downloadCsv(
       `work-schedules-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        Код: r.code || '',
-        Тип: KIND_LABEL[(r.kind || 'ordinary') as ScheduleKind] || r.kind || '',
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="work-schedules" />
 
       <div className={shared.pageHeader}>
@@ -351,21 +437,13 @@ function WorkSchedulesInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -430,31 +508,29 @@ function WorkSchedulesInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Код</th>
-                <th>Тип</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && !filtered.length ? (
+              {loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && !filtered.length ? (
+              {!loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
-                const kind = (row.kind || 'ordinary') as ScheduleKind;
                 return (
                   <Fragment key={row.id}>
                     <tr
@@ -471,20 +547,38 @@ function WorkSchedulesInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td className={styles.codeCell}>{row.code || '—'}</td>
-                      <td>{KIND_LABEL[kind] || kind}</td>
-                      <td>
-                        {row.isActive ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'code') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {row.code || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {row.isActive ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/work-schedules/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

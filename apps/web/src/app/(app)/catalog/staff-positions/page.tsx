@@ -8,8 +8,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { StaffPositionFormModal } from './StaffPositionFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -24,8 +30,6 @@ const FILTER_KEYS = [
   'to',
   'status',
 ] as const;
-
-const COL_COUNT = 6;
 
 type Emp = {
   id: string;
@@ -49,6 +53,21 @@ type StaffPos = {
 
 type Opt = { id: string; label: string };
 
+const staffPosPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.staff-positions.v1',
+  title: 'Позиции',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'employees', label: 'Сотрудники' },
+    { key: 'openedAt', label: 'Дата открытия' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'position', label: 'Должность' },
+  ],
+  defaultColumns: ['name', 'employees', 'openedAt', 'division', 'position'],
+  defaultSearchKeys: ['name', 'employees', 'division', 'position'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
 function empName(e: Emp) {
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
 }
@@ -67,10 +86,28 @@ function fmtDate(iso?: string | null) {
   return d.toLocaleDateString('ru-RU');
 }
 
+function staffPosCell(row: StaffPos, key: string): string {
+  switch (key) {
+    case 'name':
+      return displayName(row);
+    case 'employees':
+      return (row.employees || []).map(empName).join(', ');
+    case 'openedAt':
+      return row.openedAt ? fmtDate(row.openedAt) : '';
+    case 'division':
+      return row.division?.name || '';
+    case 'position':
+      return row.position?.name || row.title || '';
+    default:
+      return '';
+  }
+}
+
 function StaffPositionsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
+  const prefs = useTablePrefs(staffPosPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<StaffPos[]>([]);
@@ -96,6 +133,11 @@ function StaffPositionsInner() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [closeDate, setCloseDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : staffPosPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   async function load() {
     setLoading(true);
@@ -169,13 +211,21 @@ function StaffPositionsInner() {
     });
   }, [rows, q, filters]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, staffPosCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -184,7 +234,7 @@ function StaffPositionsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -267,7 +317,7 @@ function StaffPositionsInner() {
   }
 
   async function runBulkActive(isActive: boolean) {
-    const targets = filtered.filter((r) => checked[r.id] && r.isActive !== isActive);
+    const targets = displayRows.filter((r) => checked[r.id] && r.isActive !== isActive);
     if (targets.length === 0) return;
     setBusy(true);
     setError('');
@@ -341,19 +391,17 @@ function StaffPositionsInner() {
   function exportCsv() {
     downloadCsv(
       `staff-positions-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: displayName(r),
-        Сотрудники: (r.employees || []).map(empName).join(', '),
-        'Дата открытия': r.openedAt ? fmtDate(r.openedAt) : '',
-        Подразделение: r.division?.name || '',
-        Должность: r.position?.name || r.title || '',
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = staffPosCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="staff-positions" />
 
       <div className={shared.pageHeader}>
@@ -458,21 +506,13 @@ function StaffPositionsInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -554,29 +594,27 @@ function StaffPositionsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Сотрудники</th>
-                <th>Дата открытия</th>
-                <th>Подразделение</th>
-                <th>Должность</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const staff = (row.employees || []).map(empName);
@@ -596,36 +634,51 @@ function StaffPositionsInner() {
                           aria-label={`Выбрать ${displayName(row)}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>
-                        <span className={styles.nameText}>{displayName(row)}</span>
-                        {!row.isActive ? (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        ) : null}
-                        {row.closedAt ? (
-                          <span className={styles.statusClosed}>
-                            закрыта {fmtDate(row.closedAt)}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className={styles.staffCell}>
-                        {staff.length ? (
-                          <>
-                            <span className={styles.staffNames}>{staff.join(', ')}</span>
-                            <span className={styles.staffCount}>
-                              {staff.length}/{row.headcount || '—'}
-                            </span>
-                          </>
-                        ) : (
-                          <span className={styles.vacant}>Вакантна</span>
-                        )}
-                      </td>
-                      <td className={styles.dateCell}>{fmtDate(row.openedAt)}</td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td>{row.position?.name || row.title || '—'}</td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              <span className={styles.nameText}>{displayName(row)}</span>
+                              {!row.isActive ? (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              ) : null}
+                              {row.closedAt ? (
+                                <span className={styles.statusClosed}>
+                                  закрыта {fmtDate(row.closedAt)}
+                                </span>
+                              ) : null}
+                            </td>
+                          );
+                        }
+                        if (key === 'employees') {
+                          return (
+                            <td key={key} className={styles.staffCell}>
+                              {staff.length ? (
+                                <>
+                                  <span className={styles.staffNames}>{staff.join(', ')}</span>
+                                  <span className={styles.staffCount}>
+                                    {staff.length}/{row.headcount || '—'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className={styles.vacant}>Вакантна</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        if (key === 'openedAt') {
+                          return (
+                            <td key={key} className={styles.dateCell}>
+                              {fmtDate(row.openedAt)}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{staffPosCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/staff-positions/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />
@@ -671,7 +724,7 @@ function StaffPositionsInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

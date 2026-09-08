@@ -6,6 +6,12 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
+import { absenceRequestsPrefs } from '@/lib/table-field-defs/absence-requests';
 import { apiFetch } from '@/lib/api';
 import { AbsenceRequestCreateModal } from './AbsenceRequestCreateModal';
 import styles from './page.module.css';
@@ -19,6 +25,8 @@ type Emp = {
   lastName: string;
   middleName?: string | null;
   tabNumber?: string | null;
+  division?: { name?: string | null } | null;
+  position?: { name?: string | null } | null;
 };
 
 type Row = {
@@ -31,6 +39,7 @@ type Row = {
   startTime?: string | null;
   endTime?: string | null;
   createdAt: string;
+  updatedAt?: string;
   employee: Emp;
   absenceType: { id: string; name: string };
   meta?: Record<string, unknown> | null;
@@ -84,11 +93,64 @@ function statusLabel(row: Row) {
   return { text: row.status, cls: styles.badgeMuted };
 }
 
+function cellOf(row: Row, key: string): string {
+  const meta = row.meta || {};
+  switch (key) {
+    case 'staff_name':
+      return empName(row.employee);
+    case 'request_date':
+      return fmtDt(row.createdAt);
+    case 'request_kind_name':
+      return row.absenceType?.name || '';
+    case 'request_time':
+      return timeLabel(row);
+    case 'note':
+      return row.note || '';
+    case 'manager_note':
+      return row.managerNote || '';
+    case 'status_name':
+      return statusLabel(row).text;
+    case 'division_name':
+      return row.employee?.division?.name || String(meta.divisionName || '');
+    case 'job_name':
+      return row.employee?.position?.name || String(meta.jobName || '');
+    case 'request_type_name':
+      return String(meta.requestKind || meta.requestTypeName || '');
+    case 'begin_time':
+      return row.startTime || String(meta.startTime || '') || fmtDate(row.startDate);
+    case 'end_time':
+      return row.endTime || String(meta.endTime || '') || fmtDate(row.endDate);
+    case 'approved_by_name':
+      return String(meta.approvedByName || '');
+    case 'completed_by_name':
+      return String(meta.completedByName || '');
+    case 'created_by_name':
+      return String(meta.createdByName || '');
+    case 'created_on':
+      return fmtDt(row.createdAt);
+    case 'modified_by_name':
+      return String(meta.modifiedByName || '');
+    case 'modified_on':
+      return fmtDt(row.updatedAt || null);
+    case 'access_level_name':
+      return String(meta.accessLevelName || '');
+    case 'accrual_kind_name':
+      return String(meta.accrualKindName || '');
+    case 'barcode':
+      return String(meta.barcode || row.id.slice(0, 8));
+    case 'request_id':
+      return row.id;
+    default:
+      return '';
+  }
+}
+
 function AbsenceRequestsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope = searchParams.get('scope') === 'mine' ? 'mine' : 'available';
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(absenceRequestsPrefs(scope));
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -132,15 +194,40 @@ function AbsenceRequestsInner() {
   }, [scope, filters.status, filters.q]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      [empName(r.employee), r.absenceType?.name, r.note, r.managerNote, r.status]
-        .join(' ')
-        .toLowerCase()
-        .includes(q),
+    const matched = rows.filter((r) => prefs.matchesSearch(r, search, cellOf));
+    return prefs.applySortToRows(matched, cellOf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods stable enough via state
+  }, [rows, search, prefs.state.columns, prefs.state.searchKeys, prefs.state.sort]);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : absenceRequestsPrefs(scope).defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
+  function exportExcel() {
+    const head = visibleCols.map((k) => prefs.labelOf(k));
+    const lines = filtered.map((r) =>
+      visibleCols
+        .map((k) => {
+          if (k === 'status_name') {
+            const st = statusLabel(r);
+            return `"${st.text.replace(/"/g, '""')}"`;
+          }
+          return `"${String(cellOf(r, k) || '—').replace(/"/g, '""')}"`;
+        })
+        .join(';'),
     );
-  }, [rows, search]);
+    const csv = `\uFEFF${[head.join(';'), ...lines].join('\r\n')}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `absence-requests_${scope}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
   const allFilteredChecked =
     filtered.length > 0 && filtered.every((r) => checked.has(r.id));
@@ -241,11 +328,10 @@ function AbsenceRequestsInner() {
     router.push(`/catalog/absence-requests?${p}`);
   }
 
-  const colCount = scope === 'available' ? 7 : 7;
-
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="absence-requests" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeAbsence}`}>
@@ -344,6 +430,7 @@ function AbsenceRequestsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportExcel} />
         </div>
       </div>
 
@@ -434,13 +521,9 @@ function AbsenceRequestsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                {scope === 'available' ? <th>Сотрудник</th> : null}
-                <th>Дата запроса</th>
-                <th>Вид отсутствия</th>
-                <th>Время</th>
-                <th>Примечание</th>
-                {scope === 'mine' ? <th>Примечание руководителя</th> : null}
-                <th>Состояние</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -480,17 +563,23 @@ function AbsenceRequestsInner() {
                           aria-label={`Выбрать ${empName(row.employee)}`}
                         />
                       </td>
-                      {scope === 'available' ? (
-                        <td className={styles.empName}>{empName(row.employee)}</td>
-                      ) : null}
-                      <td>{fmtDt(row.createdAt)}</td>
-                      <td>{row.absenceType?.name || '—'}</td>
-                      <td>{timeLabel(row)}</td>
-                      <td>{row.note || '—'}</td>
-                      {scope === 'mine' ? <td>{row.managerNote || '—'}</td> : null}
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'status_name') {
+                          return (
+                            <td key={key}>
+                              <span className={st.cls}>{st.text}</span>
+                            </td>
+                          );
+                        }
+                        if (key === 'staff_name') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {expanded ? (
                       <tr className={styles.actionsRow}>

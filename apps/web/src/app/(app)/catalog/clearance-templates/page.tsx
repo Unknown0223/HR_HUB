@@ -5,9 +5,14 @@ import Link from 'next/link';
 import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
-import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { ClearanceTemplateFormModal } from './ClearanceTemplateFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -27,15 +32,61 @@ type TemplateRow = {
 };
 
 const PAGE_SIZES = [25, 50, 100] as const;
-const COL_COUNT = 8;
+
+const clearanceTemplateListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.clearance-templates.v1',
+  title: 'Шаблоны обходных листов',
+  columns: [
+    { key: 'name', label: 'Шаблон' },
+    { key: 'division', label: 'Подразделения' },
+    { key: 'position', label: 'Должность' },
+    { key: 'requireManagerSign', label: 'Подпись руководителя' },
+    { key: 'requireHigherManagerSign', label: 'Подпись вышестоящего руководителя' },
+    { key: 'employees', label: 'Сотрудники' },
+    { key: 'isActive', label: 'Активен' },
+  ],
+  defaultColumns: [
+    'name',
+    'division',
+    'position',
+    'requireManagerSign',
+    'requireHigherManagerSign',
+    'employees',
+    'isActive',
+  ],
+  defaultSearchKeys: ['name', 'division', 'position'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 function yesNo(v: boolean) {
   return v ? 'Да' : 'Нет';
 }
 
+function clearanceTemplateCell(row: TemplateRow, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'division':
+      return row.division?.name || '';
+    case 'position':
+      return row.position?.name || '';
+    case 'requireManagerSign':
+      return yesNo(row.requireManagerSign);
+    case 'requireHigherManagerSign':
+      return yesNo(row.requireHigherManagerSign);
+    case 'employees':
+      return String(row.employees?.length ?? 0);
+    case 'isActive':
+      return yesNo(row.isActive);
+    default:
+      return '';
+  }
+}
+
 function ClearanceTemplatesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(clearanceTemplateListPrefs);
   const q = searchParams.get('q') || '';
 
   const [rows, setRows] = useState<TemplateRow[]>([]);
@@ -45,11 +96,15 @@ function ClearanceTemplatesInner() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(50);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : clearanceTemplateListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -63,13 +118,19 @@ function ClearanceTemplatesInner() {
     });
   }, [rows, q]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize],
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, clearanceTemplateCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
   );
-  const rangeFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeTo = Math.min(page * pageSize, filtered.length);
+
+  const totalPages = Math.max(1, Math.ceil(displayRows.length / pageSize));
+  const pageRows = useMemo(
+    () => displayRows.slice((page - 1) * pageSize, page * pageSize),
+    [displayRows, page, pageSize],
+  );
+  const rangeFrom = displayRows.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, displayRows.length);
 
   const checkedIds = useMemo(() => Object.keys(checked).filter((id) => checked[id]), [checked]);
   const allPageChecked = pageRows.length > 0 && pageRows.every((r) => checked[r.id]);
@@ -228,36 +289,17 @@ function ClearanceTemplatesInner() {
   function exportCsv() {
     downloadCsv(
       `clearance-templates-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Шаблон: r.name || '',
-        Код: r.code || '',
-        Подразделения: r.division?.name || '',
-        Должность: r.position?.name || '',
-        'Подпись руководителя': yesNo(r.requireManagerSign),
-        'Подпись вышестоящего руководителя': yesNo(r.requireHigherManagerSign),
-        Сотрудники: String(r.employees?.length ?? 0),
-        Активен: yesNo(r.isActive),
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = clearanceTemplateCell(r, k);
+        return obj;
+      }),
     );
-  }
-
-  async function exportExcel() {
-    setExportBusy(true);
-    setError('');
-    try {
-      await downloadXlsxViaApi(
-        '/api/catalog/clearance-templates/export.xlsx',
-        `clearance-templates-${new Date().toISOString().slice(0, 10)}.xlsx`,
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка Excel');
-    } finally {
-      setExportBusy(false);
-    }
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="clearance-templates" />
 
       <div className={shared.pageHeader}>
@@ -309,31 +351,13 @@ function ClearanceTemplatesInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            disabled={exportBusy}
-            onClick={() => void exportExcel()}
-            title="Excel"
-            aria-label="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -399,26 +423,22 @@ function ClearanceTemplatesInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Шаблон</th>
-                <th>Подразделения</th>
-                <th>Должность</th>
-                <th>Подпись руководителя</th>
-                <th>Подпись вышестоящего руководителя</th>
-                <th>Сотрудники</th>
-                <th>Активен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
               {!loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
@@ -442,49 +462,78 @@ function ClearanceTemplatesInner() {
                           aria-label={`Выбрать ${row.name || row.code}`}
                         />
                       </td>
-                      <td>
-                        <div className={styles.nameCell}>
-                          <span className={styles.nameIcon} aria-hidden>
-                            <i className="fas fa-clipboard-check" />
-                          </span>
-                          <div className={styles.nameText}>
-                            <div className={styles.name}>{row.name || '—'}</div>
-                            <div className={styles.meta}>{row.code}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td>{row.position?.name || '—'}</td>
-                      <td>
-                        <span
-                          className={
-                            row.requireManagerSign ? styles.signYes : styles.signNo
-                          }
-                        >
-                          {yesNo(row.requireManagerSign)}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={
-                            row.requireHigherManagerSign ? styles.signYes : styles.signNo
-                          }
-                        >
-                          {yesNo(row.requireHigherManagerSign)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={styles.countPill}>{row.employees?.length ?? 0}</span>
-                      </td>
-                      <td>
-                        <span className={row.isActive ? styles.badgeOk : styles.badgeOff}>
-                          {yesNo(row.isActive)}
-                        </span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key}>
+                              <div className={styles.nameCell}>
+                                <span className={styles.nameIcon} aria-hidden>
+                                  <i className="fas fa-clipboard-check" />
+                                </span>
+                                <div className={styles.nameText}>
+                                  <div className={styles.name}>{row.name || '—'}</div>
+                                  <div className={styles.meta}>{row.code}</div>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        }
+                        if (key === 'requireManagerSign') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={
+                                  row.requireManagerSign ? styles.signYes : styles.signNo
+                                }
+                              >
+                                {yesNo(row.requireManagerSign)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'requireHigherManagerSign') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={
+                                  row.requireHigherManagerSign
+                                    ? styles.signYes
+                                    : styles.signNo
+                                }
+                              >
+                                {yesNo(row.requireHigherManagerSign)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'employees') {
+                          return (
+                            <td key={key}>
+                              <span className={styles.countPill}>
+                                {row.employees?.length ?? 0}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={row.isActive ? styles.badgeOk : styles.badgeOff}
+                              >
+                                {yesNo(row.isActive)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={key}>{clearanceTemplateCell(row, key) || '—'}</td>
+                        );
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button
                               type="button"
@@ -532,7 +581,7 @@ function ClearanceTemplatesInner() {
             <strong>
               {rangeFrom}–{rangeTo}
             </strong>{' '}
-            из <strong>{filtered.length}</strong>
+            из <strong>{displayRows.length}</strong>
           </p>
           <div className={styles.footerPager}>
             <button

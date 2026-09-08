@@ -206,7 +206,7 @@ export function SettingsPanel({
         <Check on={settings.position} onChange={(v) => set({ position: v })} label="Должность" />
         <Check on={settings.pinfl} onChange={(v) => set({ pinfl: v })} label="ПИНФЛ" />
         <Check on={settings.grade} onChange={(v) => set({ grade: v })} label="Разряд" />
-        <Check on={settings.hireDate} onChange={(v) => set({ hireDate: v })} label="Установка даты приема" />
+        <Check on={settings.hireDate} onChange={(v) => set({ hireDate: v })} label="Дата приема на работу" />
         <Check on={settings.altName} onChange={(v) => set({ altName: v })} label="Альтернативное имя сотрудника" />
         <Check on={settings.schedule} onChange={(v) => set({ schedule: v })} label="График работы" />
         <Check on={settings.manager} onChange={(v) => set({ manager: v, managerGroupId: v ? settings.managerGroupId : '' })} label="Руководитель" />

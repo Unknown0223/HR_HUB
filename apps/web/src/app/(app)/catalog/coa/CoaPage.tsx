@@ -7,6 +7,11 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -23,6 +28,7 @@ import {
   yesNo,
   type CoaMeta,
 } from '@/lib/coa';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   CoaForm,
   draftFromMeta,
@@ -63,10 +69,58 @@ const FILTER_KEYS = [
   'quantitative',
 ] as const;
 
+const coaListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.coa.v1',
+  title: 'План счетов',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Название' },
+    { key: 'parent', label: 'Подчинен счету' },
+    { key: 'accountKind', label: 'Вид счета' },
+    { key: 'quantitative', label: 'Количественный' },
+    { key: 'paymentKind', label: 'Вид валюты' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'code',
+    'name',
+    'parent',
+    'accountKind',
+    'quantitative',
+    'paymentKind',
+    'isActive',
+  ],
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'code', dir: 'asc' }],
+});
+
+function coaCell(row: DictItem, key: string): string {
+  const meta = asCoaMeta(row.meta);
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return row.name || '';
+    case 'parent':
+      return parentCaption(meta.parentCode, meta.parentName);
+    case 'accountKind':
+      return accountKindLabel(inferAccountKind(meta));
+    case 'quantitative':
+      return yesNo(meta.quantitative);
+    case 'paymentKind':
+      return currencyKindLabel(inferPaymentKind(meta));
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
+
 function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(coaListPrefs);
   const q = filters.q;
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -95,6 +149,11 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CoaDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : coaListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const basePath = mainOnly ? '/catalog/coa-main' : '/catalog/coa';
 
@@ -139,11 +198,17 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
     });
   }, [rows, q, mainOnly, filters]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, coaCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const p = Math.min(page, pageCount);
-    return filtered.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
-  }, [filtered, page, pageCount]);
+    return displayRows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  }, [displayRows, page, pageCount]);
 
   async function load() {
     setLoading(true);
@@ -371,23 +436,21 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
   function exportCsv() {
     downloadCsv(
       `coa-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => {
-        const meta = asCoaMeta(r.meta);
-        const kind = inferAccountKind(meta);
-        const pay = inferPaymentKind(meta);
-        const parent = accountByCode(meta.parentCode);
-        return {
-          Код: r.code,
-          Название: r.name,
-          'Подчинен счету': parentCaption(
-            meta.parentCode,
-            meta.parentName || parent?.name,
-          ),
-          'Вид счета': accountKindLabel(kind),
-          Количественный: yesNo(meta.quantitative),
-          'Вид валюты': currencyKindLabel(pay),
-          Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-        };
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) {
+          if (k === 'parent') {
+            const meta = asCoaMeta(r.meta);
+            const parent = accountByCode(meta.parentCode);
+            obj[prefs.labelOf(k)] = parentCaption(
+              meta.parentCode,
+              meta.parentName || parent?.name,
+            );
+          } else {
+            obj[prefs.labelOf(k)] = coaCell(r, k);
+          }
+        }
+        return obj;
       }),
     );
   }
@@ -436,63 +499,92 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
             aria-label={`Выбрать ${row.code}`}
           />
         </td>
-        <td>{row.code}</td>
-        <td className={styles.nameCell}>
-          <span className={styles.nameText}>{row.name}</span>
-          {open ? (
-            <div
-              className={styles.rowActions}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button type="button" onClick={() => openEdit(row)}>
-                Изменить
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void setActive([row.id], row.isActive === false)
-                }
-              >
-                {row.isActive === false ? 'Активный' : 'Неактивный'}
-              </button>
-              <button
-                type="button"
-                className={styles.danger}
-                disabled={busy}
-                onClick={() => void deleteIds([row.id], false)}
-              >
-                Удалить
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void deleteIds([row.id], true)}
-              >
-                Удалить неиспользуемые данные
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td>
-          {parentCaption(meta.parentCode, meta.parentName || parent?.name)}
-        </td>
-        <td>{accountKindLabel(kind)}</td>
-        <td>{yesNo(meta.quantitative)}</td>
-        <td>{currencyKindLabel(pay)}</td>
-        <td>
-          <span
-            className={row.isActive === false ? extra.badgeOff : extra.badge}
-          >
-            {row.isActive === false ? 'Неактивный' : 'Активный'}
-          </span>
-        </td>
+        {visibleCols.map((key) => {
+          if (key === 'code') {
+            return <td key={key}>{row.code}</td>;
+          }
+          if (key === 'name') {
+            return (
+              <td key={key} className={styles.nameCell}>
+                <span className={styles.nameText}>{row.name}</span>
+                {open ? (
+                  <div
+                    className={styles.rowActions}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button type="button" onClick={() => openEdit(row)}>
+                      Изменить
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void setActive([row.id], row.isActive === false)
+                      }
+                    >
+                      {row.isActive === false ? 'Активный' : 'Неактивный'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.danger}
+                      disabled={busy}
+                      onClick={() => void deleteIds([row.id], false)}
+                    >
+                      Удалить
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void deleteIds([row.id], true)}
+                    >
+                      Удалить неиспользуемые данные
+                    </button>
+                  </div>
+                ) : null}
+              </td>
+            );
+          }
+          if (key === 'parent') {
+            return (
+              <td key={key}>
+                {parentCaption(
+                  meta.parentCode,
+                  meta.parentName || parent?.name,
+                )}
+              </td>
+            );
+          }
+          if (key === 'accountKind') {
+            return <td key={key}>{accountKindLabel(kind)}</td>;
+          }
+          if (key === 'quantitative') {
+            return <td key={key}>{yesNo(meta.quantitative)}</td>;
+          }
+          if (key === 'paymentKind') {
+            return <td key={key}>{currencyKindLabel(pay)}</td>;
+          }
+          if (key === 'isActive') {
+            return (
+              <td key={key}>
+                <span
+                  className={
+                    row.isActive === false ? extra.badgeOff : extra.badge
+                  }
+                >
+                  {row.isActive === false ? 'Неактивный' : 'Активный'}
+                </span>
+              </td>
+            );
+          }
+          return <td key={key}>{coaCell(row, key) || '—'}</td>;
+        })}
       </tr>
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: mainOnly ? 'План главных счетов' : 'План счетов',
@@ -645,15 +737,6 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="Excel"
-            aria-label="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Предыдущая страница"
@@ -681,6 +764,7 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -694,36 +778,32 @@ function CoaPageInner({ mainOnly }: { mainOnly?: boolean }) {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Код</th>
-              <th>Название</th>
-              <th>Подчинен счету</th>
-              <th>Вид счета</th>
-              <th>Количественный</th>
-              <th>Вид валюты</th>
-              <th>Статус</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>

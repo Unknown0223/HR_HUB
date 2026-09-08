@@ -5,10 +5,16 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { confirm } from '@/lib/dialogs';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { TimesheetCorrectionFormModal } from './TimesheetCorrectionFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -46,7 +52,29 @@ type EmpOpt = { id: string; label: string };
 type DivOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'divisionId', 'employeeId'] as const;
-const COL_COUNT = 7;
+
+const timesheetAdjPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.timesheet-adjustments.v1',
+  title: 'Корректировки табеля',
+  columns: [
+    { key: 'documentDate', label: 'Дата' },
+    { key: 'number', label: 'Номер' },
+    { key: 'employees', label: 'Сотрудники' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'period', label: 'Дата корректировки' },
+    { key: 'posted', label: 'Проведен' },
+  ],
+  defaultColumns: [
+    'documentDate',
+    'number',
+    'employees',
+    'division',
+    'period',
+    'posted',
+  ],
+  defaultSearchKeys: ['number', 'employees', 'division'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -72,10 +100,41 @@ function isPosted(row: CorrectionRow) {
   return row.status === 'posted';
 }
 
+function periodLabel(row: CorrectionRow) {
+  const from = fmtDate(row.periodFrom);
+  if (row.periodFrom !== row.periodTo) return `${from} – ${fmtDate(row.periodTo)}`;
+  return from;
+}
+
+function postedLabel(row: CorrectionRow) {
+  if (isPosted(row)) return 'Да';
+  return row.status === 'cancelled' ? 'Отм.' : 'Нет';
+}
+
+function correctionCell(row: CorrectionRow, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(row.documentDate);
+    case 'number':
+      return row.number || '';
+    case 'employees':
+      return employeesLabel(row);
+    case 'division':
+      return row.division?.name || '';
+    case 'period':
+      return periodLabel(row);
+    case 'posted':
+      return postedLabel(row);
+    default:
+      return '';
+  }
+}
+
 function TimesheetAdjustmentsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(timesheetAdjPrefs);
   const q = filters.q;
   const from = filters.from;
   const to = filters.to;
@@ -99,6 +158,11 @@ function TimesheetAdjustmentsInner() {
   const [searchDraft, setSearchDraft] = useState(q);
   const [createOpen, setCreateOpen] = useState(() => searchParams.get('create') === '1');
   const [createBatch, setCreateBatch] = useState(() => searchParams.get('batch') === '1');
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : timesheetAdjPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -150,13 +214,21 @@ function TimesheetAdjustmentsInner() {
     to,
   ]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, correctionCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -165,7 +237,7 @@ function TimesheetAdjustmentsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -272,7 +344,7 @@ function TimesheetAdjustmentsInner() {
   }
 
   async function runBulk(action: 'post' | 'cancel' | 'delete') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'post') {
@@ -327,15 +399,11 @@ function TimesheetAdjustmentsInner() {
   function exportCsv() {
     downloadCsv(
       `timesheet-corrections-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        documentDate: fmtDate(r.documentDate),
-        number: r.number || '',
-        employees: employeesLabel(r),
-        division: r.division?.name || '',
-        periodFrom: fmtDate(r.periodFrom),
-        periodTo: fmtDate(r.periodTo),
-        posted: isPosted(r) ? 'Да' : 'Нет',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = correctionCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -356,6 +424,7 @@ function TimesheetAdjustmentsInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="timesheet-adjustments" />
 
       <div className={shared.pageHeader}>
@@ -433,7 +502,7 @@ function TimesheetAdjustmentsInner() {
 
         <div className={styles.rightTools}>
           <span className={styles.countBadge}>
-            {filtered.length} / {rows.length}
+            {displayRows.length} / {rows.length}
           </span>
           <button
             type="button"
@@ -445,15 +514,6 @@ function TimesheetAdjustmentsInner() {
             aria-label="Фильтр"
           >
             <i className="fas fa-filter" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
           </button>
           <button
             type="button"
@@ -474,6 +534,7 @@ function TimesheetAdjustmentsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -538,30 +599,27 @@ function TimesheetAdjustmentsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Сотрудники</th>
-                <th>Подразделение</th>
-                <th>Дата корректировки</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -580,27 +638,33 @@ function TimesheetAdjustmentsInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.documentDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td className={styles.empName}>{employeesLabel(row)}</td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td>
-                        {fmtDate(row.periodFrom)}
-                        {row.periodFrom !== row.periodTo ? ` – ${fmtDate(row.periodTo)}` : ''}
-                      </td>
-                      <td>
-                        {isPosted(row) ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>
-                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                          </span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employees') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {employeesLabel(row)}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {isPosted(row) ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>
+                                  {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{correctionCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/timesheet-adjustments/${row.id}`}>
                               <i
@@ -652,7 +716,7 @@ function TimesheetAdjustmentsInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

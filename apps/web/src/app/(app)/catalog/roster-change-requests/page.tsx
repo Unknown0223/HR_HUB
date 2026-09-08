@@ -5,7 +5,15 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   RosterChangeFormModal,
   type RosterChangeFormValues,
@@ -14,6 +22,24 @@ import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
+
+const ROSTER_CHANGE_COLUMNS: ColumnDef[] = [
+  { key: 'employee', label: 'Сотрудник' },
+  { key: 'requestDate', label: 'Дата запроса' },
+  { key: 'shift', label: 'Смена' },
+  { key: 'recommended', label: 'Рекомендуемый сотрудник' },
+  { key: 'note', label: 'Примечание' },
+  { key: 'status', label: 'Статус' },
+];
+
+const rosterChangePrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.roster-change-requests.v1',
+  title: 'Запросы на изменение смены',
+  columns: ROSTER_CHANGE_COLUMNS,
+  defaultColumns: ROSTER_CHANGE_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['employee', 'shift', 'recommended', 'note'],
+  defaultSort: [{ key: 'requestDate', dir: 'desc' }],
+});
 
 type Scope = 'mine' | 'available' | 'my_requests';
 
@@ -115,11 +141,31 @@ function parseScope(raw: string | null): Scope {
   return 'mine';
 }
 
+function cellOf(row: Row, key: string): string {
+  switch (key) {
+    case 'employee':
+      return empName(row.employee);
+    case 'requestDate':
+      return requestDateOf(row);
+    case 'shift':
+      return shiftOf(row);
+    case 'recommended':
+      return recommendedOf(row);
+    case 'note':
+      return noteOf(row);
+    case 'status':
+      return statusLabel(row.status).text;
+    default:
+      return '';
+  }
+}
+
 function RosterChangeRequestsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope = parseScope(searchParams.get('scope'));
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(rosterChangePrefsCfg);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -182,25 +228,39 @@ function RosterChangeRequestsInner() {
     );
   }, [rows, search]);
 
-  const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
-  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
-  const selectedIds = useMemo(() => [...checked], [checked]);
   const showEmployeeCol = scope === 'available';
-  const colCount = showEmployeeCol ? 7 : 6;
+  const scopeKeys = showEmployeeCol
+    ? ['employee', 'requestDate', 'shift', 'recommended', 'note', 'status']
+    : ['requestDate', 'shift', 'recommended', 'note', 'status'];
+  const visibleCols = (prefs.columns.length
+    ? prefs.columns
+    : rosterChangePrefsCfg.defaultColumns
+  ).filter((k) => scopeKeys.includes(k));
+  const colCount = 1 + visibleCols.length;
   const showCreate = scope !== 'my_requests';
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const allFilteredChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked.has(r.id));
+  const someFilteredChecked = displayRows.some((r) => checked.has(r.id));
+  const selectedIds = useMemo(() => [...checked], [checked]);
 
   function toggleAll() {
     if (allFilteredChecked) {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
+        displayRows.forEach((r) => next.delete(r.id));
         return next;
       });
     } else {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
+        displayRows.forEach((r) => next.add(r.id));
         return next;
       });
     }
@@ -292,8 +352,20 @@ function RosterChangeRequestsInner() {
     }
   }
 
+  function exportCsv() {
+    downloadCsv(
+      `roster-change-requests-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="roster-change-requests" />
 
       <div className={shared.pageHeader}>
@@ -401,6 +473,7 @@ function RosterChangeRequestsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -455,35 +528,32 @@ function RosterChangeRequestsInner() {
                         el.indeterminate = someFilteredChecked && !allFilteredChecked;
                     }}
                     onChange={toggleAll}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     title="Выбрать все"
                     aria-label="Выбрать все"
                   />
                 </th>
-                {showEmployeeCol ? <th>Сотрудник</th> : null}
-                <th>Дата запроса</th>
-                <th>Смена</th>
-                <th>Рекомендуемый сотрудник</th>
-                <th>Примечание</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && !filtered.length ? (
+              {loading && !displayRows.length ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && !filtered.length ? (
+              {!loading && !displayRows.length ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
                     {showCreate ? 'Нет данных — нажмите «Создать»' : 'Нет данных'}
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const st = statusLabel(row.status);
                 const isChecked = checked.has(row.id);
                 const expanded = expandedId === row.id;
@@ -505,16 +575,23 @@ function RosterChangeRequestsInner() {
                           aria-label={`Выбрать ${empName(row.employee)}`}
                         />
                       </td>
-                      {showEmployeeCol ? (
-                        <td className={styles.empName}>{empName(row.employee)}</td>
-                      ) : null}
-                      <td>{requestDateOf(row)}</td>
-                      <td>{shiftOf(row)}</td>
-                      <td>{recommendedOf(row)}</td>
-                      <td>{noteOf(row)}</td>
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={st.cls}>{st.text}</span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {expanded ? (
                       <tr className={styles.actionsRow}>

@@ -6,9 +6,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
-import formStyles from '../report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
 
 type Division = { id: string; name: string; code?: string };
@@ -32,9 +38,33 @@ type ExceptionRow = {
 
 type Mode = 'list' | 'create' | 'edit';
 
+const hireDocExceptionListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.hire-document-exceptions.v1',
+  title: 'Исключения по документам при приеме',
+  columns: [
+    { key: 'division', label: 'Подразделение' },
+    { key: 'position', label: 'Должность' },
+  ],
+  defaultColumns: ['division', 'position'],
+  defaultSearchKeys: ['division', 'position'],
+  defaultSort: [{ key: 'division', dir: 'asc' }],
+});
+
+function hireDocExceptionCell(row: ExceptionRow, key: string): string {
+  switch (key) {
+    case 'division':
+      return row.division?.name || '';
+    case 'position':
+      return row.position?.name || '';
+    default:
+      return '';
+  }
+}
+
 function HireDocExceptionsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(hireDocExceptionListPrefs);
   const q = searchParams?.get('q') || '';
 
   const [rows, setRows] = useState<ExceptionRow[]>([]);
@@ -55,6 +85,11 @@ function HireDocExceptionsInner() {
   const [docIds, setDocIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : hireDocExceptionListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return rows;
@@ -63,6 +98,12 @@ function HireDocExceptionsInner() {
       return blob.includes(qq);
     });
   }, [rows, q]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, hireDocExceptionCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
 
   async function load() {
     setLoading(true);
@@ -179,8 +220,20 @@ function HireDocExceptionsInner() {
     );
   }
 
+  function exportCsv() {
+    downloadCsv(
+      `hire-document-exceptions-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = hireDocExceptionCell(r, k);
+        return obj;
+      }),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: 'Исключения по документам при приеме',
@@ -233,6 +286,7 @@ function HireDocExceptionsInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -246,35 +300,36 @@ function HireDocExceptionsInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                 />
               </th>
-              <th>Подразделение</th>
-              <th>Должность</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   нет данных
                 </td>
               </tr>
             ) : null}
-            {filtered.map((row) => {
+            {displayRows.map((row) => {
               const open = focusId === row.id;
               return (
                 <tr
@@ -297,30 +352,38 @@ function HireDocExceptionsInner() {
                       }}
                     />
                   </td>
-                  <td className={styles.nameCell}>
-                    <span className={styles.nameText}>
-                      {row.division?.name || '—'}
-                    </span>
-                    {open ? (
-                      <div
-                        className={`${styles.inlineActions} ${styles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button type="button" onClick={() => openEdit(row)}>
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.danger}
-                          disabled={busy}
-                          onClick={() => void runDelete(row)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{row.position?.name || '—'}</td>
+                  {visibleCols.map((key) => {
+                    if (key === 'division') {
+                      return (
+                        <td key={key} className={styles.nameCell}>
+                          <span className={styles.nameText}>
+                            {row.division?.name || '—'}
+                          </span>
+                          {open ? (
+                            <div
+                              className={`${styles.inlineActions} ${styles.rowActions}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button type="button" onClick={() => openEdit(row)}>
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runDelete(row)}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={key}>{hireDocExceptionCell(row, key) || '—'}</td>
+                    );
+                  })}
                 </tr>
               );
             })}

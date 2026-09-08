@@ -6,8 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
@@ -29,9 +35,33 @@ type DictItem = {
 
 const DICT_CODE = 'institutions';
 
+const institutionsListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.institutions.v1',
+  title: 'Учебные заведения',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Название' },
+  ],
+  defaultColumns: ['code', 'name'],
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function institutionCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return row.name || '';
+    default:
+      return '';
+  }
+}
+
 function InstitutionsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(institutionsListPrefs);
   const q = searchParams?.get('q') || '';
 
   const [dictId, setDictId] = useState<string | null>(null);
@@ -50,6 +80,11 @@ function InstitutionsPageInner() {
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : institutionsListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return rows;
@@ -58,6 +93,12 @@ function InstitutionsPageInner() {
       return blob.includes(qq);
     });
   }, [rows, q]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, institutionCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
 
   async function load() {
     setLoading(true);
@@ -182,7 +223,7 @@ function InstitutionsPageInner() {
       setSelected(new Set());
       return;
     }
-    setSelected(new Set(filtered.map((r) => r.id)));
+    setSelected(new Set(displayRows.map((r) => r.id)));
   }
 
   function toggleOne(id: string, checked: boolean) {
@@ -197,11 +238,11 @@ function InstitutionsPageInner() {
   function exportCsv() {
     downloadCsv(
       `institutions-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: r.code,
-        Название: r.name,
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = institutionCell(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -217,6 +258,7 @@ function InstitutionsPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: 'Учебные заведения',
@@ -263,15 +305,6 @@ function InstitutionsPageInner() {
             }}
             aria-label="Поиск"
           />
-          <button
-            type="button"
-            className={styles.exportBtn}
-            onClick={exportCsv}
-            title="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-            Excel
-          </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
@@ -285,6 +318,7 @@ function InstitutionsPageInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -298,33 +332,34 @@ function InstitutionsPageInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Код</th>
-              <th>Название</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   нет данных
                 </td>
               </tr>
             ) : null}
-            {filtered.map((row) => {
+            {displayRows.map((row) => {
               const open = focusId === row.id;
               return (
                 <tr
@@ -341,28 +376,39 @@ function InstitutionsPageInner() {
                       aria-label={`Выбрать ${row.name}`}
                     />
                   </td>
-                  <td>{row.code}</td>
-                  <td className={styles.nameCell}>
-                    <span className={styles.nameText}>{row.name}</span>
-                    {open ? (
-                      <div
-                        className={`${styles.inlineActions} ${styles.rowActions}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button type="button" onClick={() => openEdit(row)}>
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.danger}
-                          disabled={busy}
-                          onClick={() => void runDelete(row)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
+                  {visibleCols.map((key) => {
+                    if (key === 'code') {
+                      return <td key={key}>{row.code}</td>;
+                    }
+                    if (key === 'name') {
+                      return (
+                        <td key={key} className={styles.nameCell}>
+                          <span className={styles.nameText}>{row.name}</span>
+                          {open ? (
+                            <div
+                              className={`${styles.inlineActions} ${styles.rowActions}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button type="button" onClick={() => openEdit(row)}>
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runDelete(row)}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={key}>{institutionCell(row, key) || '—'}</td>
+                    );
+                  })}
                 </tr>
               );
             })}

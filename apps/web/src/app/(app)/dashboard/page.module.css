@@ -2144,6 +2144,112 @@
   color: #8ca0b8;
 }
 
+.modalWide {
+  max-width: 760px;
+}
+
+.modalHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sortList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 52vh;
+  overflow: auto;
+}
+
+.sortRow {
+  display: grid;
+  grid-template-columns: 1fr 180px 28px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.sortLabel {
+  font-size: 0.92rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sortHandle {
+  color: var(--ink-muted);
+  letter-spacing: -2px;
+  text-align: center;
+  user-select: none;
+}
+
+.settingsActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settingsSectionTitle {
+  margin: 16px 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.fieldChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fieldChip {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  background: #fff;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fieldChipActive {
+  background: #eef5ff;
+  border-color: #b7d0f5;
+}
+
+.fieldChipExtra {
+  background: #fff7e8;
+  border-color: #f0d9a8;
+}
+
+.searchToggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.searchToggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
 /* ============ Responsive ============ */
 @media (max-width: 1120px) {
   .layout {

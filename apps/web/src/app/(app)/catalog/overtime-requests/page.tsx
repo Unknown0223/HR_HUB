@@ -5,7 +5,15 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import {
   OvertimeRequestFormModal,
   type OvertimeFormValues,
@@ -14,6 +22,28 @@ import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['status', 'q'] as const;
+
+const OT_COLUMNS: ColumnDef[] = [
+  { key: 'requestDate', label: 'Дата запроса' },
+  { key: 'employee', label: 'Сотрудник' },
+  { key: 'division', label: 'Подразделение' },
+  { key: 'position', label: 'Должность' },
+  { key: 'time', label: 'Время' },
+  { key: 'createdAt', label: 'Дата создания' },
+  { key: 'timeType', label: 'Типы времени' },
+  { key: 'note', label: 'Примечание' },
+  { key: 'managerNote', label: 'Примечание руководителя' },
+  { key: 'status', label: 'Статус' },
+];
+
+const overtimePrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.overtime-requests.v1',
+  title: 'Запросы на сверхурочные',
+  columns: OT_COLUMNS,
+  defaultColumns: OT_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['employee', 'note', 'timeType', 'status'],
+  defaultSort: [{ key: 'requestDate', dir: 'desc' }],
+});
 
 type Emp = {
   id: string;
@@ -110,11 +140,39 @@ function toFormValues(row: Row): OvertimeFormValues {
   };
 }
 
+function cellOf(row: Row, key: string): string {
+  switch (key) {
+    case 'requestDate':
+      return requestDateOf(row);
+    case 'employee':
+      return empName(row.employee);
+    case 'division':
+      return row.employee.division?.name || '';
+    case 'position':
+      return row.employee.position?.name || '';
+    case 'time':
+      return timeOf(row);
+    case 'createdAt':
+      return fmtDt(row.createdAt);
+    case 'timeType':
+      return timeTypeOf(row);
+    case 'note':
+      return noteOf(row);
+    case 'managerNote':
+      return managerNoteOf(row);
+    case 'status':
+      return statusLabel(row.status).text;
+    default:
+      return '';
+  }
+}
+
 function OvertimeRequestsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope = searchParams.get('scope') === 'available' ? 'available' : 'mine';
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(overtimePrefsCfg);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -177,23 +235,46 @@ function OvertimeRequestsInner() {
     );
   }, [rows, search]);
 
+  const scopeKeys =
+    scope === 'available'
+      ? ['requestDate', 'employee', 'division', 'position', 'time', 'timeType', 'note', 'status']
+      : [
+          'requestDate',
+          'time',
+          'createdAt',
+          'timeType',
+          'note',
+          'managerNote',
+          'status',
+        ];
+  const visibleCols = (prefs.columns.length
+    ? prefs.columns
+    : overtimePrefsCfg.defaultColumns
+  ).filter((k) => scopeKeys.includes(k));
+  const colCount = 1 + visibleCols.length;
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
-  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
+    displayRows.length > 0 && displayRows.every((r) => checked.has(r.id));
+  const someFilteredChecked = displayRows.some((r) => checked.has(r.id));
   const selectedIds = useMemo(() => [...checked], [checked]);
-  const colCount = scope === 'available' ? 9 : 8;
 
   function toggleAll() {
     if (allFilteredChecked) {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
+        displayRows.forEach((r) => next.delete(r.id));
         return next;
       });
     } else {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
+        displayRows.forEach((r) => next.add(r.id));
         return next;
       });
     }
@@ -270,8 +351,20 @@ function OvertimeRequestsInner() {
     router.push(`/catalog/overtime-requests?${p}`);
   }
 
+  function exportCsv() {
+    downloadCsv(
+      `overtime-requests-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="overtime-requests" />
 
       <div className={shared.pageHeader}>
@@ -370,6 +463,7 @@ function OvertimeRequestsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -433,25 +527,14 @@ function OvertimeRequestsInner() {
                         el.indeterminate = someFilteredChecked && !allFilteredChecked;
                     }}
                     onChange={toggleAll}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     title="Выбрать все"
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата запроса</th>
-                {scope === 'available' ? (
-                  <>
-                    <th>Сотрудник</th>
-                    <th>Подразделение</th>
-                    <th>Должность</th>
-                  </>
-                ) : null}
-                <th>Время</th>
-                {scope === 'mine' ? <th>Дата создания</th> : null}
-                <th>Типы времени</th>
-                <th>Примечание</th>
-                {scope === 'mine' ? <th>Примечание руководителя</th> : null}
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -461,14 +544,14 @@ function OvertimeRequestsInner() {
                     Загрузка…
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : displayRows.length === 0 ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : (
-                filtered.map((row) => {
+                displayRows.map((row) => {
                   const st = statusLabel(row.status);
                   const isChecked = checked.has(row.id);
                   const expanded = expandedId === row.id;
@@ -490,22 +573,23 @@ function OvertimeRequestsInner() {
                             aria-label={`Выбрать ${empName(row.employee)}`}
                           />
                         </td>
-                        <td>{requestDateOf(row)}</td>
-                        {scope === 'available' ? (
-                          <>
-                            <td className={styles.empName}>{empName(row.employee)}</td>
-                            <td>{row.employee.division?.name || '—'}</td>
-                            <td>{row.employee.position?.name || '—'}</td>
-                          </>
-                        ) : null}
-                        <td>{timeOf(row)}</td>
-                        {scope === 'mine' ? <td>{fmtDt(row.createdAt)}</td> : null}
-                        <td>{timeTypeOf(row)}</td>
-                        <td>{noteOf(row)}</td>
-                        {scope === 'mine' ? <td>{managerNoteOf(row)}</td> : null}
-                        <td>
-                          <span className={st.cls}>{st.text}</span>
-                        </td>
+                        {visibleCols.map((key) => {
+                          if (key === 'employee') {
+                            return (
+                              <td key={key} className={styles.empName}>
+                                {cellOf(row, key) || '—'}
+                              </td>
+                            );
+                          }
+                          if (key === 'status') {
+                            return (
+                              <td key={key}>
+                                <span className={st.cls}>{st.text}</span>
+                              </td>
+                            );
+                          }
+                          return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                        })}
                       </tr>
                       {expanded ? (
                         <tr className={styles.actionsRow}>

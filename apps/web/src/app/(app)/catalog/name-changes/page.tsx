@@ -7,9 +7,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import modal from '@/components/form-modal.module.css';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -43,7 +50,24 @@ type EmpOpt = { id: string; label: string };
 
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'employeeId', 'oldName'] as const;
 const PAGE_SIZES = [25, 50, 100] as const;
-const COL_COUNT = 7;
+
+const NAME_CHANGE_COLUMNS: ColumnDef[] = [
+  { key: 'effectiveAt', label: 'Дата' },
+  { key: 'number', label: 'Номер' },
+  { key: 'employee', label: 'Сотрудники' },
+  { key: 'prevNames', label: 'Предыдущие имена' },
+  { key: 'nextNames', label: 'Новые имена' },
+  { key: 'posted', label: 'Проведен' },
+];
+
+const nameChangePrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.name-changes.v1',
+  title: 'Изменение имени',
+  columns: NAME_CHANGE_COLUMNS,
+  defaultColumns: NAME_CHANGE_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['number', 'employee', 'prevNames', 'nextNames'],
+  defaultSort: [{ key: 'effectiveAt', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -100,10 +124,32 @@ function canDelete(row: NameChangeRow) {
   return row.status !== 'posted';
 }
 
+function cellOf(row: NameChangeRow, key: string): string {
+  switch (key) {
+    case 'effectiveAt':
+      return fmtDate(row.effectiveAt);
+    case 'number':
+      return row.documentNumber || '';
+    case 'employee':
+      return empName(row.employee);
+    case 'prevNames':
+      return prevNames(row);
+    case 'nextNames':
+      return nextNames(row);
+    case 'posted':
+      if (isPosted(row)) return 'Да';
+      if (row.status === 'cancelled') return 'Отм.';
+      return 'Нет';
+    default:
+      return '';
+  }
+}
+
 function NameChangesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(nameChangePrefsCfg);
   const q = filters.q;
   const from = filters.from;
   const to = filters.to;
@@ -188,12 +234,23 @@ function NameChangesPageInner() {
     to,
   ]);
 
-  const total = filtered.length;
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : nameChangePrefsCfg.defaultColumns;
+
+  const sorted = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageRows = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize],
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize],
   );
+  const colCount = 1 + visibleCols.length;
   const rangeFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeTo = Math.min(page * pageSize, total);
 
@@ -202,8 +259,8 @@ function NameChangesPageInner() {
     [checked],
   );
   const checkedRows = useMemo(
-    () => filtered.filter((r) => checked[r.id]),
-    [filtered, checked],
+    () => sorted.filter((r) => checked[r.id]),
+    [sorted, checked],
   );
 
   const allPageChecked = pageRows.length > 0 && pageRows.every((r) => checked[r.id]);
@@ -435,13 +492,11 @@ function NameChangesPageInner() {
   function exportCsv() {
     downloadCsv(
       `name-changes-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(r.effectiveAt),
-        Номер: r.documentNumber || '',
-        Сотрудники: empName(r.employee),
-        'Предыдущие имена': prevNames(r),
-        Проведен: isPosted(r) ? 'Да' : 'Нет',
-      })),
+      sorted.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -462,6 +517,7 @@ function NameChangesPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="name-changes" />
 
       <div className={shared.pageHeader}>
@@ -553,15 +609,6 @@ function NameChangesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
             title="Excel"
@@ -578,6 +625,7 @@ function NameChangesPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -764,25 +812,22 @@ function NameChangesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Сотрудники</th>
-                <th>Предыдущие имена</th>
-                <th>Новые имена</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
               {!loading && pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
@@ -806,24 +851,40 @@ function NameChangesPageInner() {
                           aria-label={`Выбрать ${row.documentNumber || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.effectiveAt)}</td>
-                      <td>{row.documentNumber || '—'}</td>
-                      <td className={styles.empName}>{empName(row.employee)}</td>
-                      <td>{prevNames(row)}</td>
-                      <td className={styles.newName}>{nextNames(row)}</td>
-                      <td>
-                        {isPosted(row) ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>
-                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                          </span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'nextNames') {
+                          return (
+                            <td key={key} className={styles.newName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {isPosted(row) ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>
+                                  {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             {canPost(row) ? (
                               <button

@@ -6,8 +6,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { DismissalReasonFormModal } from './DismissalReasonForm';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -22,12 +28,43 @@ type ReasonRow = {
 };
 
 const FILTER_KEYS = ['q', 'status', 'basisType'] as const;
-const COL_COUNT = 6;
 
 const BASIS_LABELS: Record<string, string> = {
   positive: 'Положительное',
   negative: 'Отрицательное',
 };
+
+const dismissalReasonListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.dismissal-reasons.v1',
+  title: 'Причины увольнения',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Наименование' },
+    { key: 'groupName', label: 'Группа' },
+    { key: 'basisType', label: 'Тип основания' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['code', 'name', 'groupName', 'basisType', 'isActive'],
+  defaultSearchKeys: ['code', 'name', 'groupName'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function reasonCell(row: ReasonRow, key: string): string {
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'name':
+      return row.name || '';
+    case 'groupName':
+      return row.groupName || '';
+    case 'basisType':
+      return row.basisType ? BASIS_LABELS[row.basisType] ?? row.basisType : '';
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    default:
+      return '';
+  }
+}
 
 function BasisPill({ value }: { value?: string | null }) {
   if (!value) return <>—</>;
@@ -55,6 +92,7 @@ function DismissalReasonsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(dismissalReasonListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
   const basisFilter = filters.basisType;
@@ -71,6 +109,11 @@ function DismissalReasonsInner() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : dismissalReasonListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -90,13 +133,21 @@ function DismissalReasonsInner() {
     return list;
   }, [rows, q, statusFilter, basisFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, reasonCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -105,7 +156,7 @@ function DismissalReasonsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -200,7 +251,7 @@ function DismissalReasonsInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -263,18 +314,17 @@ function DismissalReasonsInner() {
   function exportCsv() {
     downloadCsv(
       `dismissal-reasons-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: r.code || '',
-        Наименование: r.name,
-        Группа: r.groupName || '',
-        'Тип основания': r.basisType ? BASIS_LABELS[r.basisType] ?? r.basisType : '',
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = reasonCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="dismissal-reasons" />
 
       <div className={shared.pageHeader}>
@@ -356,21 +406,13 @@ function DismissalReasonsInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -435,29 +477,27 @@ function DismissalReasonsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Код</th>
-                <th>Наименование</th>
-                <th>Группа</th>
-                <th>Тип основания</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -476,23 +516,45 @@ function DismissalReasonsInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.codeCell}>{row.code || '—'}</td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td>{row.groupName || '—'}</td>
-                      <td>
-                        <BasisPill value={row.basisType} />
-                      </td>
-                      <td>
-                        {row.isActive ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'code') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {row.code || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'basisType') {
+                          return (
+                            <td key={key}>
+                              <BasisPill value={row.basisType} />
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {row.isActive ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{reasonCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openEdit(row.id)}>
                               <i className="fas fa-pen" aria-hidden />
@@ -530,7 +592,7 @@ function DismissalReasonsInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

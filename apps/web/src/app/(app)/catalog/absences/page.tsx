@@ -8,8 +8,15 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -70,6 +77,27 @@ const DOC_TYPE_PRESETS = [
   { label: 'Отпуск списком', documentType: 'Отпуск', typeCode: 'VAC', batch: true },
 ] as const;
 
+const ABSENCE_COLUMNS: ColumnDef[] = [
+  { key: 'documentDate', label: 'Дата' },
+  { key: 'number', label: 'Номер' },
+  { key: 'documentType', label: 'Тип документа' },
+  { key: 'tabNumber', label: 'Таб. №' },
+  { key: 'employee', label: 'Сотрудник' },
+  { key: 'startDate', label: 'Начало' },
+  { key: 'endDate', label: 'Окончание' },
+  { key: 'days', label: 'Дней' },
+  { key: 'posted', label: 'Проведен' },
+];
+
+const absencePrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.absences.v1',
+  title: 'Отсутствия',
+  columns: ABSENCE_COLUMNS,
+  defaultColumns: ABSENCE_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['number', 'documentType', 'employee', 'tabNumber'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
+
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -115,10 +143,36 @@ function daysBetween(start?: string | null, end?: string | null) {
   return days > 0 ? String(days) : '—';
 }
 
+function cellOf(row: AbsenceRow, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(rowDocDate(row));
+    case 'number':
+      return rowNumber(row);
+    case 'documentType':
+      return rowDocType(row);
+    case 'tabNumber':
+      return row.employee?.tabNumber || '';
+    case 'employee':
+      return empFull(row.employee);
+    case 'startDate':
+      return fmtDate(row.startDate);
+    case 'endDate':
+      return fmtDate(row.endDate);
+    case 'days':
+      return daysBetween(row.startDate, row.endDate);
+    case 'posted':
+      return isPosted(row) ? 'Да' : 'Нет';
+    default:
+      return '';
+  }
+}
+
 function AbsencesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(absencePrefsCfg);
   const q = filters.q;
   const from = filters.from;
   const to = filters.to;
@@ -210,15 +264,26 @@ function AbsencesPageInner() {
     to,
   ]);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : absencePrefsCfg.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
   const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked[r.id]);
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
   const someFilteredChecked =
-    filtered.some((r) => checked[r.id]) && !allFilteredChecked;
+    displayRows.some((r) => checked[r.id]) && !allFilteredChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -227,7 +292,7 @@ function AbsencesPageInner() {
   function toggleAllFiltered(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -467,21 +532,17 @@ function AbsencesPageInner() {
   function exportCsv() {
     downloadCsv(
       `absences-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(rowDocDate(r)),
-        Номер: rowNumber(r),
-        'Тип документа': rowDocType(r),
-        'Табельный номер': r.employee?.tabNumber || '',
-        Сотрудник: empFull(r.employee),
-        'Дата начала': fmtDate(r.startDate),
-        'Дата окончания': fmtDate(r.endDate),
-        Проведен: isPosted(r) ? 'Да' : 'Нет',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="absences" />
 
       <div className={shared.pageHeader}>
@@ -590,21 +651,13 @@ function AbsencesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -829,33 +882,27 @@ function AbsencesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Тип документа</th>
-                <th>Таб. №</th>
-                <th>Сотрудник</th>
-                <th>Начало</th>
-                <th>Окончание</th>
-                <th>Дней</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных по запросу
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -876,27 +923,38 @@ function AbsencesPageInner() {
                           aria-label={`Выбрать ${rowNumber(row)}`}
                         />
                       </td>
-                      <td>{fmtDate(rowDocDate(row))}</td>
-                      <td>{rowNumber(row)}</td>
-                      <td>{rowDocType(row)}</td>
-                      <td>{row.employee?.tabNumber || '—'}</td>
-                      <td className={styles.empName}>{empFull(row.employee)}</td>
-                      <td>{fmtDate(row.startDate)}</td>
-                      <td>{fmtDate(row.endDate)}</td>
-                      <td className={styles.daysCell}>
-                        {daysBetween(row.startDate, row.endDate)}
-                      </td>
-                      <td>
-                        {isPosted(row) ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>Нет</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'days') {
+                          return (
+                            <td key={key} className={styles.daysCell}>
+                              {cellOf(row, key)}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {isPosted(row) ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>Нет</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={10}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             {!isPosted(row) ? (
                               <button
@@ -956,9 +1014,9 @@ function AbsencesPageInner() {
           <p>
             Показано{' '}
             <strong>
-              {filtered.length === 0 ? 0 : 1}–{filtered.length}
+              {displayRows.length === 0 ? 0 : 1}–{displayRows.length}
             </strong>{' '}
-            из <strong>{filtered.length}</strong>
+            из <strong>{displayRows.length}</strong>
           </p>
         </div>
       </div>

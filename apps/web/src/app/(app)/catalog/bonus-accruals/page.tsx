@@ -6,8 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { bonusKindLabel, fmtDate, type BonusDoc, type BonusKind } from '@/lib/bonus-accruals';
 import { BonusAccrualFormModal } from './BonusAccrualForm';
 import styles from './page.module.css';
@@ -15,12 +21,48 @@ import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/bonus-accruals';
 const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to'] as const;
-const COL_COUNT = 7;
+
+const bonusListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.bonus-accruals.v1',
+  title: 'Бонусные начисления',
+  columns: [
+    { key: 'docDate', label: 'Дата' },
+    { key: 'number', label: 'Номер' },
+    { key: 'startDate', label: 'Дата начала' },
+    { key: 'endDate', label: 'Дата окончания' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'posted', label: 'Проведен' },
+  ],
+  defaultColumns: ['docDate', 'number', 'startDate', 'endDate', 'division', 'posted'],
+  defaultSearchKeys: ['number', 'division'],
+  defaultSort: [{ key: 'docDate', dir: 'desc' }],
+  searchableKeys: ['number', 'division'],
+});
+
+function cellOf(row: BonusDoc, key: string): string {
+  switch (key) {
+    case 'docDate':
+      return fmtDate(row.docDate);
+    case 'number':
+      return row.number || '';
+    case 'startDate':
+      return fmtDate(row.startDate);
+    case 'endDate':
+      return fmtDate(row.endDate);
+    case 'division':
+      return row.division?.name || '';
+    case 'posted':
+      return row.status === 'posted' ? 'Да' : 'Нет';
+    default:
+      return '';
+  }
+}
 
 function BonusAccrualsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(bonusListPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<BonusDoc[]>([]);
@@ -37,7 +79,6 @@ function BonusAccrualsInner() {
   const [createKind, setCreateKind] = useState<BonusKind>('fact');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   async function load() {
     setLoading(true);
@@ -82,7 +123,7 @@ function BonusAccrualsInner() {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    return rows.filter((r) => {
       if (filters.number && !String(r.number || '').includes(filters.number.trim())) return false;
       if (filters.posted === 'yes' && r.status !== 'posted') return false;
       if (filters.posted === 'no' && r.status === 'posted') return false;
@@ -93,15 +134,18 @@ function BonusAccrualsInner() {
       const blob = [r.number, r.division?.name, r.note, bonusKindLabel(r.kind)].join(' ').toLowerCase();
       return blob.includes(qq);
     });
-    const dir = sortDir === 'asc' ? 1 : -1;
-    list = [...list].sort((a, b) => {
-      const ad = String(a.docDate || '');
-      const bd = String(b.docDate || '');
-      if (ad !== bd) return ad < bd ? -dir : dir;
-      return String(a.number).localeCompare(String(b.number));
-    });
-    return list;
-  }, [rows, q, filters.number, filters.posted, filters.from, filters.to, sortDir]);
+  }, [rows, q, filters.number, filters.posted, filters.from, filters.to]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : bonusListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
@@ -115,8 +159,9 @@ function BonusAccrualsInner() {
   const unpostCount = selectedRows.filter((r) => r.status === 'posted').length;
   const deleteCount = selectedRows.filter((r) => r.status !== 'posted').length;
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -125,7 +170,7 @@ function BonusAccrualsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -231,19 +276,19 @@ function BonusAccrualsInner() {
   function exportCsv() {
     downloadCsv(
       `bonus-accruals-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(r.docDate),
-        Номер: r.number,
-        'Дата начала': fmtDate(r.startDate),
-        'Дата окончания': fmtDate(r.endDate),
-        Подразделение: r.division?.name || '',
-        Проведен: r.status === 'posted' ? 'Да' : 'Нет',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="bonus-accruals" />
 
       <div className={shared.pageHeader}>
@@ -332,6 +377,7 @@ function BonusAccrualsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -387,38 +433,27 @@ function BonusAccrualsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>
-                  <button
-                    type="button"
-                    style={{ all: 'unset', cursor: 'pointer' }}
-                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  >
-                    Дата {sortDir === 'asc' ? '↑' : '↓'}
-                  </button>
-                </th>
-                <th>Номер</th>
-                <th>Дата начала</th>
-                <th>Дата окончания</th>
-                <th>Подразделение</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -437,22 +472,24 @@ function BonusAccrualsInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.docDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td>{fmtDate(row.startDate)}</td>
-                      <td>{fmtDate(row.endDate)}</td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td>
-                        {row.status === 'posted' ? (
-                          <span className={styles.badgeOk}>Да</span>
-                        ) : (
-                          <span className={styles.badgeMuted}>Нет</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {row.status === 'posted' ? (
+                                <span className={styles.badgeOk}>Да</span>
+                              ) : (
+                                <span className={styles.badgeMuted}>Нет</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`${PATH}/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

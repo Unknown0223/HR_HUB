@@ -7,6 +7,11 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -31,6 +36,7 @@ import {
   type CurrencyMeta,
   type CurrencyRate,
 } from '@/lib/currencies';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import local from '../document-types/page.module.css';
@@ -64,6 +70,41 @@ const PAGE_SIZE = 50;
 const FILTER_KEYS = ['q', 'code', 'name', 'unit', 'isActive', 'rateDate'] as const;
 const HIST_FILTER_KEYS = ['q', 'from', 'to', 'user', 'event'] as const;
 
+const currenciesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.currencies.v1',
+  title: 'Валюты',
+  columns: [
+    { key: 'code', label: 'Код' },
+    { key: 'unit', label: 'Базовая денежная единица' },
+    { key: 'name', label: 'Название' },
+    { key: 'rate', label: 'Курс валют' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['code', 'unit', 'name', 'rate', 'isActive'],
+  defaultSearchKeys: ['code', 'name', 'unit'],
+  defaultSort: [{ key: 'code', dir: 'asc' }],
+});
+
+function currencyCell(row: DictItem, key: string, rateDate: string): string {
+  const meta = asCurrencyMeta(row.meta);
+  switch (key) {
+    case 'code':
+      return row.code || '';
+    case 'unit':
+      return meta.unit || '';
+    case 'name':
+      return row.name || '';
+    case 'rate': {
+      const rate = rateOnDate(meta.rates, rateDate);
+      return rate == null ? '' : formatRate(rate);
+    }
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
+
 export function CurrenciesPage({ historyMode }: { historyMode?: boolean }) {
   return (
     <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
@@ -76,6 +117,7 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS, ...HIST_FILTER_KEYS]);
+  const prefs = useTablePrefs(currenciesListPrefs);
   const q = filters.q;
   const rateDate = filters.rateDate || todayISO();
 
@@ -125,6 +167,11 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
   const [rateFormValue, setRateFormValue] = useState('');
   const [rateSelected, setRateSelected] = useState<Set<string>>(new Set());
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : currenciesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const visibleRows = useMemo(
     () => rows.filter((r) => !isHiddenCurrency(r.code)),
     [rows],
@@ -165,11 +212,20 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
     rateDate,
   ]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayRows = useMemo(
+    () =>
+      prefs.applySortToRows(filtered, (row, key) =>
+        currencyCell(row, key, rateDate),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort, rateDate],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
   const paged = useMemo(() => {
     const p = Math.min(page, pageCount);
-    return filtered.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
-  }, [filtered, page, pageCount]);
+    return displayRows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  }, [displayRows, page, pageCount]);
 
   async function load() {
     setLoading(true);
@@ -548,15 +604,11 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
   function exportCsv() {
     downloadCsv(
       `currencies-${todayISO()}.csv`,
-      filtered.map((r) => {
-        const meta = asCurrencyMeta(r.meta);
-        return {
-          Код: r.code,
-          'Базовая денежная единица': meta.unit || '',
-          Название: r.name,
-          'Курс валют': formatRate(rateOnDate(meta.rates, rateDate)),
-          Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-        };
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols)
+          obj[prefs.labelOf(k)] = currencyCell(r, k, rateDate);
+        return obj;
       }),
     );
   }
@@ -1313,46 +1365,72 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
             aria-label={`Выбрать ${row.name}`}
           />
         </td>
-        <td className={styles.nameCell}>
-          <span className={styles.nameText}>{row.code}</span>
-          {open ? (
-            <div
-              className={`${styles.inlineActions} ${styles.rowActions}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button type="button" onClick={() => void openView(row)}>
-                Просмотреть
-              </button>
-              <button type="button" onClick={() => openEdit(row)}>
-                Изменить
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void setActiveIds([row.id], row.isActive === false)}
-              >
-                {row.isActive === false ? 'Активный' : 'Неактивный'}
-              </button>
-              <button type="button" onClick={() => void deleteIds([row.id])}>
-                Удалить
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td>{meta.unit || '—'}</td>
-        <td>{row.name}</td>
-        <td>{rate == null ? '' : rate}</td>
-        <td>
-          <span className={row.isActive === false ? extra.badgeOff : extra.badge}>
-            {row.isActive === false ? 'Неактивный' : 'Активный'}
-          </span>
-        </td>
+        {visibleCols.map((key) => {
+          if (key === 'code') {
+            return (
+              <td key={key} className={styles.nameCell}>
+                <span className={styles.nameText}>{row.code}</span>
+                {open ? (
+                  <div
+                    className={`${styles.inlineActions} ${styles.rowActions}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button type="button" onClick={() => void openView(row)}>
+                      Просмотреть
+                    </button>
+                    <button type="button" onClick={() => openEdit(row)}>
+                      Изменить
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void setActiveIds([row.id], row.isActive === false)
+                      }
+                    >
+                      {row.isActive === false ? 'Активный' : 'Неактивный'}
+                    </button>
+                    <button type="button" onClick={() => void deleteIds([row.id])}>
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
+              </td>
+            );
+          }
+          if (key === 'unit') {
+            return <td key={key}>{meta.unit || '—'}</td>;
+          }
+          if (key === 'name') {
+            return <td key={key}>{row.name}</td>;
+          }
+          if (key === 'rate') {
+            return <td key={key}>{rate == null ? '' : rate}</td>;
+          }
+          if (key === 'isActive') {
+            return (
+              <td key={key}>
+                <span
+                  className={
+                    row.isActive === false ? extra.badgeOff : extra.badge
+                  }
+                >
+                  {row.isActive === false ? 'Неактивный' : 'Активный'}
+                </span>
+              </td>
+            );
+          }
+          return (
+            <td key={key}>{currencyCell(row, key, rateDate) || '—'}</td>
+          );
+        })}
       </tr>
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: 'Валюты',
@@ -1499,15 +1577,6 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="Excel"
-            aria-label="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Предыдущая страница"
@@ -1535,6 +1604,7 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -1546,34 +1616,32 @@ function CurrenciesInner({ historyMode }: { historyMode?: boolean }) {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => {
                     if (!e.target.checked) setSelected(new Set());
-                    else setSelected(new Set(filtered.map((r) => r.id)));
+                    else setSelected(new Set(displayRows.map((r) => r.id)));
                   }}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Код</th>
-              <th>Базовая денежная единица</th>
-              <th>Название</th>
-              <th>Курс валют</th>
-              <th>Статус</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>

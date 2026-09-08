@@ -5,10 +5,17 @@ import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
 import { confirm } from '@/lib/dialogs';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { HrChangeRequestCreateModal } from './HrChangeRequestCreateModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -43,7 +50,25 @@ type ChangeRow = {
 type RowAction = 'submit' | 'cancel' | 'delete' | 'approve' | 'reject';
 
 const FILTER_KEYS = ['q', 'number', 'kind', 'status', 'from', 'to'] as const;
-const COL_COUNT = 8;
+
+const HR_REQUEST_COLUMNS: ColumnDef[] = [
+  { key: 'requestDate', label: 'Дата заявки' },
+  { key: 'number', label: 'Номер' },
+  { key: 'kind', label: 'Тип заявки' },
+  { key: 'position', label: 'Позиция' },
+  { key: 'createdBy', label: 'Создал' },
+  { key: 'createdAt', label: 'Дата создания' },
+  { key: 'status', label: 'Статус' },
+];
+
+const hrRequestPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.hr-requests.v1',
+  title: 'Заявки на кадровые изменения',
+  columns: HR_REQUEST_COLUMNS,
+  defaultColumns: HR_REQUEST_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['number', 'kind', 'position', 'createdBy'],
+  defaultSort: [{ key: 'requestDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -99,10 +124,32 @@ async function callAction(id: string, action: RowAction) {
   await apiFetch(`/api/hr/change-requests/${id}/${action}`, { method: 'POST' });
 }
 
+function cellOf(row: ChangeRow, key: string): string {
+  switch (key) {
+    case 'requestDate':
+      return fmtDate(row.requestDate);
+    case 'number':
+      return row.number || '';
+    case 'kind':
+      return KIND_LABELS[row.kind] || row.kind;
+    case 'position':
+      return positionLabel(row);
+    case 'createdBy':
+      return row.createdByLabel || '';
+    case 'createdAt':
+      return fmtDateTime(row.createdAt);
+    case 'status':
+      return STATUS_LABELS[row.status] || row.status;
+    default:
+      return '';
+  }
+}
+
 function HrRequestsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(hrRequestPrefsCfg);
   const q = filters.q;
   const from = filters.from;
   const to = filters.to;
@@ -161,13 +208,24 @@ function HrRequestsInner() {
     return list;
   }, [rows, q, numberFilter, kindFilter, statusFilter, from, to]);
 
-  const checkedRows = useMemo(
-    () => filtered.filter((r) => checked[r.id]),
-    [filtered, checked],
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : hrRequestPrefsCfg.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
   );
 
-  const allChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const someChecked = filtered.some((r) => checked[r.id]) && !allChecked;
+  const checkedRows = useMemo(
+    () => displayRows.filter((r) => checked[r.id]),
+    [displayRows, checked],
+  );
+
+  const allChecked = displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const someChecked = displayRows.some((r) => checked[r.id]) && !allChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => {
@@ -181,7 +239,7 @@ function HrRequestsInner() {
   function toggleAll(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -330,15 +388,11 @@ function HrRequestsInner() {
   function exportCsv() {
     downloadCsv(
       `hr-requests-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        requestDate: fmtDate(r.requestDate),
-        number: r.number || '',
-        kind: KIND_LABELS[r.kind],
-        position: positionLabel(r),
-        createdBy: r.createdByLabel || '',
-        createdAt: fmtDateTime(r.createdAt),
-        status: STATUS_LABELS[r.status] || r.status,
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -359,6 +413,7 @@ function HrRequestsInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="hr-requests" />
 
       <div className={shared.pageHeader}>
@@ -466,15 +521,6 @@ function HrRequestsInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
             title="Excel"
@@ -491,6 +537,7 @@ function HrRequestsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -573,31 +620,27 @@ function HrRequestsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата заявки</th>
-                <th>Номер</th>
-                <th>Тип заявки</th>
-                <th>Позиция</th>
-                <th>Создал</th>
-                <th>Дата создания</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const badge = statusBadge(row.status);
@@ -618,19 +661,27 @@ function HrRequestsInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.requestDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td>{KIND_LABELS[row.kind]}</td>
-                      <td className={styles.empName}>{positionLabel(row)}</td>
-                      <td>{row.createdByLabel || '—'}</td>
-                      <td>{fmtDateTime(row.createdAt)}</td>
-                      <td>
-                        <span className={badge.cls}>{badge.text}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'position') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={badge.cls}>{badge.text}</span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/hr-requests/${row.id}`}>
                               <i
@@ -700,7 +751,7 @@ function HrRequestsInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

@@ -7,8 +7,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { locationListPrefs } from '@/lib/table-field-defs/catalog-lists';
 import {
   blankLocationForm,
   LocationFormModal,
@@ -35,14 +41,14 @@ type Location = {
   devicesOfflineLabel?: string;
   employeeCount?: number;
   geolocation?: string | null;
+  meta?: Record<string, unknown> | null;
   _count?: { devices?: number; qrCodes?: number; divisions?: number };
 };
 
 const FILTER_KEYS = ['q', 'name', 'geo', 'accuracy', 'status', 'typeId'] as const;
-const COL_COUNT = 8;
 
 function toForm(row: Location): LocationFormValues {
-  const meta = (row as Location & { meta?: Record<string, unknown> }).meta || {};
+  const meta = row.meta || {};
   return {
     code: row.code,
     name: row.name,
@@ -97,10 +103,41 @@ function deviceCountOf(row: Location) {
   return row.deviceCount ?? row._count?.devices ?? 0;
 }
 
+function locationCell(row: Location, key: string): string {
+  const meta = row.meta || {};
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'code':
+      return row.code || '';
+    case 'address':
+      return row.address || '';
+    case 'locationType':
+      return row.locationType?.name || '';
+    case 'region':
+      return typeof meta.region === 'string' ? meta.region : '';
+    case 'timezone':
+      return row.timezone || '';
+    case 'deviceCount':
+      return String(deviceCountOf(row));
+    case 'devicesOffline':
+      return row.devicesOfflineLabel ?? (row.devicesOffline ? 'Да' : 'Нет');
+    case 'employeeCount':
+      return String(row.employeeCount ?? 0);
+    case 'latlng':
+      return geoText(row);
+    case 'isActive':
+      return row.isActive ? 'Активная' : 'Неактивная';
+    default:
+      return '';
+  }
+}
+
 function LocationsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(locationListPrefs);
   const q = filters.q;
   const nameFilter = filters.name;
   const geoFilter = filters.geo;
@@ -189,13 +226,25 @@ function LocationsInner() {
     });
   }, [rows, q, nameFilter, geoFilter, accuracyFilter, statusFilter, typeFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, locationCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : locationListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -204,7 +253,7 @@ function LocationsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -364,17 +413,13 @@ function LocationsInner() {
   function exportCsv() {
     downloadCsv(
       `locations-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Код: r.code || '',
-        Локация: r.name,
-        Адрес: r.address || '',
-        Тип: r.locationType?.name || '',
-        Геолокация: geoText(r),
-        'Погрешность (м)': r.geoRadiusM != null ? String(r.geoRadiusM) : '',
-        Устройства: String(deviceCountOf(r)),
-        Сотрудники: String(r.employeeCount ?? 0),
-        Статус: r.isActive ? 'Активная' : 'Неактивная',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = locationCell(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
@@ -398,6 +443,7 @@ function LocationsInner() {
   return (
     <div className={styles.page}>
       <PageSubnav groupKey="locations" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTransfer}`}>
@@ -524,6 +570,7 @@ function LocationsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -588,31 +635,27 @@ function LocationsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Локация</th>
-                <th>Адрес</th>
-                <th>Тип</th>
-                <th>Устройства</th>
-                <th>Офлайн</th>
-                <th>Сотрудники</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const offlineLabel =
@@ -633,50 +676,70 @@ function LocationsInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td>
-                        <div className={styles.locCell}>
-                          <span className={styles.locIcon} aria-hidden>
-                            <i className="fas fa-map-marker-alt" />
-                          </span>
-                          <div>
-                            <div className={styles.nameCell}>
-                              {row.name}
-                              {row.isGlobal ? (
-                                <span className={styles.badgeOk}>Глобальная</span>
-                              ) : null}
-                            </div>
-                            <div className={styles.codeCell}>{row.code}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{row.address || '—'}</td>
-                      <td>{row.locationType?.name || '—'}</td>
-                      <td>
-                        <span className={styles.countPill}>{deviceCountOf(row)}</span>
-                      </td>
-                      <td>
-                        <span
-                          className={
-                            row.devicesOffline || offlineLabel === 'Да'
-                              ? styles.offlineYes
-                              : styles.offlineNo
-                          }
-                        >
-                          {offlineLabel}
-                        </span>
-                      </td>
-                      <td>{row.employeeCount ?? 0}</td>
-                      <td>
-                        {row.isActive ? (
-                          <span className={styles.statusActive}>Активная</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивная</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key}>
+                              <div className={styles.locCell}>
+                                <span className={styles.locIcon} aria-hidden>
+                                  <i className="fas fa-map-marker-alt" />
+                                </span>
+                                <div>
+                                  <div className={styles.nameCell}>
+                                    {row.name}
+                                    {row.isGlobal ? (
+                                      <span className={styles.badgeOk}>Глобальная</span>
+                                    ) : null}
+                                  </div>
+                                  <div className={styles.codeCell}>{row.code}</div>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        }
+                        if (key === 'deviceCount') {
+                          return (
+                            <td key={key}>
+                              <span className={styles.countPill}>
+                                {deviceCountOf(row)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'devicesOffline') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={
+                                  row.devicesOffline || offlineLabel === 'Да'
+                                    ? styles.offlineYes
+                                    : styles.offlineNo
+                                }
+                              >
+                                {offlineLabel}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {row.isActive ? (
+                                <span className={styles.statusActive}>Активная</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивная</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={key}>{locationCell(row, key) || '—'}</td>
+                        );
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/locations/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

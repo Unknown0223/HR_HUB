@@ -5,15 +5,20 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { confirm } from '@/lib/dialogs';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { GradePromotionFormModal } from './GradePromotionFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['number', 'divisionId', 'status', 'from', 'to'] as const;
-const COL_COUNT = 6;
 const MAX_NAMES = 3;
 
 type Emp = {
@@ -34,6 +39,27 @@ type Promotion = {
   division?: { id: string; name: string } | null;
   lines?: { employee?: Emp | null }[];
 };
+
+const gradeHistoryPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.grade-history.v1',
+  title: 'Повышение разрядов',
+  columns: [
+    { key: 'documentDate', label: 'Дата' },
+    { key: 'documentNumber', label: 'Номер' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'employees', label: 'Сотрудники' },
+    { key: 'status', label: 'Состояние' },
+  ],
+  defaultColumns: [
+    'documentDate',
+    'documentNumber',
+    'division',
+    'employees',
+    'status',
+  ],
+  defaultSearchKeys: ['documentNumber', 'division', 'employees'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -63,10 +89,28 @@ function statusClass(s: string) {
   return styles.statusDraft;
 }
 
+function gradeHistoryCell(row: Promotion, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(row.documentDate);
+    case 'documentNumber':
+      return row.documentNumber || '';
+    case 'division':
+      return row.division?.name || '';
+    case 'employees':
+      return empNames(row).join(', ');
+    case 'status':
+      return statusLabel(row.status);
+    default:
+      return '';
+  }
+}
+
 function GradeHistoryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(gradeHistoryPrefs);
 
   const [rows, setRows] = useState<Promotion[]>([]);
   const [divisions, setDivisions] = useState<{ id: string; label: string }[]>([]);
@@ -83,6 +127,11 @@ function GradeHistoryInner() {
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : gradeHistoryPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   async function load() {
     setLoading(true);
@@ -146,13 +195,21 @@ function GradeHistoryInner() {
     });
   }, [rows, search, filters]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, gradeHistoryCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -161,7 +218,7 @@ function GradeHistoryInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -239,7 +296,7 @@ function GradeHistoryInner() {
   }
 
   async function runBulk(action: 'post' | 'cancel' | 'delete') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (!targets.length) return;
 
     if (action === 'post') {
@@ -305,19 +362,17 @@ function GradeHistoryInner() {
   function exportCsv() {
     downloadCsv(
       `grade-history-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(r.documentDate),
-        Номер: r.documentNumber || '',
-        Подразделение: r.division?.name || '',
-        Сотрудники: empNames(r).join(', '),
-        Состояние: statusLabel(r.status),
-        Примечание: r.note || '',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = gradeHistoryCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="grade-history" />
 
       <div className={shared.pageHeader}>
@@ -415,21 +470,13 @@ function GradeHistoryInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -494,29 +541,27 @@ function GradeHistoryInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Подразделение</th>
-                <th>Сотрудники</th>
-                <th>Состояние</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const names = empNames(row);
@@ -538,33 +583,55 @@ function GradeHistoryInner() {
                           aria-label={`Выбрать ${row.documentNumber || row.id}`}
                         />
                       </td>
-                      <td className={styles.numCell}>{fmtDate(row.documentDate)}</td>
-                      <td className={styles.docNumber}>{row.documentNumber || '—'}</td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td className={styles.empNames}>
-                        {names.length ? (
-                          <>
-                            {names.slice(0, MAX_NAMES).join(', ')}
-                            {names.length > MAX_NAMES ? (
-                              <span className={styles.empMore}>
-                                {' '}
-                                +{names.length - MAX_NAMES}
+                      {visibleCols.map((key) => {
+                        if (key === 'documentDate') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {fmtDate(row.documentDate)}
+                            </td>
+                          );
+                        }
+                        if (key === 'documentNumber') {
+                          return (
+                            <td key={key} className={styles.docNumber}>
+                              {row.documentNumber || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'employees') {
+                          return (
+                            <td key={key} className={styles.empNames}>
+                              {names.length ? (
+                                <>
+                                  {names.slice(0, MAX_NAMES).join(', ')}
+                                  {names.length > MAX_NAMES ? (
+                                    <span className={styles.empMore}>
+                                      {' '}
+                                      +{names.length - MAX_NAMES}
+                                    </span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={statusClass(row.status)}>
+                                {statusLabel(row.status)}
                               </span>
-                            ) : null}
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        <span className={statusClass(row.status)}>
-                          {statusLabel(row.status)}
-                        </span>
-                      </td>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{gradeHistoryCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/grade-history/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />
@@ -619,7 +686,7 @@ function GradeHistoryInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

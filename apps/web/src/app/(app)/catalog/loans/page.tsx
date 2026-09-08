@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -15,18 +20,70 @@ import {
   money,
   type LoanRow,
 } from '@/lib/loans';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { LoanFormModal } from './LoanFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const PATH = '/catalog/loans';
 const FILTER_KEYS = ['q', 'number', 'status', 'from', 'to'] as const;
-const COL_COUNT = 9;
+
+const loansListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.loans.v1',
+  title: 'Займы',
+  columns: [
+    { key: 'number', label: 'Номер займа' },
+    { key: 'loanDate', label: 'Дата займа' },
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'remaining', label: 'Оставшаяся сумма' },
+    { key: 'principal', label: 'Сумма займа' },
+    { key: 'startDate', label: 'От' },
+    { key: 'endDate', label: 'До' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'number',
+    'loanDate',
+    'employee',
+    'remaining',
+    'principal',
+    'startDate',
+    'endDate',
+    'status',
+  ],
+  defaultSearchKeys: ['number', 'employee'],
+  defaultSort: [{ key: 'loanDate', dir: 'asc' }],
+  searchableKeys: ['number', 'employee', 'status'],
+});
+
+function cellOf(row: LoanRow, key: string): string {
+  switch (key) {
+    case 'number':
+      return row.number || '';
+    case 'loanDate':
+      return fmtDate(row.loanDate);
+    case 'employee':
+      return row.employee?.label || '';
+    case 'remaining':
+      return money(row.remaining);
+    case 'principal':
+      return money(row.principal);
+    case 'startDate':
+      return formatMonthRu(row.startDate);
+    case 'endDate':
+      return formatMonthRu(row.endDate || '');
+    case 'status':
+      return loanStatusLabel(row.status);
+    default:
+      return '';
+  }
+}
 
 function Inner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(loansListPrefs);
   const q = filters.q;
   const [rows, setRows] = useState<LoanRow[]>([]);
   const [error, setError] = useState('');
@@ -38,7 +95,6 @@ function Inner() {
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(filters.number || filters.status || filters.from || filters.to),
   );
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [modalOpen, setModalOpen] = useState(false);
 
   async function load() {
@@ -68,7 +124,7 @@ function Inner() {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    return rows.filter((r) => {
       if (filters.number && !String(r.number || '').includes(filters.number.trim())) return false;
       if (filters.status && r.status !== filters.status) return false;
       const d = String(r.loanDate || '').slice(0, 10);
@@ -78,26 +134,30 @@ function Inner() {
       const blob = [r.number, r.employee?.label, r.note, r.contractNumber].join(' ').toLowerCase();
       return blob.includes(qq);
     });
-    const dir = sortDir === 'asc' ? 1 : -1;
-    list = [...list].sort((a, b) => {
-      const ad = String(a.loanDate || '');
-      const bd = String(b.loanDate || '');
-      if (ad !== bd) return ad < bd ? -dir : dir;
-      return String(a.number).localeCompare(String(b.number));
-    });
-    return list;
-  }, [rows, q, filters.number, filters.status, filters.from, filters.to, sortDir]);
+  }, [rows, q, filters.number, filters.status, filters.from, filters.to]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : loansListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
   const checkedRows = useMemo(
-    () => filtered.filter((r) => checked[r.id]),
-    [filtered, checked],
+    () => displayRows.filter((r) => checked[r.id]),
+    [displayRows, checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -106,7 +166,7 @@ function Inner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -209,9 +269,23 @@ function Inner() {
     }
   }
 
+  function exportCsv() {
+    downloadCsv(
+      'loans.csv',
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="loans" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
@@ -284,21 +358,7 @@ function Inner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={() =>
-              downloadCsv(
-                'loans.csv',
-                filtered.map((r) => ({
-                  'Номер займа': r.number,
-                  'Дата займа': fmtDate(r.loanDate),
-                  Сотрудник: r.employee?.label || '',
-                  'Оставшаяся сумма займа': r.remaining,
-                  'Сумма займа': r.principal,
-                  От: formatMonthRu(r.startDate),
-                  До: formatMonthRu(r.endDate || ''),
-                  Статус: loanStatusLabel(r.status),
-                })),
-              )
-            }
+            onClick={exportCsv}
             title="CSV"
             aria-label="Экспорт CSV"
           >
@@ -313,6 +373,7 @@ function Inner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -377,40 +438,34 @@ function Inner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Номер займа</th>
-                <th>
-                  <button
-                    type="button"
-                    className={styles.sortBtn}
-                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                {visibleCols.map((key) => (
+                  <th
+                    key={key}
+                    className={
+                      key === 'remaining' || key === 'principal' ? styles.numCol : undefined
+                    }
                   >
-                    Дата займа {sortDir === 'asc' ? '↑' : '↓'}
-                  </button>
-                </th>
-                <th>Сотрудник</th>
-                <th className={styles.numCol}>Оставшаяся сумма</th>
-                <th className={styles.numCol}>Сумма займа</th>
-                <th>От</th>
-                <th>До</th>
-                <th>Статус</th>
+                    {prefs.labelOf(key)}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = focusId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -429,24 +484,47 @@ function Inner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td className={styles.numberCell}>{row.number || '—'}</td>
-                      <td>{fmtDate(row.loanDate)}</td>
-                      <td className={styles.empName}>{row.employee?.label || '—'}</td>
-                      <td className={styles.numCol}>{money(row.remaining)}</td>
-                      <td className={styles.numCol}>{money(row.principal)}</td>
-                      <td>{formatMonthRu(row.startDate)}</td>
-                      <td>{formatMonthRu(row.endDate || '')}</td>
-                      <td>
-                        <span
-                          className={row.status === 'active' ? styles.postedYes : styles.postedNo}
-                        >
-                          {loanStatusLabel(row.status)}
-                        </span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'number') {
+                          return (
+                            <td key={key} className={styles.numberCell}>
+                              {row.number || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {row.employee?.label || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'remaining' || key === 'principal') {
+                          return (
+                            <td key={key} className={styles.numCol}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span
+                                className={
+                                  row.status === 'active' ? styles.postedYes : styles.postedNo
+                                }
+                              >
+                                {loanStatusLabel(row.status)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`${PATH}/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

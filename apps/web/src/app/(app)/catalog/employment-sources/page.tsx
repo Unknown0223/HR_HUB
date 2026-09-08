@@ -7,6 +7,11 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -15,6 +20,7 @@ import {
   sourceTypeLabel,
   type EmploymentSourceType,
 } from '@/lib/employment-sources';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import extra from './page.module.css';
@@ -39,6 +45,18 @@ type DictItem = {
 const DICT_CODE = 'employment_sources';
 const FILTER_KEYS = ['q', 'sourceType', 'isActive'] as const;
 
+const employmentSourcesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.employment-sources.v1',
+  title: 'Источники занятости',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'sourceKind', label: 'Вид источника' },
+  ],
+  defaultColumns: ['name', 'sourceKind'],
+  defaultSearchKeys: ['name', 'sourceKind'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
 function slugCode(name: string) {
   return name
     .trim()
@@ -47,10 +65,22 @@ function slugCode(name: string) {
     .slice(0, 32);
 }
 
+function employmentSourceCell(row: DictItem, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'sourceKind':
+      return sourceTypeLabel(parseSourceType(row.meta));
+    default:
+      return '';
+  }
+}
+
 function EmploymentSourcesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(employmentSourcesListPrefs);
   const q = filters.q;
   const typeFilter = filters.sourceType;
   const activeFilter = filters.isActive;
@@ -76,6 +106,11 @@ function EmploymentSourcesPageInner() {
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : employmentSourcesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     return rows.filter((r) => {
@@ -88,6 +123,12 @@ function EmploymentSourcesPageInner() {
       return blob.includes(qq);
     });
   }, [rows, q, typeFilter, activeFilter]);
+
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, employmentSourceCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
 
   async function load() {
     setLoading(true);
@@ -209,7 +250,7 @@ function EmploymentSourcesPageInner() {
       setSelected(new Set());
       return;
     }
-    setSelected(new Set(filtered.map((r) => r.id)));
+    setSelected(new Set(displayRows.map((r) => r.id)));
   }
 
   function toggleOne(id: string, checked: boolean) {
@@ -255,12 +296,13 @@ function EmploymentSourcesPageInner() {
   function exportCsv() {
     downloadCsv(
       `employment-sources-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        'Вид источника': sourceTypeLabel(parseSourceType(r.meta)),
-        'Порядковый номер': r.sortOrder ?? '',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = employmentSourceCell(r, k);
+        }
+        return obj;
+      }),
     );
   }
 
@@ -275,57 +317,9 @@ function EmploymentSourcesPageInner() {
     );
   }
 
-  function renderSourceRow(row: DictItem) {
-    const open = focusId === row.id;
-    const kind = parseSourceType(row.meta);
-    return (
-      <tr
-        key={row.id}
-        className={open ? styles.rowSelected : undefined}
-        onClick={() => setFocusId(open ? null : row.id)}
-        style={{ cursor: 'pointer' }}
-      >
-        <td onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={selected.has(row.id)}
-            onChange={(e) => toggleOne(row.id, e.target.checked)}
-            aria-label={`Выбрать ${row.name}`}
-          />
-        </td>
-        <td className={styles.nameCell}>
-          <span className={styles.nameText}>{row.name}</span>
-          {row.isActive === false ? (
-            <span className={styles.statusMuted}>Неактивный</span>
-          ) : null}
-          {open ? (
-            <div
-              className={`${styles.inlineActions} ${styles.rowActions}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button type="button" onClick={() => openEdit(row)}>
-                Изменить
-              </button>
-              <button
-                type="button"
-                className={styles.danger}
-                disabled={busy}
-                onClick={() => void runDelete(row)}
-              >
-                Удалить
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td>
-          <span className={extra.typeChip}>{sourceTypeLabel(kind)}</span>
-        </td>
-      </tr>
-    );
-  }
-
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav
         group={{
           title: 'Источники занятости',
@@ -392,15 +386,6 @@ function EmploymentSourcesPageInner() {
             }}
             aria-label="Поиск"
           />
-          <button
-            type="button"
-            className={styles.exportBtn}
-            onClick={exportCsv}
-            title="Экспорт Excel"
-          >
-            <i className="fas fa-file-excel" aria-hidden />
-            Excel
-          </button>
           <span className={styles.pagerMeta}>
             {filtered.length} / {rows.length}
           </span>
@@ -414,6 +399,7 @@ function EmploymentSourcesPageInner() {
             <i className="fas fa-sync-alt" aria-hidden />
             Обновить
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -427,33 +413,95 @@ function EmploymentSourcesPageInner() {
                 <input
                   type="checkbox"
                   checked={
-                    filtered.length > 0 &&
-                    filtered.every((r) => selected.has(r.id))
+                    displayRows.length > 0 &&
+                    displayRows.every((r) => selected.has(r.id))
                   }
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Название</th>
-              <th>Вид источника</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {loading && filtered.length === 0 ? (
+            {loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
-            {!loading && filtered.length === 0 ? (
+            {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
             ) : null}
-            {filtered.map((row) => renderSourceRow(row))}
+            {displayRows.map((row) => {
+              const open = focusId === row.id;
+              return (
+                <tr
+                  key={row.id}
+                  className={open ? styles.rowSelected : undefined}
+                  onClick={() => setFocusId(open ? null : row.id)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.id)}
+                      onChange={(e) => toggleOne(row.id, e.target.checked)}
+                      aria-label={`Выбрать ${row.name}`}
+                    />
+                  </td>
+                  {visibleCols.map((key) => {
+                    if (key === 'name') {
+                      return (
+                        <td key={key} className={styles.nameCell}>
+                          <span className={styles.nameText}>{row.name}</span>
+                          {row.isActive === false ? (
+                            <span className={styles.statusMuted}>Неактивный</span>
+                          ) : null}
+                          {open ? (
+                            <div
+                              className={`${styles.inlineActions} ${styles.rowActions}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button type="button" onClick={() => openEdit(row)}>
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.danger}
+                                disabled={busy}
+                                onClick={() => void runDelete(row)}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    if (key === 'sourceKind') {
+                      return (
+                        <td key={key}>
+                          <span className={extra.typeChip}>
+                            {sourceTypeLabel(parseSourceType(row.meta))}
+                          </span>
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={key}>{employmentSourceCell(row, key) || '—'}</td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

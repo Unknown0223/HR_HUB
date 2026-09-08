@@ -8,8 +8,15 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch, type PageResult } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -24,8 +31,6 @@ const FILTER_KEYS = [
   'dateTo',
 ] as const;
 
-const COL_COUNT = 8;
-
 type Emp = {
   id: string;
   firstName: string;
@@ -33,6 +38,8 @@ type Emp = {
   middleName?: string | null;
   tabNumber?: string;
   faceProfile?: { photoUrl?: string | null } | null;
+  division?: { id: string; name: string } | null;
+  position?: { id: string; name: string } | null;
 };
 
 type Mark = {
@@ -43,6 +50,7 @@ type Mark = {
   deviceType?: string | null;
   identificationType?: string | null;
   locationName?: string | null;
+  deviceName?: string | null;
   isValid?: boolean;
   clockTamper?: boolean;
   note?: string | null;
@@ -52,6 +60,36 @@ type Mark = {
 };
 
 type Named = { id: string; name: string };
+
+const marksListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.marks.v1',
+  title: 'Отметки',
+  columns: [
+    { key: 'photo', label: 'Фото' },
+    { key: 'person', label: 'Физическое лицо' },
+    { key: 'location', label: 'Локация' },
+    { key: 'deviceType', label: 'Тип устройства' },
+    { key: 'markType', label: 'Тип отметки' },
+    { key: 'identificationType', label: 'Тип идентификации' },
+    { key: 'time', label: 'Время' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'job', label: 'Должность' },
+    { key: 'note', label: 'Примечание' },
+    { key: 'deviceName', label: 'Устройство' },
+  ],
+  defaultColumns: [
+    'photo',
+    'person',
+    'location',
+    'deviceType',
+    'markType',
+    'identificationType',
+    'time',
+  ],
+  defaultSearchKeys: ['person', 'location', 'deviceName', 'note'],
+  defaultSort: [{ key: 'time', dir: 'desc' }],
+  searchableKeys: ['person', 'location', 'deviceName', 'note', 'deviceType', 'markType'],
+});
 
 const MARK_TYPE_OPTS = [
   { key: 'in', label: 'Приход' },
@@ -87,10 +125,42 @@ function markDay(iso: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function markCell(m: Mark, key: string): string {
+  switch (key) {
+    case 'photo':
+      return m.photoUrl ? 'есть' : '';
+    case 'person':
+      return empName(m.employee) === '—' ? '' : empName(m.employee);
+    case 'location':
+      return m.locationName || m.device?.location?.name || '';
+    case 'deviceType':
+      return m.deviceType || '';
+    case 'markType':
+      return m.markTypeLabel || m.markType || '';
+    case 'identificationType':
+      return m.identificationType || '';
+    case 'time': {
+      const t = fmtDt(m.occurredAt);
+      return m.clockTamper ? `${t} ⚠` : t;
+    }
+    case 'division':
+      return m.employee?.division?.name || '';
+    case 'job':
+      return m.employee?.position?.name || '';
+    case 'note':
+      return m.note || '';
+    case 'deviceName':
+      return m.deviceName || m.device?.name || '';
+    default:
+      return '';
+  }
+}
+
 function MarksInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
+  const prefs = useTablePrefs(marksListPrefs);
   const [rows, setRows] = useState<Mark[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -119,6 +189,17 @@ function MarksInner() {
   const [employees, setEmployees] = useState<Named[]>([]);
   const photos = usePhotoLightbox();
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(rows, markCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [rows, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : marksListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const scopeLabel = useMemo(() => {
     const employeeId = (searchParams?.get('employeeId') || filters.employeeId || '').trim();
     const dateFrom = (searchParams?.get('dateFrom') || filters.dateFrom || '').trim();
@@ -146,8 +227,10 @@ function MarksInner() {
     return r && r.isValid !== false;
   }).length;
   const selectedInvalid = checkedIds.length - selectedValid;
-  const allPageChecked = rows.length > 0 && rows.every((r) => checked[r.id]);
-  const somePageChecked = rows.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
   const totalPages = Math.max(1, Math.ceil(total / 50));
 
   function urlFilter(key: string) {
@@ -269,12 +352,29 @@ function MarksInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of rows) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
       return next;
     });
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      `marks-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((m) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          if (k === 'photo') {
+            obj[prefs.labelOf(k)] = m.photoUrl ? 'есть' : '—';
+            continue;
+          }
+          obj[prefs.labelOf(k)] = markCell(m, k) || '—';
+        }
+        return obj;
+      }),
+    );
   }
 
   function applySearch() {
@@ -334,6 +434,7 @@ function MarksInner() {
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="marks" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
@@ -471,6 +572,7 @@ function MarksInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -600,33 +702,29 @@ function MarksInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Фото</th>
-                <th>Физическое лицо</th>
-                <th>Локация</th>
-                <th>Тип устройства</th>
-                <th>Тип отметки</th>
-                <th>Тип идентификации</th>
-                <th>Время</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && !rows.length ? (
+              {loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && !rows.length ? (
+              {!loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных
                   </td>
                 </tr>
               ) : null}
-              {rows.map((m) => {
+              {displayRows.map((m) => {
                 const photo = mediaSrc(m.photoUrl);
-                const slides = rows
+                const slides = displayRows
                   .map((x) => ({
                     src: mediaSrc(x.photoUrl) || '',
                     caption: `${empName(x.employee)} · ${x.markTypeLabel || x.markType} · ${fmtDt(x.occurredAt)}`,
@@ -650,50 +748,68 @@ function MarksInner() {
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
-                      <td>
-                        {photo ? (
-                          <PhotoThumb
-                            src={photo}
-                            alt=""
-                            className={styles.photo}
-                            lightbox={photos}
-                            slides={slides}
-                            index={idx < 0 ? 0 : idx}
-                          />
-                        ) : (
-                          <span className={styles.photoEmpty} />
-                        )}
-                      </td>
-                      <td
-                        className={`${styles.nameCell} ${
-                          m.isValid === false ? styles.invalid : ''
-                        }`}
-                      >
-                        {empName(m.employee)}
-                      </td>
-                      <td>{m.locationName || m.device?.location?.name || '—'}</td>
-                      <td>{m.deviceType || '—'}</td>
-                      <td>
-                        <span className={typeClass(m.markType)}>
-                          {m.markTypeLabel || m.markType}
-                        </span>
-                      </td>
-                      <td>{m.identificationType || '—'}</td>
-                      <td
-                        className={styles.codeCell}
-                        title={
-                          m.clockTamper
-                            ? m.note || 'Время терминала скорректировано'
-                            : undefined
+                      {visibleCols.map((key) => {
+                        if (key === 'photo') {
+                          return (
+                            <td key={key}>
+                              {photo ? (
+                                <PhotoThumb
+                                  src={photo}
+                                  alt=""
+                                  className={styles.photo}
+                                  lightbox={photos}
+                                  slides={slides}
+                                  index={idx < 0 ? 0 : idx}
+                                />
+                              ) : (
+                                <span className={styles.photoEmpty} />
+                              )}
+                            </td>
+                          );
                         }
-                      >
-                        {fmtDt(m.occurredAt)}
-                        {m.clockTamper ? ' ⚠' : ''}
-                      </td>
+                        if (key === 'person') {
+                          return (
+                            <td
+                              key={key}
+                              className={`${styles.nameCell} ${
+                                m.isValid === false ? styles.invalid : ''
+                              }`}
+                            >
+                              {empName(m.employee)}
+                            </td>
+                          );
+                        }
+                        if (key === 'markType') {
+                          return (
+                            <td key={key}>
+                              <span className={typeClass(m.markType)}>
+                                {m.markTypeLabel || m.markType}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'time') {
+                          return (
+                            <td
+                              key={key}
+                              className={styles.codeCell}
+                              title={
+                                m.clockTamper
+                                  ? m.note || 'Время терминала скорректировано'
+                                  : undefined
+                              }
+                            >
+                              {fmtDt(m.occurredAt)}
+                              {m.clockTamper ? ' ⚠' : ''}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{markCell(m, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/attendance/marks/${m.id}`}>
                               <i className="fas fa-eye" aria-hidden />

@@ -6,16 +6,46 @@ import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { FormModal } from '@/components/FormModal';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { TariffApprovalFormModal } from './TariffApprovalFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
 const FILTER_KEYS = ['q', 'number', 'groupId', 'status', 'from', 'to'] as const;
-const COL_COUNT = 8;
+
+const approvalListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.tariff-approvals.v1',
+  title: 'Утверждения тарифных групп',
+  columns: [
+    { key: 'documentDate', label: 'Дата' },
+    { key: 'documentNumber', label: 'Номер' },
+    { key: 'tariffGroup', label: 'Тарифная группа' },
+    { key: 'baseRate', label: 'Базовый тариф' },
+    { key: 'effectiveAt', label: 'Вступает в силу с' },
+    { key: 'status', label: 'Статус' },
+    { key: 'note', label: 'Примечание' },
+  ],
+  defaultColumns: [
+    'documentDate',
+    'documentNumber',
+    'tariffGroup',
+    'baseRate',
+    'effectiveAt',
+    'status',
+    'note',
+  ],
+  defaultSearchKeys: ['documentNumber', 'tariffGroup', 'note', 'status'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+  searchableKeys: ['documentNumber', 'tariffGroup', 'note', 'status', 'baseRate'],
+});
 
 type Approval = {
   id: string;
@@ -34,11 +64,6 @@ type Approval = {
     baseRate?: string | number;
   } | null;
 };
-
-type ModalState =
-  | null
-  | { mode: 'create' }
-  | { mode: 'edit' | 'view'; id: string };
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -71,10 +96,36 @@ function statusClass(s: string) {
   return styles.statusDraft;
 }
 
+function baseRateOf(r: Approval) {
+  return r.baseRate ?? r.tariffGroup?.baseRate ?? null;
+}
+
+function cellOf(row: Approval, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(row.documentDate || row.createdAt);
+    case 'documentNumber':
+      return row.documentNumber || '';
+    case 'tariffGroup':
+      return row.tariffGroup?.name || '';
+    case 'baseRate':
+      return fmtMoney(baseRateOf(row));
+    case 'effectiveAt':
+      return fmtDate(row.effectiveAt);
+    case 'status':
+      return statusLabel(row.status);
+    case 'note':
+      return row.note || '';
+    default:
+      return '';
+  }
+}
+
 function ApprovalsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl(FILTER_KEYS);
+  const prefs = useTablePrefs(approvalListPrefs);
   const q = filters.q;
   const [rows, setRows] = useState<Approval[]>([]);
   const [groups, setGroups] = useState<{ id: string; label: string }[]>([]);
@@ -179,13 +230,25 @@ function ApprovalsInner() {
     });
   }, [rows, q, filters]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : approvalListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -194,7 +257,7 @@ function ApprovalsInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -350,26 +413,23 @@ function ApprovalsInner() {
     }
   }
 
-  const baseRateOf = (r: Approval) => r.baseRate ?? r.tariffGroup?.baseRate ?? null;
-
   function exportCsv() {
     downloadCsv(
       `tariff-approvals-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(r.documentDate || r.createdAt),
-        Номер: r.documentNumber || '',
-        'Тарифная группа': r.tariffGroup?.name || '',
-        'Базовый тариф': fmtMoney(baseRateOf(r)),
-        'Вступает в силу с': fmtDate(r.effectiveAt),
-        Статус: statusLabel(r.status),
-        Примечание: r.note || '',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="tariff-approvals" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
@@ -476,6 +536,7 @@ function ApprovalsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -540,31 +601,27 @@ function ApprovalsInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Тарифная группа</th>
-                <th>Базовый тариф</th>
-                <th>Вступает в силу с</th>
-                <th>Статус</th>
-                <th>Примечание</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const canPost = row.status === 'draft' || row.status === 'pending';
@@ -586,23 +643,64 @@ function ApprovalsInner() {
                           aria-label="Выбрать документ"
                         />
                       </td>
-                      <td className={styles.numCell}>
-                        {fmtDate(row.documentDate || row.createdAt)}
-                      </td>
-                      <td className={styles.numCell}>{row.documentNumber || '—'}</td>
-                      <td className={styles.nameCell}>{row.tariffGroup?.name || '—'}</td>
-                      <td className={styles.moneyCell}>{fmtMoney(baseRateOf(row))}</td>
-                      <td className={styles.numCell}>{fmtDate(row.effectiveAt)}</td>
-                      <td>
-                        <span className={statusClass(row.status)}>
-                          {statusLabel(row.status)}
-                        </span>
-                      </td>
-                      <td className={styles.noteCell}>{row.note || '—'}</td>
+                      {visibleCols.map((key) => {
+                        if (key === 'documentDate') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {fmtDate(row.documentDate || row.createdAt)}
+                            </td>
+                          );
+                        }
+                        if (key === 'documentNumber') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {row.documentNumber || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'tariffGroup') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.tariffGroup?.name || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'baseRate') {
+                          return (
+                            <td key={key} className={styles.moneyCell}>
+                              {fmtMoney(baseRateOf(row))}
+                            </td>
+                          );
+                        }
+                        if (key === 'effectiveAt') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {fmtDate(row.effectiveAt)}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={statusClass(row.status)}>
+                                {statusLabel(row.status)}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (key === 'note') {
+                          return (
+                            <td key={key} className={styles.noteCell}>
+                              {row.note || '—'}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/tariff-approvals/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

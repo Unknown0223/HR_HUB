@@ -8,9 +8,16 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch, PageResult } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -42,7 +49,27 @@ type DocRow = {
 
 const FILTER_KEYS = ['q', 'status', 'posted', 'from', 'to'] as const;
 const PAGE_SIZES = [25, 50, 100] as const;
-const COL_COUNT = 10;
+
+const TRANSFER_COLUMNS: ColumnDef[] = [
+  { key: 'documentDate', label: 'Дата' },
+  { key: 'number', label: 'Номер' },
+  { key: 'employee', label: 'Сотрудник' },
+  { key: 'organization', label: 'Организация' },
+  { key: 'transferFrom', label: 'Перевод с' },
+  { key: 'transferTo', label: 'Перевод по' },
+  { key: 'positionBefore', label: 'Позиция (до перевода)' },
+  { key: 'positionAfter', label: 'Позиция (после перевода)' },
+  { key: 'posted', label: 'Проведен' },
+];
+
+const transferPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.transfers.v1',
+  title: 'Кадровые переводы',
+  columns: TRANSFER_COLUMNS,
+  defaultColumns: TRANSFER_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['number', 'employee', 'organization'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+});
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
@@ -66,10 +93,38 @@ function isPosted(row: DocRow) {
   return row.status === 'posted';
 }
 
+function cellOf(row: DocRow, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(row.documentDate);
+    case 'number':
+      return row.number || '';
+    case 'employee':
+      return empFull(row.employee);
+    case 'organization':
+      return row.organization || '';
+    case 'transferFrom':
+      return fmtDate(row.transferFrom);
+    case 'transferTo':
+      return fmtDate(row.transferTo);
+    case 'positionBefore':
+      return row.positionBefore || '';
+    case 'positionAfter':
+      return row.positionAfter || '';
+    case 'posted':
+      if (row.status === 'posted') return 'Да';
+      if (row.status === 'cancelled') return 'Отм.';
+      return 'Нет';
+    default:
+      return '';
+  }
+}
+
 function TransfersPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(transferPrefsCfg);
   const q = filters.q;
   const status = filters.status;
   const posted = filters.posted;
@@ -98,6 +153,11 @@ function TransfersPageInner() {
   const [searchDraft, setSearchDraft] = useState(q);
   const [exportBusy, setExportBusy] = useState(false);
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : transferPrefsCfg.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const query = useMemo(() => {
     const p = new URLSearchParams();
     p.set('type', 'transfer');
@@ -118,15 +178,21 @@ function TransfersPageInner() {
     return `?${p.toString()}`;
   }, [q, status, posted, from, to, page, pageSize]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(rows, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
   const allPageChecked =
-    rows.length > 0 && rows.every((r) => checked[r.id]);
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
   const somePageChecked =
-    rows.some((r) => checked[r.id]) && !allPageChecked;
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   const rangeFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeTo = Math.min(page * pageSize, total);
@@ -138,7 +204,7 @@ function TransfersPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of rows) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -347,17 +413,11 @@ function TransfersPageInner() {
   function exportCsv() {
     downloadCsv(
       `transfers-${new Date().toISOString().slice(0, 10)}.csv`,
-      rows.map((r) => ({
-        Дата: fmtDate(r.documentDate),
-        Номер: r.number || '',
-        Сотрудник: empFull(r.employee),
-        Организация: r.organization || '',
-        'Перевод с': fmtDate(r.transferFrom),
-        'Перевод по': fmtDate(r.transferTo),
-        'Позиция (до)': r.positionBefore || '',
-        'Позиция (после)': r.positionAfter || '',
-        Проведен: r.status === 'posted' ? 'Да' : 'Нет',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
@@ -384,6 +444,7 @@ function TransfersPageInner() {
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="transfers" />
 
       <div className={shared.pageHeader}>
@@ -465,15 +526,6 @@ function TransfersPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={exportBusy}
             onClick={() => void exportExcel()}
             title="Excel"
@@ -490,6 +542,7 @@ function TransfersPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -679,33 +732,27 @@ function TransfersPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Сотрудник</th>
-                <th>Организация</th>
-                <th>Перевод с</th>
-                <th>Перевод по</th>
-                <th>Позиция (до перевода)</th>
-                <th>Позиция (после перевода)</th>
-                <th>Проведен</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && rows.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && rows.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать перевод»
                   </td>
                 </tr>
               ) : null}
-              {rows.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -726,27 +773,33 @@ function TransfersPageInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td>{fmtDate(row.documentDate)}</td>
-                      <td>{row.number || '—'}</td>
-                      <td className={styles.empName}>{empFull(row.employee)}</td>
-                      <td>{row.organization || '—'}</td>
-                      <td>{fmtDate(row.transferFrom)}</td>
-                      <td>{fmtDate(row.transferTo)}</td>
-                      <td>{row.positionBefore || '—'}</td>
-                      <td>{row.positionAfter || '—'}</td>
-                      <td>
-                        {row.status === 'posted' ? (
-                          <span className={styles.postedYes}>Да</span>
-                        ) : (
-                          <span className={styles.postedNo}>
-                            {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
-                          </span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'employee') {
+                          return (
+                            <td key={key} className={styles.empName}>
+                              {cellOf(row, key) || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'posted') {
+                          return (
+                            <td key={key}>
+                              {row.status === 'posted' ? (
+                                <span className={styles.postedYes}>Да</span>
+                              ) : (
+                                <span className={styles.postedNo}>
+                                  {row.status === 'cancelled' ? 'Отм.' : 'Нет'}
+                                </span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={docHref(row)}>
                               <i className="fas fa-eye" aria-hidden />

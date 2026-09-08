@@ -8518,6 +8518,7 @@ ORDER BY pp.month;`,
       birthDate: string;
       address: string;
       phone: string;
+      email: string;
       schedule: string;
       passport: string;
       passportIssuer: string;
@@ -8557,12 +8558,13 @@ ORDER BY pp.month;`,
         grade: e.grade?.name || e.grade?.code || '',
         gender: genderLabel(p?.gender),
         region: p?.region?.name || e.region?.name || '',
-        inps: p?.inps || p?.inn || '',
+        inps: p?.inps || '',
         pinfl: p?.pinfl || '',
         inn: p?.inn || '',
         birthDate: fmtRu(p?.birthDate),
         address: p?.addressResidence || '',
         phone: e.phone || p?.phone || '',
+        email: e.email || p?.email || '',
         schedule: scheduleLabel(e.schedule),
         passport: (p?.passport || passportDoc?.docNumber || '').trim(),
         passportIssuer: (passportDoc?.issuer || '').trim(),

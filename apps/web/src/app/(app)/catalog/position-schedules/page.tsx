@@ -6,8 +6,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { PositionScheduleFormModal } from './PositionScheduleFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -31,7 +37,32 @@ const KIND_LABEL: Record<string, string> = Object.fromEntries(
 );
 
 const FILTER_KEYS = ['q', 'status', 'kind', 'from', 'to'] as const;
-const COL_COUNT = 8;
+
+const positionSchedulesListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.position-schedules.v1',
+  title: 'Графики для позиций',
+  columns: [
+    { key: 'documentDate', label: 'Дата' },
+    { key: 'number', label: 'Номер' },
+    { key: 'month', label: 'Месяц' },
+    { key: 'kind', label: 'Тип графика' },
+    { key: 'division', label: 'Подразделение' },
+    { key: 'lines', label: 'Строк' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'documentDate',
+    'number',
+    'month',
+    'kind',
+    'division',
+    'lines',
+    'status',
+  ],
+  defaultSearchKeys: ['number', 'kind', 'division', 'month'],
+  defaultSort: [{ key: 'documentDate', dir: 'desc' }],
+  searchableKeys: ['number', 'kind', 'division', 'month', 'status'],
+});
 
 type DocRow = {
   id: string;
@@ -68,10 +99,32 @@ function statusLabel(row: DocRow) {
   return { text: 'Черновик', cls: styles.badgeDraft };
 }
 
+function cellOf(row: DocRow, key: string): string {
+  switch (key) {
+    case 'documentDate':
+      return fmtDate(row.documentDate);
+    case 'number':
+      return row.number || '';
+    case 'month':
+      return fmtMonth(row.month);
+    case 'kind':
+      return KIND_LABEL[row.kind] || row.kind;
+    case 'division':
+      return row.division?.name || '';
+    case 'lines':
+      return String(row.lines?.length ?? 0);
+    case 'status':
+      return statusLabel(row).text;
+    default:
+      return '';
+  }
+}
+
 function ListInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(positionSchedulesListPrefs);
   const q = filters.q;
 
   const [rows, setRows] = useState<DocRow[]>([]);
@@ -150,12 +203,24 @@ function ListInner() {
     return list;
   }, [rows, q, filters.status, filters.kind, filters.from, filters.to]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
+    [filtered, prefs.state.sort],
+  );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : positionSchedulesListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -164,7 +229,7 @@ function ListInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -271,20 +336,20 @@ function ListInner() {
   function exportCsv() {
     downloadCsv(
       `position-schedules-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Дата: fmtDate(r.documentDate),
-        Номер: r.number || '',
-        Месяц: fmtMonth(r.month),
-        'Тип графика': KIND_LABEL[r.kind] || r.kind,
-        Подразделение: r.division?.name || '',
-        Статус: statusLabel(r).text,
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (const k of visibleCols) {
+          obj[prefs.labelOf(k)] = cellOf(r, k) || '—';
+        }
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="position-schedules" />
+      <TablePrefsModals prefs={prefs} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
@@ -380,6 +445,7 @@ function ListInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -423,35 +489,31 @@ function ListInner() {
                       if (el) el.indeterminate = somePageChecked;
                     }}
                     onChange={(e) => toggleAllPage(e.target.checked)}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата</th>
-                <th>Номер</th>
-                <th>Месяц</th>
-                <th>Тип графика</th>
-                <th>Подразделение</th>
-                <th>Строк</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && !filtered.length ? (
+              {loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && !filtered.length ? (
+              {!loading && !displayRows.length ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 const st = statusLabel(row);
@@ -471,19 +533,54 @@ function ListInner() {
                           aria-label={`Выбрать ${row.number || row.id}`}
                         />
                       </td>
-                      <td className={styles.codeCell}>{fmtDate(row.documentDate)}</td>
-                      <td className={styles.nameCell}>{row.number || '—'}</td>
-                      <td className={styles.monthCell}>{fmtMonth(row.month)}</td>
-                      <td>{KIND_LABEL[row.kind] || row.kind}</td>
-                      <td>{row.division?.name || '—'}</td>
-                      <td className={styles.numCell}>{row.lines?.length ?? 0}</td>
-                      <td>
-                        <span className={st.cls}>{st.text}</span>
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'documentDate') {
+                          return (
+                            <td key={key} className={styles.codeCell}>
+                              {fmtDate(row.documentDate)}
+                            </td>
+                          );
+                        }
+                        if (key === 'number') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.number || '—'}
+                            </td>
+                          );
+                        }
+                        if (key === 'month') {
+                          return (
+                            <td key={key} className={styles.monthCell}>
+                              {fmtMonth(row.month)}
+                            </td>
+                          );
+                        }
+                        if (key === 'kind') {
+                          return <td key={key}>{KIND_LABEL[row.kind] || row.kind}</td>;
+                        }
+                        if (key === 'division') {
+                          return <td key={key}>{row.division?.name || '—'}</td>;
+                        }
+                        if (key === 'lines') {
+                          return (
+                            <td key={key} className={styles.numCell}>
+                              {row.lines?.length ?? 0}
+                            </td>
+                          );
+                        }
+                        if (key === 'status') {
+                          return (
+                            <td key={key}>
+                              <span className={st.cls}>{st.text}</span>
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/position-schedules/${row.id}`}>
                               <i className="fas fa-table" aria-hidden />

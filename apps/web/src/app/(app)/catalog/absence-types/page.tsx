@@ -9,8 +9,15 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { AbsenceTypeFormModal } from './AbsenceTypeFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -43,7 +50,26 @@ type FlagField =
   | 'trackUnusedTime';
 
 const FILTER_KEYS = ['q', 'status'] as const;
-const COL_COUNT = 9;
+
+const ABSENCE_TYPE_COLUMNS: ColumnDef[] = [
+  { key: 'name', label: 'Название' },
+  { key: 'timeType', label: 'Вид времени' },
+  { key: 'isAnnual', label: 'Ежегодный' },
+  { key: 'requestTimeLimit', label: 'Огр. запроса' },
+  { key: 'allowEmployeeRequest', label: 'Разрешить запрос' },
+  { key: 'trackUnusedTime', label: 'Неисп. время' },
+  { key: 'carryoverPolicy', label: 'Политика переноса' },
+  { key: 'isActive', label: 'Статус' },
+];
+
+const absenceTypePrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.absence-types.v1',
+  title: 'Виды отсутствий',
+  columns: ABSENCE_TYPE_COLUMNS,
+  defaultColumns: ABSENCE_TYPE_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['name', 'timeType'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 function yesNo(v?: boolean | null) {
   if (v == null) return '—';
@@ -83,10 +109,34 @@ function calcLabel(kind?: string | null) {
   return kind === 'one_time' ? 'Разовый' : 'Годовой';
 }
 
+function cellOf(row: AbsenceTypeRow, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'timeType':
+      return row.timeType?.name || '';
+    case 'isAnnual':
+      return yesNo(row.isAnnual ?? row.calcKind === 'annual');
+    case 'requestTimeLimit':
+      return row.requestTimeLimit ? 'Да' : 'Нет';
+    case 'allowEmployeeRequest':
+      return yesNo(row.allowEmployeeRequest ?? true);
+    case 'trackUnusedTime':
+      return yesNo(row.trackUnusedTime);
+    case 'carryoverPolicy':
+      return row.carryoverPolicy || '';
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    default:
+      return '';
+  }
+}
+
 function AbsenceTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(absenceTypePrefs);
   const q = filters.q;
   const statusFilter = filters.status;
 
@@ -100,6 +150,11 @@ function AbsenceTypesPageInner() {
   const [searchDraft, setSearchDraft] = useState(q);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : absenceTypePrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -125,13 +180,20 @@ function AbsenceTypesPageInner() {
     return list;
   }, [rows, q, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, cellOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked = displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -140,7 +202,7 @@ function AbsenceTypesPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -299,21 +361,17 @@ function AbsenceTypesPageInner() {
   function exportCsv() {
     downloadCsv(
       `absence-types-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        'Вид времени': r.timeType?.name || '',
-        'Является ежегодным': yesNo(r.isAnnual ?? r.calcKind === 'annual'),
-        'Ограничение времени запроса': r.requestTimeLimit ? 'Да' : '',
-        'Разрешить сотрудникам создавать запрос': yesNo(r.allowEmployeeRequest ?? true),
-        'Учитывать неиспользованное время': yesNo(r.trackUnusedTime),
-        'Политика переноса': r.carryoverPolicy || '',
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = cellOf(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="absence-types" />
 
       <div className={shared.pageHeader}>
@@ -386,21 +444,13 @@ function AbsenceTypesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -465,32 +515,36 @@ function AbsenceTypesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Вид времени</th>
-                <th className={styles.flagCell}>Ежегодный</th>
-                <th className={styles.flagCell}>Огр. запроса</th>
-                <th className={styles.flagCell}>Разрешить запрос</th>
-                <th className={styles.flagCell}>Неисп. время</th>
-                <th>Политика переноса</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => {
+                  const flag =
+                    key === 'isAnnual' ||
+                    key === 'requestTimeLimit' ||
+                    key === 'allowEmployeeRequest' ||
+                    key === 'trackUnusedTime';
+                  return (
+                    <th key={key} className={flag ? styles.flagCell : undefined}>
+                      {prefs.labelOf(key)}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -509,54 +563,85 @@ function AbsenceTypesPageInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td>{row.timeType?.name || '—'}</td>
-                      <td className={styles.flagCell}>
-                        <FlagSwitch
-                          title="Является ежегодным"
-                          disabled={busy}
-                          checked={!!(row.isAnnual ?? row.calcKind === 'annual')}
-                          onChange={(v) => void toggleFlag(row, 'isAnnual', v)}
-                        />
-                      </td>
-                      <td className={styles.flagCell}>
-                        <FlagSwitch
-                          title="Ограничение времени запроса"
-                          disabled={busy}
-                          checked={!!row.requestTimeLimit}
-                          onChange={(v) => void toggleFlag(row, 'requestTimeLimit', v)}
-                        />
-                      </td>
-                      <td className={styles.flagCell}>
-                        <FlagSwitch
-                          title="Разрешить сотрудникам создавать запрос"
-                          disabled={busy}
-                          checked={row.allowEmployeeRequest !== false}
-                          onChange={(v) =>
-                            void toggleFlag(row, 'allowEmployeeRequest', v)
-                          }
-                        />
-                      </td>
-                      <td className={styles.flagCell}>
-                        <FlagSwitch
-                          title="Учитывать неиспользованное время"
-                          disabled={busy}
-                          checked={!!row.trackUnusedTime}
-                          onChange={(v) => void toggleFlag(row, 'trackUnusedTime', v)}
-                        />
-                      </td>
-                      <td>{row.carryoverPolicy || '—'}</td>
-                      <td>
-                        {row.isActive ? (
-                          <span className={styles.statusActive}>Активный</span>
-                        ) : (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'isAnnual') {
+                          return (
+                            <td key={key} className={styles.flagCell}>
+                              <FlagSwitch
+                                title="Является ежегодным"
+                                disabled={busy}
+                                checked={!!(row.isAnnual ?? row.calcKind === 'annual')}
+                                onChange={(v) => void toggleFlag(row, 'isAnnual', v)}
+                              />
+                            </td>
+                          );
+                        }
+                        if (key === 'requestTimeLimit') {
+                          return (
+                            <td key={key} className={styles.flagCell}>
+                              <FlagSwitch
+                                title="Ограничение времени запроса"
+                                disabled={busy}
+                                checked={!!row.requestTimeLimit}
+                                onChange={(v) =>
+                                  void toggleFlag(row, 'requestTimeLimit', v)
+                                }
+                              />
+                            </td>
+                          );
+                        }
+                        if (key === 'allowEmployeeRequest') {
+                          return (
+                            <td key={key} className={styles.flagCell}>
+                              <FlagSwitch
+                                title="Разрешить сотрудникам создавать запрос"
+                                disabled={busy}
+                                checked={row.allowEmployeeRequest !== false}
+                                onChange={(v) =>
+                                  void toggleFlag(row, 'allowEmployeeRequest', v)
+                                }
+                              />
+                            </td>
+                          );
+                        }
+                        if (key === 'trackUnusedTime') {
+                          return (
+                            <td key={key} className={styles.flagCell}>
+                              <FlagSwitch
+                                title="Учитывать неиспользованное время"
+                                disabled={busy}
+                                checked={!!row.trackUnusedTime}
+                                onChange={(v) =>
+                                  void toggleFlag(row, 'trackUnusedTime', v)
+                                }
+                              />
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {row.isActive ? (
+                                <span className={styles.statusActive}>Активный</span>
+                              ) : (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{cellOf(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <Link href={`/catalog/absence-types/${row.id}`}>
                               <i className="fas fa-eye" aria-hidden />

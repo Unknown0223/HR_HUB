@@ -7,8 +7,14 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { FactTypeFormModal } from './FactTypeFormModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -34,7 +40,35 @@ type RegistryLine = {
 };
 
 const FILTER_KEYS = ['q', 'status'] as const;
-const COL_COUNT = 5;
+
+const factTypeListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.fact-types.v1',
+  title: 'Типы фактов',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'parent', label: 'Название типа родителя' },
+    { key: 'unit', label: 'Единица измерения' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['name', 'parent', 'unit', 'isActive'],
+  defaultSearchKeys: ['name', 'parent', 'unit'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function factTypeCell(row: FactTypeRow, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'parent':
+      return row.parent?.name || '';
+    case 'unit':
+      return row.unit || 'Количество';
+    case 'isActive':
+      return row.isActive === false ? 'Неактивный' : 'Активный';
+    default:
+      return '';
+  }
+}
 
 function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
@@ -44,6 +78,7 @@ function FactTypesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(factTypeListPrefs);
   const q = filters.q;
   const statusFilter = filters.status;
 
@@ -63,6 +98,11 @@ function FactTypesPageInner() {
   const [regSaving, setRegSaving] = useState(false);
   const [regError, setRegError] = useState('');
 
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : factTypeListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
+
   const filtered = useMemo(() => {
     let list = rows;
     const qq = q.trim().toLowerCase();
@@ -80,13 +120,21 @@ function FactTypesPageInner() {
     return list;
   }, [rows, q, statusFilter]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, factTypeCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const checkedIds = useMemo(
     () => Object.keys(checked).filter((id) => checked[id]),
     [checked],
   );
 
-  const allPageChecked = filtered.length > 0 && filtered.every((r) => checked[r.id]);
-  const somePageChecked = filtered.some((r) => checked[r.id]) && !allPageChecked;
+  const allPageChecked =
+    displayRows.length > 0 && displayRows.every((r) => checked[r.id]);
+  const somePageChecked =
+    displayRows.some((r) => checked[r.id]) && !allPageChecked;
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -95,7 +143,7 @@ function FactTypesPageInner() {
   function toggleAllPage(on: boolean) {
     setChecked((prev) => {
       const next = { ...prev };
-      for (const r of filtered) {
+      for (const r of displayRows) {
         if (on) next[r.id] = true;
         else delete next[r.id];
       }
@@ -191,7 +239,7 @@ function FactTypesPageInner() {
   }
 
   async function runBulk(action: 'delete' | 'activate' | 'deactivate') {
-    const targets = filtered.filter((r) => checked[r.id]);
+    const targets = displayRows.filter((r) => checked[r.id]);
     if (targets.length === 0) return;
 
     if (action === 'delete') {
@@ -269,18 +317,17 @@ function FactTypesPageInner() {
   function exportCsv() {
     downloadCsv(
       `fact-types-${new Date().toISOString().slice(0, 10)}.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        Код: r.code || '',
-        Родитель: r.parent?.name || '',
-        'Единица измерения': r.unit || 'Количество',
-        Статус: r.isActive === false ? 'Неактивный' : 'Активный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = factTypeCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="fact-types" />
 
       <div className={shared.pageHeader}>
@@ -353,21 +400,13 @@ function FactTypesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -432,28 +471,27 @@ function FactTypesPageInner() {
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Название</th>
-                <th>Название типа родителя</th>
-                <th>Единица измерения</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {loading && filtered.length === 0 ? (
+              {loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Загрузка…
                   </td>
                 </tr>
               ) : null}
-              {!loading && filtered.length === 0 ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className={styles.empty}>
+                  <td colSpan={colCount} className={styles.empty}>
                     Нет данных — нажмите «Создать»
                   </td>
                 </tr>
               ) : null}
-              {filtered.map((row) => {
+              {displayRows.map((row) => {
                 const open = selectedId === row.id;
                 const isChecked = Boolean(checked[row.id]);
                 return (
@@ -472,20 +510,31 @@ function FactTypesPageInner() {
                           aria-label={`Выбрать ${row.name}`}
                         />
                       </td>
-                      <td className={styles.nameCell}>{row.name}</td>
-                      <td>{row.parent?.name || '—'}</td>
-                      <td>{row.unit || 'Количество'}</td>
-                      <td>
-                        {row.isActive === false ? (
-                          <span className={styles.statusMuted}>Неактивный</span>
-                        ) : (
-                          <span className={styles.statusActive}>Активный</span>
-                        )}
-                      </td>
+                      {visibleCols.map((key) => {
+                        if (key === 'name') {
+                          return (
+                            <td key={key} className={styles.nameCell}>
+                              {row.name}
+                            </td>
+                          );
+                        }
+                        if (key === 'isActive') {
+                          return (
+                            <td key={key}>
+                              {row.isActive === false ? (
+                                <span className={styles.statusMuted}>Неактивный</span>
+                              ) : (
+                                <span className={styles.statusActive}>Активный</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={key}>{factTypeCell(row, key) || '—'}</td>;
+                      })}
                     </tr>
                     {open ? (
                       <tr className={styles.actionsRow}>
-                        <td colSpan={COL_COUNT}>
+                        <td colSpan={colCount}>
                           <div className={styles.rowActions}>
                             <button type="button" onClick={() => openRegistry(row)}>
                               <i className="fas fa-list" aria-hidden />
@@ -516,7 +565,7 @@ function FactTypesPageInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{filtered.length}</strong> из <strong>{rows.length}</strong>
+            Показано <strong>{displayRows.length}</strong> из <strong>{rows.length}</strong>
           </p>
         </div>
       </div>

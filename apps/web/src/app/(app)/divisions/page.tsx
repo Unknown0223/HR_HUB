@@ -8,10 +8,18 @@ import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiDownload, apiFetch } from '@/lib/api';
+import type { ColumnDef } from '@/lib/catalog-columns';
+import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox, type PhotoLightboxApi } from '@/components/PhotoLightbox';
 import { downloadXlsxViaApi } from '@/lib/excel';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { useUrlParam } from '@/lib/use-url-state';
 import { DivisionForm } from './DivisionForm';
 import list from './list.module.css';
@@ -30,6 +38,52 @@ const DIV_FILTER_KEYS = [
   'to',
   'status',
 ] as const;
+
+const DIVISION_COLUMNS: ColumnDef[] = [
+  { key: 'code', label: 'Код' },
+  { key: 'name', label: 'Название' },
+  { key: 'manager', label: 'Руководитель' },
+  { key: 'divisionGroup', label: 'Группа подразделений' },
+  { key: 'createdBy', label: 'Создал' },
+  { key: 'createdAt', label: 'Дата создания' },
+  { key: 'isActive', label: 'Статус' },
+  { key: 'childrenCount', label: 'Кол-во подразделений' },
+];
+
+const DIVISION_GROUP_COLUMNS: ColumnDef[] = [
+  { key: 'code', label: 'Код' },
+  { key: 'name', label: 'Название' },
+  { key: 'divisionsCount', label: 'Количество отделов' },
+  { key: 'createdBy', label: 'Создал' },
+  { key: 'createdAt', label: 'Дата создания' },
+  { key: 'isActive', label: 'Статус' },
+];
+
+const divisionPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.divisions.v1',
+  title: 'Подразделения',
+  columns: DIVISION_COLUMNS,
+  defaultColumns: [
+    'code',
+    'name',
+    'manager',
+    'divisionGroup',
+    'createdBy',
+    'createdAt',
+    'isActive',
+  ],
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+const divisionGroupPrefsCfg = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.division-groups.v1',
+  title: 'Группы отделов',
+  columns: DIVISION_GROUP_COLUMNS,
+  defaultColumns: DIVISION_GROUP_COLUMNS.map((c) => c.key),
+  defaultSearchKeys: ['code', 'name'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
 
 type Division = {
   id: string;
@@ -473,6 +527,9 @@ function DivisionsPageInner() {
   const searchParams = useSearchParams();
   const [tab] = useUrlParam('tab', 'divisions', TABS);
   const filters = useFilterFromUrl(DIV_FILTER_KEYS);
+  const divPrefs = useTablePrefs(divisionPrefsCfg);
+  const groupPrefs = useTablePrefs(divisionGroupPrefsCfg);
+  const prefs = tab === 'groups' ? groupPrefs : divPrefs;
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [groups, setGroups] = useState<DivisionGroupRow[]>([]);
@@ -647,6 +704,85 @@ function DivisionsPageInner() {
     });
   }, [groups, search, filters]);
 
+  function managerLabel(d: Division) {
+    const m = d.manager;
+    if (!m) return '—';
+    const name = [m.lastName, m.firstName, m.middleName].filter(Boolean).join(' ');
+    const pos = m.position?.code || m.position?.name;
+    return [name, pos, m.tabNumber ? `(${m.tabNumber})` : null].filter(Boolean).join(' ');
+  }
+
+  function fmtCreated(iso?: string) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString('ru-RU');
+  }
+
+  function divisionCell(d: Division, key: string): string {
+    switch (key) {
+      case 'code':
+        return d.code || '';
+      case 'name':
+        return d.name || '';
+      case 'manager': {
+        const label = managerLabel(d);
+        return label === '—' ? '' : label;
+      }
+      case 'divisionGroup':
+        return d.divisionGroup?.name || '';
+      case 'createdBy':
+        return d.createdByLabel || 'Admin';
+      case 'createdAt':
+        return fmtCreated(d.createdAt);
+      case 'isActive':
+        return d.isActive ? 'Активный' : 'Неактивный';
+      case 'childrenCount':
+        return String(d._count?.children ?? 0);
+      default:
+        return '';
+    }
+  }
+
+  function divisionGroupCell(g: DivisionGroupRow, key: string): string {
+    switch (key) {
+      case 'code':
+        return g.code || '';
+      case 'name':
+        return g.name || '';
+      case 'divisionsCount':
+        return String(g._count?.divisions ?? 0);
+      case 'createdBy':
+        return 'Admin';
+      case 'createdAt':
+        return fmtCreated(g.createdAt);
+      case 'isActive':
+        return g.isActive ? 'Активный' : 'Неактивный';
+      default:
+        return '';
+    }
+  }
+
+  const displayDivisions = useMemo(
+    () => divPrefs.applySortToRows(filteredDivisions, divisionCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredDivisions, divPrefs.state.sort],
+  );
+  const displayGroups = useMemo(
+    () => groupPrefs.applySortToRows(filteredGroups, divisionGroupCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredGroups, groupPrefs.state.sort],
+  );
+
+  const visibleDivCols = divPrefs.columns.length
+    ? divPrefs.columns
+    : divisionPrefsCfg.defaultColumns;
+  const visibleGroupCols = groupPrefs.columns.length
+    ? groupPrefs.columns
+    : divisionGroupPrefsCfg.defaultColumns;
+  const divColCount = 1 + visibleDivCols.length;
+  const groupColCount = 1 + visibleGroupCols.length;
+
   const groupFilterOptions = useMemo(
     () => groups.map((g) => ({ value: g.id, label: g.name })),
     [groups],
@@ -662,15 +798,15 @@ function DivisionsPageInner() {
   );
 
   const allDivChecked =
-    filteredDivisions.length > 0 &&
-    filteredDivisions.every((d) => checkedDiv[d.id]);
+    displayDivisions.length > 0 &&
+    displayDivisions.every((d) => checkedDiv[d.id]);
   const someDivChecked =
-    filteredDivisions.some((d) => checkedDiv[d.id]) && !allDivChecked;
+    displayDivisions.some((d) => checkedDiv[d.id]) && !allDivChecked;
 
   const allGroupChecked =
-    filteredGroups.length > 0 && filteredGroups.every((g) => checkedGroup[g.id]);
+    displayGroups.length > 0 && displayGroups.every((g) => checkedGroup[g.id]);
   const someGroupChecked =
-    filteredGroups.some((g) => checkedGroup[g.id]) && !allGroupChecked;
+    displayGroups.some((g) => checkedGroup[g.id]) && !allGroupChecked;
 
   useEffect(() => {
     setCheckedDiv({});
@@ -694,7 +830,7 @@ function DivisionsPageInner() {
   function toggleAllDiv(on: boolean) {
     setCheckedDiv((prev) => {
       const next = { ...prev };
-      for (const d of filteredDivisions) {
+      for (const d of displayDivisions) {
         if (on) next[d.id] = true;
         else delete next[d.id];
       }
@@ -709,12 +845,35 @@ function DivisionsPageInner() {
   function toggleAllGroup(on: boolean) {
     setCheckedGroup((prev) => {
       const next = { ...prev };
-      for (const g of filteredGroups) {
+      for (const g of displayGroups) {
         if (on) next[g.id] = true;
         else delete next[g.id];
       }
       return next;
     });
+  }
+
+  function exportTableCsv() {
+    if (tab === 'groups') {
+      downloadCsv(
+        `division-groups-${new Date().toISOString().slice(0, 10)}.csv`,
+        displayGroups.map((r) => {
+          const obj: Record<string, string> = {};
+          for (const k of visibleGroupCols)
+            obj[groupPrefs.labelOf(k)] = divisionGroupCell(r, k);
+          return obj;
+        }),
+      );
+      return;
+    }
+    downloadCsv(
+      `divisions-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayDivisions.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleDivCols) obj[divPrefs.labelOf(k)] = divisionCell(r, k);
+        return obj;
+      }),
+    );
   }
 
   async function exportOrg(format: 'xlsx' | 'csv') {
@@ -855,23 +1014,9 @@ function DivisionsPageInner() {
         ? 'Иерархия подразделений и руководителей'
         : 'Список подразделений организации';
 
-  function managerLabel(d: Division) {
-    const m = d.manager;
-    if (!m) return '—';
-    const name = [m.lastName, m.firstName, m.middleName].filter(Boolean).join(' ');
-    const pos = m.position?.code || m.position?.name;
-    return [name, pos, m.tabNumber ? `(${m.tabNumber})` : null].filter(Boolean).join(' ');
-  }
-
-  function fmtCreated(iso?: string) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString('ru-RU');
-  }
-
   return (
     <div className={list.wrap}>
+      {tab !== 'tree' ? <TablePrefsModals prefs={prefs} /> : null}
       <PageSubnav groupKey={subnavKey} />
 
       <div className={shared.pageHeader}>
@@ -1034,6 +1179,9 @@ function DivisionsPageInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          {tab === 'divisions' || tab === 'groups' ? (
+            <TablePrefsMenuButton prefs={prefs} onExport={exportTableCsv} />
+          ) : null}
         </div>
       </div>
 
@@ -1174,17 +1322,13 @@ function DivisionsPageInner() {
                       aria-label="Выбрать все"
                     />
                   </th>
-                  <th>Код</th>
-                  <th>Название</th>
-                  <th>Руководитель</th>
-                  <th>Группа подразделений</th>
-                  <th>Создал</th>
-                  <th>Дата создания</th>
-                  <th>Статус</th>
+                  {visibleDivCols.map((key) => (
+                    <th key={key}>{divPrefs.labelOf(key)}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredDivisions.map((d) => {
+                {displayDivisions.map((d) => {
                   const open = selectedId === d.id;
                   const isChecked = Boolean(checkedDiv[d.id]);
                   return (
@@ -1205,19 +1349,29 @@ function DivisionsPageInner() {
                             aria-label={`Выбрать ${d.code || d.name}`}
                           />
                         </td>
-                        <td>{d.code || '—'}</td>
-                        <td className={list.nameCell}>{d.name}</td>
-                        <td>{managerLabel(d)}</td>
-                        <td>{d.divisionGroup?.name || '—'}</td>
-                        <td>{d.createdByLabel || 'Admin'}</td>
-                        <td>{fmtCreated(d.createdAt)}</td>
-                        <td>
-                          <StatusBadge active={d.isActive} />
-                        </td>
+                        {visibleDivCols.map((key) => {
+                          if (key === 'name') {
+                            return (
+                              <td key={key} className={list.nameCell}>
+                                {d.name}
+                              </td>
+                            );
+                          }
+                          if (key === 'isActive') {
+                            return (
+                              <td key={key}>
+                                <StatusBadge active={d.isActive} />
+                              </td>
+                            );
+                          }
+                          return (
+                            <td key={key}>{divisionCell(d, key) || '—'}</td>
+                          );
+                        })}
                       </tr>
                       {open ? (
                         <tr className={list.actionsRow}>
-                          <td colSpan={8}>
+                          <td colSpan={divColCount}>
                             <div className={list.rowActions}>
                               <Link href={`/divisions/${d.id}`}>
                                 <i className="fas fa-eye" aria-hidden />
@@ -1251,9 +1405,9 @@ function DivisionsPageInner() {
                     </Fragment>
                   );
                 })}
-                {filteredDivisions.length === 0 ? (
+                {displayDivisions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className={list.empty}>
+                    <td colSpan={divColCount} className={list.empty}>
                       Нет данных
                     </td>
                   </tr>
@@ -1290,16 +1444,13 @@ function DivisionsPageInner() {
                       aria-label="Выбрать все"
                     />
                   </th>
-                  <th>Код</th>
-                  <th>Название</th>
-                  <th>Количество отделов</th>
-                  <th>Создал</th>
-                  <th>Дата создания</th>
-                  <th>Статус</th>
+                  {visibleGroupCols.map((key) => (
+                    <th key={key}>{groupPrefs.labelOf(key)}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredGroups.map((g) => {
+                {displayGroups.map((g) => {
                   const open = selectedGroupId === g.id;
                   const isChecked = Boolean(checkedGroup[g.id]);
                   return (
@@ -1320,18 +1471,29 @@ function DivisionsPageInner() {
                             aria-label={`Выбрать ${g.code || g.name}`}
                           />
                         </td>
-                        <td>{g.code || '—'}</td>
-                        <td className={list.nameCell}>{g.name}</td>
-                        <td>{g._count?.divisions ?? 0}</td>
-                        <td>Admin</td>
-                        <td>{fmtCreated(g.createdAt)}</td>
-                        <td>
-                          <StatusBadge active={g.isActive} />
-                        </td>
+                        {visibleGroupCols.map((key) => {
+                          if (key === 'name') {
+                            return (
+                              <td key={key} className={list.nameCell}>
+                                {g.name}
+                              </td>
+                            );
+                          }
+                          if (key === 'isActive') {
+                            return (
+                              <td key={key}>
+                                <StatusBadge active={g.isActive} />
+                              </td>
+                            );
+                          }
+                          return (
+                            <td key={key}>{divisionGroupCell(g, key) || '—'}</td>
+                          );
+                        })}
                       </tr>
                       {open ? (
                         <tr className={list.actionsRow}>
-                          <td colSpan={7}>
+                          <td colSpan={groupColCount}>
                             <div className={list.rowActions}>
                               <Link href="/catalog/division-groups">
                                 <i className="fas fa-eye" aria-hidden />
@@ -1399,9 +1561,9 @@ function DivisionsPageInner() {
                     </Fragment>
                   );
                 })}
-                {filteredGroups.length === 0 ? (
+                {displayGroups.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className={list.empty}>
+                    <td colSpan={groupColCount} className={list.empty}>
                       Нет данных
                     </td>
                   </tr>

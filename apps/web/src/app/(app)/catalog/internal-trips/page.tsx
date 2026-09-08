@@ -6,7 +6,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { InternalTripCreateModal } from './InternalTripCreateModal';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -49,6 +56,35 @@ type Row = {
 
 type Scope = 'to_me' | 'mine' | 'shared';
 
+const internalTripPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.internal-trips.v1',
+  title: 'Внутренние командировки',
+  columns: [
+    { key: 'createdAt', label: 'Дата создания' },
+    { key: 'recipientDivision', label: 'Подразделение (получатель)' },
+    { key: 'senderDivision', label: 'Подразделение (отправитель)' },
+    { key: 'employee', label: 'Сотрудник' },
+    { key: 'location', label: 'Локация' },
+    { key: 'position', label: 'Позиция' },
+    { key: 'startDate', label: 'Дата начала' },
+    { key: 'endDate', label: 'Дата окончания' },
+    { key: 'status', label: 'Статус' },
+  ],
+  defaultColumns: [
+    'createdAt',
+    'recipientDivision',
+    'senderDivision',
+    'employee',
+    'location',
+    'position',
+    'startDate',
+    'endDate',
+    'status',
+  ],
+  defaultSearchKeys: ['employee', 'recipientDivision', 'senderDivision'],
+  defaultSort: [{ key: 'createdAt', dir: 'desc' }],
+});
+
 function empName(e: Emp) {
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase();
 }
@@ -76,6 +112,31 @@ function statusLabel(row: Row) {
   return { text: row.requestStatus, cls: styles.badgeMuted };
 }
 
+function tripCell(row: Row, key: string): string {
+  switch (key) {
+    case 'createdAt':
+      return fmtDt(row.createdAt);
+    case 'recipientDivision':
+      return row.recipientDivision?.name || '';
+    case 'senderDivision':
+      return row.senderDivision?.name || '';
+    case 'employee':
+      return empName(row.employee);
+    case 'location':
+      return row.location?.name || '';
+    case 'position':
+      return row.position?.name || '';
+    case 'startDate':
+      return fmtDate(row.startDate);
+    case 'endDate':
+      return fmtDate(row.endDate);
+    case 'status':
+      return statusLabel(row).text;
+    default:
+      return '';
+  }
+}
+
 function parseScope(raw: string | null): Scope {
   if (raw === 'mine') return 'mine';
   if (raw === 'shared' || raw === 'all') return 'shared';
@@ -87,6 +148,7 @@ function InternalTripsInner() {
   const searchParams = useSearchParams();
   const scope = parseScope(searchParams.get('scope'));
   const filters = useFilterFromUrl([...FILTER_KEYS]);
+  const prefs = useTablePrefs(internalTripPrefs);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -99,6 +161,11 @@ function InternalTripsInner() {
   const [createOpen, setCreateOpen] = useState(
     () => searchParams.get('create') === '1',
   );
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : internalTripPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   useEffect(() => {
     if (searchParams.get('create') === '1') setCreateOpen(true);
@@ -148,22 +215,28 @@ function InternalTripsInner() {
     );
   }, [rows, search]);
 
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, tripCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
   const allFilteredChecked =
-    filtered.length > 0 && filtered.every((r) => checked.has(r.id));
-  const someFilteredChecked = filtered.some((r) => checked.has(r.id));
+    displayRows.length > 0 && displayRows.every((r) => checked.has(r.id));
+  const someFilteredChecked = displayRows.some((r) => checked.has(r.id));
   const selectedIds = useMemo(() => [...checked], [checked]);
 
   function toggleAll() {
     if (allFilteredChecked) {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.delete(r.id));
+        displayRows.forEach((r) => next.delete(r.id));
         return next;
       });
     } else {
       setChecked((prev) => {
         const next = new Set(prev);
-        filtered.forEach((r) => next.add(r.id));
+        displayRows.forEach((r) => next.add(r.id));
         return next;
       });
     }
@@ -243,11 +316,21 @@ function InternalTripsInner() {
   }
 
   const showCreate = scope === 'mine';
-  const middleCol = scope === 'mine' ? 'Локация' : 'Позиция';
-  const colCount = 9;
+
+  function exportCsv() {
+    downloadCsv(
+      `internal-trips-${new Date().toISOString().slice(0, 10)}.csv`,
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = tripCell(r, k);
+        return obj;
+      }),
+    );
+  }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="internal-trips" />
 
       <div className={shared.pageHeader}>
@@ -333,7 +416,7 @@ function InternalTripsInner() {
         </div>
         <div className={styles.rightTools}>
           <span className={styles.countBadge}>
-            {filtered.length} / {rows.length}
+            {displayRows.length} / {rows.length}
           </span>
           <button
             type="button"
@@ -356,6 +439,7 @@ function InternalTripsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
 
@@ -410,19 +494,14 @@ function InternalTripsInner() {
                         el.indeterminate = someFilteredChecked && !allFilteredChecked;
                     }}
                     onChange={toggleAll}
-                    disabled={!filtered.length}
+                    disabled={!displayRows.length}
                     title="Выбрать все"
                     aria-label="Выбрать все"
                   />
                 </th>
-                <th>Дата создания</th>
-                <th>Подразделение (получатель)</th>
-                <th>Подразделение (отправитель)</th>
-                <th>Сотрудник</th>
-                <th>{middleCol}</th>
-                <th>Дата начала</th>
-                <th>Дата окончания</th>
-                <th>Статус</th>
+                {visibleCols.map((key) => (
+                  <th key={key}>{prefs.labelOf(key)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -432,21 +511,17 @@ function InternalTripsInner() {
                     Загрузка…
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : displayRows.length === 0 ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
                     {showCreate ? 'Нет данных — нажмите «Создать»' : 'Нет данных'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((row) => {
+                displayRows.map((row) => {
                   const st = statusLabel(row);
                   const isChecked = checked.has(row.id);
                   const expanded = expandedId === row.id;
-                  const mid =
-                    scope === 'mine'
-                      ? row.location?.name || '—'
-                      : row.position?.name || '—';
                   return (
                     <Fragment key={row.id}>
                       <tr
@@ -465,16 +540,23 @@ function InternalTripsInner() {
                             aria-label={`Выбрать ${empName(row.employee)}`}
                           />
                         </td>
-                        <td>{fmtDt(row.createdAt)}</td>
-                        <td>{row.recipientDivision?.name || '—'}</td>
-                        <td>{row.senderDivision?.name || '—'}</td>
-                        <td className={styles.empName}>{empName(row.employee)}</td>
-                        <td>{mid}</td>
-                        <td>{fmtDate(row.startDate)}</td>
-                        <td>{fmtDate(row.endDate)}</td>
-                        <td>
-                          <span className={st.cls}>{st.text}</span>
-                        </td>
+                        {visibleCols.map((key) => {
+                          if (key === 'employee') {
+                            return (
+                              <td key={key} className={styles.empName}>
+                                {empName(row.employee)}
+                              </td>
+                            );
+                          }
+                          if (key === 'status') {
+                            return (
+                              <td key={key}>
+                                <span className={st.cls}>{st.text}</span>
+                              </td>
+                            );
+                          }
+                          return <td key={key}>{tripCell(row, key) || '—'}</td>;
+                        })}
                       </tr>
                       {expanded ? (
                         <tr className={styles.actionsRow}>

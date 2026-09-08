@@ -7,9 +7,15 @@ import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
 import { ListBulkBar, togglePage, toggleSelect } from '@/components/ListBulkBar';
+import {
+  TablePrefsMenuButton,
+  TablePrefsModals,
+  useTablePrefs,
+} from '@/components/table-prefs';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { type AccountPair } from '@/lib/settlements';
+import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../absence-types/page.module.css';
 import formStyles from '../report-templates/form.module.css';
 import extra from '../settlements/extra.module.css';
@@ -18,11 +24,41 @@ import shared from '../../../page-shared.module.css';
 const PATH = '/catalog/account-pairs';
 const PAGE_SIZE = 50;
 
+const accountPairsListPrefs = prefsConfigFromColumns({
+  storageKey: 'hrhub.table.account-pairs.v1',
+  title: 'Парные счета',
+  columns: [
+    { key: 'name', label: 'Название' },
+    { key: 'firstAccount', label: 'Первый счет' },
+    { key: 'secondAccount', label: 'Второй счет' },
+    { key: 'isActive', label: 'Статус' },
+  ],
+  defaultColumns: ['name', 'firstAccount', 'secondAccount', 'isActive'],
+  defaultSearchKeys: ['name', 'firstAccount', 'secondAccount'],
+  defaultSort: [{ key: 'name', dir: 'asc' }],
+});
+
+function accountPairCell(row: AccountPair, key: string): string {
+  switch (key) {
+    case 'name':
+      return row.name || '';
+    case 'firstAccount':
+      return row.firstAccount || '';
+    case 'secondAccount':
+      return row.secondAccount || '';
+    case 'isActive':
+      return row.isActive ? 'Активный' : 'Неактивный';
+    default:
+      return '';
+  }
+}
+
 type CoaItem = { id: string; code: string; name: string };
 
 function AccountPairsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefs = useTablePrefs(accountPairsListPrefs);
   const [rows, setRows] = useState<AccountPair[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -42,6 +78,11 @@ function AccountPairsInner() {
   const [isActive, setIsActive] = useState(true);
   const [coa, setCoa] = useState<CoaItem[]>([]);
   const [formError, setFormError] = useState('');
+
+  const visibleCols = prefs.columns.length
+    ? prefs.columns
+    : accountPairsListPrefs.defaultColumns;
+  const colCount = 1 + visibleCols.length;
 
   async function load() {
     setError('');
@@ -157,8 +198,14 @@ function AccountPairsInner() {
     );
   }, [rows, q]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const displayRows = useMemo(
+    () => prefs.applySortToRows(filtered, accountPairCell),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, prefs.state.sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
+  const paged = displayRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const filteredIds = paged.map((r) => r.id);
   const selectedRows = rows.filter((r) => selected.has(r.id));
 
@@ -201,17 +248,17 @@ function AccountPairsInner() {
   function exportCsv() {
     downloadCsv(
       `account-pairs.csv`,
-      filtered.map((r) => ({
-        Название: r.name,
-        'Первый счет': r.firstAccount,
-        'Второй счет': r.secondAccount,
-        Статус: r.isActive ? 'Активный' : 'Неактивный',
-      })),
+      displayRows.map((r) => {
+        const obj: Record<string, string> = {};
+        for (const k of visibleCols) obj[prefs.labelOf(k)] = accountPairCell(r, k);
+        return obj;
+      }),
     );
   }
 
   return (
     <div className={styles.wrap}>
+      <TablePrefsModals prefs={prefs} />
       <PageSubnav groupKey="account-pairs" />
 
       <div className={shared.pageHeader}>
@@ -293,15 +340,6 @@ function AccountPairsInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={exportCsv}
-            title="CSV"
-            aria-label="Экспорт CSV"
-          >
-            <i className="fas fa-file-csv" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Предыдущая страница"
@@ -329,6 +367,7 @@ function AccountPairsInner() {
           >
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
+          <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -345,16 +384,15 @@ function AccountPairsInner() {
                   aria-label="Выбрать все"
                 />
               </th>
-              <th>Название</th>
-              <th>Первый счет</th>
-              <th>Второй счет</th>
-              <th>Статус</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{prefs.labelOf(key)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 && !loading ? (
               <tr>
-                <td colSpan={5} className={styles.empty}>
+                <td colSpan={colCount} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
@@ -375,18 +413,31 @@ function AccountPairsInner() {
                         onChange={(e) => setSelected(toggleSelect(selected, row.id, e.target.checked))}
                       />
                     </td>
-                    <td>{row.name}</td>
-                    <td>{row.firstAccount}</td>
-                    <td>{row.secondAccount}</td>
-                    <td>
-                      <span className={row.isActive ? extra.badge : extra.badgeOff}>
-                        {row.isActive ? 'Активный' : 'Неактивный'}
-                      </span>
-                    </td>
+                    {visibleCols.map((key) => {
+                      if (key === 'name') {
+                        return <td key={key}>{row.name}</td>;
+                      }
+                      if (key === 'firstAccount') {
+                        return <td key={key}>{row.firstAccount}</td>;
+                      }
+                      if (key === 'secondAccount') {
+                        return <td key={key}>{row.secondAccount}</td>;
+                      }
+                      if (key === 'isActive') {
+                        return (
+                          <td key={key}>
+                            <span className={row.isActive ? extra.badge : extra.badgeOff}>
+                              {row.isActive ? 'Активный' : 'Неактивный'}
+                            </span>
+                          </td>
+                        );
+                      }
+                      return <td key={key}>{accountPairCell(row, key) || '—'}</td>;
+                    })}
                   </tr>
                   {open ? (
                     <tr className={styles.actionsRow}>
-                      <td colSpan={5}>
+                      <td colSpan={colCount}>
                         <div className={`${styles.actionsSlide} ${styles.rowActions}`}>
                           <button type="button" onClick={() => openEdit(row)}>
                             <i className="fas fa-pen" aria-hidden />
