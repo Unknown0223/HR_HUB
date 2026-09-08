@@ -52,6 +52,8 @@ export type DeviceFormValues = {
   port: string;
   username: string;
   password: string;
+  /** Server-stored terminal password (admin view only). */
+  storedPassword?: string;
   isActive: boolean;
   meta: DeviceMeta;
 };
@@ -89,6 +91,7 @@ export function blankDeviceForm(): DeviceFormValues {
     port: '80',
     username: 'admin',
     password: '',
+    storedPassword: undefined,
     isActive: true,
     meta: emptyMeta(),
   };
@@ -138,6 +141,8 @@ export function DeviceFormModal({
   const [tab, setTab] = useState<FormTab>('main');
   const [initialLocationId, setInitialLocationId] = useState(initial.locationId);
   const [locFilter, setLocFilter] = useState('');
+  const [showStoredPwd, setShowStoredPwd] = useState(false);
+  const [copiedStored, setCopiedStored] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -151,6 +156,8 @@ export function DeviceFormModal({
     setSavingMode('idle');
     setTab(passwordOutOfSync(initial.meta, deviceStatus) ? 'link' : 'main');
     setLocFilter('');
+    setShowStoredPwd(false);
+    setCopiedStored(false);
     void apiFetch<Loc[]>('/api/attendance/locations')
       .then((d) => setLocations(Array.isArray(d) ? d : []))
       .catch(() => setLocations([]));
@@ -435,6 +442,57 @@ export function DeviceFormModal({
                 {deviceId ? (
                   <div className={styles.pwdBox}>
                     <p className={styles.pwdBoxTitle}>Пароль на терминале</p>
+                    {values.storedPassword ? (
+                      <div className={styles.full}>
+                        <p className={styles.pwdHint} style={{ margin: '0 0 6px' }}>
+                          Пароль на сервере (после Ulash / сохранения):
+                        </p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                          <code
+                            style={{
+                              minHeight: 38,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0 12px',
+                              borderRadius: 8,
+                              border: '1px solid #e3e9f1',
+                              background: '#fff',
+                              fontWeight: 650,
+                            }}
+                          >
+                            {showStoredPwd ? values.storedPassword : '••••••••••••'}
+                          </code>
+                          <button
+                            type="button"
+                            className={styles.btnGhost}
+                            disabled={locked}
+                            onClick={() => setShowStoredPwd((v) => !v)}
+                          >
+                            {showStoredPwd ? 'Скрыть' : 'Показать'}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.btnGhost}
+                            disabled={locked}
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(values.storedPassword || '');
+                                setCopiedStored(true);
+                                window.setTimeout(() => setCopiedStored(false), 1600);
+                              } catch {
+                                setCopiedStored(false);
+                              }
+                            }}
+                          >
+                            {copiedStored ? 'Скопировано' : 'Копировать'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className={styles.pwdHint}>
+                        На сервере пароль пока не сохранён (или у роли нет доступа).
+                      </p>
+                    )}
                     {passwordOutOfSync(values.meta, deviceStatus) ? (
                       <div className={styles.lockBanner}>
                         Пароль на терминале не совпадает с сервером. Введите текущий пароль

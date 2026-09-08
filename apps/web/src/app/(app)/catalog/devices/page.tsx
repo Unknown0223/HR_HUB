@@ -35,6 +35,7 @@ type Device = {
   host?: string | null;
   port?: number | null;
   username?: string | null;
+  passwordEnc?: string | null;
   status: string;
   lastSeenAt?: string | null;
   isActive: boolean;
@@ -152,6 +153,7 @@ function toForm(d: Device): DeviceFormValues {
     port: d.port != null ? String(d.port) : '',
     username: d.username || 'admin',
     password: '',
+    storedPassword: (d.passwordEnc || '').trim() || undefined,
     isActive: d.isActive,
     meta,
   };

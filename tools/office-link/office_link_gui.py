@@ -6,7 +6,7 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from auth_lock import CONFIRM, LOCKED
 from discovery import OFFLINE, OK, TIMEOUT
@@ -338,11 +338,20 @@ class OfficeLinkApp:
 
         row = self._field_row(conn, "Hozirgi admin paroli (bir marta)")
         self.pwd_var = tk.StringVar()
+        self._pwd_visible = False
         self.pwd_entry = ttk.Entry(
             row, textvariable=self.pwd_var, show="*", style="App.TEntry"
         )
         self.pwd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.pwd_entry.bind("<Return>", lambda _e: self._on_ulash())
+        self.pwd_toggle_btn = ttk.Button(
+            row,
+            text="Ko‘rsat",
+            style="Secondary.TButton",
+            command=self._toggle_pwd_visibility,
+            width=8,
+        )
+        self.pwd_toggle_btn.pack(side=tk.LEFT, padx=(8, 0))
 
         self.alert_frame = tk.Frame(conn, bg=C["danger_bg"], bd=0)
         self.lock_var = tk.StringVar(value="")
@@ -529,6 +538,16 @@ class OfficeLinkApp:
                     "keyin tokenni qayta Saqlash qiling."
                 )
 
+    def _toggle_pwd_visibility(self) -> None:
+        self._pwd_visible = not getattr(self, "_pwd_visible", False)
+        self.pwd_entry.configure(show="" if self._pwd_visible else "*")
+        try:
+            self.pwd_toggle_btn.configure(
+                text="Yashir" if self._pwd_visible else "Ko‘rsat"
+            )
+        except tk.TclError:
+            pass
+
     def _on_location_selected(self, _event=None) -> None:
         label = self.location_var.get()
         lid = getattr(self, "_label_to_id", {}).get(label) or ""
@@ -692,6 +711,25 @@ class OfficeLinkApp:
             self.status_var.set("Qurilma topilmadi")
             return
         password = self.pwd_var.get()
+        if not password.strip():
+            self.status_var.set("Parol kerak")
+            self._set_badge("PAROL", "warn")
+            self._show_alert("Hozirgi admin parolini kiriting.")
+            return
+        # Operator confirms what they typed before rotate+send to server.
+        confirm_msg = (
+            "Ulashdan oldin tasdiqlang.\n\n"
+            f"IP: {self.ip_var.get().strip() or (self.session.chosen.host if self.session.chosen else '—')}\n"
+            f"Lokatsiya: {self.location_var.get() or '—'}\n"
+            f"Siz tergan admin parol: {password}\n\n"
+            "Davom etganda ilova:\n"
+            "1) terminalda YANGI parol o‘rnatadi\n"
+            "2) yangi parolni Web serverga yuboradi\n"
+            "3) ulanishni mustahkamlaydi\n\n"
+            "Davom etasizmi?"
+        )
+        if not messagebox.askokcancel("Parolni tasdiqlang", confirm_msg):
+            return
         self._set_busy(True)
         self.status_var.set("Tekshirilmoqda...")
         self._set_badge("ULANMOQDA", "accent")
@@ -770,12 +808,20 @@ class OfficeLinkApp:
                 text=(
                     "Ulandi. Qurilma boshqaruvi Webga topshirildi."
                     + seal_note
-                    + " Yangi admin parol operatorga KO‘RSATILMAYDI — faqat tenant admin "
-                    "(Устройства) ko‘radi. Keyin Webdan yuzlarni sinxronlang."
+                    + " Yangi admin parolni Web → Устройства sahifasida "
+                    "(Показать / Копировать) ko‘ring. "
+                    "Keyin Webdan yuzlarni sinxronlang."
                     + extra
                     + svc_note
                 )
             )
+            if sealed or kind == "linked":
+                messagebox.showinfo(
+                    "Ulandi",
+                    "Yangi admin parol Web serverga yuborildi.\n"
+                    "Uni Web → Устройства → qurilma kartasida "
+                    "«Показать» / «Копировать» orqali ko‘rishingiz mumkin.",
+                )
             self.pwd_var.set("")
             self.pwd_entry.configure(state="disabled")
             self._set_primary_btn(False)

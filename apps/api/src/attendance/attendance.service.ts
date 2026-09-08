@@ -473,15 +473,21 @@ export class AttendanceService {
       include: this.deviceInclude,
     });
     if (!device) throw new NotFoundException('Device not found');
-    const out = this.redactDevicePassword(device, role);
-    if (
-      role != null &&
-      this.canViewDevicePassword(role) &&
-      Boolean(device.passwordEnc)
-    ) {
-      await this.credentialAudit.record(tenantId, id, 'view', actor);
+
+    let withPassword = device;
+    if (role != null && this.canViewDevicePassword(role)) {
+      const plain = await this.passwordForGw(
+        tenantId,
+        device.id,
+        device.passwordEnc,
+      );
+      if (plain) {
+        withPassword = { ...device, passwordEnc: plain };
+        await this.credentialAudit.record(tenantId, id, 'view', actor);
+      }
     }
-    return out;
+
+    return this.redactDevicePassword(withPassword, role);
   }
 
   async createDevice(tenantId: string, dto: CreateDeviceDto) {

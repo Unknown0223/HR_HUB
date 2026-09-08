@@ -45,6 +45,8 @@ type Device = {
   host?: string | null;
   port?: number | null;
   username?: string | null;
+  /** Present for tenant_admin / platform_admin only */
+  passwordEnc?: string | null;
   status: string;
   lastSeenAt?: string | null;
   isActive: boolean;
@@ -151,6 +153,7 @@ function toForm(d: Device): DeviceFormValues {
     port: d.port != null ? String(d.port) : '',
     username: d.username || 'admin',
     password: '',
+    storedPassword: (d.passwordEnc || '').trim() || undefined,
     isActive: d.isActive,
     meta: { ...(blankDeviceForm().meta), ...(d.meta || {}) },
   };
@@ -184,6 +187,8 @@ function DeviceDetailInner() {
   const [bannerPass, setBannerPass] = useState('');
   const [bannerPwdMsg, setBannerPwdMsg] = useState('');
   const [bannerPwdBusy, setBannerPwdBusy] = useState(false);
+  const [showServerPwd, setShowServerPwd] = useState(false);
+  const [copiedPwd, setCopiedPwd] = useState(false);
   const setTab = useCallback(
     (next: Tab) => {
       router.replace(`/catalog/devices/${id}?tab=${next}`);
@@ -595,6 +600,42 @@ function DeviceDetailInner() {
                   <label>Локация</label>
                   <div>{device.location?.name || '—'}</div>
                 </div>
+                {device.passwordEnc ? (
+                  <div className={`${styles.field} ${styles.pwdRevealField}`}>
+                    <label>Пароль терминала (сервер)</label>
+                    <div className={styles.pwdRevealRow}>
+                      <code className={styles.pwdRevealValue}>
+                        {showServerPwd ? device.passwordEnc : '••••••••••••'}
+                      </code>
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        onClick={() => setShowServerPwd((v) => !v)}
+                      >
+                        {showServerPwd ? 'Скрыть' : 'Показать'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(device.passwordEnc || '');
+                            setCopiedPwd(true);
+                            window.setTimeout(() => setCopiedPwd(false), 1600);
+                          } catch {
+                            setCopiedPwd(false);
+                          }
+                        }}
+                      >
+                        {copiedPwd ? 'Скопировано' : 'Копировать'}
+                      </button>
+                    </div>
+                    <p className={styles.pwdRevealHint}>
+                      Видно только администратору. Это пароль, который office-link отправил на
+                      сервер после Ulash.
+                    </p>
+                  </div>
+                ) : null}
                 <div className={styles.field}>
                   <label>Тип трекинга с устройства</label>
                   <div>{trackingLabel(meta.trackingType as string | undefined)}</div>

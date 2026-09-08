@@ -314,16 +314,37 @@
   align-items: center;
 }
 
-.pwdInlineInput {
-  flex: 1 1 220px;
-  height: 38px;
+.pwdRevealField {
+  grid-column: 1 / -1;
+}
+
+.pwdRevealRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pwdRevealValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
   padding: 0 12px;
-  border: 1px solid #fcd34d;
   border-radius: 10px;
+  border: 1px solid var(--line);
   background: #fff;
-  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 14px;
+  font-weight: 650;
   color: var(--ink-900);
+  letter-spacing: 0.02em;
+}
+
+.pwdRevealHint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-500);
+  font-weight: 500;
 }
 
 .infoGrid {
