@@ -26,6 +26,7 @@ a = Analysis(
         "passwords",
         "api_client",
         "runtime_setup",
+        "credential_store",
     ],
     hookspath=[],
     hooksconfig={},

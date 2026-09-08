@@ -236,6 +236,10 @@ class OfficeLinkApp:
             label="Admin parol oynasi (kalit ko‘rsatilmaydi)",
             command=self._open_admin,
         )
+        admin_menu.add_command(
+            label="Saqlangan terminal parolini ko‘rsat (tiklash)",
+            command=self._show_saved_credential,
+        )
         menubar.add_cascade(label="Admin", menu=admin_menu)
         self.root.config(menu=menubar)
 
@@ -857,6 +861,22 @@ class OfficeLinkApp:
             self.status_var.set(result.message or "Xato")
             self._set_badge("XATO", "danger")
             self._show_alert(result.message)
+
+    def _show_saved_credential(self) -> None:
+        data = None
+        try:
+            from credential_store import format_credential_for_display, read_device_credential
+
+            data = read_device_credential(self.session.root)
+            text = format_credential_for_display(data)
+        except Exception as exc:
+            text = f"O‘qib bo‘lmadi: {exc}"
+        messagebox.showinfo("Saqlangan terminal paroli", text)
+        if data and data.get("password"):
+            self._show_alert(
+                f"Tiklash paroli lokalda bor (host={data.get('host')}). "
+                "Web vault bo‘sh bo‘lsa shu parolni saqlang."
+            )
 
     def _open_admin(self) -> None:
         bat = find_root() / "ADMIN-PAROL.bat"

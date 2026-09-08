@@ -520,6 +520,22 @@ class ProvisionEngine:
                     return SubmitResult(kind=UNAUTHORIZED, message=msg)
                 return SubmitResult(kind=ERROR, message=msg)
             password = new_pwd
+            # Persist IMMEDIATELY — if API/tunnel fails later, password is recoverable.
+            try:
+                from credential_store import save_device_credential
+
+                save_device_credential(
+                    host=session.chosen.host,
+                    port=int(session.chosen.port or 80),
+                    username=username,
+                    password=password,
+                    serial=str((session.verified or {}).get("serialNumber") or ""),
+                    location_id=location_id,
+                    phase="rotated_on_device",
+                    root=session.root,
+                )
+            except Exception:
+                pass
             # change_admin_password already verifies; double-check for seal path.
             recheck = verify_password(
                 session.chosen.host,
@@ -533,10 +549,11 @@ class ProvisionEngine:
                     kind=ERROR,
                     message=(
                         "Parol terminalda o‘zgardi, lekin yangi parol bilan "
-                        "qayta kirib bo‘lmadi. Ulash to‘xtatildi."
+                        "qayta kirib bo‘lmadi. Ulash to‘xtatildi. "
+                        f"TIKLASH PAROLI: {password}"
                     ),
                 )
-            _emit(on_status, "1/4 Tayyor: yangi admin paroli terminalda ishlayapti")
+            _emit(on_status, "1/4 Tayyor: yangi admin paroli terminalda ishlayapti (lokal saqlandi)")
         else:
             _emit(on_status, "1/4 Parol allaqachon platformaga tegishli")
 
@@ -667,16 +684,61 @@ class ProvisionEngine:
                     percent=90,
                     message="Register xato",
                 )
+                recovery = (session.password or "").strip()
+                try:
+                    from credential_store import save_device_credential
+
+                    save_device_credential(
+                        host=session.chosen.host if session.chosen else "",
+                        port=int(session.chosen.port or 80) if session.chosen else 80,
+                        username=username,
+                        password=recovery,
+                        serial=str((session.verified or {}).get("serialNumber") or ""),
+                        location_id=location_id,
+                        phase="register_failed_keep_local",
+                        root=session.root,
+                    )
+                except Exception:
+                    pass
+                tip = (
+                    f" TIKLASH PAROLI (nusxa oling): {recovery}"
+                    if recovery
+                    else " data\\device-credential.json ni tekshiring."
+                )
                 return SubmitResult(
                     kind="api",
                     message=(
                         f"Qurilma/parol platformaga yozilmadi (HTTP {code}). "
-                        "Terminaldagi yangi parol allaqachon o‘zgargan bo‘lishi mumkin — "
-                        "Web → Устройства dan hozirgi parolni saqlang."
+                        "Terminaldagi yangi parol lokalga saqlandi."
+                        + tip
                     ),
                 )
 
+            # Keep local recovery copy even after successful server write.
+            try:
+                from credential_store import save_device_credential
+
+                save_device_credential(
+                    host=session.chosen.host if session.chosen else "",
+                    port=int(session.chosen.port or 80) if session.chosen else 80,
+                    username=username,
+                    password=session.password or "",
+                    serial=str((session.verified or {}).get("serialNumber") or ""),
+                    location_id=location_id,
+                    phase="registered_awaiting_admin_confirm",
+                    device_id=str(
+                        ((linked.get("device") if isinstance(linked, dict) else {}) or {}).get(
+                            "id"
+                        )
+                        or ""
+                    ),
+                    root=session.root,
+                )
+            except Exception:
+                pass
+
             session.services = bundle
+            # Do NOT wipe recovery file. Clear in-memory only.
             session.password = ""
             sealed = bool(isinstance(linked, dict) and linked.get("sealed"))
             needs_confirm = bool(
