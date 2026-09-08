@@ -44,7 +44,7 @@ for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provis
   echo REM HR HUB Link — ofis ilovasini ochish
   echo cd /d "%%~dp0"
   echo if exist "%%~dp0ilova\HRHUB-Qurilma.exe" ^(
-  echo   start "" /D "%%~dp0" "%%~dp0ilova\HRHUB-Qurilma.exe"
+  echo   start "" /D "%%~dp0ilova" "%%~dp0ilova\HRHUB-Qurilma.exe"
   echo   exit /b 0
   echo ^)
   echo echo HRHUB-Qurilma.exe topilmadi. ilova\ papkasini tekshiring.

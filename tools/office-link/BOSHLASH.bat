@@ -1,9 +1,20 @@
 @echo off
 REM HR HUB — qurilmani ulash (konsolsiz GUI)
+REM Muhim: EXE ishchi papkasi = ilova/dist papkasi (_internal yonida bo'lishi shart)
 cd /d "%~dp0"
 
+if exist "%~dp0release\HRHUB-Link\ilova\HRHUB-Qurilma.exe" (
+  start "" /D "%~dp0release\HRHUB-Link\ilova" "%~dp0release\HRHUB-Link\ilova\HRHUB-Qurilma.exe"
+  exit /b 0
+)
+
 if exist "%~dp0dist\HRHUB-Qurilma\HRHUB-Qurilma.exe" (
-  start "" /D "%~dp0" "%~dp0dist\HRHUB-Qurilma\HRHUB-Qurilma.exe"
+  start "" /D "%~dp0dist\HRHUB-Qurilma" "%~dp0dist\HRHUB-Qurilma\HRHUB-Qurilma.exe"
+  exit /b 0
+)
+
+if exist "%~dp0ilova\HRHUB-Qurilma.exe" (
+  start "" /D "%~dp0ilova" "%~dp0ilova\HRHUB-Qurilma.exe"
   exit /b 0
 )
 

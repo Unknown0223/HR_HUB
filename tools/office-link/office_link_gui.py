@@ -362,11 +362,17 @@ class OfficeLinkApp:
         threading.Thread(target=self._ulash_worker, args=(password,), daemon=True).start()
 
     def _ulash_worker(self, password: str) -> None:
+        def progress(msg: str) -> None:
+            self.root.after(0, lambda m=msg: self.status_var.set(m))
+
+        state = (self.session.detected_state or {}).get("state")
+        if state == "new":
+            linked = self.session.link_to_cloud(progress)
+            self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=False, linked=True))
+            return
+
         result = self.session.submit_password(password)
         if result.kind == OK:
-            def progress(msg: str) -> None:
-                self.root.after(0, lambda m=msg: self.status_var.set(m))
-
             linked = self.session.link_to_cloud(progress)
             self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=False, linked=True))
             return

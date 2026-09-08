@@ -61,8 +61,16 @@ export default function DeviceLinkPage() {
         '/api/attendance/office-link/sessions',
       );
       setSessions(Array.isArray(rows) ? rows : rows.items || []);
-    } catch {
-      /* ignore poll errors */
+      setError((prev) =>
+        prev.toLowerCase().includes('internal server') ||
+        prev.toLowerCase().includes('does not exist')
+          ? ''
+          : prev,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Не удалось загрузить сессии';
+      // Surface once (poll would spam); clear when API recovers.
+      setError((prev) => prev || msg);
     }
   }, []);
 
@@ -96,7 +104,15 @@ export default function DeviceLinkPage() {
       setPairing(res);
       await loadSessions();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось создать токен');
+      const raw = e instanceof Error ? e.message : 'Не удалось создать токен';
+      const lower = raw.toLowerCase();
+      setError(
+        lower.includes('does not exist') || lower.includes('device_provision')
+          ? 'База ещё без таблицы pairing-сессий. Нужен migrate на API (device_provision_sessions).'
+          : raw === 'Internal Server Error'
+            ? 'Ошибка сервера при создании токена. Проверьте API / миграции БД.'
+            : raw,
+      );
     } finally {
       setBusy(false);
     }
