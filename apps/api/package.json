@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.build.json",
-    "start": "node dist/main",
+    "start": "node scripts/prod-migrate.js && node dist/main",
     "start:dev": "nest start --watch",
     "start:prod": "node scripts/prod-migrate.js && node dist/main",
     "prisma:generate": "prisma generate",
