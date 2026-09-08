@@ -73,6 +73,7 @@ export type GwSyncFace = {
 export class DeviceGwClient implements OnModuleInit {
   private readonly logger = new Logger(DeviceGwClient.name);
   private announcedUrl: string | null = null;
+  private readonly fetchTimeoutMs = 12_000;
 
   constructor(
     private readonly config: ConfigService,
@@ -85,6 +86,19 @@ export class DeviceGwClient implements OnModuleInit {
       this.config.get<string>('DEVICE_GW_URL') ||
       'http://127.0.0.1:8000'
     ).replace(/\/$/, '');
+  }
+
+  private async gwFetch(path: string, init?: RequestInit): Promise<Response> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.fetchTimeoutMs);
+    try {
+      return await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async onModuleInit() {
@@ -183,7 +197,7 @@ export class DeviceGwClient implements OnModuleInit {
       payload.last_admin_login_serial = body.lastAdminLoginSerial ?? 0;
       if (body.adminLoginAt) payload.admin_login_at = body.adminLoginAt;
 
-      const res = await fetch(`${this.baseUrl}/devices`, {
+      const res = await this.gwFetch(`/devices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -204,7 +218,7 @@ export class DeviceGwClient implements OnModuleInit {
 
   async heartbeat(gatewayRef: string) {
     try {
-      const res = await fetch(`${this.baseUrl}/devices/${gatewayRef}/heartbeat`, {
+      const res = await this.gwFetch(`/devices/${gatewayRef}/heartbeat`, {
         method: 'POST',
       });
       if (!res.ok) return null;
@@ -215,7 +229,7 @@ export class DeviceGwClient implements OnModuleInit {
   }
 
   async syncFace(gatewayRef: string, body: GwSyncFace) {
-    const res = await fetch(`${this.baseUrl}/devices/${gatewayRef}/sync-face`, {
+    const res = await this.gwFetch(`/devices/${gatewayRef}/sync-face`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -233,7 +247,7 @@ export class DeviceGwClient implements OnModuleInit {
 
     async health() {
         try {
-      const res = await fetch(`${this.baseUrl}/health`);
+      const res = await this.gwFetch(`/health`);
       if (!res.ok) return { ok: false };
       return { ok: true, ...(await res.json()) };
     } catch {
@@ -245,7 +259,7 @@ export class DeviceGwClient implements OnModuleInit {
     gatewayRef: string,
     action: 'heartbeat' | 'sync_clock' | 'pull_events' | 'open_door' | 'reboot',
   ) {
-    const res = await fetch(`${this.baseUrl}/devices/${gatewayRef}/remote`, {
+    const res = await this.gwFetch(`/devices/${gatewayRef}/remote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
@@ -268,7 +282,7 @@ export class DeviceGwClient implements OnModuleInit {
   }
 
   async changePassword(gatewayRef: string, newPassword: string) {
-    const res = await fetch(`${this.baseUrl}/devices/${gatewayRef}/change-password`, {
+    const res = await this.gwFetch(`/devices/${gatewayRef}/change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ new_password: newPassword }),
@@ -285,7 +299,7 @@ export class DeviceGwClient implements OnModuleInit {
   }
 
   async verifyPassword(gatewayRef: string, password: string) {
-    const res = await fetch(`${this.baseUrl}/devices/${gatewayRef}/verify-password`, {
+    const res = await this.gwFetch(`/devices/${gatewayRef}/verify-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),

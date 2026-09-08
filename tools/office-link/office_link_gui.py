@@ -1,10 +1,11 @@
-"""Tkinter GUI — operator pastes pairing token and device password."""
+"""Tkinter GUI — Windows-style office link client."""
 from __future__ import annotations
 
 import subprocess
 import sys
 import threading
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 
 from auth_lock import CONFIRM, LOCKED
@@ -13,6 +14,66 @@ from paths import find_root, read_link_key, read_pairing_token
 from session import OfficeLinkSession, SubmitResult
 
 TITLE = "HR HUB — qurilmani ulash"
+
+# Fluent-inspired palette matching app icon (purple gears).
+C = {
+    "bg": "#f3f3f3",
+    "surface": "#ffffff",
+    "border": "#e5e5e5",
+    "text": "#1a1a1a",
+    "muted": "#605e5c",
+    "accent": "#7c3aed",
+    "accent_hover": "#6d28d9",
+    "accent_soft": "#f5f3ff",
+    "ok": "#0f7b3a",
+    "ok_bg": "#dff6dd",
+    "warn": "#9a6700",
+    "warn_bg": "#fff4ce",
+    "danger": "#c42b1c",
+    "danger_bg": "#fde7e9",
+    "header": "#5b21b6",
+    "header2": "#7c3aed",
+}
+
+
+def _resource_path(*names: str) -> Path | None:
+    here = Path(__file__).resolve().parent
+    search: list[Path] = [here, find_root(), find_root() / "ilova"]
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        search.insert(0, exe_dir)
+        search.insert(0, exe_dir / "_internal")
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            search.insert(0, Path(meipass))
+    for base in search:
+        for name in names:
+            cand = base / name
+            if cand.is_file():
+                return cand
+    return None
+
+
+def _icon_path() -> Path | None:
+    return _resource_path("hrhub-link.ico")
+
+
+def _png_icon_path() -> Path | None:
+    return _resource_path("hrhub-link-256.png")
+
+
+def _set_app_user_model_id() -> None:
+    """Windows taskbar groups by AppUserModelID; set before creating windows."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "HRHUB.OfficeLink.Qurilma"
+        )
+    except Exception:
+        pass
 
 
 def _hide_console() -> None:
@@ -28,6 +89,84 @@ def _hide_console() -> None:
         pass
 
 
+def _apply_style(root: tk.Tk) -> None:
+    style = ttk.Style(root)
+    try:
+        style.theme_use("vista" if sys.platform == "win32" else "clam")
+    except tk.TclError:
+        pass
+
+    style.configure("App.TFrame", background=C["bg"])
+    style.configure("Card.TFrame", background=C["surface"])
+    style.configure("Header.TFrame", background=C["header"])
+    style.configure(
+        "Title.TLabel",
+        background=C["header"],
+        foreground="#ffffff",
+        font=("Segoe UI Semibold", 14),
+    )
+    style.configure(
+        "Subtitle.TLabel",
+        background=C["header"],
+        foreground="#e9d5ff",
+        font=("Segoe UI", 9),
+    )
+    style.configure(
+        "CardTitle.TLabel",
+        background=C["surface"],
+        foreground=C["text"],
+        font=("Segoe UI Semibold", 10),
+    )
+    style.configure(
+        "Field.TLabel",
+        background=C["surface"],
+        foreground=C["muted"],
+        font=("Segoe UI", 9),
+    )
+    style.configure(
+        "Body.TLabel",
+        background=C["surface"],
+        foreground=C["text"],
+        font=("Segoe UI", 10),
+    )
+    style.configure(
+        "Muted.TLabel",
+        background=C["surface"],
+        foreground=C["muted"],
+        font=("Segoe UI", 9),
+    )
+    style.configure(
+        "Status.TLabel",
+        background=C["surface"],
+        foreground=C["text"],
+        font=("Segoe UI Semibold", 16),
+    )
+    style.configure(
+        "Alert.TLabel",
+        background=C["danger_bg"],
+        foreground=C["danger"],
+        font=("Segoe UI Semibold", 9),
+    )
+    style.configure(
+        "Hint.TLabel",
+        background=C["accent_soft"],
+        foreground=C["muted"],
+        font=("Segoe UI", 9),
+    )
+    style.configure(
+        "Primary.TButton",
+        font=("Segoe UI Semibold", 10),
+        padding=(16, 8),
+    )
+    style.configure(
+        "Secondary.TButton",
+        font=("Segoe UI", 9),
+        padding=(10, 5),
+    )
+    style.configure("App.TEntry", padding=4)
+    style.configure("App.TCombobox", padding=4)
+
+
 class OfficeLinkApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -39,14 +178,57 @@ class OfficeLinkApp:
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.after(200, self._bootstrap)
 
-    def _build(self) -> None:
-        self.root.title(TITLE)
-        self.root.minsize(420, 500)
-        self.root.geometry("500x540")
+    def _set_icon(self) -> None:
+        icon = _icon_path()
+        if icon:
+            try:
+                self.root.iconbitmap(default=str(icon))
+                self.root.iconbitmap(str(icon))
+            except tk.TclError:
+                try:
+                    self.root.iconbitmap(str(icon))
+                except tk.TclError:
+                    pass
+        # iconphoto is more reliable for title bar on modern Windows.
+        png = _png_icon_path() or icon
+        if not png:
+            return
         try:
-            self.root.configure(bg="#f4f6f8")
+            # Keep a reference so Tk GC does not drop the image.
+            self._icon_images = getattr(self, "_icon_images", [])
+            img = tk.PhotoImage(file=str(png))
+            self._icon_images.append(img)
+            self.root.iconphoto(True, img)
         except tk.TclError:
             pass
+
+    def _card(self, parent: ttk.Frame, title: str) -> ttk.Frame:
+        wrap = ttk.Frame(parent, style="App.TFrame")
+        wrap.pack(fill=tk.X, padx=16, pady=(0, 12))
+        outer = tk.Frame(wrap, bg=C["border"], bd=0, highlightthickness=0)
+        outer.pack(fill=tk.X)
+        card = tk.Frame(outer, bg=C["surface"], bd=0, highlightthickness=0)
+        card.pack(fill=tk.X, padx=1, pady=1)
+        ttk.Label(card, text=title, style="CardTitle.TLabel").pack(
+            anchor="w", padx=16, pady=(14, 8)
+        )
+        body = ttk.Frame(card, style="Card.TFrame")
+        body.pack(fill=tk.X, padx=16, pady=(0, 14))
+        return body
+
+    def _field_row(self, parent: ttk.Frame, label: str) -> ttk.Frame:
+        ttk.Label(parent, text=label, style="Field.TLabel").pack(anchor="w", pady=(0, 4))
+        row = ttk.Frame(parent, style="Card.TFrame")
+        row.pack(fill=tk.X, pady=(0, 10))
+        return row
+
+    def _build(self) -> None:
+        self.root.title(TITLE)
+        self.root.minsize(520, 640)
+        self.root.geometry("560x720")
+        self.root.configure(bg=C["bg"])
+        _apply_style(self.root)
+        self._set_icon()
 
         menubar = tk.Menu(self.root)
         admin_menu = tk.Menu(menubar, tearoff=0)
@@ -57,86 +239,184 @@ class OfficeLinkApp:
         menubar.add_cascade(label="Admin", menu=admin_menu)
         self.root.config(menu=menubar)
 
-        pad = {"padx": 16, "pady": 6}
-        frm = ttk.Frame(self.root, padding=8)
-        frm.pack(fill=tk.BOTH, expand=True)
+        shell = ttk.Frame(self.root, style="App.TFrame")
+        shell.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frm, text="Holat").pack(anchor="w", **pad)
+        header = tk.Frame(shell, bg=C["header"], height=78)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
+        head_inner = ttk.Frame(header, style="Header.TFrame")
+        head_inner.pack(fill=tk.BOTH, expand=True, padx=18, pady=12)
+        ttk.Label(head_inner, text="HR HUB Link", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(
+            head_inner,
+            text="Ofis Face ID terminalini platformaga ulash",
+            style="Subtitle.TLabel",
+        ).pack(anchor="w", pady=(2, 0))
+
+        canvas_host = ttk.Frame(shell, style="App.TFrame")
+        canvas_host.pack(fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(canvas_host, bg=C["bg"], highlightthickness=0, bd=0)
+        scroll = ttk.Scrollbar(canvas_host, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        frm = ttk.Frame(canvas, style="App.TFrame")
+        win = canvas.create_window((0, 0), window=frm, anchor="nw")
+
+        def _sync(_event=None) -> None:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfigure(win, width=canvas.winfo_width())
+
+        frm.bind("<Configure>", _sync)
+        canvas.bind("<Configure>", _sync)
+
+        # Status card
+        status_body = self._card(frm, "Holat")
         self.status_var = tk.StringVar(value="Qidirilmoqda")
         self.status_lbl = ttk.Label(
-            frm, textvariable=self.status_var, font=("Segoe UI", 12, "bold")
+            status_body, textvariable=self.status_var, style="Status.TLabel"
         )
-        self.status_lbl.pack(anchor="w", padx=16)
+        self.status_lbl.pack(anchor="w")
+        self.status_badge = tk.Label(
+            status_body,
+            text="KUTILMOQDA",
+            bg=C["warn_bg"],
+            fg=C["warn"],
+            font=("Segoe UI Semibold", 8),
+            padx=8,
+            pady=2,
+        )
+        self.status_badge.pack(anchor="w", pady=(8, 10))
 
         self.device_var = tk.StringVar(value="Qurilma: —")
-        ttk.Label(frm, textvariable=self.device_var).pack(anchor="w", **pad)
-
+        ttk.Label(status_body, textvariable=self.device_var, style="Body.TLabel").pack(
+            anchor="w"
+        )
         self.state_var = tk.StringVar(value="Aniqlangan holat: —")
-        ttk.Label(frm, textvariable=self.state_var).pack(anchor="w", padx=16)
+        ttk.Label(status_body, textvariable=self.state_var, style="Muted.TLabel").pack(
+            anchor="w", pady=(4, 0)
+        )
 
-        tok_row = ttk.Frame(frm)
-        tok_row.pack(fill=tk.X, padx=16, pady=(10, 2))
-        ttk.Label(tok_row, text="Pairing token").pack(side=tk.LEFT)
+        # Connection card
+        conn = self._card(frm, "Ulanish sozlamalari")
+
+        row = self._field_row(conn, "Pairing token")
         self.token_var = tk.StringVar(value=read_pairing_token(self.session.root))
-        self.token_entry = ttk.Entry(tok_row, textvariable=self.token_var, width=28, show="•")
-        self.token_entry.pack(side=tk.LEFT, padx=8)
-        self.token_btn = ttk.Button(tok_row, text="Saqlash", command=self._save_token)
-        self.token_btn.pack(side=tk.LEFT)
+        self.token_entry = ttk.Entry(
+            row, textvariable=self.token_var, show="•", style="App.TEntry"
+        )
+        self.token_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.token_btn = ttk.Button(
+            row, text="Saqlash", style="Secondary.TButton", command=self._save_token
+        )
+        self.token_btn.pack(side=tk.LEFT, padx=(8, 0))
 
-        row = ttk.Frame(frm)
-        row.pack(fill=tk.X, padx=16, pady=4)
-        ttk.Label(row, text="IP (ixtiyoriy)").pack(side=tk.LEFT)
+        row = self._field_row(conn, "IP manzil (ixtiyoriy)")
         self.ip_var = tk.StringVar()
-        self.ip_entry = ttk.Entry(row, textvariable=self.ip_var, width=22)
-        self.ip_entry.pack(side=tk.LEFT, padx=8)
-        self.rescan_btn = ttk.Button(row, text="Qidirish", command=self._start_scan)
-        self.rescan_btn.pack(side=tk.LEFT)
+        self.ip_entry = ttk.Entry(row, textvariable=self.ip_var, style="App.TEntry")
+        self.ip_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.rescan_btn = ttk.Button(
+            row, text="Qidirish", style="Secondary.TButton", command=self._start_scan
+        )
+        self.rescan_btn.pack(side=tk.LEFT, padx=(8, 0))
 
-        loc_row = ttk.Frame(frm)
-        loc_row.pack(fill=tk.X, padx=16, pady=(10, 2))
-        ttk.Label(loc_row, text="Lokatsiya").pack(side=tk.LEFT)
+        row = self._field_row(conn, "Lokatsiya")
         self.location_var = tk.StringVar(value="")
         self.location_combo = ttk.Combobox(
-            loc_row,
+            row,
             textvariable=self.location_var,
             state="readonly",
-            width=36,
+            style="App.TCombobox",
         )
-        self.location_combo.pack(side=tk.LEFT, padx=8, fill=tk.X, expand=True)
+        self.location_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.location_combo.bind("<<ComboboxSelected>>", self._on_location_selected)
-        ttk.Button(loc_row, text="Yangilash", command=self._load_locations).pack(
-            side=tk.LEFT, padx=(4, 0)
+        self.loc_refresh_btn = ttk.Button(
+            row, text="Yangilash", style="Secondary.TButton", command=self._load_locations
         )
+        self.loc_refresh_btn.pack(side=tk.LEFT, padx=(8, 0))
 
-        ttk.Label(frm, text="Hozirgi admin paroli (bir marta)").pack(anchor="w", padx=16, pady=(12, 2))
+        row = self._field_row(conn, "Hozirgi admin paroli (bir marta)")
         self.pwd_var = tk.StringVar()
-        self.pwd_entry = ttk.Entry(frm, textvariable=self.pwd_var, show="*", width=36)
-        self.pwd_entry.pack(anchor="w", padx=16)
+        self.pwd_entry = ttk.Entry(
+            row, textvariable=self.pwd_var, show="*", style="App.TEntry"
+        )
+        self.pwd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.pwd_entry.bind("<Return>", lambda _e: self._on_ulash())
 
+        self.alert_frame = tk.Frame(conn, bg=C["danger_bg"], bd=0)
         self.lock_var = tk.StringVar(value="")
-        self.lock_lbl = ttk.Label(frm, textvariable=self.lock_var, foreground="#a40000")
-        self.lock_lbl.pack(anchor="w", padx=16, pady=4)
-
-        self.btn = ttk.Button(frm, text="Ulash", command=self._on_ulash)
-        self.btn.pack(anchor="w", padx=16, pady=10)
-
-        self.note = ttk.Label(
-            frm,
-            text=(
-                "Web → Связь с офисом dan pairing token. "
-                "«Admin bor»: hozirgi parolni bir marta yozing — tizim YANGI parol o‘ylab "
-                "qurilmaga o‘rnatadi va serverga yuboradi. Keyin sozlash faqat Web dan. "
-                "Yangi parol ekranda KO‘RSATILMAYDI."
-            ),
-            wraplength=450,
+        self.lock_lbl = ttk.Label(
+            self.alert_frame, textvariable=self.lock_var, style="Alert.TLabel", wraplength=460
         )
-        self.note.pack(anchor="w", padx=16, pady=(8, 0))
+        self.lock_lbl.pack(anchor="w", padx=10, pady=8, fill=tk.X)
+
+        self.btn = tk.Button(
+            conn,
+            text="Ulash",
+            command=self._on_ulash,
+            bg=C["accent"],
+            fg="#ffffff",
+            activebackground=C["accent_hover"],
+            activeforeground="#ffffff",
+            disabledforeground="#e9d5ff",
+            font=("Segoe UI Semibold", 10),
+            relief=tk.FLAT,
+            bd=0,
+            padx=22,
+            pady=8,
+            cursor="hand2",
+        )
+        self.btn.pack(anchor="e", pady=(4, 0))
+
+        # Hint card
+        hint_wrap = ttk.Frame(frm, style="App.TFrame")
+        hint_wrap.pack(fill=tk.X, padx=16, pady=(0, 16))
+        hint_outer = tk.Frame(hint_wrap, bg=C["accent"], bd=0)
+        hint_outer.pack(fill=tk.X)
+        hint = tk.Frame(hint_outer, bg=C["accent_soft"], bd=0)
+        hint.pack(fill=tk.X, padx=(3, 0))
+        self.note = ttk.Label(
+            hint,
+            text=(
+                "Web → Связь с офисом dan pairing token oling. "
+                "«Admin bor»: hozirgi admin parolini bir marta yozing — Ulash: "
+                "(1) terminalda YANGI parol o‘rnatadi, (2) serverga yozadi, "
+                "(3) ulanishni mustahkamlaydi. Yangi parol ekranda KO‘RSATILMAYDI. "
+                "Keyin sozlash va yuz sync faqat Web dan."
+            ),
+            style="Hint.TLabel",
+            wraplength=480,
+            justify="left",
+        )
+        self.note.pack(anchor="w", padx=14, pady=12, fill=tk.X)
 
         if not self.session.has_credentials():
-            self.lock_var.set(
+            self._show_alert(
                 "Pairing token yoki admin kaliti kerak. Web → Связь yoki ADMIN-PAROL.bat."
             )
+        else:
+            self._hide_alert()
+
+    def _show_alert(self, text: str) -> None:
+        self.lock_var.set(text)
+        if not self.alert_frame.winfo_ismapped():
+            self.alert_frame.pack(fill=tk.X, pady=(0, 10), before=self.btn)
+
+    def _hide_alert(self) -> None:
+        self.lock_var.set("")
+        if self.alert_frame.winfo_ismapped():
+            self.alert_frame.pack_forget()
+
+    def _set_badge(self, text: str, kind: str = "warn") -> None:
+        colors = {
+            "ok": (C["ok_bg"], C["ok"]),
+            "warn": (C["warn_bg"], C["warn"]),
+            "danger": (C["danger_bg"], C["danger"]),
+            "accent": (C["accent_soft"], C["accent"]),
+        }
+        bg, fg = colors.get(kind, colors["warn"])
+        self.status_badge.configure(text=text, bg=bg, fg=fg)
 
     def _bootstrap(self) -> None:
         if self.session.pairing_token():
@@ -148,13 +428,13 @@ class OfficeLinkApp:
         token = self.token_var.get().strip()
         self.session.set_pairing_token(token)
         if not token:
-            self.lock_var.set("Token o‘chirildi.")
+            self._show_alert("Token o‘chirildi.")
             if not self.session.has_link_key():
-                self.lock_var.set(
+                self._show_alert(
                     "Pairing token yoki admin kaliti kerak. Web → Связь yoki ADMIN-PAROL.bat."
                 )
             return
-        self.lock_var.set("Token saqlandi. Sessiya bog‘lanmoqda...")
+        self._show_alert("Token saqlandi. Sessiya bog‘lanmoqda...")
         threading.Thread(target=self._bind_pairing_worker, daemon=True).start()
 
     def _bind_pairing_worker(self) -> None:
@@ -162,10 +442,10 @@ class OfficeLinkApp:
 
         def done() -> None:
             if ok:
-                self.lock_var.set("Pairing sessiya bog‘landi.")
+                self._show_alert("Pairing sessiya bog‘landi.")
                 self._load_locations()
             else:
-                self.lock_var.set(msg[:200] if msg else "Pairing xato")
+                self._show_alert(msg[:200] if msg else "Pairing xato")
 
         self.root.after(0, done)
 
@@ -175,12 +455,12 @@ class OfficeLinkApp:
         if not key and not pairing:
             self.location_combo["values"] = []
             self.location_var.set("")
-            self.lock_var.set(
+            self._show_alert(
                 "Avval pairing tokenni Saqlash qiling — keyin lokatsiyalar yuklanadi."
             )
             return
 
-        self.lock_var.set("Lokatsiyalar yuklanmoqda...")
+        self._show_alert("Lokatsiyalar yuklanmoqda...")
 
         def worker() -> None:
             try:
@@ -233,17 +513,18 @@ class OfficeLinkApp:
             if not self.location_var.get() or self.location_var.get() not in labels:
                 self.location_var.set(labels[0])
                 self.session.set_location_id(items[0]["id"])
-            self.lock_var.set(f"Lokatsiyalar: {len(labels)} ta. Ro‘yxatdan tanlang.")
+            self._show_alert(f"Lokatsiyalar: {len(labels)} ta. Ro‘yxatdan tanlang.")
+            self.root.after(1800, lambda: self._hide_alert() if "Lokatsiyalar:" in self.lock_var.get() else None)
         else:
             self.location_var.set("")
             self.session.set_location_id(None)
             if not (200 <= code < 300):
-                self.lock_var.set(
+                self._show_alert(
                     "Lokatsiyalar yuklanmadi: "
                     + (err_detail or "token / API ni tekshiring. Qayta Saqlash bosing.")
                 )
             else:
-                self.lock_var.set(
+                self._show_alert(
                     "Lokatsiya yo‘q. Web → Устройства → Локации da yarating, "
                     "keyin tokenni qayta Saqlash qiling."
                 )
@@ -253,20 +534,32 @@ class OfficeLinkApp:
         lid = getattr(self, "_label_to_id", {}).get(label) or ""
         self.session.set_location_id(lid)
 
+    def _set_primary_btn(self, enabled: bool) -> None:
+        state = "normal" if enabled else "disabled"
+        try:
+            self.btn.configure(state=state)
+        except tk.TclError:
+            pass
+
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
         state = "disabled" if busy else "normal"
+        for w in (self.rescan_btn, self.token_btn, self.loc_refresh_btn):
+            try:
+                w.state(["disabled"] if busy else ["!disabled"])
+            except (tk.TclError, AttributeError):
+                try:
+                    w.configure(state=state)
+                except tk.TclError:
+                    pass
         try:
-            self.btn.state(["disabled"] if busy else ["!disabled"])
-            self.rescan_btn.state(["disabled"] if busy else ["!disabled"])
             self.location_combo.configure(state="disabled" if busy else "readonly")
-            self.token_btn.state(["disabled"] if busy else ["!disabled"])
         except tk.TclError:
-            self.btn.configure(state=state)
-            self.rescan_btn.configure(state=state)
-        if self.session.auth.is_locked():
+            pass
+        locked = self.session.auth.is_locked()
+        self._set_primary_btn(enabled=(not busy and not locked))
+        if locked:
             self.pwd_entry.configure(state="disabled")
-            self.btn.state(["disabled"])
         elif not busy:
             self.pwd_entry.configure(state="normal")
 
@@ -274,21 +567,16 @@ class OfficeLinkApp:
         if self.session.auth.is_locked():
             left = self.session.auth.format_remaining()
             self.status_var.set("Qulflangan")
-            self.lock_var.set(f"Qulflangan: {left}  (Hikvision uslubi, 30 daqiqa)")
+            self._set_badge("QULFLANGAN", "danger")
+            self._show_alert(f"Qulflangan: {left}  (Hikvision uslubi, 30 daqiqa)")
             self.pwd_entry.configure(state="disabled")
-            try:
-                self.btn.state(["disabled"])
-            except tk.TclError:
-                self.btn.configure(state="disabled")
+            self._set_primary_btn(False)
         else:
             if self.lock_var.get().startswith("Qulflangan"):
-                self.lock_var.set("")
+                self._hide_alert()
                 if not self.busy:
                     self.pwd_entry.configure(state="normal")
-                    try:
-                        self.btn.state(["!disabled"])
-                    except tk.TclError:
-                        self.btn.configure(state="normal")
+                    self._set_primary_btn(True)
 
     def _tick_lock(self) -> None:
         self._refresh_lock_ui()
@@ -307,7 +595,7 @@ class OfficeLinkApp:
         label = self.session.detected_state_label()
         self.state_var.set(f"Aniqlangan holat: {label}")
         if (self.session.detected_state or {}).get("state") == "new":
-            self.lock_var.set(
+            self._show_alert(
                 "Yangi qurilma: Ulash bosilganda platforma o‘zi parol o‘ylab "
                 "aktivatsiya qilishga urinadi. Muvaffaqiyatsiz bo‘lsa — avval terminalda "
                 "admin o‘rnating, keyin «Admin bor» bilan ulang."
@@ -318,55 +606,72 @@ class OfficeLinkApp:
             if str(self.pwd_entry.cget("state")) == "disabled" and not self.session.auth.is_locked():
                 self.pwd_entry.configure(state="normal")
             if self.lock_var.get().startswith("Yangi qurilma:"):
-                self.lock_var.set("")
+                self._hide_alert()
 
     def _start_scan(self) -> None:
         if self.busy:
             return
         self.status_var.set("Qidirilmoqda")
+        self._set_badge("QIDIRILMOQDA", "warn")
         self.device_var.set("Qurilma: —")
         self.state_var.set("Aniqlangan holat: —")
-        self._set_busy(True)
+        try:
+            self._set_busy(True)
+        except Exception:
+            self.busy = True
         threading.Thread(target=self._scan_worker, daemon=True).start()
 
     def _scan_worker(self) -> None:
+        devices: list = []
         try:
-            devices = self.session.scan()
+            ip = self.ip_var.get().strip()
+            devices = self.session.scan(ip_hint=ip or None)
         except Exception:
             devices = []
-        self.root.after(0, lambda: self._scan_done(devices))
+        self.root.after(0, lambda d=devices: self._scan_done(d))
 
     def _scan_done(self, devices: list) -> None:
-        self._set_busy(False)
+        try:
+            self._set_busy(False)
+        except Exception:
+            self.busy = False
         if self.session.auth.is_locked():
             self._refresh_lock_ui()
             return
         if not devices:
+            hint = self.ip_var.get().strip()
             self.status_var.set("Qurilma topilmadi")
-            self.device_var.set("Qurilma: topilmadi — IP yozing")
+            self._set_badge("OFFLINE", "danger")
+            if hint:
+                self.device_var.set(f"Qurilma: {hint} javob bermadi")
+            else:
+                self.device_var.set("Qurilma: topilmadi — IP yozing (masalan 192.168.0.116)")
             self.state_var.set("Aniqlangan holat: —")
             return
         self._show_device()
         if devices[0].online:
             self.status_var.set("Online")
+            self._set_badge("ONLINE", "ok")
         else:
             self.status_var.set("Qurilma topilmadi")
+            self._set_badge("OFFLINE", "danger")
 
     def _on_ulash(self) -> None:
         if self.busy or self.session.auth.is_locked():
             return
-        # Persist token from UI before link.
         tok = self.token_var.get().strip()
         if tok != (self.session.pairing_token() or ""):
             self.session.set_pairing_token(tok)
         self._on_location_selected()
         if not (self.session.location_id or "").strip():
             self.status_var.set("Lokatsiya tanlanmagan")
-            self.lock_var.set("Lokatsiya tanlanmagan. Ulashdan oldin lokatsiyani tanlang.")
+            self._set_badge("LOKATSIYA", "warn")
+            self._show_alert("Lokatsiya tanlanmagan. Ulashdan oldin lokatsiyani tanlang.")
             return
         if not self.session.has_credentials():
             self.status_var.set("Token kerak")
-            self.lock_var.set(
+            self._set_badge("TOKEN", "warn")
+            self._show_alert(
                 "Pairing token yoki admin kaliti kerak. Web → Связь yoki ADMIN-PAROL.bat."
             )
             return
@@ -378,6 +683,7 @@ class OfficeLinkApp:
                 return
             if not chosen.online:
                 self.status_var.set("Qurilma onlayn emas")
+                self._set_badge("OFFLINE", "danger")
                 self.device_var.set(f"Qurilma: {ip}")
                 self.state_var.set("Aniqlangan holat: —")
                 return
@@ -388,22 +694,24 @@ class OfficeLinkApp:
         password = self.pwd_var.get()
         self._set_busy(True)
         self.status_var.set("Tekshirilmoqda...")
+        self._set_badge("ULANMOQDA", "accent")
         threading.Thread(target=self._ulash_worker, args=(password,), daemon=True).start()
 
     def _ulash_worker(self, password: str) -> None:
         def progress(msg: str) -> None:
-            self.root.after(0, lambda m=msg: self.status_var.set(m))
+            self.root.after(0, lambda m=msg: self.status_var.set(m[:120]))
 
         state = (self.session.detected_state or {}).get("state")
         if state == "new":
+            self.session.password = password or self.session.password or ""
             linked = self.session.link_to_cloud(progress)
-            self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=False, linked=True))
+            self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=True, linked=True))
             return
 
         result = self.session.submit_password(password)
         if result.kind == OK:
             linked = self.session.link_to_cloud(progress)
-            self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=False, linked=True))
+            self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=True, linked=True))
             return
         self.root.after(0, lambda: self._ulash_done(result, clear_pwd=result.kind in (CONFIRM, LOCKED)))
 
@@ -415,7 +723,8 @@ class OfficeLinkApp:
         kind = result.kind
         if kind == CONFIRM:
             self.status_var.set("Parol noto‘g‘ri")
-            self.lock_var.set("Parol noto‘g‘ri. Qayta kiriting (avtomatik qayta urinish yo‘q).")
+            self._set_badge("PAROL", "danger")
+            self._show_alert("Parol noto‘g‘ri. Qayta kiriting (avtomatik qayta urinish yo‘q).")
         elif kind == LOCKED:
             self.status_var.set("Qulflangan")
             self._refresh_lock_ui()
@@ -423,16 +732,21 @@ class OfficeLinkApp:
                 self._tick_lock()
         elif kind == TIMEOUT:
             self.status_var.set("Tarmoq kutish vaqti")
-            self.lock_var.set(result.message)
+            self._set_badge("TIMEOUT", "warn")
+            self._show_alert(result.message)
         elif kind == OFFLINE:
             self.status_var.set("Qurilma onlayn emas")
-            self.lock_var.set(result.message)
+            self._set_badge("OFFLINE", "danger")
+            self._show_alert(result.message)
         elif kind == "location":
             self.status_var.set("Lokatsiya tanlanmagan")
-            self.lock_var.set(result.message)
+            self._set_badge("LOKATSIYA", "warn")
+            self._show_alert(result.message)
         elif kind == "linked" or (linked and kind == "linked"):
-            self.status_var.set("Ulandi")
-            self.lock_var.set("")
+            sealed = bool((result.device or {}).get("sealed"))
+            self.status_var.set("Ulanish mustahkamlandi" if sealed else "Ulandi")
+            self._set_badge("ULANDI", "ok")
+            self._hide_alert()
             host = (result.device or {}).get("host") or ""
             name = (result.device or {}).get("name") or ""
             self.device_var.set(f"Qurilma: {name}  {host}".strip())
@@ -447,29 +761,33 @@ class OfficeLinkApp:
             except Exception:
                 svc_note = " Oyna ochiq tursin (yoki SERVICE.txt)."
             extra = f" Web: {web}." if web else ""
+            seal_note = (
+                " Parol terminalda almashtirildi va Web serverda mustahkamlandi."
+                if sealed
+                else " Parol serverga yozildi."
+            )
             self.note.configure(
                 text=(
-                    "Ulandi. Qurilma boshqaruvi Webga topshirildi. "
-                    "Yangi admin parol operatorga KO‘RSATILMAYDI — faqat tenant admin "
-                    "(Устройства) ko‘radi. Guvohlar qayta sozlamasin."
+                    "Ulandi. Qurilma boshqaruvi Webga topshirildi."
+                    + seal_note
+                    + " Yangi admin parol operatorga KO‘RSATILMAYDI — faqat tenant admin "
+                    "(Устройства) ko‘radi. Keyin Webdan yuzlarni sinxronlang."
                     + extra
                     + svc_note
                 )
             )
             self.pwd_var.set("")
             self.pwd_entry.configure(state="disabled")
-            try:
-                self.btn.state(["disabled"])
-            except tk.TclError:
-                self.btn.configure(state="disabled")
+            self._set_primary_btn(False)
         else:
             self.status_var.set(result.message or "Xato")
-            self.lock_var.set(result.message)
+            self._set_badge("XATO", "danger")
+            self._show_alert(result.message)
 
     def _open_admin(self) -> None:
         bat = find_root() / "ADMIN-PAROL.bat"
         if not bat.is_file():
-            self.lock_var.set("ADMIN-PAROL.bat topilmadi.")
+            self._show_alert("ADMIN-PAROL.bat topilmadi.")
             return
         flags = subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
         try:
@@ -479,7 +797,7 @@ class OfficeLinkApp:
                 creationflags=flags,
             )
         except OSError as exc:
-            self.lock_var.set(str(exc)[:160])
+            self._show_alert(str(exc)[:160])
 
     def _on_close(self) -> None:
         try:
@@ -495,10 +813,11 @@ class OfficeLinkApp:
 
 
 def run_app() -> None:
+    _set_app_user_model_id()
     _hide_console()
     root = tk.Tk()
     try:
-        root.call("tk", "scaling", 1.2)
+        root.call("tk", "scaling", 1.15)
     except tk.TclError:
         pass
     OfficeLinkApp(root)

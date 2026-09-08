@@ -307,6 +307,25 @@
   margin: 0 0 18px;
 }
 
+.pwdInlineRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pwdInlineInput {
+  flex: 1 1 220px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink-900);
+}
+
 .infoGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

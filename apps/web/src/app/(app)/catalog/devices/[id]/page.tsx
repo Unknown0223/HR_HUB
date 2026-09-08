@@ -181,7 +181,9 @@ function DeviceDetailInner() {
   const [ignoredPersons, setIgnoredPersons] = useState<IgnoredPerson[]>([]);
   const [ignoredDivisions, setIgnoredDivisions] = useState<IgnoredDivision[]>([]);
   const [credAudits, setCredAudits] = useState<CredentialAudit[]>([]);
-
+  const [bannerPass, setBannerPass] = useState('');
+  const [bannerPwdMsg, setBannerPwdMsg] = useState('');
+  const [bannerPwdBusy, setBannerPwdBusy] = useState(false);
   const setTab = useCallback(
     (next: Tab) => {
       router.replace(`/catalog/devices/${id}?tab=${next}`);
@@ -516,9 +518,57 @@ function DeviceDetailInner() {
               ) : null}
               {passwordOutOfSync(device.meta, device.status) ? (
                 <div className={styles.lockBanner}>
-                  Пароль на терминале изменён локально и не совпадает с сервером.
-                  Откройте карточку устройства и сохраните текущий пароль терминала —
-                  иначе администратор потеряет управление.
+                  <p style={{ margin: '0 0 10px' }}>
+                    Пароль на терминале изменён локально и не совпадает с сервером.
+                    Введите <strong>текущий</strong> пароль терминала и сохраните —
+                    иначе синхронизация лиц и управление не работают.
+                  </p>
+                  <div className={styles.pwdInlineRow}>
+                    <input
+                      type="password"
+                      className={styles.pwdInlineInput}
+                      value={bannerPass}
+                      onChange={(e) => setBannerPass(e.target.value)}
+                      placeholder="Текущий пароль терминала (8–16)"
+                      autoComplete="off"
+                      maxLength={16}
+                      disabled={bannerPwdBusy || busy}
+                    />
+                    <button
+                      type="button"
+                      className={styles.btnPrimary}
+                      disabled={
+                        bannerPwdBusy ||
+                        busy ||
+                        bannerPass.trim().length < 8 ||
+                        bannerPass.trim().length > 16
+                      }
+                      onClick={async () => {
+                        setBannerPwdMsg('');
+                        setBannerPwdBusy(true);
+                        try {
+                          await apiFetch(`/api/attendance/devices/${id}/sync-password`, {
+                            method: 'POST',
+                            body: JSON.stringify({ password: bannerPass.trim() }),
+                          });
+                          setBannerPass('');
+                          setBannerPwdMsg('Пароль сохранён. Теперь нажмите «Синхронизировать».');
+                          await loadDevice();
+                        } catch (e) {
+                          setBannerPwdMsg(
+                            e instanceof Error ? e.message : 'Не удалось сохранить пароль',
+                          );
+                        } finally {
+                          setBannerPwdBusy(false);
+                        }
+                      }}
+                    >
+                      {bannerPwdBusy ? 'Сохранение…' : 'Сохранить пароль'}
+                    </button>
+                  </div>
+                  {bannerPwdMsg ? (
+                    <p style={{ margin: '8px 0 0', fontWeight: 650 }}>{bannerPwdMsg}</p>
+                  ) : null}
                 </div>
               ) : null}
               <div className={styles.infoGrid}>
@@ -989,6 +1039,7 @@ function DeviceDetailInner() {
       </div>
 
       <DeviceFormModal
+        key={editOpen ? `edit-${device.id}` : 'edit-closed'}
         open={editOpen}
         title="Устройство (изменение)"
         initial={toForm(device)}

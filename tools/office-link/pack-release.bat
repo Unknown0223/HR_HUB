@@ -24,6 +24,8 @@ if not exist "%CD%\release" mkdir "%CD%\release"
 
 echo EXE nusxalanmoqda...
 xcopy /E /I /Y "%DIST%\*" "%REL%\ilova\" >nul
+if exist "%CD%\hrhub-link.ico" copy /Y "%CD%\hrhub-link.ico" "%REL%\ilova\" >nul
+if exist "%CD%\hrhub-link-256.png" copy /Y "%CD%\hrhub-link-256.png" "%REL%\ilova\" >nul
 
 echo Skriptlar...
 copy /Y "%CD%\install-service.bat" "%REL%\" >nul
@@ -32,6 +34,8 @@ copy /Y "%CD%\ADMIN-PAROL.bat" "%REL%\" >nul
 copy /Y "%CD%\SERVICE.txt" "%REL%\" >nul
 copy /Y "%CD%\QOLLAMA.txt" "%REL%\" >nul
 copy /Y "%CD%\config.json" "%REL%\" >nul
+if exist "%CD%\hrhub-link.ico" copy /Y "%CD%\hrhub-link.ico" "%REL%\" >nul
+if exist "%CD%\hrhub-link-256.png" copy /Y "%CD%\hrhub-link-256.png" "%REL%\" >nul
 copy /Y "%CD%\link.ps1" "%REL%\" >nul
 copy /Y "%CD%\service_worker.py" "%REL%\" >nul
 copy /Y "%CD%\bulk_provision.py" "%REL%\" >nul

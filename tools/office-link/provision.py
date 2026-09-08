@@ -493,7 +493,10 @@ class ProvisionEngine:
                 percent=30,
                 message="Platforma yangi parol o‘rnatmoqda",
             )
-            _emit(on_status, "Yangi parol o‘ylab qurilmaga o‘rnatilmoqda...")
+            _emit(
+                on_status,
+                "1/4 Admin paroli almashtirilmoqda (yangi parol platformaga tegishli)...",
+            )
             changed = change_admin_password(
                 session.chosen.host,
                 int(session.chosen.port or 80),
@@ -517,7 +520,25 @@ class ProvisionEngine:
                     return SubmitResult(kind=UNAUTHORIZED, message=msg)
                 return SubmitResult(kind=ERROR, message=msg)
             password = new_pwd
-            _emit(on_status, "Parol platformaga topshirildi (operatorga ko‘rsatilmaydi)")
+            # change_admin_password already verifies; double-check for seal path.
+            recheck = verify_password(
+                session.chosen.host,
+                int(session.chosen.port or 80),
+                username,
+                password,
+                timeout=6.0,
+            )
+            if recheck.kind != OK:
+                return SubmitResult(
+                    kind=ERROR,
+                    message=(
+                        "Parol terminalda o‘zgardi, lekin yangi parol bilan "
+                        "qayta kirib bo‘lmadi. Ulash to‘xtatildi."
+                    ),
+                )
+            _emit(on_status, "1/4 Tayyor: yangi admin paroli terminalda ishlayapti")
+        else:
+            _emit(on_status, "1/4 Parol allaqachon platformaga tegishli")
 
         session.password = password
         session.location_id = location_id
@@ -536,7 +557,7 @@ class ProvisionEngine:
                 percent=40,
                 message="Gateway",
             )
-            _emit(on_status, "Gateway ishga tushirilmoqda...")
+            _emit(on_status, "2/4 Gateway + tunnel ochilmoqda...")
             bundle.gw = runtime_setup.start_gateway(
                 session.api_url, gw_key, session.root, on_status
             )
@@ -547,7 +568,6 @@ class ProvisionEngine:
                 percent=55,
                 message="Tunnel",
             )
-            _emit(on_status, "Tunnel ochilmoqda...")
             proc, url = runtime_setup.start_tunnel(session.root, on_status)
             bundle.tunnel = proc
             bundle.tunnel_url = url
@@ -568,7 +588,7 @@ class ProvisionEngine:
                     ),
                 )
 
-            _emit(on_status, "Platformaga yozilmoqda...")
+            _emit(on_status, "3/4 Yangi parol + qurilma Web serverga yozilmoqda...")
             _progress(
                 session,
                 status="configuring",
@@ -593,7 +613,6 @@ class ProvisionEngine:
                     message="Platformaga ulanmadi. Internet yoki pairing/admin kalitini tekshiring.",
                 )
 
-            _emit(on_status, "Tunnel e'lon qilinmoqda...")
             _progress(
                 session,
                 status="configuring",
@@ -622,13 +641,12 @@ class ProvisionEngine:
                     message=f"Tunnel platformaga yozilmadi (HTTP {code}).",
                 )
 
-            _emit(on_status, "Qurilma + parol serverga yozilmoqda...")
             _progress(
                 session,
                 status="configuring",
                 step="register",
                 percent=90,
-                message="Register",
+                message="Register + vault",
             )
             code, linked = api_client.register_device(
                 session.api_url,
@@ -651,32 +669,56 @@ class ProvisionEngine:
                 )
                 return SubmitResult(
                     kind="api",
-                    message=f"Qurilma platformaga yozilmadi (HTTP {code}).",
+                    message=(
+                        f"Qurilma/parol platformaga yozilmadi (HTTP {code}). "
+                        "Terminaldagi yangi parol allaqachon o‘zgargan bo‘lishi mumkin — "
+                        "Web → Устройства dan hozirgi parolni saqlang."
+                    ),
                 )
 
             session.services = bundle
             session.password = ""
+            sealed = bool(isinstance(linked, dict) and linked.get("sealed"))
             dev = linked.get("device") if isinstance(linked, dict) else {}
             device_id = (dev or {}).get("id")
             _progress(
                 session,
                 status="linked",
-                step="linked",
+                step="sealed" if sealed else "linked",
                 percent=100,
-                message="Ulandi — boshqaruv Webda",
+                message=(
+                    "Ulanish mustahkamlandi"
+                    if sealed
+                    else "Ulandi — boshqaruv Webda"
+                ),
                 device_id=device_id,
             )
 
             name = (dev or {}).get("name") or session.verified.get("name")
-            _emit(on_status, "Ulandi — keyingi sozlash faqat Web dan")
+            if sealed:
+                _emit(
+                    on_status,
+                    "4/4 Ulanish mustahkamlandi: parol serverda saqlandi va GW orqali tasdiqlandi",
+                )
+            else:
+                _emit(
+                    on_status,
+                    "4/4 Ulandi (parol serverga yozildi). Webdan «Синхронизировать» bosing.",
+                )
             return SubmitResult(
                 kind="linked",
-                message="Ulandi",
+                message=(
+                    "Ulanish mustahkamlandi. Keyingi sozlash faqat Web dan. "
+                    "Yangi admin parol operatorga ko‘rsatilmaydi."
+                    if sealed
+                    else "Ulandi. Yangi admin parol operatorga ko‘rsatilmaydi."
+                ),
                 device={
                     "name": name,
                     "host": session.verified.get("host"),
                     "tunnel": url,
                     "locationId": location_id,
+                    "sealed": sealed,
                     "id": device_id,
                     "ownedByPlatform": True,
                 },

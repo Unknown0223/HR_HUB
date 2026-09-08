@@ -1111,6 +1111,26 @@ export class AttendanceService {
     return `${label}${ok ? ' выполнено' : ' не удалось'}${extra}`;
   }
 
+  /** Prefer vault plaintext; fall back to passwordEnc column. */
+  private async passwordForGw(
+    tenantId: string,
+    deviceId: string,
+    passwordEnc?: string | null,
+  ): Promise<string | null> {
+    try {
+      const fromVault = await this.vault.getPassword(tenantId, deviceId);
+      if (fromVault?.trim()) return fromVault.trim();
+    } catch (e) {
+      this.logger.warn(
+        `Vault getPassword failed for ${deviceId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+    const enc = (passwordEnc || '').trim();
+    return enc || null;
+  }
+
   /** Ensure device exists in device-gw memory (GW restart clears in-memory registry). */
   private async ensureGwRegistered(device: {
     id: string;
@@ -1126,7 +1146,15 @@ export class AttendanceService {
     meta?: unknown;
     gatewayRef?: string | null;
   }) {
-    const reg = await this.gw.registerFromDevice(device);
+    const plain = await this.passwordForGw(
+      device.tenantId,
+      device.id,
+      device.passwordEnc,
+    );
+    const reg = await this.gw.registerFromDevice({
+      ...device,
+      passwordEnc: plain,
+    });
     if (!reg?.id) return device.gatewayRef || device.id;
     if (reg.id !== device.gatewayRef) {
       await this.prisma.device.update({
@@ -2141,7 +2169,14 @@ export class AttendanceService {
       data: { meta: meta as Prisma.InputJsonValue },
     });
 
-    const reg = await this.gw.registerFromDevice(device);
+    // Always push vault plaintext to office GW so face sync / remote work.
+    const plainForGw =
+      (await this.passwordForGw(tenant.id, device.id, password)) || password;
+    const reg = await this.gw.registerFromDevice({
+      ...device,
+      passwordEnc: plainForGw,
+    });
+    let sealed = false;
     if (reg?.id) {
       device = await this.prisma.device.update({
         where: { id: device.id },
@@ -2151,6 +2186,37 @@ export class AttendanceService {
           lastSeenAt: new Date(),
         },
       });
+      try {
+        await this.gw.verifyPassword(reg.id, plainForGw);
+        sealed = true;
+        const sealedMeta = this.asMeta(device.meta);
+        const sealedAuth =
+          sealedMeta.auth &&
+          typeof sealedMeta.auth === 'object' &&
+          !Array.isArray(sealedMeta.auth)
+            ? { ...(sealedMeta.auth as Record<string, unknown>) }
+            : {};
+        sealedMeta.auth = {
+          ...sealedAuth,
+          passwordOutOfSync: false,
+          ownedByPlatform: true,
+          linkSealedAt: new Date().toISOString(),
+        };
+        device = await this.prisma.device.update({
+          where: { id: device.id },
+          data: {
+            meta: sealedMeta as Prisma.InputJsonValue,
+            status: 'online',
+            lastSeenAt: new Date(),
+          },
+        });
+      } catch (e) {
+        this.logger.warn(
+          `Office-link GW verify after register failed for ${device.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
     }
 
     if (device.locationId) {
@@ -2171,12 +2237,15 @@ export class AttendanceService {
           host: device.host,
           serial: device.serialNumber,
           status: 'linked',
-          step: 'linked',
+          step: sealed ? 'sealed' : 'linked',
           percent: 100,
           meta: {
             ...prevMeta,
-            message: 'Ulandi',
+            message: sealed
+              ? 'Ulandi — parol server va terminalda tasdiqlandi'
+              : 'Ulandi',
             linkedAt: new Date().toISOString(),
+            sealed,
           } as Prisma.InputJsonValue,
         },
       });
@@ -2184,6 +2253,7 @@ export class AttendanceService {
 
     return {
       ok: true,
+      sealed,
       device: {
         id: device.id,
         name: device.name,

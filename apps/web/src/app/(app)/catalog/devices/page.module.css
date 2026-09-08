@@ -557,6 +557,259 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* DeviceFormModal — must exist here (imported by DeviceFormModal.tsx) */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(10, 19, 34, 0.48);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.modal {
+  width: min(720px, 100%);
+  max-height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+
+.modalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.modalHead h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.formTabs {
+  display: flex;
+  gap: 4px;
+  padding: 0.65rem 1.25rem 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-subtle);
+}
+
+.formTab,
+.formTabActive {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: var(--ink-500);
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+}
+
+.formTabActive {
+  color: var(--accent);
+  background: #fff;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.modalBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+  overflow: auto;
+}
+
+.modalBody label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--ink-500);
+}
+
+.modalBody input,
+.modalBody select,
+.modalBody textarea {
+  appearance: none;
+  height: 38px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink-900);
+  background: #fff;
+}
+
+.modalBody textarea {
+  height: auto;
+  min-height: 72px;
+  padding: 0.55rem 0.7rem;
+  resize: vertical;
+}
+
+.modalBody .full {
+  grid-column: 1 / -1;
+}
+
+.tabHint {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-500);
+  line-height: 1.45;
+}
+
+.modalFoot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--line);
+  background: rgba(242, 245, 249, 0.55);
+}
+
+.modalStatus {
+  margin-right: auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.modalStatusOk {
+  color: #047857;
+}
+
+.modalStatusErr {
+  color: #b91c1c;
+}
+
+.btnPrimary,
+.btnGhost {
+  appearance: none;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.05);
+}
+
+.btnPrimary:disabled,
+.btnGhost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-700);
+}
+
+.btnGhost:hover {
+  background: var(--surface-subtle);
+}
+
+.checkGroup,
+.radioGroup,
+.toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  align-items: center;
+}
+
+.checkGroup label,
+.radioGroup label,
+.toggleRow label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-700);
+}
+
+.lockBanner {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pwdBox {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.pwdBoxTitle {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.pwdOk {
+  color: #047857;
+  font-weight: 650;
+}
+
+.pwdErr {
+  color: #b91c1c;
+  font-weight: 650;
+}
+
+.pwdHint {
+  color: var(--ink-500);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 640px) {
+  .modalBody {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Apply-mark-settings modal body extras */
 .applyHint {
   margin: 0 0 0.65rem;

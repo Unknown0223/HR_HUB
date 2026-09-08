@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { ModalPortal } from '@/components/ModalPortal';
-import styles from './page.module.css';
+import styles from './DeviceFormModal.module.css';
 
 export type DeviceMeta = {
   deviceType?: string;
@@ -149,14 +149,22 @@ export function DeviceFormModal({
     setSyncPass('');
     setPwdMsg('');
     setSavingMode('idle');
-    setTab('main');
+    setTab(passwordOutOfSync(initial.meta, deviceStatus) ? 'link' : 'main');
     setLocFilter('');
     void apiFetch<Loc[]>('/api/attendance/locations')
       .then((d) => setLocations(Array.isArray(d) ? d : []))
       .catch(() => setLocations([]));
-  }, [open, initial]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync form when opening
+  }, [open, deviceId, deviceStatus, initial.locationId, initial.serialNumber]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy && savingMode === 'idle' && !pwdBusy) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, busy, savingMode, pwdBusy, onClose]);
 
   const locked = !!busy || savingMode !== 'idle' || pwdBusy;
   const locQ = locFilter.trim().toLowerCase();
@@ -213,9 +221,17 @@ export function DeviceFormModal({
   }
 
   return (
-    <ModalPortal>
-      <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
-        <div className={styles.modal}>
+    <ModalPortal open={open}>
+      <div
+        className={styles.modalBackdrop}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget && !locked) onClose();
+        }}
+      >
+        <div className={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
           <div className={styles.modalHead}>
             <h2>{title}</h2>
             <button type="button" className={styles.btnGhost} onClick={onClose} disabled={locked}>

@@ -9,7 +9,11 @@ a = Analysis(
     [str(spec_dir / "office_link_app.py")],
     pathex=[str(spec_dir)],
     binaries=[],
-    datas=[(str(spec_dir / "config.json"), ".")],
+    datas=[
+        (str(spec_dir / "config.json"), "."),
+        (str(spec_dir / "hrhub-link.ico"), "."),
+        (str(spec_dir / "hrhub-link-256.png"), "."),
+    ],
     hiddenimports=[
         "tkinter",
         "tkinter.ttk",
@@ -44,6 +48,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
+    icon=str(spec_dir / "hrhub-link.ico"),
 )
 
 coll = COLLECT(

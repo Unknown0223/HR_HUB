@@ -98,7 +98,22 @@ class OfficeLinkSession:
         except Exception:
             self.detected_state = {"state": "unknown", "meta": {"reason": "detect_failed"}}
 
-    def scan(self, prefixes: list[str] | None = None) -> list[OnlineInfo]:
+    def scan(
+        self,
+        prefixes: list[str] | None = None,
+        ip_hint: str | None = None,
+    ) -> list[OnlineInfo]:
+        hint = (ip_hint or "").strip()
+        if hint and valid_ip(hint):
+            info = self.choose(hint, 80)
+            if info.online and info.likely_hikvision:
+                self.devices = [info]
+                return self.devices
+            # Port closed / not Hikvision — still keep result empty for clear UI.
+            self.devices = []
+            self.chosen = None
+            self.detected_state = None
+            return self.devices
         self.devices = find_devices(prefixes)
         self.chosen = self.devices[0] if self.devices else None
         self._refresh_detected_state()
