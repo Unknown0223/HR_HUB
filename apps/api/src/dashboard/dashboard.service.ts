@@ -230,6 +230,7 @@ export class DashboardService {
     const dayOff: Row[] = [];
     const leave: Row[] = [];
 
+    // Slim select: dashboard table needs identity + org fields, not full PII/docs.
     const employees = await this.prisma.employee.findMany({
       where: employeeWhere,
       select: {
@@ -259,29 +260,7 @@ export class DashboardService {
           select: {
             birthDate: true,
             gender: true,
-            pinfl: true,
-            inn: true,
-            inps: true,
-            code: true,
-            addressResidence: true,
-            addressRegistration: true,
           },
-        },
-        bankAccounts: {
-          where: { isActive: true },
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          take: 1,
-          select: { accountNumber: true },
-        },
-        documents: {
-          where: { type: 'other', number: 'PROFILE_EXTRAS' },
-          take: 1,
-          select: { payload: true },
-        },
-        accessGrants: {
-          where: { isActive: true, accessType: 'access_level' },
-          take: 1,
-          select: { resource: true },
         },
         faceProfile: { select: { photoUrl: true, photoKey: true } },
         marks: {
@@ -329,26 +308,10 @@ export class DashboardService {
       if (low === 'f' || low === 'female' || low === 'жен' || low === 'женский') return 'Женский';
       return g;
     };
-    const readExtras = (payload: unknown) => {
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-        return {} as Record<string, unknown>;
-      }
-      return payload as Record<string, unknown>;
-    };
 
     for (const emp of employees) {
       const d = dayByEmp.get(emp.id);
       const status = (d?.status as DayStatus | undefined) ?? missingStatus;
-      const extras = readExtras(emp.documents[0]?.payload);
-      const userSettings =
-        extras.userSettings && typeof extras.userSettings === 'object' && !Array.isArray(extras.userSettings)
-          ? (extras.userSettings as Record<string, unknown>)
-          : {};
-      const fps = Array.isArray(extras.fingerprints)
-        ? (extras.fingerprints as unknown[])
-            .map((n) => Number(n))
-            .filter((n) => Number.isInteger(n) && n >= 0 && n <= 9)
-        : [];
       const firstMark = emp.marks[0];
       const mgr = emp.division?.manager;
       const row: Row = {
@@ -359,7 +322,7 @@ export class DashboardService {
         firstName: emp.firstName,
         middleName: emp.middleName,
         tabNumber: emp.tabNumber,
-        email: emp.email || (typeof extras.emailCorp === 'string' ? extras.emailCorp : null) || null,
+        email: emp.email || null,
         phone: emp.phone || null,
         photoUrl: this.storage.mediaUrl(
           emp.faceProfile?.photoKey,
@@ -377,27 +340,21 @@ export class DashboardService {
         hiredAt: emp.hiredAt ? toLocalYmd(emp.hiredAt) : null,
         birthDate: emp.person?.birthDate ? toLocalYmd(emp.person.birthDate) : null,
         gender: genderLabel(emp.person?.gender),
-        pinfl: emp.person?.pinfl || null,
-        inn: emp.person?.inn || (typeof extras.inn === 'string' ? extras.inn : null) || null,
-        inps: emp.person?.inps || (typeof extras.inps === 'string' ? extras.inps : null) || null,
-        code: emp.person?.code || (typeof extras.extraCode === 'string' ? extras.extraCode : null) || null,
-        addressResidence:
-          emp.person?.addressResidence ||
-          (typeof extras.address === 'string' ? extras.address : null) ||
-          null,
-        addressPostal:
-          emp.person?.addressRegistration ||
-          (typeof extras.registeredAddress === 'string' ? extras.registeredAddress : null) ||
-          null,
-        bankAccount: emp.bankAccounts[0]?.accountNumber || null,
+        pinfl: null,
+        inn: null,
+        inps: null,
+        code: null,
+        addressResidence: null,
+        addressPostal: null,
+        bankAccount: null,
         employmentType: employmentTypeLabel(emp.employmentType),
         workStatus: workStatusLabel(emp.status),
-        login: typeof userSettings.login === 'string' ? userSettings.login || null : null,
-        telegram: typeof extras.telegram === 'string' ? extras.telegram : null,
-        fax: typeof extras.fax === 'string' ? extras.fax : null,
-        site: typeof extras.site === 'string' ? extras.site : null,
-        fingerprints: fps.length ? String(fps.length) : null,
-        accessLevel: emp.accessGrants[0]?.resource || null,
+        login: null,
+        telegram: null,
+        fax: null,
+        site: null,
+        fingerprints: null,
+        accessLevel: null,
         arrivalLocation: firstMark?.device?.location?.name || null,
         distanceKm: null,
       };

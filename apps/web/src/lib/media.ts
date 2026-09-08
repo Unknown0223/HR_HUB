@@ -1,4 +1,4 @@
-import { API_URL, getAccessToken } from '@/lib/api';
+import { API_ORIGIN, API_URL, getAccessToken } from '@/lib/api';
 
 /** Turn stored MinIO / API / data URLs into a browser-loadable src. */
 export function mediaSrc(url?: string | null, photoKey?: string | null): string | null {
@@ -10,6 +10,7 @@ export function mediaSrc(url?: string | null, photoKey?: string | null): string 
   } else if (url.startsWith('data:') || url.startsWith('blob:')) {
     src = url;
   } else if (url.startsWith('/api/')) {
+    // Browser: relative via Next rewrite; SSR: absolute API origin.
     src = `${API_URL}${url}`;
   } else {
     try {
@@ -38,7 +39,10 @@ function withAccessToken(src: string | null): string | null {
   const token = getAccessToken();
   if (!token) return src;
   try {
-    const u = new URL(src, typeof window !== 'undefined' ? window.location.origin : API_URL);
+    const u = new URL(
+      src,
+      typeof window !== 'undefined' ? window.location.origin : API_ORIGIN,
+    );
     if (!u.pathname.includes('/api/storage/file')) return src;
     if (!u.searchParams.get('access_token')) {
       u.searchParams.set('access_token', token);

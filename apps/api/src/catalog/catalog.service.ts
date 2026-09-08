@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ApprovalStatus, DayStatus, DocumentLifecycle, GradePromotionPeriodType, PayrollLineType, Prisma, WorkScheduleKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { buildExcelBuffer, flattenExportRow } from '../common/excel';
 import { daysAgo, parseDateParam, parseYearMonth, startOfCurrentMonth } from '../common/date-range';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -79,6 +80,7 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly redis: RedisService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
@@ -127,15 +129,42 @@ export class CatalogService {
       from?: string;
       to?: string;
       contractId?: string;
+      page?: number;
+      limit?: number;
     } = {},
   ) {
     const res = findResource(key);
     if (!res) throw new NotFoundException(`Resource ${key}`);
     const where = this.buildListWhere(tenantId, res, opts);
+    const paging = opts.page != null || opts.limit != null;
+    const limit = Math.min(Math.max(Number(opts.limit) || 1000, 1), 5000);
+    const page = Math.max(Number(opts.page) || 1, 1);
+    const skip = paging ? (page - 1) * limit : 0;
+    if (paging) {
+      const [items, total] = await Promise.all([
+        this.delegate(res.model).findMany({
+          where,
+          orderBy: res.orderBy ?? { createdAt: 'desc' },
+          include: res.include,
+          skip,
+          take: limit,
+        }),
+        this.delegate(res.model).count({ where }),
+      ]);
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      };
+    }
+    // Soft cap unbounded catalog lists (keeps array response shape).
     return this.delegate(res.model).findMany({
       where,
       orderBy: res.orderBy ?? { createdAt: 'desc' },
       include: res.include,
+      take: limit,
     });
   }
 
@@ -4293,7 +4322,7 @@ export class CatalogService {
       select: {
         employee: { select: { divisionId: true } },
       },
-      take: 20000,
+      take: 5000,
     });
     const activeDivIds = new Set<string>();
     for (const a of attendance) {
@@ -8894,7 +8923,7 @@ ORDER BY pp.month;`,
             ],
           },
           select: { employeeId: true, amount: true, postedAt: true, createdAt: true },
-          take: 20000,
+          take: 5000,
         });
         for (const l of lines) {
           const day = l.postedAt || l.createdAt;
@@ -15042,6 +15071,26 @@ ORDER BY pp.month;`,
 
   /** Lookup lists for forms */
   async lookups(tenantId: string) {
+    const cacheKey = `lookups:${tenantId}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        // corrupt cache — rebuild
+      }
+    }
+
+    const result = await this.buildLookups(tenantId);
+    await this.redis.set(cacheKey, JSON.stringify(result), 120);
+    return result;
+  }
+
+  async invalidateLookups(tenantId: string) {
+    await this.redis.del(`lookups:${tenantId}`);
+  }
+
+  private async buildLookups(tenantId: string) {
     const empty = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]);
     const none = <T>(p: Promise<T | null>) => p.catch(() => null);
     const [

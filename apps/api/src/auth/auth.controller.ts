@@ -35,15 +35,15 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto: LoginDto,
   ) {
-    this.loginLimit.assertAllowed(req, dto.email);
+    await this.loginLimit.assertAllowed(req, dto.email);
     try {
       const result = await this.auth.login(dto);
-      this.loginLimit.recordSuccess(req, dto.email);
+      await this.loginLimit.recordSuccess(req, dto.email);
       setAuthCookie(res, result.accessToken);
       return result;
     } catch (e) {
       if (e instanceof UnauthorizedException) {
-        this.loginLimit.recordFailure(req, dto.email);
+        await this.loginLimit.recordFailure(req, dto.email);
       }
       throw e;
     }

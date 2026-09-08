@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.web"
+watchPatterns = ["/apps/web/**", "/package.json", "/package-lock.json", "/Dockerfile.web", "/railway.web.toml"]
 
 [deploy]
 healthcheckPath = "/"

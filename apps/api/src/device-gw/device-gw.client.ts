@@ -73,7 +73,8 @@ export type GwSyncFace = {
 export class DeviceGwClient implements OnModuleInit {
   private readonly logger = new Logger(DeviceGwClient.name);
   private announcedUrl: string | null = null;
-  private readonly fetchTimeoutMs = 12_000;
+  private readonly fetchTimeoutMs = 8_000;
+  private readonly fetchRetries = 1;
 
   constructor(
     private readonly config: ConfigService,
@@ -89,16 +90,26 @@ export class DeviceGwClient implements OnModuleInit {
   }
 
   private async gwFetch(path: string, init?: RequestInit): Promise<Response> {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.fetchTimeoutMs);
-    try {
-      return await fetch(`${this.baseUrl}${path}`, {
-        ...init,
-        signal: ctrl.signal,
-      });
-    } finally {
-      clearTimeout(timer);
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= this.fetchRetries; attempt++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), this.fetchTimeoutMs);
+      try {
+        return await fetch(`${this.baseUrl}${path}`, {
+          ...init,
+          signal: ctrl.signal,
+        });
+      } catch (e) {
+        lastErr = e;
+        if (attempt < this.fetchRetries) {
+          await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+          continue;
+        }
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   }
 
   async onModuleInit() {

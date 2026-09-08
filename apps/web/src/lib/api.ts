@@ -1,5 +1,18 @@
-const API_URL =
+import {
+  isCatalogLookupsGet,
+  withCatalogLookupsCache,
+} from './lookups-cache';
+
+/** Absolute API origin (always set). Use for media / SSR / display. */
+export const API_ORIGIN =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:3002';
+
+/**
+ * Fetch base: full origin on the server; empty string in the browser so
+ * requests hit same-origin `/api/...` and Next rewrites proxy to the API.
+ */
+const API_URL =
+  typeof window === 'undefined' ? API_ORIGIN : '';
 
 export type Session = {
   /** Present only in the login JSON (mobile). Web stores cookie, not this field. */
@@ -105,45 +118,61 @@ function authHeaders(extra?: HeadersInit, tenantIdOverride?: string | null): Hea
   return headers;
 }
 
+export { invalidateCatalogLookupsCache } from './lookups-cache';
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & { tenantId?: string | null } = {},
 ): Promise<T> {
   const { tenantId, ...init } = options;
-  const headers = authHeaders(init.headers, tenantId);
-  const isFormData =
-    typeof FormData !== 'undefined' && init.body instanceof FormData;
-  if (!isFormData && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
-  const res = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
-
-  if (!res.ok) {
-    let message = res.statusText;
-    try {
-      const body = await res.json();
-      message = Array.isArray(body.message)
-        ? body.message.join(', ')
-        : body.message || message;
-    } catch {
-      /* ignore */
+  const run = async (): Promise<T> => {
+    const headers = authHeaders(init.headers, tenantId);
+    const isFormData =
+      typeof FormData !== 'undefined' && init.body instanceof FormData;
+    if (!isFormData && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
     }
-    throw new Error(message);
+
+    const res = await fetch(`${API_URL}${normalizedPath}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      let message = res.statusText;
+      try {
+        const body = await res.json();
+        message = Array.isArray(body.message)
+          ? body.message.join(', ')
+          : body.message || message;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json() as Promise<T>;
+  };
+
+  if (isCatalogLookupsGet(normalizedPath, init.method)) {
+    const session = getSession();
+    const cacheTenant =
+      tenantId ?? session?.tenant?.id ?? session?.user.tenantId ?? null;
+    return withCatalogLookupsCache(normalizedPath, cacheTenant, run);
   }
 
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  return run();
 }
 
 /** Authenticated binary download (e.g. .xlsx). */
 export async function apiDownload(path: string, filename: string): Promise<void> {
   const headers = authHeaders();
-  const res = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const res = await fetch(`${API_URL}${normalizedPath}`, {
     headers,
     credentials: 'include',
   });

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_URL, apiFetch, getSession, setSession, Session } from '@/lib/api';
+import { API_ORIGIN, apiFetch, getSession, setSession, Session } from '@/lib/api';
 import styles from '../mobile.module.css';
 
 export default function MobileLoginPage() {
@@ -86,7 +86,7 @@ export default function MobileLoginPage() {
           <i className="fas fa-cloud" aria-hidden />
           <div className={styles.fieldStack}>
             <span>Server manzil</span>
-            <input className={styles.input} value={API_URL} readOnly />
+            <input className={styles.input} value={API_ORIGIN} readOnly />
           </div>
           <i className="fas fa-server" aria-hidden style={{ opacity: 0.6 }} />
         </div>

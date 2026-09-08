@@ -1978,6 +1978,8 @@ export class CatalogController {
     @Query('type') type?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const parsedActive =
       isActive === '1' || isActive === 'true'
@@ -1985,6 +1987,8 @@ export class CatalogController {
         : isActive === '0' || isActive === 'false'
           ? false
           : undefined;
+    const pageNum = page != null && page !== '' ? Number(page) : undefined;
+    const limitNum = limit != null && limit !== '' ? Number(limit) : undefined;
     return this.catalog.list(this.catalog.requireTenant(t), resource, {
       activeOnly: active === '1' || active === 'true',
       employeeId,
@@ -1994,37 +1998,48 @@ export class CatalogController {
       isActive: parsedActive,
       from,
       to,
+      page: Number.isFinite(pageNum) ? pageNum : undefined,
+      limit: Number.isFinite(limitNum) ? limitNum : undefined,
     });
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Post(':resource')
-  create(
+  async create(
     @CurrentTenant() t: string | null,
     @Param('resource') resource: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.catalog.create(this.catalog.requireTenant(t), resource, body);
+    const tenantId = this.catalog.requireTenant(t);
+    const row = await this.catalog.create(tenantId, resource, body);
+    await this.catalog.invalidateLookups(tenantId);
+    return row;
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Patch(':resource/:id')
-  update(
+  async update(
     @CurrentTenant() t: string | null,
     @Param('resource') resource: string,
     @Param('id') id: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.catalog.update(this.catalog.requireTenant(t), resource, id, body);
+    const tenantId = this.catalog.requireTenant(t);
+    const row = await this.catalog.update(tenantId, resource, id, body);
+    await this.catalog.invalidateLookups(tenantId);
+    return row;
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Delete(':resource/:id')
-  remove(
+  async remove(
     @CurrentTenant() t: string | null,
     @Param('resource') resource: string,
     @Param('id') id: string,
   ) {
-    return this.catalog.remove(this.catalog.requireTenant(t), resource, id);
+    const tenantId = this.catalog.requireTenant(t);
+    const row = await this.catalog.remove(tenantId, resource, id);
+    await this.catalog.invalidateLookups(tenantId);
+    return row;
   }
 }

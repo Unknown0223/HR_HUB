@@ -5,13 +5,14 @@ import { DeviceGwClient } from '../device-gw/device-gw.client';
 /**
  * Re-register active Nest devices into device-gw after GW/API restart.
  *
- * Persistence model (Faza 2.4): PostgreSQL devices + this bootstrap is the
- * source of truth. Redis registry is optional later — API start re-hydrates GW.
+ * Persistence model: PostgreSQL devices + this bootstrap is the source of
+ * truth. API start re-hydrates GW in parallel batches.
  */
 @Injectable()
 export class DeviceSyncBootstrapService implements OnModuleInit {
   private readonly logger = new Logger(DeviceSyncBootstrapService.name);
   private readonly maxAttempts = 5;
+  private readonly concurrency = 4;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -19,7 +20,6 @@ export class DeviceSyncBootstrapService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Delay slightly so GW may come up with API
     setTimeout(() => {
       void this.registerAll(1);
     }, 1500);
@@ -39,8 +39,7 @@ export class DeviceSyncBootstrapService implements OnModuleInit {
         return;
       }
       this.logger.error(
-        `Device GW offline — bootstrap gave up after ${this.maxAttempts} attempts ` +
-          '(API re-register on start = persistence; Redis optional later)',
+        `Device GW offline — bootstrap gave up after ${this.maxAttempts} attempts`,
       );
       return;
     }
@@ -51,36 +50,53 @@ export class DeviceSyncBootstrapService implements OnModuleInit {
 
     let ok = 0;
     let fail = 0;
-    for (const d of devices) {
-      try {
-        const reg = await this.gw.registerFromDevice(d);
-        if (reg?.id) {
-          await this.prisma.device.update({
-            where: { id: d.id },
-            data: {
-              gatewayRef: reg.id,
-              status: reg.status || 'online',
-              lastSeenAt: new Date(),
-            },
-          });
-          ok += 1;
-        } else {
-          fail += 1;
-          this.logger.warn(
-            `Device GW bootstrap: no id returned for device ${d.id} (${d.serialNumber})`,
-          );
-        }
-      } catch (e) {
-        fail += 1;
-        this.logger.warn(
-          `Device GW bootstrap: register failed for ${d.id}: ${
-            e instanceof Error ? e.message : e
-          }`,
-        );
+    let skipped = 0;
+
+    for (let i = 0; i < devices.length; i += this.concurrency) {
+      const batch = devices.slice(i, i + this.concurrency);
+      const results = await Promise.all(
+        batch.map(async (d) => {
+          // Skip devices already online with a gateway ref — avoid tunnel spam.
+          if (d.status === 'online' && d.gatewayRef) {
+            return 'skipped' as const;
+          }
+          try {
+            const reg = await this.gw.registerFromDevice(d);
+            if (reg?.id) {
+              await this.prisma.device.update({
+                where: { id: d.id },
+                data: {
+                  gatewayRef: reg.id,
+                  status: reg.status || 'online',
+                  lastSeenAt: new Date(),
+                },
+              });
+              return 'ok' as const;
+            }
+            this.logger.warn(
+              `Device GW bootstrap: no id returned for device ${d.id} (${d.serialNumber})`,
+            );
+            return 'fail' as const;
+          } catch (e) {
+            this.logger.warn(
+              `Device GW bootstrap: register failed for ${d.id}: ${
+                e instanceof Error ? e.message : e
+              }`,
+            );
+            return 'fail' as const;
+          }
+        }),
+      );
+      for (const r of results) {
+        if (r === 'ok') ok += 1;
+        else if (r === 'fail') fail += 1;
+        else skipped += 1;
       }
     }
+
     this.logger.log(
       `Device GW bootstrap: registered ${ok}/${devices.length}` +
+        (skipped ? ` (skipped online ${skipped})` : '') +
         (fail ? ` (failed ${fail})` : '') +
         (attempt > 1 ? ` after attempt ${attempt}` : ''),
     );

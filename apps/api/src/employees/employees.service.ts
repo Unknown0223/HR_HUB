@@ -432,7 +432,7 @@ export class EmployeesService {
         absences: {
           include: { absenceType: true },
           orderBy: [{ createdAt: 'desc' }, { startDate: 'desc' }],
-          take: 200,
+          take: 50,
         },
         internalTrips: {
           include: { location: { select: { id: true, name: true, code: true } } },
@@ -447,10 +447,10 @@ export class EmployeesService {
           orderBy: { grantedAt: 'desc' },
           take: 100,
         },
-        days: { orderBy: { workDate: 'desc' }, take: 400 },
+        days: { orderBy: { workDate: 'desc' }, take: 60 },
         marks: {
           orderBy: { occurredAt: 'desc' },
-          take: 300,
+          take: 50,
           include: {
             device: {
               select: {

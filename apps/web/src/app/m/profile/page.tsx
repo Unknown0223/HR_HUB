@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { API_URL, apiFetch, setSession } from '@/lib/api';
+import { API_ORIGIN, apiFetch, setSession } from '@/lib/api';
 import MobileFrame from '../_components/MobileFrame';
 import styles from '../mobile.module.css';
 import { initials } from '../_lib/mobile';
@@ -59,7 +59,7 @@ export default function MobileProfilePage() {
         { label: 'Lavozim', value: profile.employee?.position?.name ?? '—' },
         { label: 'Jadval', value: profile.employee?.schedule?.name ?? '—' },
         { label: 'Telefon', value: profile.employee?.phone ?? '—' },
-        { label: 'Server', value: API_URL },
+        { label: 'Server', value: API_ORIGIN },
       ]
     : [];
 

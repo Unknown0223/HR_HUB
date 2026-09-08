@@ -1068,13 +1068,18 @@ export default function DashboardPage() {
     setTableColumns(loadColumns());
     setSearchFields(loadSearchKeys());
     setSortRules(loadSortRules());
-    fetchOptions();
-  }, [fetchOptions]);
+  }, []);
 
-  // Initial load + when applied filters change (only via «Обновить» / template)
+  // Initial: options + stats in parallel; later: stats only when filters applied
+  const initialParallelDone = useRef(false);
   useEffect(() => {
-    fetchStats(applied);
-  }, [applied, fetchStats]);
+    if (!initialParallelDone.current) {
+      initialParallelDone.current = true;
+      void Promise.all([fetchOptions(), fetchStats(applied)]);
+      return;
+    }
+    void fetchStats(applied);
+  }, [applied, fetchStats, fetchOptions]);
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
