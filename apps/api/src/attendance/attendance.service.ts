@@ -1711,7 +1711,11 @@ export class AttendanceService {
     });
   }
 
-  async syncDevicePersons(tenantId: string, deviceId: string) {
+  async syncDevicePersons(
+    tenantId: string,
+    deviceId: string,
+    opts: { force?: boolean } = {},
+  ) {
     const alreadyRunning = this.personsSyncInFlight.has(deviceId);
     // Claim lock synchronously before any await so parallel requests cannot both start waves.
     if (!alreadyRunning) {
@@ -1748,7 +1752,7 @@ export class AttendanceService {
             employeeId: emp.id,
             syncStatus: FaceSyncStatus.pending,
           });
-        } else if (row.syncStatus !== FaceSyncStatus.synced) {
+        } else if (opts.force || row.syncStatus !== FaceSyncStatus.synced) {
           toRequeueIds.push(row.id);
         }
       }
@@ -1771,7 +1775,9 @@ export class AttendanceService {
 
       await this.appendCommand(tenantId, deviceId, {
         type: 'Person Sync',
-        employeeName: `queued +${created}/requeue ${requeued} (loc employees ${withFace.length})`,
+        employeeName: `queued +${created}/requeue ${requeued}${
+          opts.force ? ' force' : ''
+        } (loc employees ${withFace.length})`,
         status: 'completed',
       });
 
@@ -1797,6 +1803,7 @@ export class AttendanceService {
         created,
         requeued,
         withPhoto: withFace.length,
+        force: Boolean(opts.force),
         locationId: device.locationId,
       };
     } catch (e) {

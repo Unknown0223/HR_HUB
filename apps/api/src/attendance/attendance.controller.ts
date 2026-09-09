@@ -376,11 +376,17 @@ export class AttendanceController {
   @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Post('devices/:id/persons/sync')
+  @ApiQuery({ name: 'force', required: false, description: 'Re-queue even already synced faces' })
   syncDevicePersons(
     @CurrentTenant() tenantId: string | null,
     @Param('id') id: string,
+    @Query('force') force?: string,
   ) {
-    return this.attendance.syncDevicePersons(this.attendance.requireTenant(tenantId), id);
+    return this.attendance.syncDevicePersons(
+      this.attendance.requireTenant(tenantId),
+      id,
+      { force: force === '1' || force === 'true' },
+    );
   }
 
   @ApiBearerAuth()

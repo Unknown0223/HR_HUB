@@ -160,6 +160,9 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self.auth_failed: bool = False
         self.clock_read_ok: bool = False
         self.auth_lock_until: Optional[datetime] = None
+        # Hikvision DigestAuth is not safe under concurrent ISAPI calls
+        # (AcsEvent poll + face enroll) — serialize all adapter HTTP.
+        self._http_lock = asyncio.Lock()
 
     @property
     def base_url(self) -> str:
@@ -261,19 +264,27 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             logger.warning("heartbeat failed: %s", exc)
             return False
 
-    async def _try_requests(
+    async def _command_client(self) -> Any:
+        """Fresh Digest client for writes — avoids racing AcsEvent/alertStream auth."""
+        return httpx.AsyncClient(
+            base_url=self.base_url,
+            auth=httpx.DigestAuth(self.username or "admin", self.password or ""),
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            verify=False,
+        )
+
+    async def _try_requests_on(
         self,
+        client: httpx.AsyncClient,
         attempts: list[tuple[str, str, dict[str, Any]]],
         ok_log: str,
     ) -> bool:
-        """Run HTTP attempts; treat 2xx as success. Skip 401 digest handshake noise."""
-        assert self._client is not None
         last_status = 0
         last_body = ""
         last_path = ""
         for method, path, kwargs in attempts:
             try:
-                resp = await self._client.request(method, path, **kwargs)
+                resp = await client.request(method, path, **kwargs)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("%s %s connection error: %s", method, path, exc)
                 continue
@@ -281,10 +292,17 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             if resp.status_code < 400:
                 logger.info("%s via %s %s", ok_log, method, path)
                 return True
-            # Face already present on terminal — enroll is effectively done.
             if "deviceUserAlreadyExistFace" in (resp.text or ""):
                 logger.info("%s already on device via %s %s", ok_log, method, path)
                 return True
+            if "employeeNoAlreadyExist" in (resp.text or ""):
+                logger.info(
+                    "%s employee exists via %s %s — try next upsert path",
+                    ok_log,
+                    method,
+                    path,
+                )
+                continue
             logger.warning(
                 "%s %s -> %s %s", method, path, resp.status_code, resp.text[:400]
             )
@@ -296,6 +314,20 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             last_body,
         )
         return False
+
+    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        assert self._client is not None
+        async with self._http_lock:
+            return await self._client.request(method, path, **kwargs)
+
+    async def _try_requests(
+        self,
+        attempts: list[tuple[str, str, dict[str, Any]]],
+        ok_log: str,
+    ) -> bool:
+        """Run HTTP attempts; treat 2xx as success. Skip 401 digest handshake noise."""
+        assert self._client is not None
+        return await self._try_requests_on(self._client, attempts, ok_log)
 
     async def upsert_user(self, employee_id: str, name: str) -> bool:
         """Create/update person: POST Record, then PUT SetUp/Modify (MinMoe ISAPI)."""
@@ -341,16 +373,19 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             "content": xml_body.encode("utf-8"),
             "headers": {"Content-Type": "application/xml"},
         }
-        return await self._try_requests(
-            [
-                ("POST", "/ISAPI/AccessControl/UserInfo/Record?format=json", {"json": payload}),
-                ("PUT", "/ISAPI/AccessControl/UserInfo/SetUp?format=json", {"json": payload}),
-                ("PUT", "/ISAPI/AccessControl/UserInfo/Modify?format=json", {"json": payload}),
-                ("POST", "/ISAPI/AccessControl/UserInfo/Record", xml_kw),
-                ("PUT", "/ISAPI/AccessControl/UserInfo/SetUp", xml_kw),
-            ],
-            f"UserInfo upsert employeeNo={emp_no}",
-        )
+        attempts = [
+            ("PUT", "/ISAPI/AccessControl/UserInfo/SetUp?format=json", {"json": payload}),
+            ("PUT", "/ISAPI/AccessControl/UserInfo/Modify?format=json", {"json": payload}),
+            ("POST", "/ISAPI/AccessControl/UserInfo/Record?format=json", {"json": payload}),
+            ("PUT", "/ISAPI/AccessControl/UserInfo/SetUp", xml_kw),
+            ("POST", "/ISAPI/AccessControl/UserInfo/Record", xml_kw),
+        ]
+        async with await self._command_client() as client:
+            return await self._try_requests_on(
+                client,
+                attempts,
+                f"UserInfo upsert employeeNo={emp_no}",
+            )
 
     async def enroll_face(
         self,
@@ -414,42 +449,42 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 {"json": {"FaceDataRecord": {**record, "faceData": b64}}},
             ),
         ]
-        if await self._try_requests(json_attempts, f"Face enroll json employeeNo={emp_no}"):
-            return True
+        async with await self._command_client() as client:
+            if await self._try_requests_on(
+                client, json_attempts, f"Face enroll json employeeNo={emp_no}"
+            ):
+                return True
 
-        assert self._client is not None
-        files = {
-            "FaceDataRecord": (
-                None,
-                json.dumps(record),
-                "application/json",
-            ),
-            "FaceImage": ("face.jpg", raw, "image/jpeg"),
-        }
-        try:
-            resp = await self._client.post(
-                "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
-                files=files,
-            )
-            body = resp.text or ""
-            # Already enrolled on terminal — treat as success so sync is not marked failed.
-            if "deviceUserAlreadyExistFace" in body:
-                logger.info(
-                    "Face already on device employeeNo=%s — treating enroll as ok",
-                    emp_no,
+            files = {
+                "FaceDataRecord": (
+                    None,
+                    json.dumps(record),
+                    "application/json",
+                ),
+                "FaceImage": ("face.jpg", raw, "image/jpeg"),
+            }
+            try:
+                resp = await client.post(
+                    "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+                    files=files,
                 )
-                return True
-            logger.warning(
-                "multipart FaceDataRecord -> %s %s",
-                resp.status_code,
-                body[:400],
-            )
-            if resp.status_code < 400:
-                logger.info("Face enroll multipart ok employeeNo=%s", emp_no)
-                return True
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("multipart FaceDataRecord error: %s", exc)
-        return False
+                if resp.status_code < 400 or "deviceUserAlreadyExistFace" in (
+                    resp.text or ""
+                ):
+                    logger.info(
+                        "Face enroll multipart employeeNo=%s via %s",
+                        emp_no,
+                        resp.status_code,
+                    )
+                    return True
+                logger.warning(
+                    "Face enroll multipart -> %s %s",
+                    resp.status_code,
+                    resp.text[:400],
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Face enroll multipart error: %s", exc)
+            return False
 
     async def sync_clock(self) -> bool:
         """Align terminal clock with the PC (Uzbekistan UTC+5)."""
