@@ -141,6 +141,8 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self._event_queue: list[dict[str, Any]] = []
         self._seen_event_keys: set[str] = set()
         self._on_realtime_event: Optional[Any] = None  # async (punch: dict) -> None
+        self._pending_realtime_punch: Optional[dict[str, Any]] = None
+        self._pending_realtime_flush: Optional[asyncio.Task] = None
         self.realtime_connected: bool = False
         self.last_realtime_at: Optional[datetime] = None
         self.last_drift_seconds: float = 0.0
@@ -1139,9 +1141,26 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 continue
             last_kept[eid] = occurred
             item = punch.get("raw") if isinstance(punch.get("raw"), dict) else {}
-            b64 = await self._fetch_capture_jpeg(
-                item.get("pictureURL") if isinstance(item, dict) else None
-            )
+            url = None
+            if isinstance(item, dict):
+                url = (
+                    item.get("pictureURL")
+                    or item.get("pictureUrl")
+                    or item.get("faceUrl")
+                    or item.get("FaceURL")
+                    or item.get("captureUrl")
+                )
+                alert = item.get("alert") if isinstance(item.get("alert"), dict) else None
+                if not url and isinstance(alert, dict):
+                    ev = alert.get("AccessControllerEvent")
+                    if isinstance(ev, dict):
+                        url = (
+                            ev.get("pictureURL")
+                            or ev.get("pictureUrl")
+                            or ev.get("faceUrl")
+                            or ev.get("FaceURL")
+                        )
+            b64 = await self._fetch_capture_jpeg(url)
             if b64:
                 punch["photo_base64"] = b64
                 attached += 1
@@ -1332,7 +1351,101 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             self.realtime_connected = False
             await stream_client.aclose()
 
+    async def _dispatch_realtime_punch(self, punch: dict[str, Any]) -> None:
+        """Send realtime punch to callback / queue (with optional capture photo)."""
+        self.last_realtime_at = datetime.now(timezone.utc)
+        logger.info(
+            "realtime punch emp=%s at=%s photo=%s",
+            punch.get("employee_external_id"),
+            punch.get("occurred_at"),
+            "yes" if punch.get("photo_base64") else "no",
+        )
+        cb = self._on_realtime_event
+        if cb is not None:
+            try:
+                result = cb(punch)
+                if asyncio.iscoroutine(result):
+                    await result
+                return
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("realtime callback failed: %s", exc)
+        self._event_queue.append(punch)
+
+    async def _flush_pending_realtime(self) -> None:
+        punch = self._pending_realtime_punch
+        self._pending_realtime_punch = None
+        self._pending_realtime_flush = None
+        if punch:
+            # Try pictureURL before giving up without a snapshot.
+            if not punch.get("photo_base64"):
+                raw = punch.get("raw") if isinstance(punch.get("raw"), dict) else {}
+                url = None
+                if isinstance(raw, dict):
+                    url = (
+                        raw.get("pictureURL")
+                        or raw.get("pictureUrl")
+                        or raw.get("faceUrl")
+                        or raw.get("FaceURL")
+                    )
+                    alert = raw.get("alert") if isinstance(raw.get("alert"), dict) else None
+                    if not url and isinstance(alert, dict):
+                        ev = alert.get("AccessControllerEvent")
+                        if isinstance(ev, dict):
+                            url = (
+                                ev.get("pictureURL")
+                                or ev.get("pictureUrl")
+                                or ev.get("faceUrl")
+                                or ev.get("FaceURL")
+                            )
+                b64 = await self._fetch_capture_jpeg(url)
+                if b64:
+                    punch["photo_base64"] = b64
+            await self._dispatch_realtime_punch(punch)
+
+    def _schedule_pending_realtime_flush(self, delay_s: float = 1.2) -> None:
+        if self._pending_realtime_flush and not self._pending_realtime_flush.done():
+            self._pending_realtime_flush.cancel()
+
+        async def _delayed() -> None:
+            try:
+                await asyncio.sleep(delay_s)
+                await self._flush_pending_realtime()
+            except asyncio.CancelledError:
+                return
+
+        self._pending_realtime_flush = asyncio.create_task(_delayed())
+
+    @staticmethod
+    def _extract_jpeg_from_mime_part(part: bytes) -> Optional[bytes]:
+        """Return JPEG bytes from an alertStream MIME part, if present."""
+        head = part[:800].lower()
+        idx = part.find(b"\xff\xd8")
+        if idx < 0:
+            return None
+        # Prefer explicit image parts; also accept raw JPEG payloads.
+        if b"image/jpeg" not in head and b"content-type: image" not in head:
+            # JSON parts sometimes embed tiny markers — require a meaningful size.
+            if b"{" in part[:idx] and (len(part) - idx) < 2000:
+                return None
+        end = part.find(b"\xff\xd9", idx)
+        if end > idx:
+            return part[idx : end + 2]
+        return part[idx:]
+
     async def _handle_alert_mime_part(self, part: bytes) -> None:
+        jpeg = self._extract_jpeg_from_mime_part(part)
+        if jpeg and len(jpeg) > 500:
+            b64 = base64.b64encode(jpeg).decode("ascii")
+            if self._pending_realtime_punch is not None:
+                if self._pending_realtime_flush and not self._pending_realtime_flush.done():
+                    self._pending_realtime_flush.cancel()
+                    self._pending_realtime_flush = None
+                punch = self._pending_realtime_punch
+                self._pending_realtime_punch = None
+                punch["photo_base64"] = b64
+                await self._dispatch_realtime_punch(punch)
+            return
+
         text = part.decode("utf-8", errors="ignore")
         # Skip pure binary image parts without JSON
         if "{" not in text:
@@ -1341,24 +1454,12 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             punch = self._punch_from_alert_payload(data)
             if not punch:
                 continue
-            self.last_realtime_at = datetime.now(timezone.utc)
-            logger.info(
-                "realtime punch emp=%s at=%s",
-                punch.get("employee_external_id"),
-                punch.get("occurred_at"),
-            )
-            cb = self._on_realtime_event
-            if cb is not None:
-                try:
-                    result = cb(punch)
-                    if asyncio.iscoroutine(result):
-                        await result
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("realtime callback failed: %s", exc)
-                    # Fallback: keep for poll publisher
-                    self._event_queue.append(punch)
-            else:
-                self._event_queue.append(punch)
+            # Flush any previous punch waiting for a photo.
+            if self._pending_realtime_punch is not None:
+                await self._flush_pending_realtime()
+            # Hold briefly so the following image/* MIME part can attach.
+            self._pending_realtime_punch = punch
+            self._schedule_pending_realtime_flush(1.2)
 
     @staticmethod
     def _extract_json_objects(text: str) -> list[dict[str, Any]]:
