@@ -143,6 +143,8 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self._on_realtime_event: Optional[Any] = None  # async (punch: dict) -> None
         self._pending_realtime_punch: Optional[dict[str, Any]] = None
         self._pending_realtime_flush: Optional[asyncio.Task] = None
+        self._orphan_jpeg_b64: Optional[str] = None
+        self._orphan_jpeg_at: Optional[datetime] = None
         self.realtime_connected: bool = False
         self.last_realtime_at: Optional[datetime] = None
         self.last_drift_seconds: float = 0.0
@@ -184,11 +186,56 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             self.base_url,
             self.model,
         )
+        try:
+            await self.ensure_capture_photo_settings()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ensure capture photo settings failed: %s", exc)
         if self.punch_locked:
             try:
                 await self.set_punching_enabled(False)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("restore punch lock on connect failed: %s", exc)
+
+    async def ensure_capture_photo_settings(self) -> None:
+        """Enable terminal save/upload of authentication capture snapshots.
+
+        Without these flags AcsEvent returns picturesNumber=1 but no pictureURL,
+        and alertStream often omits the JPEG MIME part — marks ФОТО stays empty.
+        """
+        if not self._client:
+            return
+        resp = await self._client.get("/ISAPI/AccessControl/AcsCfg?format=json")
+        if resp.status_code >= 400:
+            logger.warning("AcsCfg read %s %s", resp.status_code, resp.text[:160])
+            return
+        data = resp.json()
+        acs = data.get("AcsCfg") if isinstance(data, dict) else None
+        if not isinstance(acs, dict):
+            return
+        wanted = {
+            "uploadCapPic": True,
+            "saveCapPic": True,
+            "uploadVerificationPic": True,
+            "saveVerificationPic": True,
+            "showPicture": True,
+        }
+        changed = False
+        for key, val in wanted.items():
+            if key not in acs:
+                continue
+            if acs.get(key) is not True:
+                acs[key] = val
+                changed = True
+        if not changed:
+            return
+        put = await self._client.put(
+            "/ISAPI/AccessControl/AcsCfg?format=json",
+            json=data,
+        )
+        if put.status_code >= 400:
+            logger.warning("AcsCfg write %s %s", put.status_code, put.text[:160])
+            return
+        logger.info("AcsCfg: capture photo save/upload enabled")
 
     async def disconnect(self) -> None:
         if self._subscribe_task and not self._subscribe_task.done():
@@ -1197,6 +1244,8 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                         "minor": 75,
                         "startTime": start,
                         "endTime": end,
+                        # Ask device to include capture pictureURL when available.
+                        "picEnable": True,
                     }
                 }
                 resp = await self._client.post(
@@ -1279,6 +1328,17 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             return
         self._subscribe_task = asyncio.create_task(self._alert_stream_loop())
 
+    @staticmethod
+    def _boundary_from_content_type(content_type: str | None) -> bytes:
+        """Parse multipart boundary; fall back to Hikvision's common default."""
+        if content_type:
+            m = re.search(r"boundary=([^;\s]+)", content_type, flags=re.I)
+            if m:
+                raw = m.group(1).strip().strip('"')
+                if raw:
+                    return b"--" + raw.encode("ascii", errors="ignore")
+        return b"--MIME_boundary"
+
     async def _alert_stream_loop(self) -> None:
         """Long-lived multipart alertStream → queue + optional realtime callback."""
         assert self._client is not None
@@ -1288,7 +1348,9 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             auth=httpx.DigestAuth(self.username, self.password),
             timeout=httpx.Timeout(None, connect=5.0),
             verify=False,
+            headers={"Accept": "multipart/mixed"},
         )
+        # Prefer plain alertStream (some firmwares reject ?format=json under load).
         url = "/ISAPI/Event/notification/alertStream"
         logger.info("Starting alertStream subscribe on %s", self.base_url)
         try:
@@ -1306,15 +1368,38 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                     async with stream_client.stream("GET", url) as resp:
                         if resp.status_code >= 400:
                             self.realtime_connected = False
-                            # Never mark platform password out-of-sync from alertStream.
-                            self._note_auth_response(resp, mark_auth_failed=False)
+                            body_preview = ""
+                            try:
+                                body_preview = (await resp.aread())[:240].decode(
+                                    "utf-8", errors="ignore"
+                                )
+                            except Exception:  # noqa: BLE001
+                                body_preview = ""
+                            # Do not call _note_auth_response(resp): streaming
+                            # responses break on resp.text access.
+                            if resp.status_code == 401 and (
+                                "lockStatus>lock" in body_preview
+                                or "<lockStatus>lock</lockStatus>" in body_preview
+                            ):
+                                m = re.search(
+                                    r"<unlockTime>\s*(\d+)\s*</unlockTime>",
+                                    body_preview,
+                                )
+                                secs = int(m.group(1)) if m else 120
+                                secs = max(30, min(secs + 5, 3600))
+                                self.auth_lock_until = datetime.now(
+                                    timezone.utc
+                                ) + timedelta(seconds=secs)
                             logger.warning(
-                                "alertStream %s status %s", url, resp.status_code
+                                "alertStream %s status %s %s",
+                                url,
+                                resp.status_code,
+                                body_preview.replace("\n", " ")[:160],
                             )
-                            wait = 5.0
+                            wait = 12.0 if "deployExceedMax" in body_preview else 5.0
                             if self.auth_lock_until:
                                 wait = max(
-                                    5.0,
+                                    wait,
                                     (
                                         self.auth_lock_until
                                         - datetime.now(timezone.utc)
@@ -1323,8 +1408,14 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                             await asyncio.sleep(min(wait, 600))
                             continue
                         self.realtime_connected = True
-                        logger.info("alertStream connected %s", self.base_url)
-                        boundary = b"--MIME_boundary"
+                        boundary = self._boundary_from_content_type(
+                            resp.headers.get("content-type")
+                        )
+                        logger.info(
+                            "alertStream connected %s boundary=%s",
+                            self.base_url,
+                            boundary.decode("ascii", errors="ignore"),
+                        )
                         buffer = b""
                         async for chunk in resp.aiter_bytes():
                             buffer += chunk
@@ -1371,12 +1462,27 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 logger.warning("realtime callback failed: %s", exc)
         self._event_queue.append(punch)
 
+    def _take_orphan_jpeg(self, max_age_s: float = 3.0) -> Optional[str]:
+        if not self._orphan_jpeg_b64 or not self._orphan_jpeg_at:
+            return None
+        age = (datetime.now(timezone.utc) - self._orphan_jpeg_at).total_seconds()
+        b64 = self._orphan_jpeg_b64
+        self._orphan_jpeg_b64 = None
+        self._orphan_jpeg_at = None
+        if age > max_age_s:
+            return None
+        return b64
+
     async def _flush_pending_realtime(self) -> None:
         punch = self._pending_realtime_punch
         self._pending_realtime_punch = None
         self._pending_realtime_flush = None
         if punch:
             # Try pictureURL before giving up without a snapshot.
+            if not punch.get("photo_base64"):
+                orphan = self._take_orphan_jpeg()
+                if orphan:
+                    punch["photo_base64"] = orphan
             if not punch.get("photo_base64"):
                 raw = punch.get("raw") if isinstance(punch.get("raw"), dict) else {}
                 url = None
@@ -1402,7 +1508,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                     punch["photo_base64"] = b64
             await self._dispatch_realtime_punch(punch)
 
-    def _schedule_pending_realtime_flush(self, delay_s: float = 1.2) -> None:
+    def _schedule_pending_realtime_flush(self, delay_s: float = 2.5) -> None:
         if self._pending_realtime_flush and not self._pending_realtime_flush.done():
             self._pending_realtime_flush.cancel()
 
@@ -1418,7 +1524,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
     @staticmethod
     def _extract_jpeg_from_mime_part(part: bytes) -> Optional[bytes]:
         """Return JPEG bytes from an alertStream MIME part, if present."""
-        head = part[:800].lower()
+        head = part[:1200].lower()
         idx = part.find(b"\xff\xd8")
         if idx < 0:
             return None
@@ -1427,10 +1533,13 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             # JSON parts sometimes embed tiny markers — require a meaningful size.
             if b"{" in part[:idx] and (len(part) - idx) < 2000:
                 return None
-        end = part.find(b"\xff\xd9", idx)
+        end = part.rfind(b"\xff\xd9", idx)
         if end > idx:
             return part[idx : end + 2]
-        return part[idx:]
+        # Incomplete trailing JPEG — keep if large enough to be a real snapshot.
+        if (len(part) - idx) >= 2500:
+            return part[idx:]
+        return None
 
     async def _handle_alert_mime_part(self, part: bytes) -> None:
         jpeg = self._extract_jpeg_from_mime_part(part)
@@ -1444,6 +1553,11 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 self._pending_realtime_punch = None
                 punch["photo_base64"] = b64
                 await self._dispatch_realtime_punch(punch)
+            else:
+                # Image may arrive before JSON on some firmwares — hold briefly.
+                self._orphan_jpeg_b64 = b64
+                self._orphan_jpeg_at = datetime.now(timezone.utc)
+                logger.info("alertStream orphan jpeg held (%s bytes)", len(jpeg))
             return
 
         text = part.decode("utf-8", errors="ignore")
@@ -1454,12 +1568,17 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             punch = self._punch_from_alert_payload(data)
             if not punch:
                 continue
+            orphan = self._take_orphan_jpeg()
+            if orphan:
+                punch["photo_base64"] = orphan
+                await self._dispatch_realtime_punch(punch)
+                continue
             # Flush any previous punch waiting for a photo.
             if self._pending_realtime_punch is not None:
                 await self._flush_pending_realtime()
             # Hold briefly so the following image/* MIME part can attach.
             self._pending_realtime_punch = punch
-            self._schedule_pending_realtime_flush(1.2)
+            self._schedule_pending_realtime_flush(2.5)
 
     @staticmethod
     def _extract_json_objects(text: str) -> list[dict[str, Any]]:
