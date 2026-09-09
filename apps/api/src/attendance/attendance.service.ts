@@ -4519,10 +4519,21 @@ export class AttendanceService {
               ? 'Ручной ввод'
               : m.source);
 
-    const photoUrl = this.storage.mediaUrl(
-      typeof payload.photoKey === 'string' ? payload.photoKey : null,
-      typeof payload.photoUrl === 'string' ? payload.photoUrl : null,
-    );
+    const photoUrl =
+      this.storage.mediaUrl(
+        typeof payload.photoKey === 'string' ? payload.photoKey : null,
+        typeof payload.photoUrl === 'string' ? payload.photoUrl : null,
+      ) ||
+      // Realtime Hikvision punches often have no snapshot — show employee face photo.
+      (m.employee?.faceProfile
+        ? this.storage.mediaUrl(
+            m.employee.faceProfile.photoKey ?? null,
+            // Prefer storage key over huge data: URLs in list payloads.
+            m.employee.faceProfile.photoKey
+              ? null
+              : (m.employee.faceProfile.photoUrl ?? null),
+          )
+        : null);
 
     const changeHistory = Array.isArray(payload.changeHistory)
       ? (payload.changeHistory as unknown[])
@@ -4551,7 +4562,9 @@ export class AttendanceService {
                   ...m.employee.faceProfile,
                   photoUrl: this.storage.mediaUrl(
                     m.employee.faceProfile.photoKey,
-                    m.employee.faceProfile.photoUrl,
+                    m.employee.faceProfile.photoKey
+                      ? null
+                      : m.employee.faceProfile.photoUrl,
                   ),
                 }
               : m.employee.faceProfile,

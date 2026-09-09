@@ -497,7 +497,13 @@
   object-fit: cover;
   background: var(--surface-subtle);
   display: block;
-  cursor: pointer;
+  cursor: zoom-in;
+  border: 1px solid var(--line);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.photo:hover {
+  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.25);
+  transform: scale(1.06);
 }
 .photoEmpty {
   width: 40px;

@@ -37,7 +37,7 @@ type Emp = {
   lastName: string;
   middleName?: string | null;
   tabNumber?: string;
-  faceProfile?: { photoUrl?: string | null } | null;
+  faceProfile?: { photoUrl?: string | null; photoKey?: string | null } | null;
   division?: { id: string; name: string } | null;
   position?: { id: string; name: string } | null;
 };
@@ -119,6 +119,15 @@ function typeClass(t: string) {
   return styles.dotMark;
 }
 
+function markPhotoSrc(m: Mark): string | null {
+  return (
+    mediaSrc(m.photoUrl) ||
+    mediaSrc(m.employee?.faceProfile?.photoUrl, m.employee?.faceProfile?.photoKey) ||
+    mediaSrc(m.employee?.faceProfile?.photoUrl) ||
+    null
+  );
+}
+
 function markDay(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -128,7 +137,7 @@ function markDay(iso: string) {
 function markCell(m: Mark, key: string): string {
   switch (key) {
     case 'photo':
-      return m.photoUrl ? 'есть' : '';
+      return markPhotoSrc(m) ? 'есть' : '';
     case 'person':
       return empName(m.employee) === '—' ? '' : empName(m.employee);
     case 'location':
@@ -367,7 +376,7 @@ function MarksInner() {
         const obj: Record<string, unknown> = {};
         for (const k of visibleCols) {
           if (k === 'photo') {
-            obj[prefs.labelOf(k)] = m.photoUrl ? 'есть' : '—';
+            obj[prefs.labelOf(k)] = markPhotoSrc(m) ? 'есть' : '—';
             continue;
           }
           obj[prefs.labelOf(k)] = markCell(m, k) || '—';
@@ -723,10 +732,10 @@ function MarksInner() {
                 </tr>
               ) : null}
               {displayRows.map((m) => {
-                const photo = mediaSrc(m.photoUrl);
+                const photo = markPhotoSrc(m);
                 const slides = displayRows
                   .map((x) => ({
-                    src: mediaSrc(x.photoUrl) || '',
+                    src: markPhotoSrc(x) || '',
                     caption: `${empName(x.employee)} · ${x.markTypeLabel || x.markType} · ${fmtDt(x.occurredAt)}`,
                   }))
                   .filter((s) => s.src);
@@ -751,18 +760,18 @@ function MarksInner() {
                       {visibleCols.map((key) => {
                         if (key === 'photo') {
                           return (
-                            <td key={key}>
+                            <td key={key} onClick={(e) => e.stopPropagation()}>
                               {photo ? (
                                 <PhotoThumb
                                   src={photo}
-                                  alt=""
+                                  alt={empName(m.employee)}
                                   className={styles.photo}
                                   lightbox={photos}
                                   slides={slides}
                                   index={idx < 0 ? 0 : idx}
                                 />
                               ) : (
-                                <span className={styles.photoEmpty} />
+                                <span className={styles.photoEmpty} aria-hidden />
                               )}
                             </td>
                           );
