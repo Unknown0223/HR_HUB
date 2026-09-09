@@ -8,6 +8,7 @@ import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
 import { FormModal } from '@/components/FormModal';
+import { PassportScanModal } from '@/components/PassportScanModal';
 import { ModalPortal } from '@/components/ModalPortal';
 import fmStyles from '@/components/form-modal.module.css';
 import styles from './page.module.css';
@@ -1034,6 +1035,7 @@ export default function EmployeeDetailPage() {
     isValid: true,
   });
   const [docOpen, setDocOpen] = useState(false);
+  const [passportScanOpen, setPassportScanOpen] = useState(false);
   const [docEditId, setDocEditId] = useState<string | null>(null);
   const [docTypeOpts, setDocTypeOpts] = useState<{ code: string; name: string }[]>([]);
   const [docTypeQuery, setDocTypeQuery] = useState('');
@@ -2150,6 +2152,7 @@ export default function EmployeeDetailPage() {
   async function loadDocTypes() {
     const fallback = [
       { code: 'PASSPORT', name: 'Паспорт' },
+      { code: 'ID_CARD', name: 'ID-карта' },
       { code: 'ID', name: 'ID-карта' },
       { code: 'DIPLOMA', name: 'Диплом' },
     ];
@@ -4183,6 +4186,17 @@ export default function EmployeeDetailPage() {
                   <span className={styles.sideValue}>
                     {row.person?.passport ?? '—'}
                   </span>
+                  <button
+                    type="button"
+                    className={styles.linkBtn}
+                    style={{ display: 'block', marginTop: 4 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void openDocModal('passport').then(() => setPassportScanOpen(true));
+                    }}
+                  >
+                    Скан қилиш
+                  </button>
                 </div>
               </li>
               <li className={styles.sideItem}>
@@ -9204,6 +9218,15 @@ export default function EmployeeDetailPage() {
         }
       >
         <div className={styles.docModalFields}>
+          <div style={{ marginBottom: '0.65rem' }}>
+            <button
+              type="button"
+              className={fmStyles.btnGhost}
+              onClick={() => setPassportScanOpen(true)}
+            >
+              Паспорт / ID дан скан қилиш
+            </button>
+          </div>
           <div className={styles.docTypeCombo} ref={docTypeComboRef}>
             <div className={styles.modalField}>
               <label>
@@ -9379,6 +9402,48 @@ export default function EmployeeDetailPage() {
           </div>
         </div>
       </FormModal>
+      <PassportScanModal
+        open={passportScanOpen}
+        onClose={() => setPassportScanOpen(false)}
+        onConfirm={(r) => {
+          const wantsId = r.docType === 'ID_CARD';
+          const code =
+            (wantsId &&
+              (docTypeOpts.find((t) => t.code === 'ID_CARD')?.code ||
+                docTypeOpts.find((t) => t.code === 'ID')?.code)) ||
+            (wantsId ? 'ID_CARD' : 'PASSPORT');
+          const label =
+            docTypeOpts.find((t) => t.code === code)?.name ||
+            (wantsId ? 'ID-карта' : 'Паспорт');
+          setDocForm((f) => ({
+            ...f,
+            docType: code,
+            series: r.series || f.series,
+            docNumber: r.docNumber || f.docNumber,
+            issuer: r.issuer || f.issuer,
+            issuedAt: r.issuedAt || f.issuedAt,
+            expiresAt: r.expiresAt || f.expiresAt,
+          }));
+          setDocTypeQuery(label);
+          setPassportScanOpen(false);
+          if (id) {
+            void apiFetch(`/api/employees/${id}/personal`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                firstName: r.firstName || undefined,
+                lastName: r.lastName || undefined,
+                middleName: r.middleName || undefined,
+                birthDate: r.birthDate || undefined,
+                gender: r.gender || undefined,
+                pinfl: r.pinfl || undefined,
+                nationality: r.nationality || undefined,
+              }),
+            })
+              .then(() => load())
+              .catch(() => undefined);
+          }
+        }}
+      />
       <FormModal
         open={relOpen}
         title={relEditId ? 'Родственник (изменение)' : 'Родственник (добавление)'}

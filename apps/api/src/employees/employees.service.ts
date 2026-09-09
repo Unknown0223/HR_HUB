@@ -1467,6 +1467,22 @@ export class EmployeesService {
       },
     });
 
+    const personPatch = {
+      firstName: dto.firstName ?? emp.firstName,
+      lastName: dto.lastName ?? emp.lastName,
+      middleName:
+        dto.middleName !== undefined ? dto.middleName : emp.middleName,
+      gender: dto.gender ?? undefined,
+      pinfl: dto.pinfl ?? undefined,
+      birthDate:
+        dto.birthDate !== undefined
+          ? dto.birthDate
+            ? new Date(dto.birthDate)
+            : null
+          : undefined,
+      nationality: dto.nationality ?? undefined,
+    };
+
     if (emp.personId) {
       await this.prisma.person.update({
         where: { id: emp.personId },
@@ -1476,13 +1492,31 @@ export class EmployeesService {
           middleName: dto.middleName ?? undefined,
           gender: dto.gender ?? undefined,
           pinfl: dto.pinfl ?? undefined,
-          birthDate:
-            dto.birthDate !== undefined
-              ? dto.birthDate
-                ? new Date(dto.birthDate)
-                : null
-              : undefined,
+          nationality: dto.nationality ?? undefined,
+          birthDate: personPatch.birthDate,
         },
+      });
+    } else if (
+      dto.pinfl !== undefined ||
+      dto.birthDate !== undefined ||
+      dto.gender !== undefined ||
+      dto.nationality !== undefined
+    ) {
+      const person = await this.prisma.person.create({
+        data: {
+          tenantId,
+          firstName: personPatch.firstName,
+          lastName: personPatch.lastName,
+          middleName: personPatch.middleName || null,
+          gender: dto.gender || null,
+          pinfl: dto.pinfl || null,
+          nationality: dto.nationality || null,
+          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+        },
+      });
+      await this.prisma.employee.update({
+        where: { id: employeeId },
+        data: { personId: person.id },
       });
     }
 
@@ -1797,8 +1831,40 @@ export class EmployeesService {
     };
   }
 
-  create(tenantId: string, dto: CreateEmployeeDto) {
-    return this.prisma.employee.create({
+  async create(tenantId: string, dto: CreateEmployeeDto) {
+    const hasPassportBits = Boolean(
+      dto.pinfl ||
+        dto.birthDate ||
+        dto.passportNumber ||
+        dto.passportSeries ||
+        dto.gender ||
+        dto.nationality,
+    );
+    let personId = dto.personId;
+    if (!personId && hasPassportBits) {
+      const series = String(dto.passportSeries || '').trim();
+      const number = String(dto.passportNumber || '').trim();
+      const passport =
+        [series, number].filter(Boolean).join(' ').trim() || number || null;
+      const person = await this.prisma.person.create({
+        data: {
+          tenantId,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          middleName: dto.middleName || null,
+          pinfl: String(dto.pinfl || '').trim() || null,
+          passport,
+          gender: String(dto.gender || '').trim() || null,
+          nationality: String(dto.nationality || '').trim() || null,
+          birthDate: dto.birthDate ? new Date(dto.birthDate.slice(0, 10)) : null,
+          phone: dto.phone || null,
+          email: dto.email || null,
+        },
+      });
+      personId = person.id;
+    }
+
+    const emp = await this.prisma.employee.create({
       data: {
         tenantId,
         tabNumber: dto.tabNumber,
@@ -1809,7 +1875,7 @@ export class EmployeesService {
         phone: dto.phone,
         divisionId: dto.divisionId,
         positionId: dto.positionId,
-        personId: dto.personId,
+        personId,
         employmentType: dto.employmentType ?? EmploymentType.staff,
         hiredAt: dto.hiredAt ? new Date(dto.hiredAt) : undefined,
         externalId: dto.externalId,
@@ -1824,6 +1890,41 @@ export class EmployeesService {
         grade: { select: { id: true, name: true, code: true } },
       },
     });
+
+    const docNumber = String(dto.passportNumber || '').trim();
+    if (docNumber) {
+      const series = String(dto.passportSeries || '').trim();
+      const docType =
+        String(dto.passportDocType || '').trim().toUpperCase() === 'ID_CARD'
+          ? 'ID_CARD'
+          : 'PASSPORT';
+      await this.prisma.personDocument.create({
+        data: {
+          tenantId,
+          employeeId: emp.id,
+          personId: personId || null,
+          docType,
+          docNumber,
+          issuer: String(dto.passportIssuer || '').trim() || null,
+          issuedAt: dto.passportIssuedAt
+            ? new Date(dto.passportIssuedAt.slice(0, 10))
+            : null,
+          expiresAt: dto.passportExpiresAt
+            ? new Date(dto.passportExpiresAt.slice(0, 10))
+            : null,
+          payload: {
+            series,
+            isValid: true,
+            source: 'passport_scan',
+          } as Prisma.InputJsonValue,
+        },
+      });
+      if (personId) {
+        await this.syncPassportFromDoc(personId, docType, series, docNumber);
+      }
+    }
+
+    return emp;
   }
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {
@@ -3067,7 +3168,13 @@ export class EmployeesService {
     docNumber: string,
   ) {
     if (!personId) return;
-    if (!/^PASSPORT$/i.test(docType) && !/паспорт/i.test(docType)) return;
+    if (
+      !/^PASSPORT$/i.test(docType) &&
+      !/^ID(_?CARD)?$/i.test(docType) &&
+      !/паспорт|id.?карт/i.test(docType)
+    ) {
+      return;
+    }
     const passport = [series, docNumber].filter(Boolean).join(' ').trim() || docNumber;
     await this.prisma.person.update({
       where: { id: personId },

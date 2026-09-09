@@ -17,6 +17,10 @@ import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { FormModal } from '@/components/FormModal';
+import {
+  PassportScanModal,
+  type PassportScanResult,
+} from '@/components/PassportScanModal';
 import modal from '@/components/form-modal.module.css';
 import { useUrlParam } from '@/lib/use-url-state';
 import styles from '../../page-shared.module.css';
@@ -195,9 +199,12 @@ function EmployeesPageInner() {
   const [saving, setSaving] = useState(false);
   const [flagBusyId, setFlagBusyId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [passportScan, setPassportScan] = useState<PassportScanResult | null>(null);
   const photos = usePhotoLightbox();
   const menuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const createFormRef = useRef<HTMLFormElement>(null);
 
   const subnavKey =
     tab === 'dismissed'
@@ -398,21 +405,34 @@ function EmployeesPageInner() {
     const fd = new FormData(form);
     setSaving(true);
     try {
+      const scan = passportScan;
       await apiFetch('/api/employees', {
         method: 'POST',
         body: JSON.stringify({
           tabNumber: fd.get('tabNumber'),
           firstName: fd.get('firstName'),
           lastName: fd.get('lastName'),
+          middleName: fd.get('middleName') || undefined,
           email: fd.get('email') || undefined,
           divisionId: fd.get('divisionId') || undefined,
           positionId: fd.get('positionId') || undefined,
           employmentType: fd.get('employmentType') || 'staff',
           externalId: fd.get('externalId') || undefined,
           hiredAt: fd.get('hiredAt') || undefined,
+          pinfl: scan?.pinfl || undefined,
+          birthDate: scan?.birthDate || undefined,
+          gender: scan?.gender || undefined,
+          nationality: scan?.nationality || undefined,
+          passportSeries: scan?.series || undefined,
+          passportNumber: scan?.docNumber || undefined,
+          passportDocType: scan?.docType || undefined,
+          passportIssuer: scan?.issuer || undefined,
+          passportIssuedAt: scan?.issuedAt || undefined,
+          passportExpiresAt: scan?.expiresAt || undefined,
         }),
       });
       form.reset();
+      setPassportScan(null);
       setPanel('none');
       await load();
     } catch (err) {
@@ -628,7 +648,10 @@ function EmployeesPageInner() {
       <FormModal
         open={panel === 'create'}
         title="Создать сотрудника"
-        onClose={() => setPanel('none')}
+        onClose={() => {
+          setPanel('none');
+          setPassportScan(null);
+        }}
         width="lg"
         footer={
           <>
@@ -643,7 +666,10 @@ function EmployeesPageInner() {
             <button
               type="button"
               className={modal.btnGhost}
-              onClick={() => setPanel('none')}
+              onClick={() => {
+                setPanel('none');
+                setPassportScan(null);
+              }}
             >
               Отмена
             </button>
@@ -653,7 +679,30 @@ function EmployeesPageInner() {
         {error && panel === 'create' ? (
           <p className={modal.error}>{error}</p>
         ) : null}
-        <form id="emp-create-form" className={modal.fields} onSubmit={onCreate}>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <button
+            type="button"
+            className={modal.btnGhost}
+            onClick={() => setScanOpen(true)}
+          >
+            Паспорт / ID дан скан қилиш
+          </button>
+          {passportScan ? (
+            <p style={{ margin: '0.4rem 0 0', fontSize: '0.85rem', color: '#0f766e' }}>
+              Скан қабул қилинди:{' '}
+              {[passportScan.series, passportScan.docNumber].filter(Boolean).join(' ') ||
+                passportScan.pinfl ||
+                'FIO'}{' '}
+              ({passportScan.docType === 'ID_CARD' ? 'ID-карта' : 'паспорт'})
+            </p>
+          ) : null}
+        </div>
+        <form
+          id="emp-create-form"
+          ref={createFormRef}
+          className={modal.fields}
+          onSubmit={onCreate}
+        >
           <div className={modal.row2}>
             <label className={modal.field}>
               <span>
@@ -671,15 +720,48 @@ function EmployeesPageInner() {
               <span>
                 Фамилия <em className={modal.req}>*</em>
               </span>
-              <input name="lastName" required />
+              <input
+                name="lastName"
+                required
+                defaultValue={passportScan?.lastName || ''}
+                key={`ln-${passportScan?.docNumber || 'x'}-${passportScan?.lastName || ''}`}
+              />
             </label>
             <label className={modal.field}>
               <span>
                 Имя <em className={modal.req}>*</em>
               </span>
-              <input name="firstName" required />
+              <input
+                name="firstName"
+                required
+                defaultValue={passportScan?.firstName || ''}
+                key={`fn-${passportScan?.docNumber || 'x'}-${passportScan?.firstName || ''}`}
+              />
             </label>
           </div>
+          <label className={modal.field}>
+            <span>Отчество</span>
+            <input
+              name="middleName"
+              defaultValue={passportScan?.middleName || ''}
+              key={`mn-${passportScan?.docNumber || 'x'}-${passportScan?.middleName || ''}`}
+            />
+          </label>
+          {passportScan ? (
+            <div className={modal.row2}>
+              <label className={modal.field}>
+                <span>Паспорт серия / рақам</span>
+                <input
+                  readOnly
+                  value={[passportScan.series, passportScan.docNumber].filter(Boolean).join(' ')}
+                />
+              </label>
+              <label className={modal.field}>
+                <span>ПИНФЛ</span>
+                <input readOnly value={passportScan.pinfl || '—'} />
+              </label>
+            </div>
+          ) : null}
           <div className={modal.row2}>
             <label className={modal.field}>
               <span>Подразделение</span>
@@ -723,6 +805,15 @@ function EmployeesPageInner() {
           </label>
         </form>
       </FormModal>
+
+      <PassportScanModal
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onConfirm={(result) => {
+          setPassportScan(result);
+          setScanOpen(false);
+        }}
+      />
 
       <FormModal
         open={panel === 'attach'}

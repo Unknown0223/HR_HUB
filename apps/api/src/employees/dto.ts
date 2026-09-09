@@ -85,6 +85,21 @@ export class CreateEmployeeDto {
   @IsOptional()
   @IsString()
   gradeId?: string;
+
+  /** Optional personal / passport fields (e.g. after passport scan). */
+  @ApiPropertyOptional() @IsOptional() @IsString() pinfl?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() birthDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() gender?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() nationality?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() passportSeries?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() passportNumber?: string;
+  @ApiPropertyOptional({ description: 'PASSPORT | ID_CARD' })
+  @IsOptional()
+  @IsString()
+  passportDocType?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() passportIssuer?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() passportIssuedAt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() passportExpiresAt?: string;
 }
 
 export class UpdateEmployeeDto {
