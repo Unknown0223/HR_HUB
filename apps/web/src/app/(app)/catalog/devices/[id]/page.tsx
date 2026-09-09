@@ -37,6 +37,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'all-marks', label: 'Все отметки' },
 ];
 
+const PAGE_SIZES = [10, 20, 50, 100] as const;
+
 type Device = {
   id: string;
   name: string;
@@ -63,6 +65,26 @@ type Person = {
   fullName: string;
   role?: string;
   synchronized?: boolean;
+  syncStatus?: 'pending' | 'syncing' | 'synced' | 'failed' | string;
+  lastError?: string | null;
+};
+
+type SyncProgress = {
+  running?: boolean;
+  inFlight?: boolean;
+  phase?: string;
+  message?: string;
+  currentNames?: string[];
+  total?: number;
+  synced?: number;
+  pending?: number;
+  syncing?: number;
+  failed?: number;
+  done?: number;
+  percent?: number;
+  startedAt?: string | null;
+  updatedAt?: string | null;
+  finishedAt?: string | null;
 };
 
 type Mark = {
@@ -137,6 +159,13 @@ function trackingLabel(t?: string) {
   return 'Отметка';
 }
 
+function personSyncLabel(p: Person) {
+  if (p.syncStatus === 'synced' || p.synchronized) return 'Да';
+  if (p.syncStatus === 'pending' || p.syncStatus === 'syncing') return 'В очереди';
+  if (p.syncStatus === 'failed') return 'Ошибка';
+  return p.synchronized ? 'Да' : 'Нет';
+}
+
 function empName(m: Mark) {
   if (m.fullName) return m.fullName;
   if (!m.employee) return '—';
@@ -175,6 +204,10 @@ function DeviceDetailInner() {
   const [syncOpen, setSyncOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [personsTotal, setPersonsTotal] = useState(0);
+  const [personsTotalPages, setPersonsTotalPages] = useState(1);
   const [ignoreScope, setIgnoreScope] = useState<'attached' | 'available'>('attached');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const photos = usePhotoLightbox();
@@ -192,10 +225,13 @@ function DeviceDetailInner() {
   const [copiedPwd, setCopiedPwd] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmMsg, setConfirmMsg] = useState('');
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [syncNotice, setSyncNotice] = useState('');
   const setTab = useCallback(
     (next: Tab) => {
       router.replace(`/catalog/devices/${id}?tab=${next}`);
       setSearch('');
+      setPage(1);
       setSelectedIds([]);
       setIgnoreScope('attached');
     },
@@ -228,10 +264,24 @@ function DeviceDetailInner() {
     if (!id) return;
     try {
       if (tab === 'persons') {
-        const data = await apiFetch<Person[]>(`/api/attendance/devices/${id}/persons`);
-        setPersons(Array.isArray(data) ? data : []);
+        const qs = new URLSearchParams({
+          page: String(page),
+          limit: String(pageSize),
+        });
+        if (search.trim()) qs.set('q', search.trim());
+        const data = await apiFetch<{
+          items?: Person[];
+          total?: number;
+          totalPages?: number;
+        }>(`/api/attendance/devices/${id}/persons?${qs.toString()}`);
+        const items = Array.isArray(data) ? (data as Person[]) : data.items || [];
+        setPersons(items);
+        setPersonsTotal(Array.isArray(data) ? items.length : data.total || items.length);
+        setPersonsTotalPages(
+          Array.isArray(data) ? 1 : Math.max(1, data.totalPages || 1),
+        );
       } else if (tab === 'marks' || tab === 'all-marks') {
-        const qs = tab === 'all-marks' ? '?all=1&limit=100' : '?limit=100';
+        const qs = tab === 'all-marks' ? '?all=1&limit=500' : '?limit=500';
         const data = await apiFetch<{ items?: Mark[] } | Mark[]>(
           `/api/attendance/devices/${id}/marks${qs}`,
         );
@@ -256,26 +306,113 @@ function DeviceDetailInner() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки раздела');
     }
-  }, [id, tab, ignoreScope]);
+  }, [
+    id,
+    tab,
+    ignoreScope,
+    // Server-side paging only for persons tab
+    tab === 'persons' ? page : 0,
+    tab === 'persons' ? pageSize : 0,
+    tab === 'persons' ? search : '',
+  ]);
 
   useEffect(() => {
     void loadDevice();
   }, [id]);
 
   useEffect(() => {
-    void loadTabData();
-  }, [loadTabData]);
+    const delay = tab === 'persons' && search.trim() ? 300 : 0;
+    const handle = window.setTimeout(() => {
+      void loadTabData();
+    }, delay);
+    return () => window.clearTimeout(handle);
+  }, [loadTabData, tab, search]);
+
+  const loadSyncProgress = useCallback(async () => {
+    if (!id) return null as SyncProgress | null;
+    try {
+      const data = await apiFetch<SyncProgress>(
+        `/api/attendance/devices/${id}/persons/sync-progress`,
+      );
+      setSyncProgress(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void loadSyncProgress();
+  }, [loadSyncProgress]);
+
+  useEffect(() => {
+    const active =
+      syncProgress?.running ||
+      syncProgress?.inFlight ||
+      (syncProgress?.pending || 0) > 0 ||
+      (syncProgress?.syncing || 0) > 0 ||
+      syncProgress?.phase === 'uploading' ||
+      syncProgress?.phase === 'queuing';
+    if (!active) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        const data = await loadSyncProgress();
+        if (tab === 'persons') {
+          await loadTabData();
+        }
+        if (
+          data &&
+          !data.running &&
+          !data.inFlight &&
+          (data.pending || 0) === 0 &&
+          (data.syncing || 0) === 0
+        ) {
+          setSyncNotice(data.message || 'Синхронизация завершена');
+        }
+      })();
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [
+    syncProgress?.running,
+    syncProgress?.inFlight,
+    syncProgress?.pending,
+    syncProgress?.syncing,
+    syncProgress?.phase,
+    loadSyncProgress,
+    loadTabData,
+    tab,
+  ]);
 
   const meta = device?.meta || {};
   const hk = meta.hikCentral || {};
 
-  const filteredPersons = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return persons;
-    return persons.filter((p) =>
-      [p.fullName, p.pin, p.role].filter(Boolean).some((x) => String(x).toLowerCase().includes(q)),
-    );
-  }, [persons, search]);
+  const syncPct = Math.max(0, Math.min(100, syncProgress?.percent ?? 0));
+  const syncActive = Boolean(
+    syncProgress?.running ||
+      syncProgress?.inFlight ||
+      (syncProgress?.pending || 0) > 0 ||
+      (syncProgress?.syncing || 0) > 0 ||
+      syncProgress?.phase === 'uploading' ||
+      syncProgress?.phase === 'queuing',
+  );
+  const syncFinishedRecently = (() => {
+    const stamp = syncProgress?.finishedAt || syncProgress?.updatedAt;
+    if (!stamp) return false;
+    const ms = Date.now() - new Date(stamp).getTime();
+    return Number.isFinite(ms) && ms >= 0 && ms < 30 * 60 * 1000;
+  })();
+  const showSyncPanel = Boolean(
+    syncActive ||
+      syncNotice ||
+      (syncFinishedRecently &&
+        syncProgress &&
+        (syncProgress.total || 0) > 0 &&
+        (syncProgress.phase === 'completed' ||
+          syncProgress.phase === 'failed' ||
+          syncProgress.finishedAt)),
+  );
+
+  const filteredPersons = persons;
 
   const filteredMarks = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -315,6 +452,103 @@ function DeviceDetailInner() {
     );
   }, [ignoredDivisions, search]);
 
+  const listTotal =
+    tab === 'persons'
+      ? personsTotal
+      : tab === 'marks' || tab === 'all-marks'
+        ? filteredMarks.length
+        : tab === 'commands'
+          ? filteredCommands.length
+          : tab === 'ignored-persons'
+            ? filteredIgnoredPersons.length
+            : tab === 'ignored-divisions'
+              ? filteredIgnoredDivisions.length
+              : 0;
+
+  const listTotalPages =
+    tab === 'persons'
+      ? Math.max(1, personsTotalPages)
+      : Math.max(1, Math.ceil(listTotal / pageSize) || 1);
+
+  const pageSafe = Math.min(Math.max(1, page), listTotalPages);
+
+  const pagedMarks = useMemo(() => {
+    const start = (pageSafe - 1) * pageSize;
+    return filteredMarks.slice(start, start + pageSize);
+  }, [filteredMarks, pageSafe, pageSize]);
+
+  const pagedCommands = useMemo(() => {
+    const start = (pageSafe - 1) * pageSize;
+    return filteredCommands.slice(start, start + pageSize);
+  }, [filteredCommands, pageSafe, pageSize]);
+
+  const pagedIgnoredPersons = useMemo(() => {
+    const start = (pageSafe - 1) * pageSize;
+    return filteredIgnoredPersons.slice(start, start + pageSize);
+  }, [filteredIgnoredPersons, pageSafe, pageSize]);
+
+  const pagedIgnoredDivisions = useMemo(() => {
+    const start = (pageSafe - 1) * pageSize;
+    return filteredIgnoredDivisions.slice(start, start + pageSize);
+  }, [filteredIgnoredDivisions, pageSafe, pageSize]);
+
+  const rangeFrom = listTotal === 0 ? 0 : (pageSafe - 1) * pageSize + 1;
+  const rangeTo = Math.min(pageSafe * pageSize, listTotal);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, pageSize, ignoreScope]);
+
+  function renderListPager() {
+    if (tab === 'info') return null;
+    return (
+      <div className={styles.listFooter}>
+        <p>
+          Показано{' '}
+          <strong>
+            {rangeFrom}–{rangeTo}
+          </strong>{' '}
+          из <strong>{listTotal}</strong>
+        </p>
+        <div className={styles.footerPager}>
+          <button
+            type="button"
+            className={styles.pagerBtn}
+            disabled={pageSafe <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Предыдущая страница"
+          >
+            ‹
+          </button>
+          <span className={styles.countBadge}>
+            {pageSafe}/{listTotalPages}
+          </span>
+          <button
+            type="button"
+            className={styles.pagerBtn}
+            disabled={pageSafe >= listTotalPages}
+            onClick={() => setPage((p) => Math.min(listTotalPages, p + 1))}
+            aria-label="Следующая страница"
+          >
+            ›
+          </button>
+          <select
+            aria-label="Размер страницы"
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            className={styles.pageSize}
+          >
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  }
+
   async function save(
     values: DeviceFormValues,
     sync: boolean,
@@ -343,12 +577,14 @@ function DeviceDetailInner() {
       });
       // Location change already schedules backend sync — avoid double pipeline.
       if (sync && !locationChanged) {
-        void apiFetch(`/api/attendance/devices/${id}/persons/sync`, { method: 'POST' }).catch(
-          () => undefined,
-        );
+        setSyncNotice('Синхронизация сотрудников запущена');
+        void apiFetch(`/api/attendance/devices/${id}/persons/sync`, { method: 'POST' })
+          .then(() => loadSyncProgress())
+          .catch(() => undefined);
       }
       await loadDevice();
       await loadTabData();
+      await loadSyncProgress();
       window.setTimeout(() => setEditOpen(false), 900);
     } finally {
       setBusy(false);
@@ -357,10 +593,14 @@ function DeviceDetailInner() {
 
   async function doSync() {
     setBusy(true);
+    setError('');
+    setSyncNotice('');
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
       setSyncOpen(false);
+      setSyncNotice('Синхронизация лиц запущена');
       await loadDevice();
+      await loadSyncProgress();
       await loadTabData();
     } finally {
       setBusy(false);
@@ -387,16 +627,23 @@ function DeviceDetailInner() {
   async function syncPersons() {
     setBusy(true);
     setError('');
+    setSyncNotice('');
     try {
-      const res = await apiFetch<{ queued?: boolean; alreadyRunning?: boolean; created?: number }>(
-        `/api/attendance/devices/${id}/persons/sync`,
-        { method: 'POST' },
-      );
-      setError(
+      const res = await apiFetch<{
+        queued?: boolean;
+        alreadyRunning?: boolean;
+        created?: number;
+        requeued?: number;
+        withPhoto?: number;
+      }>(`/api/attendance/devices/${id}/persons/sync`, { method: 'POST' });
+      setSyncNotice(
         res.alreadyRunning
-          ? 'Синхронизация уже выполняется'
-          : 'Синхронизация сотрудников запущена',
+          ? 'Синхронизация уже выполняется — прогресс ниже'
+          : `Синхронизация сотрудников запущена${
+              res.withPhoto != null ? ` (${res.withPhoto} с фото)` : ''
+            }`,
       );
+      await loadSyncProgress();
       await loadTabData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка синхронизации');
@@ -481,6 +728,59 @@ function DeviceDetailInner() {
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
+      {syncNotice && !error ? <p className={styles.syncNotice}>{syncNotice}</p> : null}
+
+      {showSyncPanel && syncProgress ? (
+        <div
+          className={`${styles.syncPanel} ${
+            syncActive
+              ? styles.syncPanelActive
+              : syncProgress.phase === 'failed' || (syncProgress.failed || 0) > 0
+                ? styles.syncPanelWarn
+                : styles.syncPanelDone
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className={styles.syncPanelHead}>
+            <div>
+              <div className={styles.syncPanelTitle}>
+                {syncActive ? 'Синхронизация сотрудников' : 'Синхронизация'}
+                {syncActive ? <span className={styles.syncPulse} aria-hidden /> : null}
+              </div>
+              <div className={styles.syncPanelMsg}>
+                {syncProgress.message || syncNotice || 'Обновление данных на терминале…'}
+              </div>
+            </div>
+            <div className={styles.syncPanelPct}>{syncPct}%</div>
+          </div>
+          <div className={styles.syncBar} aria-hidden>
+            <div
+              className={`${styles.syncBarFill} ${syncActive ? styles.syncBarFillActive : ''}`}
+              style={{ width: `${syncPct}%` }}
+            />
+          </div>
+          <div className={styles.syncStats}>
+            <span>
+              Готово: <strong>{syncProgress.done ?? 0}</strong> / {syncProgress.total ?? 0}
+            </span>
+            <span>
+              Успешно: <strong>{syncProgress.synced ?? 0}</strong>
+            </span>
+            <span>
+              В очереди: <strong>{(syncProgress.pending || 0) + (syncProgress.syncing || 0)}</strong>
+            </span>
+            <span>
+              Ошибки: <strong>{syncProgress.failed ?? 0}</strong>
+            </span>
+          </div>
+          {syncProgress.currentNames && syncProgress.currentNames.length > 0 ? (
+            <div className={styles.syncCurrent}>
+              Сейчас: {syncProgress.currentNames.join(', ')}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className={styles.layout}>
         {/* ── Sidebar ── */}
@@ -820,13 +1120,13 @@ function DeviceDetailInner() {
                           {p.fullName}
                         </td>
                         <td>{p.role || 'Обычный пользователь'}</td>
-                        <td>{p.synchronized ? 'Да' : 'Нет'}</td>
+                        <td>{personSyncLabel(p)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
-              </div></div>
+              </div>{renderListPager()}</div>
             </>
           ) : null}
 
@@ -856,16 +1156,16 @@ function DeviceDetailInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMarks.length === 0 ? (
+                  {pagedMarks.length === 0 ? (
                     <tr>
                       <td colSpan={tab === 'all-marks' ? 4 : 5} className={styles.empty}>
                         Нет данных
                       </td>
                     </tr>
                   ) : (
-                    filteredMarks.map((m) => {
+                    pagedMarks.map((m) => {
                       const photo = mediaSrc(m.photoUrl);
-                      const slides = filteredMarks
+                      const slides = pagedMarks
                         .map((x) => ({
                           src: mediaSrc(x.photoUrl) || '',
                           caption: empName(x),
@@ -905,7 +1205,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
-              </div></div>
+              </div>{renderListPager()}</div>
             </>
           ) : null}
 
@@ -967,14 +1267,14 @@ function DeviceDetailInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredIgnoredPersons.length === 0 ? (
+                  {pagedIgnoredPersons.length === 0 ? (
                     <tr>
                       <td colSpan={4} className={styles.empty}>
                         Нет данных
                       </td>
                     </tr>
                   ) : (
-                    filteredIgnoredPersons.map((p) => (
+                    pagedIgnoredPersons.map((p) => (
                       <tr key={p.id}>
                         <td>
                           <input
@@ -994,7 +1294,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
-              </div></div>
+              </div>{renderListPager()}</div>
             </>
           ) : null}
 
@@ -1057,14 +1357,14 @@ function DeviceDetailInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredIgnoredDivisions.length === 0 ? (
+                  {pagedIgnoredDivisions.length === 0 ? (
                     <tr>
                       <td colSpan={5} className={styles.empty}>
                         Нет данных
                       </td>
                     </tr>
                   ) : (
-                    filteredIgnoredDivisions.map((d) => (
+                    pagedIgnoredDivisions.map((d) => (
                       <tr key={d.id}>
                         <td>
                           <input
@@ -1086,7 +1386,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
-              </div></div>
+              </div>{renderListPager()}</div>
             </>
           ) : null}
 
@@ -1117,14 +1417,14 @@ function DeviceDetailInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCommands.length === 0 ? (
+                  {pagedCommands.length === 0 ? (
                     <tr>
                       <td colSpan={7} className={styles.empty}>
                         Нет данных
                       </td>
                     </tr>
                   ) : (
-                    filteredCommands.map((c) => (
+                    pagedCommands.map((c) => (
                       <tr key={String(c.id)}>
                         <td>{c.id}</td>
                         <td>
@@ -1148,7 +1448,7 @@ function DeviceDetailInner() {
                   )}
                 </tbody>
               </table>
-              </div></div>
+              </div>{renderListPager()}</div>
             </>
           ) : null}
         </section>

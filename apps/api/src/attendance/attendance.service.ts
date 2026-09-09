@@ -1056,6 +1056,19 @@ export class AttendanceService {
           status: r.ok ? 'completed' : 'failed',
         });
       }
+      const counts = await this.faceSyncCounts(tenantId, id);
+      await this.writePersonsSyncProgress(tenantId, id, {
+        running: true,
+        phase: 'uploading',
+        message: `Загрузка лиц на терминал… ${counts.done} из ${counts.total}`,
+        currentNames: results.map((r) => r.name).filter(Boolean),
+        total: counts.total,
+        synced: counts.synced,
+        pending: counts.pending,
+        syncing: counts.syncing,
+        failed: counts.failed,
+        percent: counts.percent,
+      });
     }
 
     if (commandBatch.length) {
@@ -1406,40 +1419,209 @@ export class AttendanceService {
     };
   }
 
-  async listDevicePersons(tenantId: string, deviceId: string) {
+  async listDevicePersons(
+    tenantId: string,
+    deviceId: string,
+    opts: { page?: string | number; limit?: string | number; q?: string } = {},
+  ) {
     await this.getDevice(tenantId, deviceId);
-    const rows = await this.prisma.deviceFaceSync.findMany({
-      where: { tenantId, deviceId },
-      include: {
-        faceProfile: {
-          include: {
-            employee: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                middleName: true,
-                tabNumber: true,
+    const { page, limit, skip } = parsePagination(opts.page, opts.limit, {
+      defaultLimit: 20,
+      maxLimit: 100,
+    });
+    const q = (opts.q || '').trim();
+
+    const where: Prisma.DeviceFaceSyncWhereInput = { tenantId, deviceId };
+    if (q) {
+      const tokens = q.split(/\s+/).filter(Boolean);
+      where.AND = tokens.map((token) => ({
+        OR: [
+          {
+            faceProfile: {
+              employee: {
+                lastName: { contains: token, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            faceProfile: {
+              employee: {
+                firstName: { contains: token, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            faceProfile: {
+              employee: {
+                middleName: { contains: token, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            faceProfile: {
+              employee: {
+                tabNumber: { contains: token, mode: 'insensitive' },
+              },
+            },
+          },
+        ],
+      }));
+    }
+
+    const [total, rows] = await Promise.all([
+      this.prisma.deviceFaceSync.count({ where }),
+      this.prisma.deviceFaceSync.findMany({
+        where,
+        include: {
+          faceProfile: {
+            select: {
+              photoUrl: true,
+              photoKey: true,
+              employee: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  middleName: true,
+                  tabNumber: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-    return rows.map((r) => {
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const items = rows.map((r) => {
       const e = r.faceProfile.employee;
       return {
         id: e.id,
         pin: e.tabNumber,
         fullName: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' '),
-        photoUrl: r.faceProfile.photoUrl,
+        hasPhoto: Boolean(r.faceProfile.photoUrl || r.faceProfile.photoKey),
         role: 'Обычный пользователь',
         synchronized: r.syncStatus === 'synced',
         syncStatus: r.syncStatus,
+        lastError: r.lastError,
         lastSyncedAt: r.lastSyncedAt,
       };
     });
+
+    return pageResult(items, total, page, limit);
+  }
+
+  private async faceSyncCounts(tenantId: string, deviceId: string) {
+    const grouped = await this.prisma.deviceFaceSync.groupBy({
+      by: ['syncStatus'],
+      where: { tenantId, deviceId },
+      _count: { _all: true },
+    });
+    const counts = {
+      pending: 0,
+      syncing: 0,
+      synced: 0,
+      failed: 0,
+    };
+    for (const row of grouped) {
+      const key = row.syncStatus as keyof typeof counts;
+      if (key in counts) counts[key] = row._count._all;
+    }
+    const total = counts.pending + counts.syncing + counts.synced + counts.failed;
+    const done = counts.synced + counts.failed;
+    const percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    return { ...counts, total, done, percent };
+  }
+
+  private async writePersonsSyncProgress(
+    tenantId: string,
+    deviceId: string,
+    patch: Record<string, unknown>,
+  ) {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, tenantId },
+      select: { id: true, meta: true },
+    });
+    if (!device) return;
+    const meta = this.asMeta(device.meta);
+    const prev =
+      meta.personsSync && typeof meta.personsSync === 'object' && !Array.isArray(meta.personsSync)
+        ? (meta.personsSync as Record<string, unknown>)
+        : {};
+    meta.personsSync = {
+      ...prev,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.prisma.device.update({
+      where: { id: deviceId },
+      data: { meta: meta as Prisma.InputJsonValue },
+    });
+  }
+
+  async getDevicePersonsSyncProgress(tenantId: string, deviceId: string) {
+    await this.getDevice(tenantId, deviceId);
+    const counts = await this.faceSyncCounts(tenantId, deviceId);
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, tenantId },
+      select: { meta: true },
+    });
+    const meta = this.asMeta(device?.meta);
+    const stored =
+      meta.personsSync && typeof meta.personsSync === 'object' && !Array.isArray(meta.personsSync)
+        ? (meta.personsSync as Record<string, unknown>)
+        : {};
+    const inFlight = this.personsSyncInFlight.has(deviceId);
+    const remaining = counts.pending + counts.syncing;
+    const running =
+      inFlight ||
+      stored.running === true ||
+      (remaining > 0 && stored.phase === 'uploading');
+    const phase =
+      typeof stored.phase === 'string'
+        ? stored.phase
+        : running
+          ? 'uploading'
+          : remaining > 0
+            ? 'queued'
+            : counts.total > 0 && counts.synced === counts.total
+              ? 'completed'
+              : 'idle';
+    const currentNames = Array.isArray(stored.currentNames)
+      ? stored.currentNames.filter((n): n is string => typeof n === 'string').slice(0, 5)
+      : [];
+    const message =
+      typeof stored.message === 'string' && stored.message
+        ? stored.message
+        : running
+          ? 'Загрузка сотрудников на терминал…'
+          : remaining > 0
+            ? 'Есть очередь на синхронизацию'
+            : counts.failed > 0 && counts.synced > 0
+              ? 'Синхронизация завершена с ошибками'
+              : counts.total > 0 && remaining === 0
+                ? 'Синхронизация завершена'
+                : 'Синхронизация не запущена';
+
+    return {
+      running,
+      inFlight,
+      phase,
+      message,
+      currentNames,
+      total: counts.total,
+      synced: counts.synced,
+      pending: counts.pending,
+      syncing: counts.syncing,
+      failed: counts.failed,
+      done: counts.done,
+      percent: counts.percent,
+      startedAt: typeof stored.startedAt === 'string' ? stored.startedAt : null,
+      updatedAt: typeof stored.updatedAt === 'string' ? stored.updatedAt : null,
+      finishedAt: typeof stored.finishedAt === 'string' ? stored.finishedAt : null,
+    };
   }
 
   private deviceIgnoreSets(meta: unknown): {
@@ -1696,19 +1878,66 @@ export class AttendanceService {
   private async runPersonsSyncWaves(tenantId: string, deviceId: string) {
     let totalSynced = 0;
     let totalFailed = 0;
-    for (let wave = 0; wave < 20; wave += 1) {
-      const result = await this.syncDevice(tenantId, deviceId, {
-        skipHeartbeat: wave > 0,
-      });
-      totalSynced += result.synced;
-      totalFailed += result.failed ?? 0;
-      if (!result.pending) break;
-    }
-    await this.appendCommand(tenantId, deviceId, {
-      type: 'Person Sync',
-      employeeName: `synced=${totalSynced}; failed=${totalFailed}`,
-      status: totalFailed && !totalSynced ? 'failed' : 'completed',
+    const startedAt = new Date().toISOString();
+    const initial = await this.faceSyncCounts(tenantId, deviceId);
+    await this.writePersonsSyncProgress(tenantId, deviceId, {
+      running: true,
+      phase: 'uploading',
+      message: `Синхронизация сотрудников… 0 из ${initial.total}`,
+      currentNames: [],
+      startedAt,
+      finishedAt: null,
+      total: initial.total,
+      synced: initial.synced,
+      pending: initial.pending,
+      syncing: initial.syncing,
+      failed: initial.failed,
+      percent: initial.percent,
     });
+    try {
+      // More waves for large location queues (batch size in syncDevice is 500).
+      for (let wave = 0; wave < 80; wave += 1) {
+        const result = await this.syncDevice(tenantId, deviceId, {
+          skipHeartbeat: wave > 0,
+        });
+        totalSynced += result.synced;
+        totalFailed += result.failed ?? 0;
+        if (!result.pending) break;
+      }
+      const finalCounts = await this.faceSyncCounts(tenantId, deviceId);
+      const remaining = finalCounts.pending + finalCounts.syncing;
+      await this.writePersonsSyncProgress(tenantId, deviceId, {
+        running: false,
+        phase: remaining > 0 ? 'queued' : totalFailed && !totalSynced ? 'failed' : 'completed',
+        message: remaining > 0
+          ? `Очередь ещё есть: ${remaining}. Нажмите «Синхронизировать» снова.`
+          : totalFailed
+            ? `Готово: ${finalCounts.synced} ок, ${finalCounts.failed} с ошибкой`
+            : `Готово: ${finalCounts.synced} из ${finalCounts.total}`,
+        currentNames: [],
+        finishedAt: new Date().toISOString(),
+        total: finalCounts.total,
+        synced: finalCounts.synced,
+        pending: finalCounts.pending,
+        syncing: finalCounts.syncing,
+        failed: finalCounts.failed,
+        percent: finalCounts.percent,
+      });
+      await this.appendCommand(tenantId, deviceId, {
+        type: 'Person Sync',
+        employeeName: `synced=${totalSynced}; failed=${totalFailed}`,
+        status: totalFailed && !totalSynced ? 'failed' : 'completed',
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await this.writePersonsSyncProgress(tenantId, deviceId, {
+        running: false,
+        phase: 'failed',
+        message: `Синхронизация прервана: ${msg}`,
+        finishedAt: new Date().toISOString(),
+      });
+      throw e;
+    }
   }
 
   async syncDevicePersons(
@@ -1772,6 +2001,24 @@ export class AttendanceService {
 
       const created = toCreate.length;
       const requeued = toRequeueIds.length;
+      const counts = await this.faceSyncCounts(tenantId, deviceId);
+
+      await this.writePersonsSyncProgress(tenantId, deviceId, {
+        running: true,
+        phase: alreadyRunning ? 'uploading' : 'queuing',
+        message: alreadyRunning
+          ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
+          : `Очередь подготовлена: +${created}, повтор ${requeued} (всего ${counts.total})`,
+        currentNames: [],
+        ...(alreadyRunning ? {} : { startedAt: new Date().toISOString() }),
+        finishedAt: null,
+        total: counts.total,
+        synced: counts.synced,
+        pending: counts.pending,
+        syncing: counts.syncing,
+        failed: counts.failed,
+        percent: counts.percent,
+      });
 
       await this.appendCommand(tenantId, deviceId, {
         type: 'Person Sync',

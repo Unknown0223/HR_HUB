@@ -365,11 +365,21 @@ export class AttendanceController {
   @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
   @Get('devices/:id/persons')
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'q', required: false })
   listDevicePersons(
     @CurrentTenant() tenantId: string | null,
     @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('q') q?: string,
   ) {
-    return this.attendance.listDevicePersons(this.attendance.requireTenant(tenantId), id);
+    return this.attendance.listDevicePersons(this.attendance.requireTenant(tenantId), id, {
+      page,
+      limit,
+      q,
+    });
   }
 
   @ApiBearerAuth()
@@ -386,6 +396,20 @@ export class AttendanceController {
       this.attendance.requireTenant(tenantId),
       id,
       { force: force === '1' || force === 'true' },
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
+  @Get('devices/:id/persons/sync-progress')
+  getDevicePersonsSyncProgress(
+    @CurrentTenant() tenantId: string | null,
+    @Param('id') id: string,
+  ) {
+    return this.attendance.getDevicePersonsSyncProgress(
+      this.attendance.requireTenant(tenantId),
+      id,
     );
   }
 
