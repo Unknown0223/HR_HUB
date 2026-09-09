@@ -12,7 +12,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:push": "prisma db push",
     "prisma:seed": "ts-node --transpile-only prisma/seed.ts",
-    "test": "node --require ts-node/register --test src/news/news-html.spec.ts src/common/excel-import.spec.ts"
+    "test": "node --require ts-node/register --test src/news/news-html.spec.ts src/common/excel-import.spec.ts src/attendance/office-link-reconnect.spec.ts"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"

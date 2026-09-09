@@ -819,6 +819,204 @@ class ProvisionEngine:
             )
             return SubmitResult(kind=ERROR, message=str(exc)[:240])
 
+    def provision_network_reconnect(
+        self,
+        session: Any,
+        password: str,
+        *,
+        device_id: str,
+        on_status: StatusFn | None = None,
+    ) -> Any:
+        """After Wi‑Fi change: GW+tunnel+announce + host update — no password rotate."""
+        import api_client
+        import runtime_setup
+        from session import SubmitResult
+
+        password = (password or "").strip()
+        device_id = (device_id or "").strip()
+        if not password:
+            return SubmitResult(kind="empty", message="Parol kiritilmadi.")
+        if not device_id:
+            return SubmitResult(kind="api", message="deviceId yo‘q.")
+        if not session.chosen:
+            return SubmitResult(kind="no_device", message="Qurilma topilmadi.")
+        if not session.verified:
+            return SubmitResult(kind=ERROR, message="Avval parolni tasdiqlang.")
+
+        key = read_link_key(session.root)
+        pairing = ""
+        if hasattr(session, "pairing_token"):
+            pairing = session.pairing_token() or ""
+        if not key and not pairing:
+            return SubmitResult(
+                kind="no_key",
+                message="Pairing token yoki admin kaliti kerak.",
+            )
+
+        username = (getattr(session, "username", None) or "admin").strip() or "admin"
+        session.password = password
+        session.username = username
+        host = session.chosen.host
+        port = int(session.chosen.port or 80)
+        serial = str((session.verified or {}).get("serialNumber") or "")
+
+        runtime_setup.ensure_runtime(session.root, on_status)
+        bundle = runtime_setup.ServiceBundle()
+        bundle.root = session.root
+        try:
+            gw_key = key or pairing
+            _progress(
+                session,
+                status="configuring",
+                step="gateway",
+                percent=40,
+                message="Gateway",
+                device_id=device_id,
+            )
+            _emit(on_status, "1/3 Gateway + tunnel ochilmoqda...")
+            bundle.gw = runtime_setup.start_gateway(
+                session.api_url, gw_key, session.root, on_status
+            )
+            _progress(
+                session,
+                status="configuring",
+                step="tunnel",
+                percent=55,
+                message="Tunnel",
+                device_id=device_id,
+            )
+            proc, url = runtime_setup.start_tunnel(session.root, on_status)
+            bundle.tunnel = proc
+            bundle.tunnel_url = url
+            if not (url or "").strip():
+                bundle.stop()
+                return SubmitResult(
+                    kind="api",
+                    message=(
+                        "Tunnel URL topilmadi. trycloudflare yoki config.json da "
+                        "namedTunnelUrl / cloudflareTunnelToken ni tekshiring."
+                    ),
+                )
+
+            _emit(on_status, "2/3 Tunnel platformaga yozilmoqda...")
+            code, _ping = api_client.ping(
+                session.api_url, key, session.tenant, pairing_token=pairing or None
+            )
+            if not api_client.is_success(code):
+                bundle.stop()
+                return SubmitResult(
+                    kind="api",
+                    message="Platformaga ulanmadi. Internet yoki pairing/admin kalitini tekshiring.",
+                )
+
+            code, _ann = api_client.announce(
+                session.api_url,
+                key,
+                session.tenant,
+                url,
+                pairing_token=pairing or None,
+            )
+            if not api_client.is_success(code):
+                bundle.stop()
+                return SubmitResult(
+                    kind="api",
+                    message=f"Tunnel platformaga yozilmadi (HTTP {code}).",
+                )
+
+            _emit(on_status, "3/3 Yangi IP serverga yozilmoqda (parol o‘zgarmaydi)...")
+            _progress(
+                session,
+                status="configuring",
+                step="reconnect",
+                percent=90,
+                message="Host reconnect",
+                device_id=device_id,
+            )
+            code, linked = api_client.reconnect_device(
+                session.api_url,
+                key,
+                session.tenant,
+                device_id=device_id,
+                host=host,
+                port=port,
+                serial_number=serial or None,
+                pairing_token=pairing or None,
+            )
+            if not api_client.is_success(code):
+                bundle.stop()
+                tip = ""
+                if isinstance(linked, dict):
+                    tip = str(linked.get("message") or linked.get("error") or "")
+                return SubmitResult(
+                    kind="api",
+                    message=(
+                        f"Tarmoq yangilanmadi (HTTP {code}). {tip}".strip()
+                    ),
+                )
+
+            try:
+                from credential_store import save_device_credential
+
+                save_device_credential(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    serial=serial,
+                    location_id=str(
+                        ((linked.get("device") if isinstance(linked, dict) else {}) or {}).get(
+                            "locationId"
+                        )
+                        or getattr(session, "location_id", None)
+                        or ""
+                    ),
+                    phase="network_reconnected",
+                    device_id=device_id,
+                    root=session.root,
+                )
+            except Exception:
+                pass
+
+            session.services = bundle
+            session.password = ""
+            dev = linked.get("device") if isinstance(linked, dict) else {}
+            name = (dev or {}).get("name") or (session.verified or {}).get("name")
+            _progress(
+                session,
+                status="linked",
+                step="reconnected",
+                percent=100,
+                message="Tarmoq yangilandi",
+                device_id=device_id,
+            )
+            _emit(on_status, "Tarmoq yangilandi — parol o‘zgarmadi, yuzlar saqlanadi")
+            return SubmitResult(
+                kind="reconnected",
+                message="Tarmoq yangilandi. Parol o‘zgarmadi, yuzlar qayta yuklanmaydi.",
+                device={
+                    "name": name,
+                    "host": host,
+                    "port": port,
+                    "tunnel": url,
+                    "id": device_id,
+                    "reconnected": True,
+                    "gwVerified": bool(
+                        isinstance(linked, dict) and linked.get("gwVerified")
+                    ),
+                },
+            )
+        except Exception as exc:
+            bundle.stop()
+            _progress(
+                session,
+                status="failed",
+                step="reconnect_exception",
+                percent=0,
+                message=str(exc)[:160],
+                device_id=device_id,
+            )
+            return SubmitResult(kind=ERROR, message=str(exc)[:240])
+
 
 def _emit(cb: StatusFn | None, msg: str) -> None:
     if cb:

@@ -17,7 +17,11 @@ import {
   OfficeLinkAuthContext,
   OfficeLinkAuthGuard,
 } from './office-link-auth.guard';
-import { OfficeLinkAnnounceDto, OfficeLinkDeviceDto } from './dto';
+import {
+  OfficeLinkAnnounceDto,
+  OfficeLinkDeviceDto,
+  OfficeLinkReconnectDto,
+} from './dto';
 
 const CurrentOfficeLinkAuth = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): OfficeLinkAuthContext | undefined => {
@@ -73,5 +77,40 @@ export class OfficeLinkController {
       return this.attendance.officeLinkLocationsForTenant(auth.pairing.tenantId);
     }
     return this.attendance.officeLinkLocations(tenantCode || 'demo');
+  }
+
+  /**
+   * List active devices with vault passwords for LAN reconnect
+   * (pairing token or link key). Audit-logged as view.
+   */
+  @Get('devices')
+  listDevices(
+    @Query('tenantCode') tenantCode?: string,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    if (auth?.pairing?.tenantId) {
+      return this.attendance.officeLinkListDevices(auth.pairing.tenantId, {
+        userId: auth.pairing.createdById ?? null,
+      });
+    }
+    return this.attendance.officeLinkListDevicesByCode(tenantCode || 'demo');
+  }
+
+  /**
+   * Update host/port after Wi‑Fi change — no password rotate,
+   * no pendingAdminConfirm.
+   */
+  @Post('reconnect')
+  @HttpCode(200)
+  reconnect(
+    @Body() dto: OfficeLinkReconnectDto,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    if (auth?.pairing?.tenantId) {
+      return this.attendance.officeLinkReconnect(auth.pairing.tenantId, dto, {
+        userId: auth.pairing.createdById ?? null,
+      });
+    }
+    return this.attendance.officeLinkReconnectByCode(dto.tenantCode || 'demo', dto);
   }
 }

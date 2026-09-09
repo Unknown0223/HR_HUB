@@ -412,3 +412,12 @@ export class OfficeLinkDevicePasswordDto {
   @ApiPropertyOptional() @IsOptional() @IsString() username?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() provisionSessionId?: string;
 }
+
+/** Wi‑Fi/LAN reconnect: update host only, keep vault password. */
+export class OfficeLinkReconnectDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
+  @ApiProperty() @IsUUID() deviceId!: string;
+  @ApiProperty() @IsString() host!: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() port?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() serialNumber?: string;
+}

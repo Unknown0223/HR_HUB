@@ -2097,6 +2097,194 @@ export class AttendanceService {
     return { ok: true, gwUrl: url.replace(/\/$/, '') };
   }
 
+  async officeLinkListDevicesByCode(tenantCode: string) {
+    const tenant = await this.resolveTenantByCode(tenantCode);
+    return this.officeLinkListDevices(tenant.id);
+  }
+
+  /**
+   * Pairing/link-key: return active devices with vault passwords for
+   * network reconnect (auto admin login without Ulash rotate).
+   */
+  async officeLinkListDevices(
+    tenantId: string,
+    actor?: AuditActor,
+  ) {
+    const rows = await this.prisma.device.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        serialNumber: true,
+        host: true,
+        port: true,
+        username: true,
+        passwordEnc: true,
+        status: true,
+        locationId: true,
+        model: true,
+        adapterType: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const eligible = rows.filter((row) => {
+      const adapter = (row.adapterType || '').trim().toLowerCase();
+      return (
+        !adapter ||
+        adapter === 'hikvision' ||
+        adapter === 'hikvision_isapi'
+      );
+    });
+
+    const devices = [];
+    for (const row of eligible) {
+      const password =
+        (await this.passwordForGw(tenantId, row.id, row.passwordEnc)) || '';
+      if (password) {
+        await this.credentialAudit.record(tenantId, row.id, 'view', actor);
+      }
+      devices.push({
+        id: row.id,
+        name: row.name,
+        serialNumber: row.serialNumber,
+        host: row.host,
+        port: row.port ?? 80,
+        username: row.username || 'admin',
+        password,
+        status: row.status,
+        locationId: row.locationId,
+        model: row.model,
+        adapterType: row.adapterType,
+      });
+    }
+    return { ok: true, devices };
+  }
+
+  async officeLinkReconnectByCode(
+    tenantCode: string,
+    dto: {
+      deviceId: string;
+      host: string;
+      port?: number;
+      serialNumber?: string;
+    },
+  ) {
+    const tenant = await this.resolveTenantByCode(tenantCode);
+    return this.officeLinkReconnect(tenant.id, dto);
+  }
+
+  /**
+   * After Wi‑Fi change: update LAN host/port only. Does not rotate password
+   * or set pendingAdminConfirm.
+   */
+  async officeLinkReconnect(
+    tenantId: string,
+    dto: {
+      deviceId: string;
+      host: string;
+      port?: number;
+      serialNumber?: string;
+    },
+    actor?: AuditActor,
+  ) {
+    const host = (dto.host || '').trim();
+    if (!host) throw new BadRequestException('host required');
+    const port = dto.port ?? 80;
+    const device = await this.prisma.device.findFirst({
+      where: { id: dto.deviceId, tenantId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
+    const serial = (dto.serialNumber || '').trim();
+    const meta = this.asMeta(device.meta);
+    const prevAuth =
+      meta.auth && typeof meta.auth === 'object' && !Array.isArray(meta.auth)
+        ? { ...(meta.auth as Record<string, unknown>) }
+        : {};
+    meta.auth = {
+      ...prevAuth,
+      passwordOutOfSync: false,
+      lastError: null,
+      reconnectedAt: new Date().toISOString(),
+      // Keep seal / confirm flags as-is (do not re-open pending confirm).
+      pendingAdminConfirm: prevAuth.pendingAdminConfirm === true,
+    };
+
+    let gatewayRef = device.gatewayRef;
+    const plain =
+      (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) || '';
+
+    const updated = await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        host,
+        port,
+        ...(serial ? { serialNumber: serial } : {}),
+        meta: meta as Prisma.InputJsonValue,
+        lastSeenAt: new Date(),
+        isActive: true,
+      },
+      include: this.deviceInclude,
+    });
+
+    let gwOk = false;
+    if (plain) {
+      try {
+        const reg = await this.gw.registerFromDevice({
+          ...updated,
+          passwordEnc: plain,
+        });
+        if (reg?.id) {
+          gatewayRef = reg.id;
+          await this.gw.verifyPassword(reg.id, plain);
+          gwOk = true;
+        }
+      } catch (e) {
+        this.logger.warn(
+          `officeLinkReconnect GW failed for ${device.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+
+    const final = await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        gatewayRef: gatewayRef || device.gatewayRef,
+        status: gwOk
+          ? 'online'
+          : updated.status === 'pending_confirm'
+            ? 'pending_confirm'
+            : 'registered',
+        lastSeenAt: new Date(),
+      },
+      include: this.deviceInclude,
+    });
+
+    await this.credentialAudit.record(tenantId, device.id, 'sync', actor);
+
+    return {
+      ok: true,
+      reconnected: true,
+      gwVerified: gwOk,
+      device: {
+        id: final.id,
+        name: final.name,
+        serialNumber: final.serialNumber,
+        host: final.host,
+        port: final.port,
+        locationId: final.locationId,
+        status: final.status,
+        gatewayRef: final.gatewayRef,
+      },
+    };
+  }
+
   async officeLinkDevice(
     tenantCode: string,
     dto: {

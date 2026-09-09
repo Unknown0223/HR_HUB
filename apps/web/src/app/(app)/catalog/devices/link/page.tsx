@@ -156,6 +156,9 @@ export default function DeviceLinkPage() {
         <strong>Faza 2 (Service):</strong> GUI yopilganda tunnel/GW ishlashi uchun Windows Service
         o‘rnatish mumkin (`install-service.bat` / <code>SERVICE.txt</code>). Yo‘riqnoma:{' '}
         <code>tools/office-link/QOLLAMA.txt</code>.
+        {' '}
+        Wi‑Fi o‘zgasa office-link → <strong>Tarmoqni qayta ulash</strong> (parol va yuzlar
+        saqlanadi; to‘liq Ulash shart emas).
       </p>
 
       <div className={styles.grid}>

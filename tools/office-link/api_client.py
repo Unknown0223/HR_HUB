@@ -148,6 +148,55 @@ def list_locations(
     )
 
 
+def list_office_link_devices(
+    api: str,
+    key: str,
+    tenant: str,
+    *,
+    pairing_token: str | None = None,
+) -> tuple[int, Any]:
+    """GET devices + vault passwords (pairing or link-key)."""
+    q = urlencode({"tenantCode": tenant})
+    return api_req(
+        api,
+        "GET",
+        f"/api/attendance/office-link/devices?{q}",
+        key,
+        pairing_token=pairing_token,
+    )
+
+
+def reconnect_device(
+    api: str,
+    key: str,
+    tenant: str,
+    *,
+    device_id: str,
+    host: str,
+    port: int = 80,
+    serial_number: str | None = None,
+    pairing_token: str | None = None,
+) -> tuple[int, Any]:
+    """POST reconnect — update host/port only (no password rotate)."""
+    body: dict[str, Any] = {
+        "tenantCode": tenant,
+        "deviceId": device_id,
+        "host": host,
+        "port": int(port or 80),
+    }
+    serial = (serial_number or "").strip()
+    if serial:
+        body["serialNumber"] = serial
+    return api_req(
+        api,
+        "POST",
+        "/api/attendance/office-link/reconnect",
+        key,
+        body,
+        pairing_token=pairing_token,
+    )
+
+
 def patch_progress(
     api: str,
     key: str,

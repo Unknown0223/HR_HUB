@@ -276,6 +276,259 @@ class OfficeLinkSession:
             rotate_password=True,
         )
 
+    def fetch_web_devices(self) -> tuple[bool, list[dict[str, Any]], str]:
+        """List tenant devices with vault passwords (pairing/link-key)."""
+        import api_client
+
+        if not self.has_credentials():
+            return False, [], "Pairing token yoki admin kaliti kerak."
+        code, data = api_client.list_office_link_devices(
+            self.api_url,
+            read_link_key(self.root),
+            self.tenant,
+            pairing_token=self.pairing_token() or None,
+        )
+        if not api_client.is_success(code) or not isinstance(data, dict):
+            msg = ""
+            if isinstance(data, dict):
+                msg = str(data.get("message") or data.get("error") or "")
+            return False, [], msg or f"Qurilmalar ro‘yxati xato (HTTP {code})."
+        raw = data.get("devices")
+        devices = [d for d in raw if isinstance(d, dict)] if isinstance(raw, list) else []
+        return True, devices, "OK"
+
+    @staticmethod
+    def match_web_device(
+        devices: list[dict[str, Any]],
+        *,
+        serial: str = "",
+        host: str = "",
+    ) -> dict[str, Any] | None:
+        serial_n = (serial or "").strip().lower()
+        host_n = (host or "").strip().lower()
+        if serial_n:
+            for d in devices:
+                sn = str(d.get("serialNumber") or "").strip().lower()
+                if sn and sn == serial_n:
+                    return d
+        if host_n:
+            for d in devices:
+                h = str(d.get("host") or "").strip().lower()
+                if h and h == host_n:
+                    return d
+        with_pwd = [
+            d
+            for d in devices
+            if str(d.get("password") or "").strip() and str(d.get("id") or "").strip()
+        ]
+        if len(with_pwd) == 1:
+            return with_pwd[0]
+        return None
+
+    def peek_reconnect_password(
+        self,
+        manual_password: str = "",
+    ) -> dict[str, Any]:
+        """Resolve password without verifying: local → web → manual."""
+        from credential_store import read_device_credential
+
+        manual = (manual_password or "").strip()
+        local = read_device_credential(self.root)
+        if local and str(local.get("password") or "").strip():
+            return {
+                "password": str(local.get("password")).strip(),
+                "source": "local",
+                "device": None,
+                "username": str(local.get("username") or "admin").strip() or "admin",
+            }
+
+        ok, devices, err = self.fetch_web_devices()
+        if ok:
+            serial = ""
+            host = self.chosen.host if self.chosen else ""
+            if local:
+                serial = str(local.get("serialNumber") or "")
+                if not host:
+                    host = str(local.get("host") or "")
+            if self.verified:
+                serial = str(self.verified.get("serialNumber") or serial)
+            matched = self.match_web_device(devices, serial=serial, host=host)
+            if matched and str(matched.get("password") or "").strip():
+                return {
+                    "password": str(matched.get("password")).strip(),
+                    "source": "web",
+                    "device": matched,
+                    "username": str(matched.get("username") or "admin").strip() or "admin",
+                }
+            # No serial match yet — still expose single-device web password for UI fill.
+            with_pwd = [d for d in devices if str(d.get("password") or "").strip()]
+            if len(with_pwd) == 1:
+                d0 = with_pwd[0]
+                return {
+                    "password": str(d0.get("password")).strip(),
+                    "source": "web",
+                    "device": d0,
+                    "username": str(d0.get("username") or "admin").strip() or "admin",
+                }
+            if not devices:
+                err = err or "Webda faol qurilma yo‘q."
+        elif err:
+            pass
+
+        if manual:
+            return {
+                "password": manual,
+                "source": "manual",
+                "device": None,
+                "username": self.username or "admin",
+            }
+        return {
+            "password": "",
+            "source": "",
+            "device": None,
+            "username": self.username or "admin",
+            "error": err
+            or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash.",
+        }
+
+    def reconnect_network(
+        self,
+        password: str = "",
+        on_status: StatusFn | None = None,
+        *,
+        ip_hint: str | None = None,
+    ) -> SubmitResult:
+        """Wi‑Fi change: verify existing password, update host/tunnel — no rotate."""
+        from provision import ProvisionEngine
+
+        if not self.has_credentials():
+            return SubmitResult(
+                kind="no_key",
+                message="Pairing token yoki admin kaliti kerak.",
+            )
+
+        hint = (ip_hint or "").strip()
+        if hint:
+            chosen = self.choose_ip(hint)
+            if chosen is None:
+                return SubmitResult(kind=ERROR, message="IP manzil noto‘g‘ri.")
+            if not chosen.online:
+                return SubmitResult(kind=OFFLINE, message="Qurilma onlayn emas.")
+        elif not self.chosen:
+            self.scan()
+        if not self.chosen or not self.chosen.online:
+            return SubmitResult(kind=OFFLINE, message="Qurilma topilmadi yoki onlayn emas.")
+
+        peek = self.peek_reconnect_password(password)
+        pwd = (peek.get("password") or password or "").strip()
+        if not pwd:
+            return SubmitResult(
+                kind="empty",
+                message=str(
+                    peek.get("error")
+                    or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash."
+                ),
+            )
+        username = str(peek.get("username") or self.username or "admin").strip() or "admin"
+        self.username = username
+
+        if on_status:
+            on_status("Parol tekshirilmoqda (o‘zgartirilmaydi)...")
+        result = verify_password(
+            self.chosen.host,
+            int(self.chosen.port or 80),
+            username,
+            pwd,
+        )
+        if result.kind == TIMEOUT:
+            return SubmitResult(
+                kind=TIMEOUT,
+                message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+            )
+        if result.kind == UNAUTHORIZED:
+            # Try remaining sources if first peek was wrong.
+            tried = {pwd}
+            ok, devices, _err = self.fetch_web_devices()
+            candidates: list[str] = []
+            if ok:
+                for d in devices:
+                    p = str(d.get("password") or "").strip()
+                    if p and p not in tried:
+                        candidates.append(p)
+            manual = (password or "").strip()
+            if manual and manual not in tried:
+                candidates.append(manual)
+            found = None
+            for cand in candidates:
+                vr = verify_password(
+                    self.chosen.host,
+                    int(self.chosen.port or 80),
+                    username,
+                    cand,
+                )
+                if vr.kind == OK:
+                    found = vr
+                    pwd = cand
+                    break
+                if vr.kind == UNAUTHORIZED:
+                    tried.add(cand)
+                    continue
+                if vr.kind == TIMEOUT:
+                    return SubmitResult(
+                        kind=TIMEOUT,
+                        message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+                    )
+            if not found:
+                return SubmitResult(
+                    kind=UNAUTHORIZED,
+                    message=(
+                        "Parol noto‘g‘ri. Webdagi/yoki lokal parol mos kelmadi — "
+                        "qo‘lda kiriting yoki to‘liq Ulash."
+                    ),
+                )
+            result = found
+
+        if result.kind != OK:
+            return SubmitResult(
+                kind=result.kind,
+                message="Parolni tekshirib bo‘lmadi.",
+            )
+
+        self.auth.record_success()
+        self.verified = result.as_device()
+        self.password = pwd
+
+        serial = str((self.verified or {}).get("serialNumber") or "")
+        ok, devices, err = self.fetch_web_devices()
+        if not ok:
+            return SubmitResult(
+                kind="api",
+                message=err or "Webdan qurilmalar o‘qilmadi.",
+            )
+        matched = peek.get("device") if isinstance(peek.get("device"), dict) else None
+        if not matched or str(matched.get("id") or "") == "":
+            matched = self.match_web_device(
+                devices,
+                serial=serial,
+                host=self.chosen.host,
+            )
+        if not matched or not str(matched.get("id") or "").strip():
+            return SubmitResult(
+                kind="api",
+                message=(
+                    "Webdagi qurilma topilmadi (serial mos kelmadi). "
+                    "Avval to‘liq Ulash qiling."
+                ),
+            )
+
+        engine = ProvisionEngine()
+        return engine.provision_network_reconnect(
+            self,
+            pwd,
+            device_id=str(matched["id"]),
+            on_status=on_status,
+        )
+
     def stop(self) -> None:
         if self.services is not None:
             self.services.stop()

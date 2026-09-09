@@ -9,7 +9,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 
 from auth_lock import CONFIRM, LOCKED
-from discovery import OFFLINE, OK, TIMEOUT
+from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
 from paths import find_root, read_link_key, read_pairing_token
 from session import OfficeLinkSession, SubmitResult
 
@@ -364,8 +364,30 @@ class OfficeLinkApp:
         )
         self.lock_lbl.pack(anchor="w", padx=10, pady=8, fill=tk.X)
 
+        self.btn_row = ttk.Frame(conn, style="App.TFrame")
+        self.btn_row.pack(anchor="e", pady=(4, 0))
+        self.reconnect_btn = tk.Button(
+            self.btn_row,
+            text="Tarmoqni qayta ulash",
+            command=self._on_reconnect,
+            bg=C["surface"],
+            fg=C["accent"],
+            activebackground=C["accent_soft"],
+            activeforeground=C["accent"],
+            disabledforeground="#a78bfa",
+            font=("Segoe UI Semibold", 10),
+            relief=tk.FLAT,
+            bd=0,
+            padx=16,
+            pady=8,
+            cursor="hand2",
+            highlightthickness=1,
+            highlightbackground=C["accent"],
+            highlightcolor=C["accent"],
+        )
+        self.reconnect_btn.pack(side=tk.LEFT, padx=(0, 8))
         self.btn = tk.Button(
-            conn,
+            self.btn_row,
             text="Ulash",
             command=self._on_ulash,
             bg=C["accent"],
@@ -380,7 +402,7 @@ class OfficeLinkApp:
             pady=8,
             cursor="hand2",
         )
-        self.btn.pack(anchor="e", pady=(4, 0))
+        self.btn.pack(side=tk.LEFT)
 
         # Hint card
         hint_wrap = ttk.Frame(frm, style="App.TFrame")
@@ -393,10 +415,9 @@ class OfficeLinkApp:
             hint,
             text=(
                 "Web → Связь с офисом dan pairing token oling. "
-                "«Admin bor»: hozirgi admin parolini bir marta yozing "
-                "(Ko‘rsat tugmasi bilan tekshiring). Ulash: "
-                "(1) terminalda YANGI parol o‘rnatadi, (2) serverga yuboradi, "
-                "(3) mustahkamlaydi. Yangi parolni Web → Устройства da ko‘rasiz."
+                "Birinchi ulash: «Ulash» — yangi parol o‘rnatadi. "
+                "Wi‑Fi o‘zgasa: «Tarmoqni qayta ulash» — webdan parol olinadi, "
+                "faqat IP/tunnel yangilanadi (parol va yuzlar saqlanadi)."
             ),
             style="Hint.TLabel",
             wraplength=480,
@@ -414,7 +435,7 @@ class OfficeLinkApp:
     def _show_alert(self, text: str) -> None:
         self.lock_var.set(text)
         if not self.alert_frame.winfo_ismapped():
-            self.alert_frame.pack(fill=tk.X, pady=(0, 10), before=self.btn)
+            self.alert_frame.pack(fill=tk.X, pady=(0, 10), before=self.btn_row)
 
     def _hide_alert(self) -> None:
         self.lock_var.set("")
@@ -559,10 +580,13 @@ class OfficeLinkApp:
 
     def _set_primary_btn(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
-        try:
-            self.btn.configure(state=state)
-        except tk.TclError:
-            pass
+        for w in (self.btn, getattr(self, "reconnect_btn", None)):
+            if w is None:
+                continue
+            try:
+                w.configure(state=state)
+            except tk.TclError:
+                pass
 
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
@@ -678,6 +702,162 @@ class OfficeLinkApp:
         else:
             self.status_var.set("Qurilma topilmadi")
             self._set_badge("OFFLINE", "danger")
+
+    def _on_reconnect(self) -> None:
+        if self.busy or self.session.auth.is_locked():
+            return
+        tok = self.token_var.get().strip()
+        if tok != (self.session.pairing_token() or ""):
+            self.session.set_pairing_token(tok)
+        if not self.session.has_credentials():
+            self.status_var.set("Token kerak")
+            self._set_badge("TOKEN", "warn")
+            self._show_alert(
+                "Pairing token yoki admin kaliti kerak. Web → Связь yoki ADMIN-PAROL.bat."
+            )
+            return
+        ip = self.ip_var.get().strip()
+        if ip:
+            chosen = self.session.choose_ip(ip)
+            if chosen is None:
+                self.status_var.set("IP manzil noto‘g‘ri.")
+                return
+            if not chosen.online:
+                self.status_var.set("Qurilma onlayn emas")
+                self._set_badge("OFFLINE", "danger")
+                self.device_var.set(f"Qurilma: {ip}")
+                return
+            self._show_device()
+        elif not self.session.chosen:
+            self.status_var.set("Qurilma topilmadi — IP yozing yoki Qidirish")
+            return
+
+        self._set_busy(True)
+        self.status_var.set("Webdan parol olinmoqda...")
+        self._set_badge("PAROL", "accent")
+        threading.Thread(target=self._reconnect_prepare_worker, daemon=True).start()
+
+    def _reconnect_prepare_worker(self) -> None:
+        peek = self.session.peek_reconnect_password(self.pwd_var.get())
+        self.root.after(0, lambda: self._reconnect_prepare_done(peek))
+
+    def _reconnect_prepare_done(self, peek: dict) -> None:
+        self._set_busy(False)
+        pwd = str(peek.get("password") or "").strip()
+        source = str(peek.get("source") or "")
+        if pwd:
+            self.pwd_var.set(pwd)
+            src_label = {
+                "local": "lokal recovery",
+                "web": "Web vault",
+                "manual": "qo‘lda",
+            }.get(source, source or "—")
+            self.status_var.set(f"Parol topildi ({src_label})")
+            self._set_badge("PAROL OK", "ok")
+            self._hide_alert()
+        else:
+            self.status_var.set("Parol topilmadi")
+            self._set_badge("PAROL", "warn")
+            self._show_alert(
+                str(
+                    peek.get("error")
+                    or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash."
+                )
+            )
+            if not self.pwd_var.get().strip():
+                return
+
+        host = self.ip_var.get().strip() or (
+            self.session.chosen.host if self.session.chosen else "—"
+        )
+        confirm_msg = (
+            "Tarmoqni qayta ulash — tasdiqlang.\n\n"
+            f"IP: {host}\n"
+            f"Parol manbai: {source or 'qo‘lda'}\n\n"
+            "Parol o‘zgarmaydi, faqat tarmoq (IP + tunnel) yangilanadi.\n"
+            "Yuzlar qayta yuklanmaydi.\n\n"
+            "Davom etasizmi?"
+        )
+        if not messagebox.askokcancel("Tarmoqni qayta ulash", confirm_msg):
+            return
+        password = self.pwd_var.get().strip()
+        if not password:
+            self._show_alert("Parol kerak — qo‘lda kiriting yoki to‘liq Ulash.")
+            return
+        self._set_busy(True)
+        self.status_var.set("Tarmoq yangilanmoqda...")
+        self._set_badge("ULANMOQDA", "accent")
+        threading.Thread(
+            target=self._reconnect_worker, args=(password,), daemon=True
+        ).start()
+
+    def _reconnect_worker(self, password: str) -> None:
+        def progress(msg: str) -> None:
+            self.root.after(0, lambda m=msg: self.status_var.set(m[:120]))
+
+        result = self.session.reconnect_network(
+            password,
+            progress,
+            ip_hint=self.ip_var.get().strip() or None,
+        )
+        self.root.after(0, lambda: self._reconnect_done(result))
+
+    def _reconnect_done(self, result: SubmitResult) -> None:
+        self._set_busy(False)
+        kind = result.kind
+        if kind == "reconnected":
+            self.pwd_var.set("")
+            self.status_var.set("Tarmoq yangilandi")
+            self._set_badge("YANGILANDI", "ok")
+            self._hide_alert()
+            host = (result.device or {}).get("host") or ""
+            name = (result.device or {}).get("name") or ""
+            self.device_var.set(f"Qurilma: {name}  {host}".strip())
+            try:
+                self.session.write_service_handoff()
+                svc_note = " Service config yangilandi."
+            except Exception:
+                svc_note = ""
+            self.note.configure(
+                text=(
+                    "Tarmoq yangilandi. Parol o‘zgarmadi, yuzlar saqlanadi. "
+                    "Keyin Windows Service ishlayotganini tekshiring."
+                    + svc_note
+                )
+            )
+            messagebox.showinfo(
+                "Tarmoq yangilandi",
+                "IP va tunnel yangilandi.\n"
+                "Admin parol o‘zgarmadi — yuzlarni qayta yuklash shart emas.",
+            )
+            return
+        if kind == UNAUTHORIZED or kind == "empty":
+            self.status_var.set(result.message or "Parol topilmadi")
+            self._set_badge("PAROL", "danger")
+            self._show_alert(
+                result.message
+                or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash."
+            )
+            return
+        if kind == LOCKED:
+            self.status_var.set("Qulflangan")
+            self._refresh_lock_ui()
+            if self._tick_job is None:
+                self._tick_lock()
+            return
+        if kind == TIMEOUT:
+            self.status_var.set("Tarmoq kutish vaqti")
+            self._set_badge("TIMEOUT", "warn")
+            self._show_alert(result.message)
+            return
+        if kind == OFFLINE:
+            self.status_var.set("Qurilma onlayn emas")
+            self._set_badge("OFFLINE", "danger")
+            self._show_alert(result.message)
+            return
+        self.status_var.set(result.message or "Xato")
+        self._set_badge("XATO", "danger")
+        self._show_alert(result.message)
 
     def _on_ulash(self) -> None:
         if self.busy or self.session.auth.is_locked():
