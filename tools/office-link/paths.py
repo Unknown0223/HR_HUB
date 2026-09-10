@@ -60,18 +60,97 @@ def config_file(root: Path | None = None) -> Path:
     return (root or find_root()) / "config.json"
 
 
+def connection_file(root: Path | None = None) -> Path:
+    """Signed bind blob issued by a specific web deployment."""
+    return (root or find_root()) / "connection.hrhub"
+
+
+def _decode_connection_hrhub(raw: str) -> dict | None:
+    import base64
+    import json
+
+    text = (raw or "").strip()
+    if not text:
+        return None
+    try:
+        # base64url
+        pad = "=" * (-len(text) % 4)
+        data = base64.urlsafe_b64decode(text + pad)
+        parsed = json.loads(data.decode("utf-8"))
+        payload = parsed.get("payload") if isinstance(parsed, dict) else None
+        if not isinstance(payload, dict):
+            return None
+        if not payload.get("apiUrl") or not payload.get("tenantCode"):
+            return None
+        return parsed
+    except Exception:
+        return None
+
+
+def load_bound_connection(root: Path | None = None) -> dict | None:
+    path = connection_file(root)
+    if not path.is_file():
+        return None
+    try:
+        return _decode_connection_hrhub(path.read_text(encoding="utf-8"))
+    except OSError:
+        return None
+
+
 def load_config(root: Path | None = None) -> dict:
     import json
 
     path = config_file(root)
-    if not path.is_file():
-        return {
-            "apiUrl": "https://hr-hubapi-production.up.railway.app",
-            "webUrl": "https://hr-hubweb-production.up.railway.app",
-            "tenantCode": "demo",
-        }
-    return json.loads(path.read_text(encoding="utf-8"))
+    defaults = {
+        "apiUrl": "https://hr-hubapi-production.up.railway.app",
+        "webUrl": "https://hr-hubweb-production.up.railway.app",
+        "tenantCode": "demo",
+        "recoveryEmail": "botirovanvar96@gmail.com",
+    }
+    data = dict(defaults)
+    if path.is_file():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data.update(loaded)
+        except Exception:
+            pass
 
+    # Prefer signed connection pack from the web that issued the download.
+    bound = load_bound_connection(root)
+    if bound and isinstance(bound.get("payload"), dict):
+        p = bound["payload"]
+        data["apiUrl"] = str(p.get("apiUrl") or data.get("apiUrl") or "").rstrip("/")
+        data["webUrl"] = str(p.get("webUrl") or data.get("webUrl") or "").rstrip("/")
+        data["tenantCode"] = str(p.get("tenantCode") or data.get("tenantCode") or "").strip()
+        if p.get("tenantName"):
+            data["tenantName"] = str(p.get("tenantName"))
+        data["bound"] = True
+        data["boundAt"] = str(p.get("issuedAt") or "")
+        data["installerUrl"] = p.get("installerUrl") or data.get("installerUrl")
+        data["version"] = p.get("version") or data.get("version")
+    else:
+        data["bound"] = bool(data.get("bound"))
+
+    data["apiUrl"] = str(data.get("apiUrl") or defaults["apiUrl"]).rstrip("/")
+    data["webUrl"] = str(data.get("webUrl") or defaults["webUrl"]).rstrip("/")
+    data["tenantCode"] = str(data.get("tenantCode") or defaults["tenantCode"]).strip()
+    return data
+
+
+def bound_web_label(cfg: dict | None = None, root: Path | None = None) -> str:
+    data = cfg if cfg is not None else load_config(root)
+    web = str(data.get("webUrl") or "").rstrip("/")
+    tenant = str(data.get("tenantCode") or "").strip()
+    name = str(data.get("tenantName") or "").strip()
+    if not web and not tenant:
+        return ""
+    bits = [web or "web?"]
+    if tenant:
+        bits.append(f"tenant={tenant}")
+    if name:
+        bits.append(name)
+    return " · ".join(bits)
 
 def service_config_file(root: Path | None = None) -> Path:
     return data_dir(root) / "service.json"

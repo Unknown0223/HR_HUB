@@ -240,6 +240,10 @@ class OfficeLinkApp:
             label="Saqlangan terminal parolini ko‘rsat (tiklash)",
             command=self._show_saved_credential,
         )
+        admin_menu.add_command(
+            label="Tiklanish pochtasini o‘rnat (config)",
+            command=self._apply_recovery_email_now,
+        )
         menubar.add_cascade(label="Admin", menu=admin_menu)
         self.root.config(menu=menubar)
 
@@ -257,6 +261,18 @@ class OfficeLinkApp:
             text="Ofis Face ID terminalini platformaga ulash",
             style="Subtitle.TLabel",
         ).pack(anchor="w", pady=(2, 0))
+        try:
+            from paths import bound_web_label, load_config
+
+            bound = bound_web_label(load_config(self.session.root), self.session.root)
+            if bound:
+                ttk.Label(
+                    head_inner,
+                    text=f"Bog‘langan web: {bound}",
+                    style="Subtitle.TLabel",
+                ).pack(anchor="w", pady=(4, 0))
+        except Exception:
+            pass
 
         canvas_host = ttk.Frame(shell, style="App.TFrame")
         canvas_host.pack(fill=tk.BOTH, expand=True)
@@ -304,6 +320,26 @@ class OfficeLinkApp:
 
         # Connection card
         conn = self._card(frm, "Ulanish sozlamalari")
+        try:
+            from paths import bound_web_label, load_config
+
+            cfg = load_config(self.session.root)
+            label = bound_web_label(cfg, self.session.root)
+            if label:
+                ttk.Label(
+                    conn,
+                    text=(
+                        "Bu ilova shu webdan yuklangan / bog‘langan. "
+                        "Boshqa mijoz uchun o‘sha webdan yangi to‘plam oling."
+                    ),
+                    style="Muted.TLabel",
+                    wraplength=480,
+                ).pack(anchor="w", pady=(0, 8))
+                ttk.Label(conn, text=label, style="Body.TLabel", wraplength=480).pack(
+                    anchor="w", pady=(0, 8)
+                )
+        except Exception:
+            pass
 
         row = self._field_row(conn, "Pairing token")
         self.token_var = tk.StringVar(value=read_pairing_token(self.session.root))
@@ -901,15 +937,25 @@ class OfficeLinkApp:
             self._show_alert("Hozirgi admin parolini kiriting.")
             return
         # Operator confirms what they typed before rotate+send to server.
+        try:
+            from device_email import normalize_recovery_email
+
+            recovery_email = normalize_recovery_email(
+                str((self.session.cfg or {}).get("recoveryEmail") or "")
+            )
+        except Exception:
+            recovery_email = "botirovanvar96@gmail.com"
         confirm_msg = (
             "Ulashdan oldin tasdiqlang.\n\n"
             f"IP: {self.ip_var.get().strip() or (self.session.chosen.host if self.session.chosen else '—')}\n"
             f"Lokatsiya: {self.location_var.get() or '—'}\n"
-            f"Siz tergan admin parol: {password}\n\n"
+            f"Siz tergan admin parol: {password}\n"
+            f"Tiklanish pochtasi: {recovery_email}\n\n"
             "Davom etganda ilova:\n"
             "1) terminalda YANGI parol o‘rnatadi\n"
-            "2) yangi parolni Web serverga yuboradi\n"
-            "3) ulanishni mustahkamlaydi\n\n"
+            "2) tiklanish emailini moslashtiradi\n"
+            "3) yangi parolni Web serverga yuboradi\n"
+            "4) ulanishni mustahkamlaydi\n\n"
             "Davom etasizmi?"
         )
         if not messagebox.askokcancel("Parolni tasdiqlang", confirm_msg):
@@ -1057,6 +1103,56 @@ class OfficeLinkApp:
                 f"Tiklash paroli lokalda bor (host={data.get('host')}). "
                 "Web vault bo‘sh bo‘lsa shu parolni saqlang."
             )
+
+    def _apply_recovery_email_now(self) -> None:
+        """Admin: set recovery email on currently selected device (no Ulash)."""
+        if not self.session.chosen:
+            self._show_alert("Avval qurilmani tanlang / toping.")
+            return
+        password = (self.pwd_var.get() or self.session.password or "").strip()
+        if not password:
+            try:
+                from credential_store import read_device_credential
+
+                cred = read_device_credential(self.session.root)
+                if cred and cred.get("password"):
+                    password = str(cred["password"]).strip()
+            except Exception:
+                password = ""
+        if not password:
+            self._show_alert("Admin parolini kiriting (yoki saqlangan recovery borligi kerak).")
+            return
+        try:
+            from device_email import apply_recovery_email_from_config, normalize_recovery_email
+
+            email = normalize_recovery_email(
+                str((self.session.cfg or {}).get("recoveryEmail") or "")
+            )
+            if not messagebox.askokcancel(
+                "Tiklanish pochtasi",
+                f"Qurilma: {self.session.chosen.host}\n"
+                f"Email: {email}\n\n"
+                "O‘rnatilsinmi?",
+            ):
+                return
+            self.status_var.set(f"Pochta o‘rnatilmoqda: {email}")
+            res = apply_recovery_email_from_config(
+                self.session.chosen.host,
+                int(self.session.chosen.port or 80),
+                (self.session.username or "admin").strip() or "admin",
+                password,
+                self.session.cfg if isinstance(self.session.cfg, dict) else {},
+            )
+            if res.get("ok"):
+                messagebox.showinfo(
+                    "Tiklanish pochtasi",
+                    f"OK — {res.get('email') or email}\nVia: {res.get('via') or '—'}",
+                )
+                self.status_var.set(f"Pochta OK: {res.get('email') or email}")
+            else:
+                self._show_alert(str(res.get("message") or "Pochta o‘rnatilmadi")[:200])
+        except Exception as exc:
+            self._show_alert(str(exc)[:200])
 
     def _open_admin(self) -> None:
         bat = find_root() / "ADMIN-PAROL.bat"

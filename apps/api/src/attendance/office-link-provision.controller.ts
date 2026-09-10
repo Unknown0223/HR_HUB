@@ -96,6 +96,45 @@ export class OfficeLinkProvisionController {
     return info;
   }
 
+  /**
+   * Tenant-bound connection pack (config.json + signed connection.hrhub).
+   * Download from THIS web so the desktop app connects to the correct API/tenant.
+   */
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Get('download-bound')
+  async downloadBound(
+    @CurrentTenant() tenantId: string | null,
+    @Res() res: Response,
+    @Query('format') format?: string,
+    // Express request host via header fallback on Response.req
+  ) {
+    const tid = this.attendance.requireTenant(tenantId);
+    const req = res.req as { headers?: Record<string, string | string[] | undefined> };
+    const xf = req?.headers?.['x-forwarded-host'];
+    const hostHeader = req?.headers?.host;
+    const reqHost = String(
+      (Array.isArray(xf) ? xf[0] : xf) ||
+        (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) ||
+        '',
+    );
+    if (format === 'json') {
+      const bind = await this.attendance.buildOfficeLinkBind(tid, { reqHost });
+      return res.json(bind);
+    }
+    const { zip, filename } = await this.attendance.buildOfficeLinkBoundZip(tid, {
+      reqHost,
+    });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+    res.setHeader('Content-Length', String(zip.length));
+    res.send(zip);
+  }
+
   // ── Pairing token ──────────────────────────────────────────
 
   @Public()

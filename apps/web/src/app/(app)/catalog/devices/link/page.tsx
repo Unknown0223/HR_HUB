@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageSubnav } from '@/components/PageSubnav';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getAccessToken, getSession } from '@/lib/api';
 import styles from './page.module.css';
 import shared from '../../../../page-shared.module.css';
 
@@ -18,6 +18,16 @@ type DownloadInfo = {
   url?: string | null;
   version?: string | null;
   available?: boolean;
+};
+
+type BindInfo = {
+  apiUrl: string;
+  webUrl: string;
+  tenantCode: string;
+  tenantName?: string;
+  installerUrl?: string | null;
+  version?: string | null;
+  installerAvailable?: boolean;
 };
 
 type SessionRow = {
@@ -49,9 +59,11 @@ function statusPill(status: string) {
 
 export default function DeviceLinkPage() {
   const [busy, setBusy] = useState(false);
+  const [boundBusy, setBoundBusy] = useState(false);
   const [error, setError] = useState('');
   const [pairing, setPairing] = useState<PairingResult | null>(null);
   const [download, setDownload] = useState<DownloadInfo | null>(null);
+  const [bind, setBind] = useState<BindInfo | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [copied, setCopied] = useState(false);
 
@@ -83,6 +95,14 @@ export default function DeviceLinkPage() {
     } catch {
       setDownload({ available: false });
     }
+    try {
+      const b = await apiFetch<BindInfo>(
+        '/api/attendance/office-link/download-bound?format=json',
+      );
+      setBind(b);
+    } catch {
+      setBind(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -92,6 +112,50 @@ export default function DeviceLinkPage() {
     return () => clearInterval(t);
   }, [loadDownload, loadSessions]);
 
+  async function downloadBoundPack() {
+    setBoundBusy(true);
+    setError('');
+    try {
+      const session = getSession();
+      const headers = new Headers();
+      const token = getAccessToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const tenantId = session?.tenant?.id ?? session?.user.tenantId;
+      if (tenantId) headers.set('X-Tenant-Id', tenantId);
+      const res = await fetch('/api/attendance/office-link/download-bound', {
+        headers,
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        let message = res.statusText;
+        try {
+          const body = await res.json();
+          message = body.message || message;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(typeof message === 'string' ? message : 'Yuklab bo‘lmadi');
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="?([^"]+)"?/i);
+      const filename =
+        m?.[1] ||
+        `HRHUB-Link-${bind?.tenantCode || 'bind'}-bind.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Bog‘langan to‘plam yuklanmadi');
+    } finally {
+      setBoundBusy(false);
+    }
+  }
   async function createPairing() {
     setBusy(true);
     setError('');
@@ -165,27 +229,56 @@ export default function DeviceLinkPage() {
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>1. Скачать HR HUB Link</h2>
           <p className={styles.cardHint}>
-            Установите программу на офисный ПК в одной сети с терминалом Face ID.
+            Har bir web o‘z ilovasini beradi: yuklab olgan to‘plam shu platformaga
+            (API + tenant) bog‘lanadi. Boshqa mijoz webiga ulash uchun o‘sha webdan
+            yangi to‘plam oling.
           </p>
-          {download?.url ? (
-            <a
-              className={styles.primaryBtn}
-              href={download.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Скачать .exe
-              {download.version ? ` (v${download.version})` : ''}
-            </a>
-          ) : (
+          {bind ? (
             <p className={styles.muted}>
-              Ссылка ещё не настроена (`OFFICE_LINK_DOWNLOAD_URL`). Локально:
-              запустите <code>tools/office-link/BUILD-EXE.bat</code> →{' '}
-              <code>dist/HRHUB-Qurilma/HRHUB-Qurilma.exe</code>, либо{' '}
-              <code>BOSHLASH.bat</code> (Python). Инструкция:{' '}
-              <code>tools/office-link/QOLLAMA.txt</code>
+              Shu web: <strong>{bind.webUrl}</strong>
+              {' · '}
+              tenant <code>{bind.tenantCode}</code>
+              {bind.tenantName ? ` (${bind.tenantName})` : ''}
+              <br />
+              API: <code>{bind.apiUrl}</code>
             </p>
-          )}
+          ) : null}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              disabled={boundBusy}
+              onClick={() => void downloadBoundPack()}
+            >
+              {boundBusy
+                ? 'Tayyorlanmoqda…'
+                : 'Shu web uchun bog‘langan to‘plam (.zip)'}
+            </button>
+            {download?.url ? (
+              <a
+                className={styles.ghostBtn}
+                href={download.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                To‘liq dastur
+                {download.version ? ` (v${download.version})` : ''}
+              </a>
+            ) : null}
+          </div>
+          <p className={styles.muted} style={{ marginTop: '0.75rem' }}>
+            Zip ichida: <code>config.json</code>, shifrlangan{' '}
+            <code>connection.hrhub</code>, qo‘llanma. Dasturni ochishdan oldin
+            fayllarni HR HUB Link papkasiga qo‘ying (yoki avval to‘liq dasturni
+            yuklab, keyin shu fayllarni ustiga yozing).
+            {!download?.url ? (
+              <>
+                {' '}
+                To‘liq EXE hali sozlanmagan (`OFFICE_LINK_DOWNLOAD_URL`) — lokal:{' '}
+                <code>BUILD-EXE.bat</code> / <code>BOSHLASH.bat</code>.
+              </>
+            ) : null}
+          </p>
         </section>
 
         <section className={styles.card}>

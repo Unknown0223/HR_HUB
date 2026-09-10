@@ -22,6 +22,12 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import type { PairingAuthContext } from './pairing-token.guard';
 import {
+  buildStoreZip,
+  encodeConnectionHrhub,
+  signOfficeLinkBind,
+  type OfficeLinkBindPayload,
+} from './office-link-bind';
+import {
   CreateDeviceDto,
   CreateLocationDto,
   CreateProductionCalendarDto,
@@ -2954,6 +2960,141 @@ export class AttendanceService {
       return { url: null, version, message: 'OFFICE_LINK_DOWNLOAD_URL sozlanmagan' };
     }
     return { url, version };
+  }
+
+  private officeLinkBindSecret(): string {
+    return (
+      (this.config.get<string>('OFFICE_LINK_BIND_SECRET') ?? '').trim() ||
+      (this.config.get<string>('JWT_SECRET') ?? '').trim() ||
+      'hrhub-office-link-bind-dev-secret!!'
+    );
+  }
+
+  private resolvePublicApiUrl(reqHost?: string | null): string {
+    const fromEnv = (
+      this.config.get<string>('API_PUBLIC_URL') ||
+      this.config.get<string>('PUBLIC_API_URL') ||
+      ''
+    )
+      .trim()
+      .replace(/\/$/, '');
+    if (fromEnv) return fromEnv;
+    const railway =
+      this.config.get<string>('RAILWAY_PUBLIC_DOMAIN') ||
+      this.config.get<string>('RAILWAY_STATIC_URL') ||
+      '';
+    if (railway) {
+      return `https://${String(railway).replace(/^https?:\/\//, '').replace(/\/$/, '')}`;
+    }
+    if (reqHost) {
+      const host = String(reqHost).split(',')[0].trim();
+      if (host) return `https://${host.replace(/^https?:\/\//, '')}`;
+    }
+    const port = this.config.get<string>('API_PORT') || '3002';
+    return `http://localhost:${port}`;
+  }
+
+  private resolvePublicWebUrl(): string {
+    const fromEnv = (
+      this.config.get<string>('WEB_PUBLIC_URL') ||
+      this.config.get<string>('PUBLIC_WEB_URL') ||
+      ''
+    )
+      .trim()
+      .replace(/\/$/, '');
+    if (fromEnv) return fromEnv;
+    const cors = (this.config.get<string>('CORS_ORIGIN') || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (cors[0] && cors[0] !== '*') return cors[0].replace(/\/$/, '');
+    return 'http://localhost:3001';
+  }
+
+  async buildOfficeLinkBind(
+    tenantId: string,
+    opts?: { reqHost?: string | null },
+  ) {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId },
+      select: { id: true, code: true, name: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const download = this.getOfficeLinkDownload();
+    const payload: OfficeLinkBindPayload = {
+      v: 1,
+      apiUrl: this.resolvePublicApiUrl(opts?.reqHost),
+      webUrl: this.resolvePublicWebUrl(),
+      tenantCode: tenant.code,
+      tenantName: tenant.name,
+      issuedAt: new Date().toISOString(),
+      installerUrl: download.url,
+      version: download.version,
+    };
+    const signed = signOfficeLinkBind(payload, this.officeLinkBindSecret());
+    return {
+      ...payload,
+      connectionToken: encodeConnectionHrhub(signed),
+      signed,
+      installerAvailable: Boolean(download.url),
+    };
+  }
+
+  async buildOfficeLinkBoundZip(
+    tenantId: string,
+    opts?: { reqHost?: string | null },
+  ) {
+    const bind = await this.buildOfficeLinkBind(tenantId, opts);
+    const configJson = {
+      apiUrl: bind.apiUrl,
+      webUrl: bind.webUrl,
+      tenantCode: bind.tenantCode,
+      tenantName: bind.tenantName,
+      boundAt: bind.issuedAt,
+      version: bind.version,
+      recoveryEmail: '',
+    };
+    const readme = [
+      'HR HUB Link — ushbu webga bog‘langan ulanish to‘plami',
+      '====================================================',
+      '',
+      `Web:    ${bind.webUrl}`,
+      `API:    ${bind.apiUrl}`,
+      `Tenant: ${bind.tenantCode}${bind.tenantName ? ` (${bind.tenantName})` : ''}`,
+      '',
+      'Qanday o‘rnatish:',
+      '1) Agar to‘liq dastur (EXE/ZIP) allaqachon bor bo‘lsa — shu papkaga',
+      '   config.json va connection.hrhub fayllarini nusxalang (ustiga yozing).',
+      '2) Agar dastur yo‘q bo‘lsa — avval INSTALLER.url dagi manzildan yuklab oling,',
+      '   keyin shu bog‘lash fayllarini dastur papkasiga qo‘ying.',
+      '3) HRHUB-Qurilma.exe / BOSHLASH.bat ni oching — yuqorida shu web ko‘rinadi.',
+      '4) Web → Связь с офисом dan pairing token oling va Ulash qiling.',
+      '',
+      'Muhim: bu to‘plam faqat shu platformaga tegishli. Boshqa mijoz webiga',
+      'ulash uchun o‘sha webdan yangi to‘plamni yuklab oling.',
+      '',
+    ].join('\n');
+
+    const files: Array<{ name: string; content: string }> = [
+      { name: 'config.json', content: `${JSON.stringify(configJson, null, 2)}\n` },
+      { name: 'connection.hrhub', content: `${bind.connectionToken}\n` },
+      { name: 'OQISH.txt', content: readme },
+    ];
+    if (bind.installerUrl) {
+      files.push({
+        name: 'INSTALLER.url',
+        content: `[InternetShortcut]\nURL=${bind.installerUrl}\n`,
+      });
+      files.push({
+        name: 'INSTALLER.txt',
+        content: `To‘liq dastur yuklash:\n${bind.installerUrl}\n`,
+      });
+    }
+
+    const zip = buildStoreZip(files);
+    const safeTenant = bind.tenantCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const filename = `HRHUB-Link-${safeTenant}-bind.zip`;
+    return { zip, filename, bind };
   }
 
   /** Field credential for GW punch ingest (same as DEVICE_LINK_KEY / PUNCH_INGEST_API_KEY). */
