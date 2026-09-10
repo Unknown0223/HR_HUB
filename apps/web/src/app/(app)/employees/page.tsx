@@ -3,6 +3,7 @@ import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -21,6 +22,7 @@ import {
   PassportScanModal,
   type PassportScanResult,
 } from '@/components/PassportScanModal';
+import { TelegramJoinPanel } from '@/components/employees/TelegramJoinPanel';
 import modal from '@/components/form-modal.module.css';
 import { useUrlParam } from '@/lib/use-url-state';
 import styles from '../../page-shared.module.css';
@@ -172,6 +174,7 @@ function cellOf(row: Emp, key: string): string {
 }
 
 function EmployeesPageInner() {
+  const searchParams = useSearchParams();
   const [tab] = useUrlParam('tab', 'active', TABS);
   const filters = useFilterFromUrl(FILTER_KEYS);
   const q = filters.q;
@@ -187,7 +190,9 @@ function EmployeesPageInner() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [persons, setPersons] = useState<PersonOpt[]>([]);
   const [error, setError] = useState('');
-  const [panel, setPanel] = useState<'none' | 'create' | 'attach' | 'import'>('none');
+  const [panel, setPanel] = useState<
+    'none' | 'create' | 'attach' | 'import' | 'telegram'
+  >('none');
   const [menuOpen, setMenuOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(
     () => Boolean(q || divisionId || positionId),
@@ -223,6 +228,12 @@ function EmployeesPageInner() {
     if (positionId) p.set('positionId', positionId);
     return p.toString();
   }, [tab, q, divisionId, positionId]);
+
+  useEffect(() => {
+    if (searchParams.get('panel') === 'telegram') {
+      setPanel('telegram');
+    }
+  }, [searchParams]);
 
   const query = useMemo(() => {
     const p = new URLSearchParams(exportQuery);
@@ -536,6 +547,17 @@ function EmployeesPageInner() {
                 >
                   Импортировать
                 </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPanel('telegram');
+                    setError('');
+                  }}
+                >
+                  Telegram
+                </button>
               </div>
             ) : null}
           </div>
@@ -626,6 +648,27 @@ function EmployeesPageInner() {
             ]}
             onDone={() => void load()}
           />
+        </div>
+      ) : null}
+
+      {panel === 'telegram' ? (
+        <div className={styles.panel} style={{ marginBottom: '1rem' }}>
+          <div className={styles.rowActions} style={{ marginBottom: '0.65rem' }}>
+            <strong>Telegram</strong>
+            <div className={styles.rowActions}>
+              <Link href="/settings/telegram" className={styles.btnSecondary}>
+                Настройки бота
+              </Link>
+              <button
+                type="button"
+                className={styles.btnGhost}
+                onClick={() => setPanel('none')}
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+          <TelegramJoinPanel />
         </div>
       ) : null}
 

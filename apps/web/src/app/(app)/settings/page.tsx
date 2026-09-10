@@ -105,6 +105,7 @@ const SYS_CODES = [
   'onec',
   'esign',
   'mehnat',
+  'telegram',
 ] as const;
 
 function integrationSys(i: Integration): string {
@@ -120,6 +121,7 @@ function integrationSys(i: Integration): string {
   if (n.includes('1с') || n.includes('1c') || n.includes('onec')) return 'onec';
   if (n.includes('e-imzo') || n.includes('подпис') || n.includes('esign')) return 'esign';
   if (n.includes('mehnat')) return 'mehnat';
+  if (n.includes('telegram')) return 'telegram';
   return '';
 }
 
@@ -141,6 +143,8 @@ function sysLabel(s: string) {
       return 'E-IMZO';
     case 'mehnat':
       return 'Mehnat.gov';
+    case 'telegram':
+      return 'Telegram Bot';
     default:
       return s;
   }
@@ -263,6 +267,9 @@ export default function SettingsPage() {
     }
     if (tab === 'integrations' && sysCode === 'billz1') {
       router.replace('/settings/billz-sales');
+    }
+    if (tab === 'integrations' && sysCode === 'telegram') {
+      router.replace('/settings/telegram');
     }
     if (tab === 'admin' && panel === 'orgs') {
       router.replace('/settings/organizations');

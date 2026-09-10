@@ -575,6 +575,7 @@ export const MEGA_NAV: MegaSection[] = [
           { href: '/settings/iiko-sales', label: 'Продажи IIKO', faIcon: 'fa-receipt', iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0e9f6e 100%)' },
           { href: '/settings/billz', label: 'Настройки Billz 2.0', faIcon: 'fa-store', iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #0a85e2 100%)' },
           { href: '/settings/billz-sales', label: 'Продажи Billz 1.0', faIcon: 'fa-shopping-bag', iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #7c3aed 100%)' },
+          { href: '/settings/telegram', label: 'Telegram Bot', faIcon: 'fa-paper-plane', iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #06b6d4 100%)' },
           { href: '/settings?tab=integrations&sys=onec', label: '1С:Предприятие', faIcon: 'fa-server', iconAccent: 'linear-gradient(135deg, #e11d48 0%, #f59e0b 100%)' },
           { href: '/settings?tab=integrations&sys=esign', label: 'Электронная подпись', faIcon: 'fa-pen', iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)' },
           { href: '/settings?tab=integrations&sys=mehnat', label: 'Mehnat.gov.uz', faIcon: 'fa-landmark', iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #6366f1 100%)' },

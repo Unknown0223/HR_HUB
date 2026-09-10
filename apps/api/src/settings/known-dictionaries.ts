@@ -755,4 +755,10 @@ export const KNOWN_INTEGRATIONS: {
     stub: true,
     note: 'Гос. API синхронизации не клонируется; только контракт настроек',
   },
+  {
+    sys: 'telegram',
+    name: 'Telegram Bot',
+    type: 'webhook',
+    note: 'Xodimlarni bot orqali qo‘shish: token, webhook, foto',
+  },
 ];

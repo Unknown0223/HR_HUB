@@ -111,12 +111,13 @@ export function TelegramJoinPanel() {
         Telegram orqali qo‘shilish
       </h2>
       <p style={{ margin: '0 0 0.75rem', color: '#605e5c', fontSize: '0.9rem' }}>
-        Xodimga bot havolasini yuboring — FIO/telefon/PINFL keladi, HR tasdiqlaydi.
+        Xodimga bot havolasini yuboring — FIO/telefon/PINFL/foto keladi, HR tasdiqlaydi.
         {!status?.enabled ? (
           <>
             {' '}
-            Hozir bot o‘chiq: API da <code>TELEGRAM_BOT_TOKEN</code> va{' '}
-            <code>TELEGRAM_BOT_USERNAME</code> sozlang.
+            Bot o‘chiq:{' '}
+            <a href="/settings/telegram">Настройки → Telegram</a> da token
+            kiriting va webhook ni ro‘yxatdan o‘tkazing.
           </>
         ) : (
           <>

@@ -6,7 +6,6 @@ import {
   Post,
   Query,
   Headers,
-  UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
 import {
@@ -17,7 +16,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
-import { ConfigService } from '@nestjs/config';
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import { Roles, Public } from '../auth/decorators';
@@ -39,13 +37,19 @@ class RejectJoinDto {
   reason?: string;
 }
 
+class SetupWebhookDto {
+  @ApiPropertyOptional({
+    example: 'https://hr-hubapi-production.up.railway.app',
+  })
+  @IsOptional()
+  @IsString()
+  publicApiUrl?: string;
+}
+
 @ApiTags('telegram')
 @Controller('telegram')
 export class TelegramController {
-  constructor(
-    private readonly telegram: TelegramService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly telegram: TelegramService) {}
 
   private requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
@@ -56,8 +60,21 @@ export class TelegramController {
   @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Get('status')
-  status() {
-    return this.telegram.status();
+  status(@CurrentTenant() tenantId: string | null) {
+    return this.telegram.status(this.requireTenant(tenantId));
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin)
+  @Post('setup-webhook')
+  setupWebhook(
+    @CurrentTenant() tenantId: string | null,
+    @Body() dto: SetupWebhookDto,
+  ) {
+    return this.telegram.setupWebhook(this.requireTenant(tenantId), {
+      publicApiUrl: dto.publicApiUrl,
+    });
   }
 
   @ApiBearerAuth()
@@ -112,7 +129,7 @@ export class TelegramController {
     );
   }
 
-  /** Telegram Bot API webhook (set via setWebhook). */
+  /** Telegram Bot API webhook (set via Settings → Telegram → Webhook). */
   @Public()
   @SkipTenant()
   @Post('webhook')
@@ -120,12 +137,7 @@ export class TelegramController {
     @Headers('x-telegram-bot-api-secret-token') secret: string | undefined,
     @Body() body: unknown,
   ) {
-    const expected = (
-      this.config.get<string>('TELEGRAM_WEBHOOK_SECRET') ?? ''
-    ).trim();
-    if (expected && secret !== expected) {
-      throw new UnauthorizedException('Invalid webhook secret');
-    }
+    await this.telegram.assertWebhookSecret(secret);
     return this.telegram.handleWebhook(body as never);
   }
 }
