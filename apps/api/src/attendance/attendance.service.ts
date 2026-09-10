@@ -2980,20 +2980,69 @@ export class AttendanceService {
     loadedAt: number;
   } | null = null;
 
-  private officeLinkBaseZipCandidates(): string[] {
-    const fromEnv = (this.config.get<string>('OFFICE_LINK_BASE_ZIP') ?? '').trim();
+  private officeLinkSetupCache: {
+    buf: Buffer;
+    source: string;
+    loadedAt: number;
+  } | null = null;
+
+  private officeLinkAssetDirs(): string[] {
     const cwd = process.cwd();
     return [
+      path.resolve(cwd, 'assets/office-link'),
+      path.resolve(cwd, 'apps/api/assets/office-link'),
+      path.resolve(__dirname, '../../assets/office-link'),
+    ];
+  }
+
+  private officeLinkSetupCandidates(): string[] {
+    const fromEnv = (this.config.get<string>('OFFICE_LINK_SETUP_EXE') ?? '').trim();
+    return [
       fromEnv,
-      path.resolve(cwd, 'assets/office-link/HRHUB-Link-portable.zip'),
-      path.resolve(cwd, 'apps/api/assets/office-link/HRHUB-Link-portable.zip'),
-      path.resolve(__dirname, '../../assets/office-link/HRHUB-Link-portable.zip'),
+      ...this.officeLinkAssetDirs().map((d) =>
+        path.join(d, 'HRHUB-Link-Setup.exe'),
+      ),
     ].filter(Boolean);
   }
 
+  private officeLinkBaseZipCandidates(): string[] {
+    const fromEnv = (this.config.get<string>('OFFICE_LINK_BASE_ZIP') ?? '').trim();
+    return [
+      fromEnv,
+      ...this.officeLinkAssetDirs().map((d) =>
+        path.join(d, 'HRHUB-Link-portable.zip'),
+      ),
+    ].filter(Boolean);
+  }
+
+  private hasOfficeLinkSetupSource(): boolean {
+    return this.officeLinkSetupCandidates().some((p) => existsSync(p));
+  }
+
   private hasOfficeLinkBaseZipSource(): boolean {
+    if (this.hasOfficeLinkSetupSource()) return true;
     if (this.officeLinkBaseZipCandidates().some((p) => existsSync(p))) return true;
     return Boolean((this.config.get<string>('OFFICE_LINK_DOWNLOAD_URL') ?? '').trim());
+  }
+
+  private async loadOfficeLinkSetupExe(): Promise<{
+    buf: Buffer;
+    source: string;
+  } | null> {
+    const ttlMs = 60 * 60 * 1000;
+    const cached = this.officeLinkSetupCache;
+    if (cached && Date.now() - cached.loadedAt < ttlMs) {
+      return { buf: cached.buf, source: cached.source };
+    }
+    for (const p of this.officeLinkSetupCandidates()) {
+      if (!existsSync(p)) continue;
+      const buf = await readFile(p);
+      if (buf.length < 1000) continue;
+      this.officeLinkSetupCache = { buf, source: p, loadedAt: Date.now() };
+      this.logger.log(`Office-link Setup.exe loaded (${buf.length} bytes)`);
+      return { buf, source: p };
+    }
+    return null;
   }
 
   private async loadOfficeLinkBaseZip(): Promise<{
@@ -3110,7 +3159,9 @@ export class AttendanceService {
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
     const download = this.getOfficeLinkDownload();
-    const fullPackageAvailable = this.hasOfficeLinkBaseZipSource();
+    const setupAvailable = this.hasOfficeLinkSetupSource();
+    const fullPackageAvailable =
+      setupAvailable || this.hasOfficeLinkBaseZipSource();
     const payload: OfficeLinkBindPayload = {
       v: 1,
       apiUrl: this.resolvePublicApiUrl(opts?.reqHost),
@@ -3126,8 +3177,9 @@ export class AttendanceService {
       ...payload,
       connectionToken: encodeConnectionHrhub(signed),
       signed,
-      installerAvailable: Boolean(download.url),
+      installerAvailable: Boolean(download.url) || setupAvailable,
       fullPackageAvailable,
+      setupAvailable,
     };
   }
 
@@ -3148,6 +3200,54 @@ export class AttendanceService {
     const configText = `${JSON.stringify(configJson, null, 2)}\n`;
     const connectionText = `${bind.connectionToken}\n`;
     const safeTenant = bind.tenantCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
+
+    const setupReadme = [
+      'HR HUB Link — Windows o‘rnatuvchi (Setup)',
+      '========================================',
+      '',
+      `Web:    ${bind.webUrl}`,
+      `API:    ${bind.apiUrl}`,
+      `Tenant: ${bind.tenantCode}${bind.tenantName ? ` (${bind.tenantName})` : ''}`,
+      '',
+      'Qanday o‘rnatish:',
+      '1) HRHUB-Link-Setup.exe ni ishga tushiring.',
+      '2) Shartlarga «Roziman» bosing, papkani tanlang, O‘rnatish.',
+      '3) Setup yonidagi config.json va connection.hrhub avtomatik',
+      '   o‘rnatilgan papkaga ko‘chiriladi (shu webga bog‘lanadi).',
+      '4) Ilovani oching → Web dan pairing token → Ulash.',
+      '',
+      'Zipda endi yuzlab fayl YO‘Q — faqat Setup + bog‘lash fayllari.',
+      '',
+    ].join('\n');
+
+    const setup = await this.loadOfficeLinkSetupExe();
+    if (setup) {
+      let license = '';
+      for (const dir of this.officeLinkAssetDirs()) {
+        const lic = path.join(dir, 'LICENSE.txt');
+        if (existsSync(lic)) {
+          license = await readFile(lic, 'utf8');
+          break;
+        }
+      }
+      if (!license) {
+        license =
+          'HR HUB Link — Setup ni ishga tushirib shartlarga rozilik bering.\n';
+      }
+      const zip = buildStoreZip([
+        { name: 'HRHUB-Link-Setup.exe', content: setup.buf },
+        { name: 'config.json', content: configText },
+        { name: 'connection.hrhub', content: connectionText },
+        { name: 'OQISH.txt', content: setupReadme },
+        { name: 'LICENSE.txt', content: license },
+      ]);
+      return {
+        zip,
+        filename: `HRHUB-Link-${safeTenant}-Setup.zip`,
+        bind,
+        mode: 'setup' as const,
+      };
+    }
 
     const fullReadme = [
       'HR HUB Link — ushbu webga bog‘langan TO‘LIQ ilova',

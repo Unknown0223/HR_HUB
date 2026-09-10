@@ -24,6 +24,7 @@ type BindInfo = {
   version?: string | null;
   installerAvailable?: boolean;
   fullPackageAvailable?: boolean;
+  setupAvailable?: boolean;
 };
 
 type SessionRow = {
@@ -267,13 +268,22 @@ export default function DeviceLinkPage() {
             >
               {boundBusy
                 ? 'Tayyorlanmoqda…'
-                : bind?.fullPackageAvailable
-                  ? 'Shu web uchun to‘liq ilova (.zip)'
-                  : 'Shu web uchun bog‘langan config (.zip)'}
+                : bind?.setupAvailable
+                  ? 'Windows o‘rnatuvchi (Setup.zip)'
+                  : bind?.fullPackageAvailable
+                    ? 'Shu web uchun to‘liq ilova (.zip)'
+                    : 'Shu web uchun bog‘langan config (.zip)'}
             </button>
           </div>
           <p className={styles.muted} style={{ marginTop: '0.75rem' }}>
-            {bind?.fullPackageAvailable ? (
+            {bind?.setupAvailable ? (
+              <>
+                Zip ichida asosan <code>HRHUB-Link-Setup.exe</code> (EULA +
+                o‘rnatish). Uni oching → shartlarga rozilik → o‘rnatish. Yonidagi{' '}
+                <code>config.json</code> / <code>connection.hrhub</code> shu
+                webga bog‘laydi. Keyin pairing token bilan Ulash.
+              </>
+            ) : bind?.fullPackageAvailable ? (
               <>
                 Bitta zip: <code>HRHUB-Qurilma.exe</code> + shu webga
                 moslashtirilgan <code>config.json</code> /{' '}
@@ -284,9 +294,8 @@ export default function DeviceLinkPage() {
             ) : (
               <>
                 Hozircha faqat bog‘lash fayllari (config). To‘liq EXE uchun
-                serverda <code>OFFICE_LINK_DOWNLOAD_URL</code> yoki{' '}
-                <code>OFFICE_LINK_BASE_ZIP</code> sozlanishi kerak. Lokal:{' '}
-                <code>BUILD-EXE.bat</code> / <code>pack-release.bat</code>.
+                serverda <code>pack-setup.bat</code> /{' '}
+                <code>OFFICE_LINK_SETUP_EXE</code> sozlanishi kerak.
               </>
             )}
           </p>

@@ -24,6 +24,7 @@ import { StorageModule } from './storage/storage.module';
 import { MobileModule } from './mobile/mobile.module';
 import { NewsModule } from './news/news.module';
 import { HireDocumentExceptionsModule } from './hire-document-exceptions/hire-document-exceptions.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { HireDocumentExceptionsModule } from './hire-document-exceptions/hire-do
     MobileModule,
     NewsModule,
     HireDocumentExceptionsModule,
+    TelegramModule,
   ],
 })
 export class AppModule {}

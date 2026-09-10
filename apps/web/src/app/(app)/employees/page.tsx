@@ -17,10 +17,8 @@ import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { FormModal } from '@/components/FormModal';
-import {
-  PassportScanModal,
-  type PassportScanResult,
-} from '@/components/PassportScanModal';
+import { EmployeeCreateWizard } from '@/components/employees/EmployeeCreateWizard';
+import { TelegramJoinPanel } from '@/components/employees/TelegramJoinPanel';
 import modal from '@/components/form-modal.module.css';
 import { useUrlParam } from '@/lib/use-url-state';
 import styles from '../../page-shared.module.css';
@@ -199,12 +197,9 @@ function EmployeesPageInner() {
   const [saving, setSaving] = useState(false);
   const [flagBusyId, setFlagBusyId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [scanOpen, setScanOpen] = useState(false);
-  const [passportScan, setPassportScan] = useState<PassportScanResult | null>(null);
   const photos = usePhotoLightbox();
   const menuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
-  const createFormRef = useRef<HTMLFormElement>(null);
 
   const subnavKey =
     tab === 'dismissed'
@@ -399,40 +394,14 @@ function EmployeesPageInner() {
     }
   }
 
-  async function onCreate(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const fd = new FormData(form);
+  async function onCreatePayload(payload: Record<string, unknown>) {
     setSaving(true);
+    setError('');
     try {
-      const scan = passportScan;
       await apiFetch('/api/employees', {
         method: 'POST',
-        body: JSON.stringify({
-          tabNumber: fd.get('tabNumber'),
-          firstName: fd.get('firstName'),
-          lastName: fd.get('lastName'),
-          middleName: fd.get('middleName') || undefined,
-          email: fd.get('email') || undefined,
-          divisionId: fd.get('divisionId') || undefined,
-          positionId: fd.get('positionId') || undefined,
-          employmentType: fd.get('employmentType') || 'staff',
-          externalId: fd.get('externalId') || undefined,
-          hiredAt: fd.get('hiredAt') || undefined,
-          pinfl: scan?.pinfl || undefined,
-          birthDate: scan?.birthDate || undefined,
-          gender: scan?.gender || undefined,
-          nationality: scan?.nationality || undefined,
-          passportSeries: scan?.series || undefined,
-          passportNumber: scan?.docNumber || undefined,
-          passportDocType: scan?.docType || undefined,
-          passportIssuer: scan?.issuer || undefined,
-          passportIssuedAt: scan?.issuedAt || undefined,
-          passportExpiresAt: scan?.expiresAt || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
-      form.reset();
-      setPassportScan(null);
       setPanel('none');
       await load();
     } catch (err) {
@@ -650,170 +619,21 @@ function EmployeesPageInner() {
         title="Создать сотрудника"
         onClose={() => {
           setPanel('none');
-          setPassportScan(null);
         }}
         width="lg"
-        footer={
-          <>
-            <button
-              type="submit"
-              form="emp-create-form"
-              className={modal.btnPrimary}
-              disabled={saving}
-            >
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-            <button
-              type="button"
-              className={modal.btnGhost}
-              onClick={() => {
-                setPanel('none');
-                setPassportScan(null);
-              }}
-            >
-              Отмена
-            </button>
-          </>
-        }
+        footer={null}
       >
-        {error && panel === 'create' ? (
-          <p className={modal.error}>{error}</p>
-        ) : null}
-        <div style={{ marginBottom: '0.75rem' }}>
-          <button
-            type="button"
-            className={modal.btnGhost}
-            onClick={() => setScanOpen(true)}
-          >
-            Паспорт / ID дан скан қилиш
-          </button>
-          {passportScan ? (
-            <p style={{ margin: '0.4rem 0 0', fontSize: '0.85rem', color: '#0f766e' }}>
-              Скан қабул қилинди:{' '}
-              {[passportScan.series, passportScan.docNumber].filter(Boolean).join(' ') ||
-                passportScan.pinfl ||
-                'FIO'}{' '}
-              ({passportScan.docType === 'ID_CARD' ? 'ID-карта' : 'паспорт'})
-            </p>
-          ) : null}
-        </div>
-        <form
-          id="emp-create-form"
-          ref={createFormRef}
-          className={modal.fields}
-          onSubmit={onCreate}
-        >
-          <div className={modal.row2}>
-            <label className={modal.field}>
-              <span>
-                Таб. номер <em className={modal.req}>*</em>
-              </span>
-              <input name="tabNumber" required autoFocus />
-            </label>
-            <label className={modal.field}>
-              <span>Email</span>
-              <input name="email" type="email" />
-            </label>
-          </div>
-          <div className={modal.row2}>
-            <label className={modal.field}>
-              <span>
-                Фамилия <em className={modal.req}>*</em>
-              </span>
-              <input
-                name="lastName"
-                required
-                defaultValue={passportScan?.lastName || ''}
-                key={`ln-${passportScan?.docNumber || 'x'}-${passportScan?.lastName || ''}`}
-              />
-            </label>
-            <label className={modal.field}>
-              <span>
-                Имя <em className={modal.req}>*</em>
-              </span>
-              <input
-                name="firstName"
-                required
-                defaultValue={passportScan?.firstName || ''}
-                key={`fn-${passportScan?.docNumber || 'x'}-${passportScan?.firstName || ''}`}
-              />
-            </label>
-          </div>
-          <label className={modal.field}>
-            <span>Отчество</span>
-            <input
-              name="middleName"
-              defaultValue={passportScan?.middleName || ''}
-              key={`mn-${passportScan?.docNumber || 'x'}-${passportScan?.middleName || ''}`}
-            />
-          </label>
-          {passportScan ? (
-            <div className={modal.row2}>
-              <label className={modal.field}>
-                <span>Паспорт серия / рақам</span>
-                <input
-                  readOnly
-                  value={[passportScan.series, passportScan.docNumber].filter(Boolean).join(' ')}
-                />
-              </label>
-              <label className={modal.field}>
-                <span>ПИНФЛ</span>
-                <input readOnly value={passportScan.pinfl || '—'} />
-              </label>
-            </div>
-          ) : null}
-          <div className={modal.row2}>
-            <label className={modal.field}>
-              <span>Подразделение</span>
-              <select name="divisionId" defaultValue="">
-                <option value="">—</option>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={modal.field}>
-              <span>Должность</span>
-              <select name="positionId" defaultValue="">
-                <option value="">—</option>
-                {positions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className={modal.row2}>
-            <label className={modal.field}>
-              <span>Тип</span>
-              <select name="employmentType" defaultValue="staff">
-                <option value="staff">Штат</option>
-                <option value="gph">ГПХ</option>
-              </select>
-            </label>
-            <label className={modal.field}>
-              <span>Дата приёма</span>
-              <input name="hiredAt" type="date" />
-            </label>
-          </div>
-          <label className={modal.field}>
-            <span>Face / external ID</span>
-            <input name="externalId" placeholder="face-0003" />
-          </label>
-        </form>
+        <EmployeeCreateWizard
+          divisions={divisions}
+          positions={positions}
+          saving={saving}
+          error={error && panel === 'create' ? error : undefined}
+          onCancel={() => {
+            setPanel('none');
+          }}
+          onSubmit={onCreatePayload}
+        />
       </FormModal>
-
-      <PassportScanModal
-        open={scanOpen}
-        onClose={() => setScanOpen(false)}
-        onConfirm={(result) => {
-          setPassportScan(result);
-          setScanOpen(false);
-        }}
-      />
 
       <FormModal
         open={panel === 'attach'}
@@ -1238,6 +1058,7 @@ function EmployeesPageInner() {
           </button>
         </div>
       </div>
+      <TelegramJoinPanel />
       {photos.node}
     </div>
   );

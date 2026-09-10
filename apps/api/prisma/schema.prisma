@@ -292,6 +292,7 @@ model Tenant {
   deviceProvisionSessions DeviceProvisionSession[]
   deviceCredentialVault   DeviceCredentialVault[]
   deviceCredentialAudits  DeviceCredentialAudit[]
+  employeeJoinRequests    EmployeeJoinRequest[]
 
   @@map("tenants")
 }
@@ -471,6 +472,8 @@ model Employee {
   middleName     String?          @map("middle_name")
   email          String?
   phone          String?
+  /// Telegram @username (without @) for bot / HR contact
+  telegramUsername String?       @map("telegram_username")
   divisionId     String?          @map("division_id") @db.Uuid
   positionId     String?          @map("position_id") @db.Uuid
   gradeId        String?          @map("grade_id") @db.Uuid
@@ -3827,3 +3830,39 @@ model ReportTemplate {
   @@index([tenantId])
   @@map("report_templates")
 }
+
+/// Telegram orqali xodim qo‘shilish so‘rovi (self-service onboarding)
+model EmployeeJoinRequest {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  /// Invite code from HR (short)
+  inviteCode       String   @map("invite_code")
+  status           String   @default("pending")
+  telegramUserId   String?  @map("telegram_user_id")
+  telegramUsername String?  @map("telegram_username")
+  firstName        String?  @map("first_name")
+  lastName         String?  @map("last_name")
+  middleName       String?  @map("middle_name")
+  phone            String?
+  pinfl            String?
+  passportSeries   String?  @map("passport_series")
+  passportNumber   String?  @map("passport_number")
+  birthDate        DateTime? @map("birth_date") @db.Date
+  gender           String?
+  /// Passport / face photo URL (storage)
+  photoUrl         String?  @map("photo_url")
+  note             String?
+  employeeId       String?  @map("employee_id") @db.Uuid
+  reviewedBy       String?  @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime? @map("reviewed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, inviteCode])
+  @@index([telegramUserId])
+  @@map("employee_join_requests")
+}
+

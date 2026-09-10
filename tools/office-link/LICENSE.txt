@@ -1,0 +1,29 @@
+# HR HUB Link — foydalanish shartlari (EULA)
+#
+# Ushbu dastur ("HR HUB Link") ofis Face ID terminallarini HR HUB
+# platformasiga ulash uchun mo‘ljallangan.
+#
+# 1. Litsenziya
+#    Dastur faqat HR HUB mijozlari / tenantlari uchun beriladi.
+#    Qayta tarqatish, decompile yoki boshqa mijoz webiga bog‘lash
+#    taqiqlanadi (har bir web o‘z to‘plamini yuklab oladi).
+#
+# 2. Ma’lumotlar
+#    Qurilma parollari va pairing tokenlar ofis kompyuterida saqlanadi.
+#    Operator ularni uchinchi shaxslarga bermasligi shart.
+#
+# 3. Tarmoq
+#    Dastur lokal tarmoq (LAN) va internet orqali platformaga ulanadi.
+#    Kerakli portlar / firewall qoidalari uchun administrator roziligi kerak.
+#
+# 4. Xizmat (ixtiyoriy)
+#    Windows Service o‘rnatilsa, tunnel va gateway fonda ishlaydi.
+#    O‘chirish: «HR HUB Link» → O‘chirish yoki uninstall-service.bat.
+#
+# 5. Mas’uliyat
+#    Noto‘g‘ri konfiguratsiya yoki uchinchi tomon qurilma xatolari uchun
+#    HR HUB kafolat bermaydi. Productionda o‘zgartirishlardan oldin
+#    zaxira nusxa tavsiya etiladi.
+#
+# «Roziman» tugmasini bosish orqali siz yuqoridagi shartlarni o‘qiganingizni
+# va qabul qilganingizni tasdiqlaysiz.
