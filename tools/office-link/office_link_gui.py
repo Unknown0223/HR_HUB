@@ -343,10 +343,21 @@ class OfficeLinkApp:
 
         row = self._field_row(conn, "Pairing token")
         self.token_var = tk.StringVar(value=read_pairing_token(self.session.root))
+        # ASCII mask — Unicode «•» on some Windows/Tk builds breaks paste/input.
         self.token_entry = ttk.Entry(
-            row, textvariable=self.token_var, show="•", style="App.TEntry"
+            row, textvariable=self.token_var, show="*", style="App.TEntry"
         )
         self.token_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._enable_entry_clipboard(self.token_entry, self.token_var, replace_all=True)
+        self.token_paste_btn = ttk.Button(
+            row,
+            text="Joylashtir",
+            style="Secondary.TButton",
+            command=lambda: self._paste_into_entry(
+                self.token_entry, self.token_var, replace_all=True
+            ),
+        )
+        self.token_paste_btn.pack(side=tk.LEFT, padx=(8, 0))
         self.token_btn = ttk.Button(
             row, text="Saqlash", style="Secondary.TButton", command=self._save_token
         )
@@ -356,6 +367,7 @@ class OfficeLinkApp:
         self.ip_var = tk.StringVar()
         self.ip_entry = ttk.Entry(row, textvariable=self.ip_var, style="App.TEntry")
         self.ip_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._enable_entry_clipboard(self.ip_entry, self.ip_var, replace_all=False)
         self.rescan_btn = ttk.Button(
             row, text="Qidirish", style="Secondary.TButton", command=self._start_scan
         )
@@ -383,6 +395,7 @@ class OfficeLinkApp:
             row, textvariable=self.pwd_var, show="*", style="App.TEntry"
         )
         self.pwd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._enable_entry_clipboard(self.pwd_entry, self.pwd_var, replace_all=True)
         self.pwd_entry.bind("<Return>", lambda _e: self._on_ulash())
         self.pwd_toggle_btn = ttk.Button(
             row,
@@ -450,7 +463,8 @@ class OfficeLinkApp:
         self.note = ttk.Label(
             hint,
             text=(
-                "Web → Связь с офисом dan pairing token oling. "
+                "Web → Связь с офисом dan pairing token oling (nusxalang). "
+                "Shu yerda Ctrl+V / Shift+Insert yoki «Joylashtir», so‘ng «Saqlash». "
                 "Birinchi ulash: «Ulash» — yangi parol o‘rnatadi. "
                 "Wi‑Fi o‘zgasa: «Tarmoqni qayta ulash» — webdan parol olinadi, "
                 "faqat IP/tunnel yangilanadi (parol va yuzlar saqlanadi)."
@@ -493,6 +507,107 @@ class OfficeLinkApp:
             threading.Thread(target=self._bind_pairing_worker, daemon=True).start()
         self._load_locations()
         self._start_scan()
+
+    def _clipboard_text(self) -> str:
+        try:
+            raw = self.root.clipboard_get()
+        except tk.TclError:
+            return ""
+        text = str(raw or "").strip()
+        # Web/copy often wraps token in quotes or newlines.
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+            text = text[1:-1].strip()
+        return text.replace("\r", "").replace("\n", "").strip()
+
+    def _paste_into_entry(
+        self,
+        entry: ttk.Entry,
+        var: tk.StringVar,
+        *,
+        replace_all: bool = False,
+    ) -> None:
+        text = self._clipboard_text()
+        if not text:
+            self._show_alert("Bufer bo‘sh — avval webdan tokenni nusxalang (Ctrl+C).")
+            return
+        try:
+            state = str(entry.cget("state"))
+        except tk.TclError:
+            state = "normal"
+        if state == "disabled":
+            return
+        try:
+            entry.focus_set()
+        except tk.TclError:
+            pass
+        if replace_all:
+            var.set(text)
+        else:
+            try:
+                if entry.selection_present():
+                    entry.delete(tk.SEL_FIRST, tk.SEL_LAST)
+                entry.insert(tk.INSERT, text)
+            except tk.TclError:
+                var.set(text)
+        try:
+            entry.icursor(tk.END)
+        except tk.TclError:
+            pass
+        if self.lock_var.get().startswith("Bufer"):
+            self._hide_alert()
+
+    def _enable_entry_clipboard(
+        self,
+        entry: ttk.Entry,
+        var: tk.StringVar,
+        *,
+        replace_all: bool = False,
+    ) -> None:
+        """Reliable paste for ttk.Entry (esp. inside Canvas / masked fields)."""
+
+        def _do_paste(_event=None):
+            self._paste_into_entry(entry, var, replace_all=replace_all)
+            return "break"
+
+        def _select_all(_event=None):
+            entry.selection_range(0, tk.END)
+            entry.icursor(tk.END)
+            return "break"
+
+        def _clear(_event=None):
+            var.set("")
+            return "break"
+
+        for seq in (
+            "<<Paste>>",
+            "<Control-v>",
+            "<Control-V>",
+            "<Shift-Insert>",
+            "<Control-Key-v>",
+            "<Control-Key-V>",
+        ):
+            entry.bind(seq, _do_paste)
+        for seq in ("<Control-a>", "<Control-A>", "<Control-Key-a>", "<Control-Key-A>"):
+            entry.bind(seq, _select_all)
+
+        menu = tk.Menu(entry, tearoff=0)
+        menu.add_command(
+            label="Joylashtirish (Ctrl+V)",
+            command=lambda: self._paste_into_entry(entry, var, replace_all=replace_all),
+        )
+        menu.add_command(label="Hammasini belgilash", command=lambda: _select_all())
+        menu.add_command(label="Tozalash", command=lambda: _clear())
+
+        def _popup(event):
+            try:
+                entry.focus_set()
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        entry.bind("<Button-3>", _popup)
+        # macOS / some mice
+        entry.bind("<Button-2>", _popup)
 
     def _save_token(self) -> None:
         token = self.token_var.get().strip()
@@ -627,7 +742,7 @@ class OfficeLinkApp:
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
         state = "disabled" if busy else "normal"
-        for w in (self.rescan_btn, self.token_btn, self.loc_refresh_btn):
+        for w in (self.rescan_btn, self.token_btn, self.token_paste_btn, self.loc_refresh_btn):
             try:
                 w.state(["disabled"] if busy else ["!disabled"])
             except (tk.TclError, AttributeError):
@@ -635,6 +750,11 @@ class OfficeLinkApp:
                     w.configure(state=state)
                 except tk.TclError:
                     pass
+        for w in (self.token_entry, self.ip_entry):
+            try:
+                w.configure(state="disabled" if busy else "normal")
+            except tk.TclError:
+                pass
         try:
             self.location_combo.configure(state="disabled" if busy else "readonly")
         except tk.TclError:
