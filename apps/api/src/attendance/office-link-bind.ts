@@ -141,6 +141,84 @@ export function buildStoreZip(
   return Buffer.concat([...locals, centralDir, end]);
 }
 
+/**
+ * Inject tenant-bound config into a full portable HRHUB-Link zip.
+ * Writes config at package root and next to the EXE (`ilova/`) when present.
+ */
+export async function injectBoundConfigIntoPortableZip(
+  baseZip: Buffer,
+  files: {
+    configJson: string;
+    connectionHrhub: string;
+    readme: string;
+  },
+): Promise<Buffer> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(baseZip);
+
+  const names = Object.keys(zip.files);
+  const norm = (n: string) => n.replace(/\\/g, '/');
+  const sep = names.some((n) => n.includes('\\')) ? '\\' : '/';
+  const joinZip = (...parts: string[]) =>
+    parts
+      .filter(Boolean)
+      .map((p) => p.replace(/^[\\/]+|[\\/]+$/g, ''))
+      .join(sep);
+
+  const hasIlova = names.some((n) => {
+    const p = norm(n);
+    return (
+      /(^|\/)ilova\/HRHUB-Qurilma\.exe$/i.test(p) ||
+      /(^|\/)ilova\/(?!_internal)/i.test(p)
+    );
+  });
+
+  // Detect optional top-level folder prefix (e.g. HRHUB-Link/),
+  // but never treat PyInstaller `_internal/config.json` as the package root.
+  let prefix = '';
+  const anchors = names
+    .map(norm)
+    .filter(
+      (n) =>
+        !n.includes('_internal') &&
+        (/BOSHLASH\.bat$/i.test(n) ||
+          /(^|\/)config\.json$/i.test(n) ||
+          /HRHUB-Qurilma\.exe$/i.test(n)),
+    )
+    .sort(
+      (a, b) =>
+        a.split('/').length - b.split('/').length || a.length - b.length,
+    );
+  const sample = anchors[0];
+  if (sample) {
+    const idx = sample.lastIndexOf('/');
+    if (idx > 0) prefix = sample.slice(0, idx + 1);
+    if (/ilova\//i.test(prefix)) {
+      prefix = prefix.replace(/ilova\/$/i, '');
+    }
+  }
+  // Convert forward-slash prefix to zip's native separator
+  const prefixNative = prefix ? prefix.replace(/\//g, sep) : '';
+
+  zip.file(joinZip(prefixNative, 'config.json'), files.configJson);
+  zip.file(joinZip(prefixNative, 'connection.hrhub'), files.connectionHrhub);
+  zip.file(joinZip(prefixNative, 'OQISH.txt'), files.readme);
+  if (hasIlova) {
+    zip.file(joinZip(prefixNative, 'ilova', 'config.json'), files.configJson);
+    zip.file(
+      joinZip(prefixNative, 'ilova', 'connection.hrhub'),
+      files.connectionHrhub,
+    );
+  }
+
+  const out = await zip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 },
+  });
+  return Buffer.from(out);
+}
+
 function crc32(buf: Buffer): number {
   let c = ~0;
   for (let i = 0; i < buf.length; i++) {

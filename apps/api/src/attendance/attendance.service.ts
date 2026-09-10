@@ -1,4 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'crypto';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
+import * as path from 'path';
 import { BadRequestException, BadGatewayException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -24,6 +27,7 @@ import type { PairingAuthContext } from './pairing-token.guard';
 import {
   buildStoreZip,
   encodeConnectionHrhub,
+  injectBoundConfigIntoPortableZip,
   signOfficeLinkBind,
   type OfficeLinkBindPayload,
 } from './office-link-bind';
@@ -2969,6 +2973,84 @@ export class AttendanceService {
     return { url, version };
   }
 
+  /** In-memory cache for the base portable zip (shared across tenants). */
+  private officeLinkBaseZipCache: {
+    buf: Buffer;
+    source: string;
+    loadedAt: number;
+  } | null = null;
+
+  private officeLinkBaseZipCandidates(): string[] {
+    const fromEnv = (this.config.get<string>('OFFICE_LINK_BASE_ZIP') ?? '').trim();
+    const cwd = process.cwd();
+    return [
+      fromEnv,
+      path.resolve(cwd, 'assets/office-link/HRHUB-Link-portable.zip'),
+      path.resolve(cwd, 'apps/api/assets/office-link/HRHUB-Link-portable.zip'),
+      path.resolve(__dirname, '../../assets/office-link/HRHUB-Link-portable.zip'),
+    ].filter(Boolean);
+  }
+
+  private hasOfficeLinkBaseZipSource(): boolean {
+    if (this.officeLinkBaseZipCandidates().some((p) => existsSync(p))) return true;
+    return Boolean((this.config.get<string>('OFFICE_LINK_DOWNLOAD_URL') ?? '').trim());
+  }
+
+  private async loadOfficeLinkBaseZip(): Promise<{
+    buf: Buffer;
+    source: string;
+  } | null> {
+    const ttlMs = 60 * 60 * 1000;
+    const cached = this.officeLinkBaseZipCache;
+    if (cached && Date.now() - cached.loadedAt < ttlMs) {
+      return { buf: cached.buf, source: cached.source };
+    }
+
+    for (const p of this.officeLinkBaseZipCandidates()) {
+      if (!existsSync(p)) continue;
+      const buf = await readFile(p);
+      this.officeLinkBaseZipCache = {
+        buf,
+        source: p,
+        loadedAt: Date.now(),
+      };
+      this.logger.log(`Office-link base zip loaded from file (${buf.length} bytes)`);
+      return { buf, source: p };
+    }
+
+    const url = (this.config.get<string>('OFFICE_LINK_DOWNLOAD_URL') ?? '').trim();
+    if (!url) return null;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        this.logger.warn(
+          `Office-link base zip fetch failed: ${res.status} ${url}`,
+        );
+        return null;
+      }
+      const ab = await res.arrayBuffer();
+      const buf = Buffer.from(ab);
+      if (buf.length < 1000 || buf.readUInt32LE(0) !== 0x04034b50) {
+        this.logger.warn('Office-link DOWNLOAD_URL did not return a ZIP');
+        return null;
+      }
+      this.officeLinkBaseZipCache = {
+        buf,
+        source: url,
+        loadedAt: Date.now(),
+      };
+      this.logger.log(
+        `Office-link base zip fetched from URL (${buf.length} bytes)`,
+      );
+      return { buf, source: url };
+    } catch (e) {
+      this.logger.warn(
+        `Office-link base zip fetch error: ${e instanceof Error ? e.message : e}`,
+      );
+      return null;
+    }
+  }
+
   private officeLinkBindSecret(): string {
     return (
       (this.config.get<string>('OFFICE_LINK_BIND_SECRET') ?? '').trim() ||
@@ -3028,6 +3110,7 @@ export class AttendanceService {
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
     const download = this.getOfficeLinkDownload();
+    const fullPackageAvailable = this.hasOfficeLinkBaseZipSource();
     const payload: OfficeLinkBindPayload = {
       v: 1,
       apiUrl: this.resolvePublicApiUrl(opts?.reqHost),
@@ -3044,6 +3127,7 @@ export class AttendanceService {
       connectionToken: encodeConnectionHrhub(signed),
       signed,
       installerAvailable: Boolean(download.url),
+      fullPackageAvailable,
     };
   }
 
@@ -3061,7 +3145,45 @@ export class AttendanceService {
       version: bind.version,
       recoveryEmail: '',
     };
-    const readme = [
+    const configText = `${JSON.stringify(configJson, null, 2)}\n`;
+    const connectionText = `${bind.connectionToken}\n`;
+    const safeTenant = bind.tenantCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
+
+    const fullReadme = [
+      'HR HUB Link — ushbu webga bog‘langan TO‘LIQ ilova',
+      '================================================',
+      '',
+      `Web:    ${bind.webUrl}`,
+      `API:    ${bind.apiUrl}`,
+      `Tenant: ${bind.tenantCode}${bind.tenantName ? ` (${bind.tenantName})` : ''}`,
+      '',
+      'Qanday ishlatish:',
+      '1) Zipni oching (masalan Desktop\\HRHUB-Link).',
+      '2) BOSHLASH.bat yoki ilova\\HRHUB-Qurilma.exe ni ishga tushiring.',
+      '3) Yuqorida shu web / tenant ko‘rinishi kerak.',
+      '4) Web → Связь с офисом dan pairing token oling va Ulash qiling.',
+      '',
+      'Muhim: bu paket faqat shu platformaga tegishli. Boshqa mijoz webiga',
+      'ulash uchun o‘sha webdan yangi paketni yuklab oling.',
+      '',
+    ].join('\n');
+
+    const base = await this.loadOfficeLinkBaseZip();
+    if (base) {
+      const zip = await injectBoundConfigIntoPortableZip(base.buf, {
+        configJson: configText,
+        connectionHrhub: connectionText,
+        readme: fullReadme,
+      });
+      return {
+        zip,
+        filename: `HRHUB-Link-${safeTenant}-portable.zip`,
+        bind,
+        mode: 'full' as const,
+      };
+    }
+
+    const configOnlyReadme = [
       'HR HUB Link — ushbu webga bog‘langan ulanish to‘plami',
       '====================================================',
       '',
@@ -3069,23 +3191,23 @@ export class AttendanceService {
       `API:    ${bind.apiUrl}`,
       `Tenant: ${bind.tenantCode}${bind.tenantName ? ` (${bind.tenantName})` : ''}`,
       '',
-      'Qanday o‘rnatish:',
-      '1) Agar to‘liq dastur (EXE/ZIP) allaqachon bor bo‘lsa — shu papkaga',
-      '   config.json va connection.hrhub fayllarini nusxalang (ustiga yozing).',
-      '2) Agar dastur yo‘q bo‘lsa — avval INSTALLER.url dagi manzildan yuklab oling,',
-      '   keyin shu bog‘lash fayllarini dastur papkasiga qo‘ying.',
-      '3) HRHUB-Qurilma.exe / BOSHLASH.bat ni oching — yuqorida shu web ko‘rinadi.',
-      '4) Web → Связь с офисом dan pairing token oling va Ulash qiling.',
+      'DIQQAT: to‘liq ilova (EXE) serverda sozlanmagan.',
+      'Shu zip faqat config.json + connection.hrhub beradi.',
+      'To‘liq dasturni alohida oling yoki admin OFFICE_LINK_DOWNLOAD_URL /',
+      'OFFICE_LINK_BASE_ZIP ni sozlasin.',
       '',
-      'Muhim: bu to‘plam faqat shu platformaga tegishli. Boshqa mijoz webiga',
-      'ulash uchun o‘sha webdan yangi to‘plamni yuklab oling.',
+      'Qanday o‘rnatish:',
+      '1) To‘liq dasturni oching, so‘ng config.json va connection.hrhub ni',
+      '   dastur papkasiga (va ilova\\ ichiga) nusxalang.',
+      '2) BOSHLASH.bat / HRHUB-Qurilma.exe ni oching.',
+      '3) Web → Связь с офисом dan pairing token oling va Ulash qiling.',
       '',
     ].join('\n');
 
     const files: Array<{ name: string; content: string }> = [
-      { name: 'config.json', content: `${JSON.stringify(configJson, null, 2)}\n` },
-      { name: 'connection.hrhub', content: `${bind.connectionToken}\n` },
-      { name: 'OQISH.txt', content: readme },
+      { name: 'config.json', content: configText },
+      { name: 'connection.hrhub', content: connectionText },
+      { name: 'OQISH.txt', content: configOnlyReadme },
     ];
     if (bind.installerUrl) {
       files.push({
@@ -3099,9 +3221,12 @@ export class AttendanceService {
     }
 
     const zip = buildStoreZip(files);
-    const safeTenant = bind.tenantCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
-    const filename = `HRHUB-Link-${safeTenant}-bind.zip`;
-    return { zip, filename, bind };
+    return {
+      zip,
+      filename: `HRHUB-Link-${safeTenant}-bind.zip`,
+      bind,
+      mode: 'config-only' as const,
+    };
   }
 
   /** Field credential for GW punch ingest (same as DEVICE_LINK_KEY / PUNCH_INGEST_API_KEY). */

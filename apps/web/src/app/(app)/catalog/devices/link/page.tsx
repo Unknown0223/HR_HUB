@@ -15,12 +15,6 @@ type PairingResult = {
   qrPayload?: string;
 };
 
-type DownloadInfo = {
-  url?: string | null;
-  version?: string | null;
-  available?: boolean;
-};
-
 type BindInfo = {
   apiUrl: string;
   webUrl: string;
@@ -29,6 +23,7 @@ type BindInfo = {
   installerUrl?: string | null;
   version?: string | null;
   installerAvailable?: boolean;
+  fullPackageAvailable?: boolean;
 };
 
 type SessionRow = {
@@ -64,7 +59,6 @@ export default function DeviceLinkPage() {
   const [clearBusy, setClearBusy] = useState(false);
   const [error, setError] = useState('');
   const [pairing, setPairing] = useState<PairingResult | null>(null);
-  const [download, setDownload] = useState<DownloadInfo | null>(null);
   const [bind, setBind] = useState<BindInfo | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [copied, setCopied] = useState(false);
@@ -88,15 +82,7 @@ export default function DeviceLinkPage() {
     }
   }, []);
 
-  const loadDownload = useCallback(async () => {
-    try {
-      const info = await apiFetch<DownloadInfo>(
-        '/api/attendance/office-link/download?redirect=0',
-      );
-      setDownload(info);
-    } catch {
-      setDownload({ available: false });
-    }
+  const loadBind = useCallback(async () => {
     try {
       const b = await apiFetch<BindInfo>(
         '/api/attendance/office-link/download-bound?format=json',
@@ -108,11 +94,11 @@ export default function DeviceLinkPage() {
   }, []);
 
   useEffect(() => {
-    void loadDownload();
+    void loadBind();
     void loadSessions();
     const t = setInterval(() => void loadSessions(), 2000);
     return () => clearInterval(t);
-  }, [loadDownload, loadSessions]);
+  }, [loadBind, loadSessions]);
 
   async function downloadBoundPack() {
     setBoundBusy(true);
@@ -281,32 +267,28 @@ export default function DeviceLinkPage() {
             >
               {boundBusy
                 ? 'Tayyorlanmoqda…'
-                : 'Shu web uchun bog‘langan to‘plam (.zip)'}
+                : bind?.fullPackageAvailable
+                  ? 'Shu web uchun to‘liq ilova (.zip)'
+                  : 'Shu web uchun bog‘langan config (.zip)'}
             </button>
-            {download?.url ? (
-              <a
-                className={styles.ghostBtn}
-                href={download.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                To‘liq dastur
-                {download.version ? ` (v${download.version})` : ''}
-              </a>
-            ) : null}
           </div>
           <p className={styles.muted} style={{ marginTop: '0.75rem' }}>
-            Zip ichida: <code>config.json</code>, shifrlangan{' '}
-            <code>connection.hrhub</code>, qo‘llanma. Dasturni ochishdan oldin
-            fayllarni HR HUB Link papkasiga qo‘ying (yoki avval to‘liq dasturni
-            yuklab, keyin shu fayllarni ustiga yozing).
-            {!download?.url ? (
+            {bind?.fullPackageAvailable ? (
               <>
-                {' '}
-                To‘liq EXE hali sozlanmagan (`OFFICE_LINK_DOWNLOAD_URL`) — lokal:{' '}
-                <code>BUILD-EXE.bat</code> / <code>BOSHLASH.bat</code>.
+                Bitta zip: <code>HRHUB-Qurilma.exe</code> + shu webga
+                moslashtirilgan <code>config.json</code> /{' '}
+                <code>connection.hrhub</code>. Ochib{' '}
+                <code>BOSHLASH.bat</code> ni ishga tushiring — pairing token
+                bilan Ulash.
               </>
-            ) : null}
+            ) : (
+              <>
+                Hozircha faqat bog‘lash fayllari (config). To‘liq EXE uchun
+                serverda <code>OFFICE_LINK_DOWNLOAD_URL</code> yoki{' '}
+                <code>OFFICE_LINK_BASE_ZIP</code> sozlanishi kerak. Lokal:{' '}
+                <code>BUILD-EXE.bat</code> / <code>pack-release.bat</code>.
+              </>
+            )}
           </p>
         </section>
 

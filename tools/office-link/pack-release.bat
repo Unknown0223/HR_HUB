@@ -12,7 +12,7 @@ set "ZIP=%CD%\release\HRHUB-Link-portable.zip"
 if not exist "%DIST%\HRHUB-Qurilma.exe" (
   echo [XATO] EXE yo'q: %DIST%\HRHUB-Qurilma.exe
   echo Avval BUILD-EXE.bat ni ishga tushiring.
-  pause
+  if not defined NOPAUSE pause
   exit /b 1
 )
 
@@ -39,7 +39,7 @@ if exist "%CD%\hrhub-link-256.png" copy /Y "%CD%\hrhub-link-256.png" "%REL%\" >n
 copy /Y "%CD%\link.ps1" "%REL%\" >nul
 copy /Y "%CD%\service_worker.py" "%REL%\" >nul
 copy /Y "%CD%\bulk_provision.py" "%REL%\" >nul
-for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provision.py session.py runtime_setup.py office_link_app.py office_link_gui.py office_link_run.py credential_store.py) do (
+for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provision.py session.py runtime_setup.py office_link_app.py office_link_gui.py office_link_run.py credential_store.py device_email.py) do (
   if exist "%CD%\%%F" copy /Y "%CD%\%%F" "%REL%\" >nul
 )
 
@@ -122,10 +122,16 @@ for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provis
 
 echo ZIP...
 if exist "%ZIP%" del /F /Q "%ZIP%"
-powershell -NoProfile -Command "Compress-Archive -Path '%REL%\*' -DestinationPath '%ZIP%' -Force"
-if errorlevel 1 (
+REM Prefer Python zip (forward slashes) so API inject works reliably across platforms.
+where python >nul 2>&1
+if %ERRORLEVEL%==0 (
+  python "%CD%\pack_zip.py" "%REL%" "%ZIP%"
+) else (
+  powershell -NoProfile -Command "Compress-Archive -Path '%REL%\*' -DestinationPath '%ZIP%' -Force"
+)
+if not exist "%ZIP%" (
   echo [XATO] ZIP yaratilmadi.
-  pause
+  if not defined NOPAUSE pause
   exit /b 1
 )
 
@@ -133,5 +139,5 @@ echo.
 echo [OK] Papka: %REL%
 echo [OK] ZIP:   %ZIP%
 echo Ofis PCga release\HRHUB-Link papkasini yoki ZIP ni bering.
-pause
+if not defined NOPAUSE pause
 exit /b 0

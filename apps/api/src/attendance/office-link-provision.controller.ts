@@ -108,8 +108,8 @@ export class OfficeLinkProvisionController {
   }
 
   /**
-   * Tenant-bound connection pack (config.json + signed connection.hrhub).
-   * Download from THIS web so the desktop app connects to the correct API/tenant.
+   * Tenant-bound full portable app (EXE package + signed connection.hrhub).
+   * Falls back to config-only zip if the base portable package is unavailable.
    */
   @ApiBearerAuth()
   @ApiSecurity('tenant')
