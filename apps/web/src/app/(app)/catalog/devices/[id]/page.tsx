@@ -602,6 +602,14 @@ function DeviceDetailInner() {
       await loadDevice();
       await loadSyncProgress();
       await loadTabData();
+    } catch (e) {
+      setSyncOpen(false);
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Синхронизация не удалась — проверьте office-link / DEVICE_GW_URL',
+      );
+      await loadSyncProgress().catch(() => undefined);
     } finally {
       setBusy(false);
     }

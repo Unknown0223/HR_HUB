@@ -100,10 +100,6 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional() @IsOptional() @IsString() passportIssuer?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() passportIssuedAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() passportExpiresAt?: string;
-  @ApiPropertyOptional({ description: 'Telegram @username without @' })
-  @IsOptional()
-  @IsString()
-  telegramUsername?: string;
 }
 
 export class UpdateEmployeeDto {
@@ -256,10 +252,6 @@ export class UpdateEmployeeContactsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() phoneExtra?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() emailCorp?: string;
-  @ApiPropertyOptional({ description: 'Telegram @username without @' })
-  @IsOptional()
-  @IsString()
-  telegramUsername?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() regionId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() street?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() house?: string;

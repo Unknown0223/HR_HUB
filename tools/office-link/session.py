@@ -32,6 +32,10 @@ from paths import (
 from provision import STATE_NEW, detect_state, state_label_uz
 
 StatusFn = Callable[[str], None]
+# step_id, state (pending|active|done|fail|skip), detail message
+StepFn = Callable[[str, str, str], None]
+
+RECONNECT_STEPS = ("scan", "web", "match", "auth", "link")
 
 
 @dataclass
@@ -40,6 +44,19 @@ class SubmitResult:
     message: str = ""
     device: dict[str, Any] = field(default_factory=dict)
     remaining: int = 0
+
+
+@dataclass
+class ReconnectMatch:
+    """LAN device matched to a web vault row after password verify."""
+
+    lan: OnlineInfo
+    web: dict[str, Any]
+    password: str
+    username: str
+    serial: str
+    password_source: str
+    host_changed: bool
 
 
 class OfficeLinkSession:
@@ -303,9 +320,15 @@ class OfficeLinkSession:
         *,
         serial: str = "",
         host: str = "",
+        device_id: str = "",
     ) -> dict[str, Any] | None:
         serial_n = (serial or "").strip().lower()
         host_n = (host or "").strip().lower()
+        id_n = (device_id or "").strip().lower()
+        if id_n:
+            for d in devices:
+                if str(d.get("id") or "").strip().lower() == id_n:
+                    return d
         if serial_n:
             for d in devices:
                 sn = str(d.get("serialNumber") or "").strip().lower()
@@ -391,15 +414,286 @@ class OfficeLinkSession:
             or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash.",
         }
 
-    def reconnect_network(
+    def _password_candidates(
+        self,
+        manual_password: str,
+        web_devices: list[dict[str, Any]],
+        *,
+        prefer_web: dict[str, Any] | None = None,
+    ) -> list[tuple[str, str, str, dict[str, Any] | None]]:
+        """Ordered (password, username, source, web_device|None) — unique passwords."""
+        from credential_store import read_device_credential
+
+        out: list[tuple[str, str, str, dict[str, Any] | None]] = []
+        seen: set[str] = set()
+
+        def add(
+            pwd: str,
+            username: str,
+            source: str,
+            web: dict[str, Any] | None,
+        ) -> None:
+            p = (pwd or "").strip()
+            if not p or p in seen:
+                return
+            seen.add(p)
+            u = (username or "admin").strip() or "admin"
+            out.append((p, u, source, web))
+
+        if prefer_web and str(prefer_web.get("password") or "").strip():
+            add(
+                str(prefer_web.get("password")),
+                str(prefer_web.get("username") or "admin"),
+                "web",
+                prefer_web,
+            )
+
+        local = read_device_credential(self.root)
+        if local:
+            add(
+                str(local.get("password") or ""),
+                str(local.get("username") or "admin"),
+                "local",
+                None,
+            )
+
+        for d in web_devices:
+            add(
+                str(d.get("password") or ""),
+                str(d.get("username") or "admin"),
+                "web",
+                d,
+            )
+
+        add(manual_password, self.username or "admin", "manual", None)
+        return out
+
+    def _priority_hosts(
+        self,
+        *,
+        ip_hint: str,
+        web_devices: list[dict[str, Any]],
+    ) -> list[str]:
+        from credential_store import read_device_credential
+
+        ordered: list[str] = []
+        seen: set[str] = set()
+
+        def push(host: str) -> None:
+            h = (host or "").strip()
+            if not h or not valid_ip(h) or h in seen:
+                return
+            seen.add(h)
+            ordered.append(h)
+
+        push(ip_hint)
+        local = read_device_credential(self.root)
+        if local:
+            push(str(local.get("host") or ""))
+        for d in web_devices:
+            push(str(d.get("host") or ""))
+        return ordered
+
+    def scan_for_reconnect(
+        self,
+        *,
+        ip_hint: str | None = None,
+        known_hosts: list[str] | None = None,
+        on_status: StatusFn | None = None,
+    ) -> list[OnlineInfo]:
+        """Probe known IPs first, then full LAN Hikvision scan. Deduped by host."""
+        by_host: dict[str, OnlineInfo] = {}
+
+        def take(info: OnlineInfo | None) -> None:
+            if not info or not info.online or not info.likely_hikvision:
+                return
+            by_host[info.host] = info
+
+        hint = (ip_hint or "").strip()
+        for host in list(known_hosts or []) + ([hint] if hint else []):
+            if on_status:
+                on_status(f"Tekshirilmoqda: {host}")
+            take(probe_online(host, 80))
+
+        if on_status:
+            on_status("LAN skaner… Hikvision qidirilmoqda")
+        # Full subnet scan (ignores hint-only empty path in scan()).
+        for info in find_devices():
+            take(info)
+
+        devices = list(by_host.values())
+        # Prefer hint / known hosts order for chosen.
+        preferred = None
+        for host in list(known_hosts or []) + ([hint] if hint else []):
+            if host in by_host:
+                preferred = by_host[host]
+                break
+        self.devices = devices
+        self.chosen = preferred or (devices[0] if devices else None)
+        self._refresh_detected_state()
+        return devices
+
+    def resolve_reconnect_match(
+        self,
+        lan_devices: list[OnlineInfo],
+        web_devices: list[dict[str, Any]],
+        manual_password: str = "",
+        *,
+        on_status: StatusFn | None = None,
+    ) -> ReconnectMatch | SubmitResult:
+        """Compare LAN probes with web vault rows via serial after password verify."""
+        if not lan_devices:
+            return SubmitResult(
+                kind=OFFLINE,
+                message="LAN da Hikvision topilmadi — IP yozing yoki tarmoqni tekshiring.",
+            )
+        if not web_devices:
+            return SubmitResult(
+                kind="api",
+                message="Webda faol qurilma yo‘q. Avval to‘liq Ulash qiling.",
+            )
+
+        from credential_store import read_device_credential
+
+        local = read_device_credential(self.root) or {}
+        local_serial = str(local.get("serialNumber") or "").strip()
+        local_device_id = str(local.get("deviceId") or "").strip()
+
+        # Order LAN: known serial's previous host → hint hosts already in list order.
+        ordered_lan = list(lan_devices)
+        prefer_web = self.match_web_device(
+            web_devices,
+            serial=local_serial,
+            device_id=local_device_id,
+        )
+
+        candidates = self._password_candidates(
+            manual_password, web_devices, prefer_web=prefer_web
+        )
+        if not candidates:
+            return SubmitResult(
+                kind="empty",
+                message="Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash.",
+            )
+
+        matches: list[ReconnectMatch] = []
+        timeouts = 0
+        for lan in ordered_lan:
+            if on_status:
+                on_status(f"Solishtirish: {lan.host}…")
+            for pwd, username, source, bound_web in candidates:
+                result = verify_password(lan.host, int(lan.port or 80), username, pwd)
+                if result.kind == TIMEOUT:
+                    timeouts += 1
+                    break
+                if result.kind == UNAUTHORIZED:
+                    continue
+                if result.kind != OK:
+                    continue
+                serial = str(result.serialNumber or "").strip()
+                web = None
+                if bound_web and source == "web":
+                    # Password belonged to a specific vault row — confirm serial if possible.
+                    web_sn = str(bound_web.get("serialNumber") or "").strip().lower()
+                    if not serial or not web_sn or web_sn == serial.lower():
+                        web = bound_web
+                if web is None:
+                    web = self.match_web_device(
+                        web_devices,
+                        serial=serial,
+                        host=lan.host,
+                        device_id=local_device_id,
+                    )
+                if web is None and len(web_devices) == 1:
+                    web = web_devices[0]
+                if not web or not str(web.get("id") or "").strip():
+                    continue
+                # If password came from another web row, require serial match.
+                if (
+                    bound_web
+                    and source == "web"
+                    and str(bound_web.get("id")) != str(web.get("id"))
+                    and serial
+                ):
+                    web_sn = str(web.get("serialNumber") or "").strip().lower()
+                    if web_sn and web_sn != serial.lower():
+                        continue
+                prev_host = str(web.get("host") or "").strip()
+                matches.append(
+                    ReconnectMatch(
+                        lan=lan,
+                        web=web,
+                        password=pwd,
+                        username=username,
+                        serial=serial or str(web.get("serialNumber") or ""),
+                        password_source=source,
+                        host_changed=bool(prev_host and prev_host != lan.host),
+                    )
+                )
+                break  # next LAN device
+
+        if not matches:
+            if timeouts and timeouts >= len(ordered_lan):
+                return SubmitResult(
+                    kind=TIMEOUT,
+                    message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+                )
+            return SubmitResult(
+                kind=UNAUTHORIZED,
+                message=(
+                    "LAN qurilma(lar) topildi, lekin webdagi parol/serial mos kelmadi. "
+                    "Parolni qo‘lda kiriting yoki to‘liq Ulash."
+                ),
+            )
+
+        # Prefer host_changed + serial-known; then local deviceId; then first.
+        def score(m: ReconnectMatch) -> tuple[int, int, int]:
+            same_id = int(
+                bool(
+                    local_device_id
+                    and str(m.web.get("id") or "").strip() == local_device_id
+                )
+            )
+            same_serial = int(
+                bool(
+                    local_serial
+                    and m.serial
+                    and local_serial.lower() == m.serial.lower()
+                )
+            )
+            return (same_id, same_serial, int(m.host_changed))
+
+        matches.sort(key=score, reverse=True)
+        best = matches[0]
+        # Ambiguity: multiple different web ids with equal top score.
+        top = score(best)
+        rivals = [m for m in matches if score(m) == top and m.web.get("id") != best.web.get("id")]
+        if rivals:
+            return SubmitResult(
+                kind="api",
+                message=(
+                    f"Bir nechta qurilma mos keldi ({1 + len(rivals)}). "
+                    "IP maydoniga aniq manzil yozing."
+                ),
+            )
+        return best
+
+    def auto_reconnect_network(
         self,
         password: str = "",
         on_status: StatusFn | None = None,
+        on_step: StepFn | None = None,
         *,
         ip_hint: str | None = None,
     ) -> SubmitResult:
-        """Wi‑Fi change: verify existing password, update host/tunnel — no rotate."""
+        """Full Wi‑Fi reconnect: scan → web compare → auth → tunnel/host sync."""
         from provision import ProvisionEngine
+
+        def step(sid: str, state: str, detail: str = "") -> None:
+            if on_step:
+                on_step(sid, state, detail)
+            if on_status and detail:
+                on_status(detail)
 
         if not self.has_credentials():
             return SubmitResult(
@@ -407,126 +701,127 @@ class OfficeLinkSession:
                 message="Pairing token yoki admin kaliti kerak.",
             )
 
-        hint = (ip_hint or "").strip()
-        if hint:
-            chosen = self.choose_ip(hint)
-            if chosen is None:
-                return SubmitResult(kind=ERROR, message="IP manzil noto‘g‘ri.")
-            if not chosen.online:
-                return SubmitResult(kind=OFFLINE, message="Qurilma onlayn emas.")
-        elif not self.chosen:
-            self.scan()
-        if not self.chosen or not self.chosen.online:
-            return SubmitResult(kind=OFFLINE, message="Qurilma topilmadi yoki onlayn emas.")
+        for sid in RECONNECT_STEPS:
+            step(sid, "pending")
 
-        peek = self.peek_reconnect_password(password)
-        pwd = (peek.get("password") or password or "").strip()
-        if not pwd:
-            return SubmitResult(
-                kind="empty",
-                message=str(
-                    peek.get("error")
-                    or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash."
-                ),
-            )
-        username = str(peek.get("username") or self.username or "admin").strip() or "admin"
-        self.username = username
-
-        if on_status:
-            on_status("Parol tekshirilmoqda (o‘zgartirilmaydi)...")
-        result = verify_password(
-            self.chosen.host,
-            int(self.chosen.port or 80),
-            username,
-            pwd,
-        )
-        if result.kind == TIMEOUT:
-            return SubmitResult(
-                kind=TIMEOUT,
-                message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
-            )
-        if result.kind == UNAUTHORIZED:
-            # Try remaining sources if first peek was wrong.
-            tried = {pwd}
-            ok, devices, _err = self.fetch_web_devices()
-            candidates: list[str] = []
-            if ok:
-                for d in devices:
-                    p = str(d.get("password") or "").strip()
-                    if p and p not in tried:
-                        candidates.append(p)
-            manual = (password or "").strip()
-            if manual and manual not in tried:
-                candidates.append(manual)
-            found = None
-            for cand in candidates:
-                vr = verify_password(
-                    self.chosen.host,
-                    int(self.chosen.port or 80),
-                    username,
-                    cand,
-                )
-                if vr.kind == OK:
-                    found = vr
-                    pwd = cand
-                    break
-                if vr.kind == UNAUTHORIZED:
-                    tried.add(cand)
-                    continue
-                if vr.kind == TIMEOUT:
-                    return SubmitResult(
-                        kind=TIMEOUT,
-                        message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
-                    )
-            if not found:
-                return SubmitResult(
-                    kind=UNAUTHORIZED,
-                    message=(
-                        "Parol noto‘g‘ri. Webdagi/yoki lokal parol mos kelmadi — "
-                        "qo‘lda kiriting yoki to‘liq Ulash."
-                    ),
-                )
-            result = found
-
-        if result.kind != OK:
-            return SubmitResult(
-                kind=result.kind,
-                message="Parolni tekshirib bo‘lmadi.",
-            )
-
-        self.auth.record_success()
-        self.verified = result.as_device()
-        self.password = pwd
-
-        serial = str((self.verified or {}).get("serialNumber") or "")
-        ok, devices, err = self.fetch_web_devices()
+        # 1) Web devices first (known hosts help scan priority).
+        step("web", "active", "Webdan qurilmalar olinmoqda…")
+        ok, web_devices, err = self.fetch_web_devices()
         if not ok:
+            step("web", "fail", err or "Web o‘qilmadi")
             return SubmitResult(
                 kind="api",
                 message=err or "Webdan qurilmalar o‘qilmadi.",
             )
-        matched = peek.get("device") if isinstance(peek.get("device"), dict) else None
-        if not matched or str(matched.get("id") or "") == "":
-            matched = self.match_web_device(
-                devices,
-                serial=serial,
-                host=self.chosen.host,
-            )
-        if not matched or not str(matched.get("id") or "").strip():
-            return SubmitResult(
-                kind="api",
-                message=(
-                    "Webdagi qurilma topilmadi (serial mos kelmadi). "
-                    "Avval to‘liq Ulash qiling."
-                ),
-            )
+        step("web", "done", f"Web: {len(web_devices)} ta qurilma")
 
-        engine = ProvisionEngine()
-        return engine.provision_network_reconnect(
-            self,
-            pwd,
-            device_id=str(matched["id"]),
+        # 2) LAN scan
+        step("scan", "active", "Tarmoq skaneri…")
+        known = self._priority_hosts(
+            ip_hint=(ip_hint or "").strip(),
+            web_devices=web_devices,
+        )
+        lan = self.scan_for_reconnect(
+            ip_hint=ip_hint,
+            known_hosts=known,
             on_status=on_status,
+        )
+        if not lan:
+            step("scan", "fail", "LAN da topilmadi")
+            return SubmitResult(
+                kind=OFFLINE,
+                message="Qurilma topilmadi yoki onlayn emas. IP yozing yoki Qidirish.",
+            )
+        step("scan", "done", f"LAN: {len(lan)} ta Hikvision")
+
+        # 3) Match
+        step("match", "active", "Web bilan solishtirilmoqda…")
+        resolved = self.resolve_reconnect_match(
+            lan,
+            web_devices,
+            password,
+            on_status=on_status,
+        )
+        if isinstance(resolved, SubmitResult):
+            if resolved.kind in (UNAUTHORIZED, "empty", TIMEOUT):
+                step("match", "done", "Solishtirish yakunlandi")
+                step("auth", "fail", resolved.message)
+            else:
+                step("match", "fail", resolved.message)
+            return resolved
+
+        match = resolved
+        self.chosen = match.lan
+        self._refresh_detected_state()
+        change_note = (
+            f"IP o‘zgargan: {match.web.get('host')} → {match.lan.host}"
+            if match.host_changed
+            else f"IP bir xil ({match.lan.host}) — tunnel/GW yangilanadi"
+        )
+        step(
+            "match",
+            "done",
+            f"Mos: {match.web.get('name') or match.web.get('id')} · {change_note}",
+        )
+
+        # 4) Auth confirmed (already verified in resolve)
+        step(
+            "auth",
+            "active",
+            f"Parol OK ({match.password_source}) · serial={match.serial or '—'}",
+        )
+        self.auth.record_success()
+        self.verified = {
+            "host": match.lan.host,
+            "port": int(match.lan.port or 80),
+            "serialNumber": match.serial,
+            "name": match.web.get("name") or match.lan.hint_name or match.lan.host,
+            "model": match.web.get("model") or "Hikvision",
+        }
+        self.password = match.password
+        self.username = match.username
+        step("auth", "done", f"Parol manbai: {match.password_source}")
+
+        # 5) Link / provision
+        step("link", "active", "Gateway + tunnel + web host yangilanmoqda…")
+        engine = ProvisionEngine()
+
+        def _status(msg: str) -> None:
+            if on_status:
+                on_status(msg)
+            if on_step:
+                on_step("link", "active", msg)
+
+        result = engine.provision_network_reconnect(
+            self,
+            match.password,
+            device_id=str(match.web["id"]),
+            on_status=_status,
+        )
+        if result.kind == "reconnected":
+            step("link", "done", "Tarmoq web bilan sinxron")
+            if isinstance(result.device, dict):
+                result.device["passwordSource"] = match.password_source
+                result.device["hostChanged"] = match.host_changed
+                result.device["serialNumber"] = match.serial
+        else:
+            step("link", "fail", result.message or "Ulash xato")
+        return result
+
+    def reconnect_network(
+        self,
+        password: str = "",
+        on_status: StatusFn | None = None,
+        *,
+        ip_hint: str | None = None,
+        on_step: StepFn | None = None,
+    ) -> SubmitResult:
+        """Wi‑Fi change: auto scan, web match, update host/tunnel — no rotate."""
+        return self.auto_reconnect_network(
+            password,
+            on_status=on_status,
+            on_step=on_step,
+            ip_hint=ip_hint,
         )
 
     def stop(self) -> None:

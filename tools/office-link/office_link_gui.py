@@ -11,9 +11,17 @@ from tkinter import messagebox, ttk
 from auth_lock import CONFIRM, LOCKED
 from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
 from paths import find_root, read_link_key, read_pairing_token
-from session import OfficeLinkSession, SubmitResult
+from session import RECONNECT_STEPS, OfficeLinkSession, SubmitResult
 
 TITLE = "HR HUB — qurilmani ulash"
+
+_RECONNECT_STEP_LABELS = {
+    "web": "1 · Web",
+    "scan": "2 · Skaner",
+    "match": "3 · Moslash",
+    "auth": "4 · Parol",
+    "link": "5 · Ulash",
+}
 
 # Fluent-inspired palette matching app icon (purple gears).
 C = {
@@ -318,6 +326,35 @@ class OfficeLinkApp:
             anchor="w", pady=(4, 0)
         )
 
+        self.reconnect_steps_frame = tk.Frame(status_body, bg=C["surface"], bd=0)
+        self.reconnect_steps_frame.pack(fill=tk.X, pady=(10, 0))
+        self._reconnect_step_vars: dict[str, tk.StringVar] = {}
+        self._reconnect_step_labels: dict[str, tk.Label] = {}
+        steps_row = tk.Frame(self.reconnect_steps_frame, bg=C["surface"])
+        steps_row.pack(fill=tk.X)
+        for sid in RECONNECT_STEPS:
+            var = tk.StringVar(value=_RECONNECT_STEP_LABELS.get(sid, sid))
+            self._reconnect_step_vars[sid] = var
+            lbl = tk.Label(
+                steps_row,
+                textvariable=var,
+                bg=C["border"],
+                fg=C["muted"],
+                font=("Segoe UI Semibold", 8),
+                padx=6,
+                pady=3,
+            )
+            lbl.pack(side=tk.LEFT, padx=(0, 4))
+            self._reconnect_step_labels[sid] = lbl
+        self.reconnect_detail_var = tk.StringVar(value="")
+        ttk.Label(
+            self.reconnect_steps_frame,
+            textvariable=self.reconnect_detail_var,
+            style="Muted.TLabel",
+            wraplength=460,
+        ).pack(anchor="w", pady=(6, 0))
+        self.reconnect_steps_frame.pack_forget()
+
         # Connection card
         conn = self._card(frm, "Ulanish sozlamalari")
         try:
@@ -466,8 +503,9 @@ class OfficeLinkApp:
                 "Web → Связь с офисом dan pairing token oling (nusxalang). "
                 "Shu yerda Ctrl+V / Shift+Insert yoki «Joylashtir», so‘ng «Saqlash». "
                 "Birinchi ulash: «Ulash» — yangi parol o‘rnatadi. "
-                "Wi‑Fi o‘zgasa: «Tarmoqni qayta ulash» — webdan parol olinadi, "
-                "faqat IP/tunnel yangilanadi (parol va yuzlar saqlanadi)."
+                "Wi‑Fi / IP o‘zgasa: «Tarmoqni qayta ulash» — LAN skaner, "
+                "web bilan serial/parol solishtirish, tunnel + host avtomatik "
+                "yangilanadi (parol va yuzlar saqlanadi)."
             ),
             style="Hint.TLabel",
             wraplength=480,
@@ -859,6 +897,54 @@ class OfficeLinkApp:
             self.status_var.set("Qurilma topilmadi")
             self._set_badge("OFFLINE", "danger")
 
+    def _reset_reconnect_steps(self) -> None:
+        self.reconnect_detail_var.set("")
+        for sid in RECONNECT_STEPS:
+            self._set_reconnect_step(sid, "pending")
+
+    def _show_reconnect_steps(self, show: bool = True) -> None:
+        try:
+            if show:
+                self.reconnect_steps_frame.pack(fill=tk.X, pady=(10, 0))
+            else:
+                self.reconnect_steps_frame.pack_forget()
+        except tk.TclError:
+            pass
+
+    def _set_reconnect_step(self, step_id: str, state: str, detail: str = "") -> None:
+        lbl = self._reconnect_step_labels.get(step_id)
+        var = self._reconnect_step_vars.get(step_id)
+        if not lbl or not var:
+            return
+        base = _RECONNECT_STEP_LABELS.get(step_id, step_id)
+        mark = {
+            "pending": "○",
+            "active": "●",
+            "done": "✓",
+            "fail": "✗",
+            "skip": "–",
+        }.get(state, "○")
+        var.set(f"{mark} {base}")
+        colors = {
+            "pending": (C["border"], C["muted"]),
+            "active": (C["accent_soft"], C["accent"]),
+            "done": (C["ok_bg"], C["ok"]),
+            "fail": (C["danger_bg"], C["danger"]),
+            "skip": (C["border"], C["muted"]),
+        }
+        bg, fg = colors.get(state, (C["border"], C["muted"]))
+        try:
+            lbl.configure(bg=bg, fg=fg)
+        except tk.TclError:
+            pass
+        if detail:
+            self.reconnect_detail_var.set(detail[:180])
+
+    def _on_reconnect_step(self, step_id: str, state: str, detail: str = "") -> None:
+        self.root.after(
+            0, lambda: self._set_reconnect_step(step_id, state, detail)
+        )
+
     def _on_reconnect(self) -> None:
         if self.busy or self.session.auth.is_locked():
             return
@@ -872,89 +958,38 @@ class OfficeLinkApp:
                 "Pairing token yoki admin kaliti kerak. Web → Связь yoki ADMIN-PAROL.bat."
             )
             return
+
         ip = self.ip_var.get().strip()
         if ip:
-            chosen = self.session.choose_ip(ip)
-            if chosen is None:
+            from discovery import valid_ip
+
+            if not valid_ip(ip):
                 self.status_var.set("IP manzil noto‘g‘ri.")
+                self._set_badge("IP", "warn")
                 return
-            if not chosen.online:
-                self.status_var.set("Qurilma onlayn emas")
-                self._set_badge("OFFLINE", "danger")
-                self.device_var.set(f"Qurilma: {ip}")
-                return
-            self._show_device()
-        elif not self.session.chosen:
-            self.status_var.set("Qurilma topilmadi — IP yozing yoki Qidirish")
-            return
 
+        self._show_reconnect_steps(True)
+        self._reset_reconnect_steps()
         self._set_busy(True)
-        self.status_var.set("Webdan parol olinmoqda...")
-        self._set_badge("PAROL", "accent")
-        threading.Thread(target=self._reconnect_prepare_worker, daemon=True).start()
-
-    def _reconnect_prepare_worker(self) -> None:
-        peek = self.session.peek_reconnect_password(self.pwd_var.get())
-        self.root.after(0, lambda: self._reconnect_prepare_done(peek))
-
-    def _reconnect_prepare_done(self, peek: dict) -> None:
-        self._set_busy(False)
-        pwd = str(peek.get("password") or "").strip()
-        source = str(peek.get("source") or "")
-        if pwd:
-            self.pwd_var.set(pwd)
-            src_label = {
-                "local": "lokal recovery",
-                "web": "Web vault",
-                "manual": "qo‘lda",
-            }.get(source, source or "—")
-            self.status_var.set(f"Parol topildi ({src_label})")
-            self._set_badge("PAROL OK", "ok")
-            self._hide_alert()
-        else:
-            self.status_var.set("Parol topilmadi")
-            self._set_badge("PAROL", "warn")
-            self._show_alert(
-                str(
-                    peek.get("error")
-                    or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash."
-                )
-            )
-            if not self.pwd_var.get().strip():
-                return
-
-        host = self.ip_var.get().strip() or (
-            self.session.chosen.host if self.session.chosen else "—"
-        )
-        confirm_msg = (
-            "Tarmoqni qayta ulash — tasdiqlang.\n\n"
-            f"IP: {host}\n"
-            f"Parol manbai: {source or 'qo‘lda'}\n\n"
-            "Parol o‘zgarmaydi, faqat tarmoq (IP + tunnel) yangilanadi.\n"
-            "Yuzlar qayta yuklanmaydi.\n\n"
-            "Davom etasizmi?"
-        )
-        if not messagebox.askokcancel("Tarmoqni qayta ulash", confirm_msg):
-            return
+        self.status_var.set("Avtomatik qayta ulash…")
+        self._set_badge("SKANER", "accent")
+        self._hide_alert()
         password = self.pwd_var.get().strip()
-        if not password:
-            self._show_alert("Parol kerak — qo‘lda kiriting yoki to‘liq Ulash.")
-            return
-        self._set_busy(True)
-        self.status_var.set("Tarmoq yangilanmoqda...")
-        self._set_badge("ULANMOQDA", "accent")
         threading.Thread(
-            target=self._reconnect_worker, args=(password,), daemon=True
+            target=self._reconnect_auto_worker,
+            args=(password, ip or None),
+            daemon=True,
         ).start()
 
-    def _reconnect_worker(self, password: str) -> None:
-        def progress(msg: str) -> None:
+    def _reconnect_auto_worker(self, password: str, ip_hint: str | None) -> None:
+        def on_status(msg: str) -> None:
             self.root.after(0, lambda m=msg: self.status_var.set(m[:120]))
 
-        result = self.session.reconnect_network(
+        result = self.session.auto_reconnect_network(
             password,
-            progress,
-            ip_hint=self.ip_var.get().strip() or None,
+            on_status=on_status,
+            on_step=self._on_reconnect_step,
+            ip_hint=ip_hint,
         )
         self.root.after(0, lambda: self._reconnect_done(result))
 
@@ -963,12 +998,20 @@ class OfficeLinkApp:
         kind = result.kind
         if kind == "reconnected":
             self.pwd_var.set("")
+            host = (result.device or {}).get("host") or ""
+            name = (result.device or {}).get("name") or ""
+            serial = (result.device or {}).get("serialNumber") or ""
+            changed = bool((result.device or {}).get("hostChanged"))
             self.status_var.set("Tarmoq yangilandi")
             self._set_badge("YANGILANDI", "ok")
             self._hide_alert()
-            host = (result.device or {}).get("host") or ""
-            name = (result.device or {}).get("name") or ""
             self.device_var.set(f"Qurilma: {name}  {host}".strip())
+            if host:
+                self.ip_var.set(host)
+            self.state_var.set(
+                "Aniqlangan holat: tarmoq sinxron"
+                + (f" · S/N {serial}" if serial else "")
+            )
             try:
                 self.session.write_service_handoff()
                 svc_note = " Service config yangilandi."
@@ -981,10 +1024,17 @@ class OfficeLinkApp:
                     + svc_note
                 )
             )
+            self.reconnect_detail_var.set(
+                ("IP o‘zgardi — " if changed else "Tunnel/GW yangilandi — ")
+                + f"{host}"
+            )
             messagebox.showinfo(
                 "Tarmoq yangilandi",
-                "IP va tunnel yangilandi.\n"
-                "Admin parol o‘zgarmadi — yuzlarni qayta yuklash shart emas.",
+                "LAN skaner + web solishtirish OK.\n"
+                f"Host: {host}\n"
+                + ("IP o‘zgargan — server yangilandi.\n" if changed else "")
+                + "Admin parol o‘zgarmadi — yuzlarni qayta yuklash shart emas.\n"
+                "Endi Web → Синхронизировать ishlashi kerak (DEVICE_GW tunnel).",
             )
             return
         if kind == UNAUTHORIZED or kind == "empty":
@@ -1009,6 +1059,11 @@ class OfficeLinkApp:
         if kind == OFFLINE:
             self.status_var.set("Qurilma onlayn emas")
             self._set_badge("OFFLINE", "danger")
+            self._show_alert(result.message)
+            return
+        if kind == "no_key":
+            self.status_var.set("Token kerak")
+            self._set_badge("TOKEN", "warn")
             self._show_alert(result.message)
             return
         self.status_var.set(result.message or "Xato")

@@ -1873,9 +1873,6 @@ export class EmployeesService {
         middleName: dto.middleName,
         email: dto.email,
         phone: dto.phone,
-        telegramUsername: dto.telegramUsername
-          ? String(dto.telegramUsername).replace(/^@/, '').trim() || null
-          : undefined,
         divisionId: dto.divisionId,
         positionId: dto.positionId,
         personId,

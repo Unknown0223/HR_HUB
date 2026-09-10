@@ -557,6 +557,41 @@ class ProvisionEngine:
         else:
             _emit(on_status, "1/4 Parol allaqachon platformaga tegishli")
 
+        # Tiklanish pochtasi (parol unutilganda) — config.json recoveryEmail
+        try:
+            from device_email import apply_recovery_email_from_config, normalize_recovery_email
+
+            cfg = getattr(session, "cfg", None) or {}
+            email_target = normalize_recovery_email(str(cfg.get("recoveryEmail") or ""))
+            _emit(on_status, f"1b/4 Tiklanish pochtasi: {email_target}")
+            _progress(
+                session,
+                status="configuring",
+                step="recovery_email",
+                percent=35,
+                message=f"Recovery email → {email_target}",
+            )
+            email_res = apply_recovery_email_from_config(
+                session.chosen.host,
+                int(session.chosen.port or 80),
+                username,
+                password,
+                cfg if isinstance(cfg, dict) else {},
+            )
+            if email_res.get("ok"):
+                _emit(
+                    on_status,
+                    f"Tiklanish pochtasi o‘rnatildi: {email_res.get('email') or email_target}",
+                )
+            else:
+                _emit(
+                    on_status,
+                    "Tiklanish pochtasini yozib bo‘lmadi "
+                    f"({email_res.get('message') or 'xato'}) — Ulash davom etadi",
+                )
+        except Exception as exc:
+            _emit(on_status, f"Tiklanish pochtasi: {exc} — Ulash davom etadi")
+
         session.password = password
         session.location_id = location_id
         session.username = username

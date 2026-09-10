@@ -77,8 +77,16 @@ def read_device_credential(root: Path | None = None) -> dict[str, Any] | None:
 
 
 def format_credential_for_display(data: dict[str, Any] | None) -> str:
+    path = credential_file(find_root())
     if not data:
-        return "Saqlangan parol yo‘q (hali Ulash qilinmagan yoki fayl o‘chirilgan)."
+        return (
+            "Saqlangan parol yo‘q.\n\n"
+            "Sabab: hali «Ulash» muvaffaqiyatli tugamagan yoki fayl yozilmagan.\n"
+            "Ulashdan keyin fayl shu yerda paydo bo‘ladi:\n"
+            f"{path}\n\n"
+            "Eslatma: Program Files ga yozib bo‘lmasa, fayl "
+            "%LOCALAPPDATA%\\HRHUB-Link\\data\\ ichida bo‘ladi."
+        )
     return (
         f"Host: {data.get('host') or '—'}\n"
         f"Port: {data.get('port') or 80}\n"
@@ -87,5 +95,5 @@ def format_credential_for_display(data: dict[str, Any] | None) -> str:
         f"Serial: {data.get('serialNumber') or '—'}\n"
         f"Bosqich: {data.get('phase') or '—'}\n"
         f"Saqlangan: {data.get('savedAt') or '—'}\n"
-        f"Fayl: {credential_file(find_root())}"
+        f"Fayl: {path}"
     )

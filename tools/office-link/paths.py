@@ -32,16 +32,62 @@ def find_root() -> Path:
     return starts[0]
 
 
+def user_data_root() -> Path:
+    """Writable per-user data (Program Files ga yozib bo‘lmasa shu yer)."""
+    base = (
+        os.environ.get("LOCALAPPDATA")
+        or os.environ.get("APPDATA")
+        or str(Path.home() / "AppData" / "Local")
+    )
+    return Path(base) / "HRHUB-Link"
+
+
+def _dir_is_writable(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".hrhub_write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
 def data_dir(root: Path | None = None) -> Path:
-    d = (root or find_root()) / "data"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    """
+    Prefer <install>/data when writable; otherwise %LOCALAPPDATA%\\HRHUB-Link\\data.
+
+    Program Files o‘rnatilganda oddiy foydalanuvchi yozolmasligi mumkin —
+    shunda parol fayli AppData ga tushadi (bo‘sh Program Files\\data kutiladi).
+    """
+    root = root or find_root()
+    install_data = root / "data"
+    user_data = user_data_root() / "data"
+
+    # Prefer location that already has recovery / link key
+    for cand in (install_data, user_data):
+        try:
+            if (cand / "device-credential.json").is_file() or (cand / "link.key").is_file():
+                cand.mkdir(parents=True, exist_ok=True)
+                return cand
+        except OSError:
+            pass
+
+    if _dir_is_writable(install_data):
+        return install_data
+
+    user_data.mkdir(parents=True, exist_ok=True)
+    return user_data
 
 
 def runtime_dir(root: Path | None = None) -> Path:
-    d = (root or find_root()) / "runtime"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    root = root or find_root()
+    install_rt = root / "runtime"
+    user_rt = user_data_root() / "runtime"
+    if _dir_is_writable(install_rt):
+        return install_rt
+    user_rt.mkdir(parents=True, exist_ok=True)
+    return user_rt
 
 
 def gw_dir(root: Path | None = None) -> Path:

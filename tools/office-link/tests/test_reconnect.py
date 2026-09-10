@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import _pathsetup  # noqa: F401
 
 from discovery import OK, UNAUTHORIZED, OnlineInfo, VerifyResult
-from session import OfficeLinkSession, SubmitResult
+from session import OfficeLinkSession, ReconnectMatch, SubmitResult
 
 
 def _online(host: str = "192.168.0.116") -> OnlineInfo:
@@ -36,6 +36,69 @@ class MatchWebDeviceTests(unittest.TestCase):
         m = OfficeLinkSession.match_web_device(devices, serial="999", host="192.168.0.116")
         self.assertEqual(m["id"], "a")
 
+    def test_match_by_device_id(self):
+        devices = [
+            {"id": "dev-a", "serialNumber": "1", "host": "1.1.1.1", "password": "x"},
+            {"id": "dev-b", "serialNumber": "2", "host": "2.2.2.2", "password": "y"},
+        ]
+        m = OfficeLinkSession.match_web_device(devices, device_id="dev-b")
+        self.assertEqual(m["id"], "dev-b")
+
+
+class ResolveReconnectMatchTests(unittest.TestCase):
+    def setUp(self):
+        self.sess = OfficeLinkSession()
+
+    def test_match_serial_and_host_changed(self):
+        lan = [_online("192.168.0.200")]
+        web = [
+            {
+                "id": "dev-1",
+                "serialNumber": "SN-1",
+                "host": "10.0.0.1",
+                "password": "VaultPwd1!",
+                "username": "admin",
+                "name": "Gate",
+            }
+        ]
+        ok_verify = VerifyResult(
+            kind=OK,
+            host="192.168.0.200",
+            port=80,
+            name="Gate",
+            serialNumber="SN-1",
+            model="DS",
+        )
+        with patch(
+            "credential_store.read_device_credential", return_value=None
+        ), patch("session.verify_password", return_value=ok_verify):
+            resolved = self.sess.resolve_reconnect_match(lan, web)
+        self.assertIsInstance(resolved, ReconnectMatch)
+        assert isinstance(resolved, ReconnectMatch)
+        self.assertEqual(resolved.web["id"], "dev-1")
+        self.assertTrue(resolved.host_changed)
+        self.assertEqual(resolved.lan.host, "192.168.0.200")
+
+    def test_bad_password(self):
+        lan = [_online()]
+        web = [
+            {
+                "id": "dev-1",
+                "serialNumber": "SN-1",
+                "host": "192.168.0.116",
+                "password": "wrong",
+                "username": "admin",
+            }
+        ]
+        bad = VerifyResult(kind=UNAUTHORIZED, host="192.168.0.116")
+        with patch(
+            "credential_store.read_device_credential", return_value=None
+        ), patch("session.verify_password", return_value=bad):
+            resolved = self.sess.resolve_reconnect_match(lan, web)
+        self.assertIsInstance(resolved, SubmitResult)
+        assert isinstance(resolved, SubmitResult)
+        self.assertEqual(resolved.kind, UNAUTHORIZED)
+
 
 class ReconnectNetworkTests(unittest.TestCase):
     def setUp(self):
@@ -43,13 +106,14 @@ class ReconnectNetworkTests(unittest.TestCase):
         self.sess.chosen = _online()
         self.sess.set_pairing_token("pair-token")
 
-    def test_reconnect_uses_web_password_and_skips_rotate(self):
+    def test_auto_reconnect_scan_match_link(self):
         web_device = {
             "id": "dev-1",
             "serialNumber": "SN-1",
             "host": "10.0.0.1",
             "password": "VaultPwd1!",
             "username": "admin",
+            "name": "Gate",
         }
         ok_verify = VerifyResult(
             kind=OK,
@@ -72,24 +136,25 @@ class ReconnectNetworkTests(unittest.TestCase):
 
         dummy = DummyBundle()
         rotate_spy = MagicMock()
+        steps: list[tuple[str, str]] = []
+
+        def on_step(sid: str, state: str, _detail: str = "") -> None:
+            steps.append((sid, state))
 
         with patch(
             "session.read_link_key", return_value="link-key"
         ), patch.object(
             self.sess,
-            "peek_reconnect_password",
-            return_value={
-                "password": "VaultPwd1!",
-                "source": "web",
-                "device": web_device,
-                "username": "admin",
-            },
-        ), patch(
-            "session.verify_password", return_value=ok_verify
-        ) as vp, patch.object(
-            self.sess,
             "fetch_web_devices",
             return_value=(True, [web_device], "OK"),
+        ), patch.object(
+            self.sess,
+            "scan_for_reconnect",
+            return_value=[_online()],
+        ), patch(
+            "session.verify_password", return_value=ok_verify
+        ), patch(
+            "credential_store.read_device_credential", return_value=None
         ), patch(
             "runtime_setup.ensure_runtime"
         ), patch(
@@ -113,16 +178,23 @@ class ReconnectNetworkTests(unittest.TestCase):
         ), patch(
             "credential_store.save_device_credential"
         ):
-            r = self.sess.reconnect_network("VaultPwd1!")
+            r = self.sess.auto_reconnect_network(
+                "VaultPwd1!",
+                on_step=on_step,
+                ip_hint="192.168.0.116",
+            )
 
         self.assertEqual(r.kind, "reconnected")
-        vp.assert_called()
+        self.assertTrue(r.device.get("hostChanged"))
         recon.assert_called_once()
-        args, kwargs = recon.call_args
+        kwargs = recon.call_args.kwargs
         self.assertEqual(kwargs.get("device_id"), "dev-1")
         self.assertEqual(kwargs.get("host"), "192.168.0.116")
         reg.assert_not_called()
         rotate_spy.assert_not_called()
+        self.assertIn(("link", "done"), steps)
+        self.assertIn(("scan", "done"), steps)
+        self.assertIn(("match", "done"), steps)
 
     def test_peek_prefers_local_then_web(self):
         with patch(
@@ -157,24 +229,35 @@ class ReconnectNetworkTests(unittest.TestCase):
         self.assertEqual(peek2["password"], "WebPwd")
 
     def test_bad_password_message(self):
-        bad = VerifyResult(kind=UNAUTHORIZED, host="192.168.0.116")
         with patch(
             "session.read_link_key", return_value="k"
         ), patch.object(
             self.sess,
-            "peek_reconnect_password",
-            return_value={
-                "password": "wrong",
-                "source": "manual",
-                "device": None,
-                "username": "admin",
-            },
-        ), patch(
-            "session.verify_password", return_value=bad
+            "fetch_web_devices",
+            return_value=(
+                True,
+                [
+                    {
+                        "id": "dev-1",
+                        "serialNumber": "SN",
+                        "host": "1.1.1.1",
+                        "password": "wrong",
+                        "username": "admin",
+                    }
+                ],
+                "OK",
+            ),
         ), patch.object(
-            self.sess, "fetch_web_devices", return_value=(True, [], "OK")
+            self.sess,
+            "scan_for_reconnect",
+            return_value=[_online()],
+        ), patch(
+            "credential_store.read_device_credential", return_value=None
+        ), patch(
+            "session.verify_password",
+            return_value=VerifyResult(kind=UNAUTHORIZED, host="192.168.0.116"),
         ):
-            r = self.sess.reconnect_network("wrong")
+            r = self.sess.auto_reconnect_network("wrong")
         self.assertEqual(r.kind, UNAUTHORIZED)
         self.assertIn("Ulash", r.message)
 
