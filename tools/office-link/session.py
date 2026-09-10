@@ -314,6 +314,29 @@ class OfficeLinkSession:
         devices = [d for d in raw if isinstance(d, dict)] if isinstance(raw, list) else []
         return True, devices, "OK"
 
+    def fetch_provision_status(self) -> tuple[bool, dict[str, Any], str]:
+        """Poll Web for admin confirm / sealed after Ulash."""
+        import api_client
+
+        sid = (self.provision_session_id or "").strip()
+        token = self.pairing_token() or ""
+        if not sid:
+            return False, {}, "Provision session yo‘q."
+        if not token:
+            return False, {}, "Pairing token kerak."
+        code, data = api_client.get_provision_session(
+            self.api_url,
+            read_link_key(self.root),
+            session_id=sid,
+            pairing_token=token,
+        )
+        if not api_client.is_success(code) or not isinstance(data, dict):
+            msg = ""
+            if isinstance(data, dict):
+                msg = str(data.get("message") or data.get("error") or "")
+            return False, {}, msg or f"Session holati xato (HTTP {code})."
+        return True, data, "OK"
+
     @staticmethod
     def match_web_device(
         devices: list[dict[str, Any]],

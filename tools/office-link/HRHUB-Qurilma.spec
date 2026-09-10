@@ -28,6 +28,7 @@ a = Analysis(
         "runtime_setup",
         "credential_store",
         "device_email",
+        "device_security",
     ],
     hookspath=[],
     hooksconfig={},

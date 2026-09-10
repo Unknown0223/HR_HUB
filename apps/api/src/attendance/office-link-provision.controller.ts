@@ -164,6 +164,18 @@ export class OfficeLinkProvisionController {
   @SkipTenant()
   @UseGuards(PairingTokenGuard)
   @ApiHeader({ name: 'X-Pairing-Token', required: true })
+  @Get('session/:id')
+  getSession(
+    @CurrentPairing() pairing: PairingAuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.attendance.getProvisionSession(pairing, id);
+  }
+
+  @Public()
+  @SkipTenant()
+  @UseGuards(PairingTokenGuard)
+  @ApiHeader({ name: 'X-Pairing-Token', required: true })
   @Patch('session/:id/progress')
   patchProgress(
     @CurrentPairing() pairing: PairingAuthContext,

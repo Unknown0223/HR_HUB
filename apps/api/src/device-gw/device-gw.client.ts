@@ -348,5 +348,18 @@ function gwDetail(text: string, fallback: string): string {
   } catch {
     /* not JSON */
   }
+  // Cloudflare / proxy HTML error pages must never leak into UI.
+  const lower = raw.toLowerCase();
+  if (
+    lower.startsWith('<!doctype') ||
+    lower.startsWith('<html') ||
+    lower.includes('cloudflare tunnel error') ||
+    lower.includes('<title>')
+  ) {
+    return (
+      'Связь с терминалом недоступна (Cloudflare tunnel / office-link). ' +
+      'Запустите HR HUB Link и повторите.'
+    );
+  }
   return raw.length > 400 ? `${raw.slice(0, 400)}…` : raw;
 }

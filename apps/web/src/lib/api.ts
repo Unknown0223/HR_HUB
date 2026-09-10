@@ -36,6 +36,25 @@ export type PageResult<T> = {
 };
 
 const SESSION_KEY = 'hrhub_session';
+
+/** Nest/proxy sometimes returns HTML (Cloudflare errors) as message — never show raw markup. */
+function sanitizeApiErrorMessage(message: string, fallback: string): string {
+  const msg = (message || '').trim();
+  if (!msg) return fallback;
+  const lower = msg.toLowerCase();
+  if (
+    lower.startsWith('<!doctype') ||
+    lower.startsWith('<html') ||
+    lower.includes('cloudflare tunnel error') ||
+    (lower.includes('<title>') && lower.includes('<'))
+  ) {
+    return (
+      'Связь с терминалом недоступна (Cloudflare tunnel / office-link). ' +
+      'Запустите HR HUB Link и повторите.'
+    );
+  }
+  return msg.length > 280 ? `${msg.slice(0, 280)}…` : msg;
+}
 /**
  * JWT for API Authorization + <img src>?access_token=.
  * Cookie (httpOnly) is preferred when same-site; on Railway web/api are
@@ -151,7 +170,7 @@ export async function apiFetch<T>(
       } catch {
         /* ignore */
       }
-      throw new Error(message);
+      throw new Error(sanitizeApiErrorMessage(String(message), res.statusText || 'Ошибка'));
     }
 
     if (res.status === 204) return undefined as T;
@@ -186,7 +205,7 @@ export async function apiDownload(path: string, filename: string): Promise<void>
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    throw new Error(sanitizeApiErrorMessage(String(message), res.statusText || 'Ошибка'));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

@@ -181,6 +181,8 @@ class OfficeLinkApp:
         self.session = OfficeLinkSession()
         self.busy = False
         self._tick_job: str | None = None
+        self._confirm_poll_job: str | None = None
+        self._confirm_notified = False
         self._locations: list[dict] = []
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -667,10 +669,42 @@ class OfficeLinkApp:
             if ok:
                 self._show_alert("Pairing sessiya bog‘landi.")
                 self._load_locations()
+                self._maybe_resume_confirm_poll()
             else:
                 self._show_alert(msg[:200] if msg else "Pairing xato")
 
         self.root.after(0, done)
+
+    def _maybe_resume_confirm_poll(self) -> None:
+        """If Ulash already waiting for Web confirm, resume poll after restart."""
+        if not (self.session.provision_session_id or "").strip():
+            return
+        if self._confirm_notified or self._confirm_poll_job is not None:
+            return
+
+        def work() -> None:
+            ok, info, _msg = self.session.fetch_provision_status()
+            self.root.after(0, lambda: self._resume_confirm_from_status(ok, info))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _resume_confirm_from_status(self, ok: bool, info: dict) -> None:
+        if not ok or not isinstance(info, dict):
+            return
+        if info.get("sealed") or (
+            info.get("status") == "linked" and not info.get("pendingAdminConfirm")
+        ):
+            # Already confirmed while app was closed — show once.
+            self._confirm_poll_done(True, info, "OK")
+            return
+        if info.get("pendingAdminConfirm") or info.get("step") == "awaiting_admin_confirm":
+            self.status_var.set("Web tasdiq kutilmoqda")
+            self._set_badge("TASDIQ", "warn")
+            self._show_alert(
+                "Web → Устройства → «Подтвердить привязку». "
+                "Tasdiqni ilova kuzatmoqda…"
+            )
+            self._start_confirm_poll()
 
     def _load_locations(self) -> None:
         key = read_link_key(self.session.root)
@@ -1220,7 +1254,8 @@ class OfficeLinkApp:
                     text=(
                         "Keyingi qadam: Webda tenant admin bildirishnomani ochib "
                         "parolni tekshirsin va «Подтвердить привязку» bossin. "
-                        "Shundan keyin yuzlar va qurilma to‘liq sinxronlanadi."
+                        "Shundan keyin yuzlar va qurilma to‘liq sinxronlanadi. "
+                        "Ilova Web tasdiqni avtomatik kuzatadi."
                         + extra
                         + svc_note
                     )
@@ -1230,8 +1265,9 @@ class OfficeLinkApp:
                     "Parol qurilmaga o‘rnatildi va Webga yuborildi.\n\n"
                     "Tenant admin Webdagi bildirishnomada (qo‘ng‘iroqcha) "
                     "yoki Устройства kartasida «Подтвердить привязку» ni bosishi kerak.\n"
-                    "Tasdiqdan keyin yuzlar sinxroni avtomatik boshlanadi.",
+                    "Tasdiqdan keyin shu oynada «Ulandi» bildirishnomasi chiqadi.",
                 )
+                self._start_confirm_poll()
             else:
                 seal_note = (
                     " Parol terminalda almashtirildi va Web serverda mustahkamlandi."
@@ -1344,11 +1380,76 @@ class OfficeLinkApp:
         except OSError as exc:
             self._show_alert(str(exc)[:160])
 
+    def _cancel_confirm_poll(self) -> None:
+        if self._confirm_poll_job is not None:
+            try:
+                self.root.after_cancel(self._confirm_poll_job)
+            except Exception:
+                pass
+            self._confirm_poll_job = None
+
+    def _start_confirm_poll(self) -> None:
+        """Poll Web until admin confirms — then show success in this app."""
+        self._cancel_confirm_poll()
+        self._confirm_notified = False
+        # First check soon (admin may already have confirmed).
+        self._confirm_poll_job = self.root.after(1500, self._poll_confirm_once)
+
+    def _poll_confirm_once(self) -> None:
+        self._confirm_poll_job = None
+
+        def work() -> None:
+            ok, info, msg = self.session.fetch_provision_status()
+            self.root.after(0, lambda: self._confirm_poll_done(ok, info, msg))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _confirm_poll_done(
+        self, ok: bool, info: dict, msg: str
+    ) -> None:
+        if self._confirm_notified:
+            return
+        sealed = bool(ok and isinstance(info, dict) and info.get("sealed"))
+        pending = bool(
+            ok and isinstance(info, dict) and info.get("pendingAdminConfirm")
+        )
+        if sealed or (ok and not pending and info.get("status") == "linked"):
+            self._confirm_notified = True
+            self._cancel_confirm_poll()
+            name = ""
+            if isinstance(info, dict):
+                name = str(info.get("deviceName") or "")
+            self.status_var.set("Ulanish mustahkamlandi")
+            self._set_badge("ULANDI", "ok")
+            self._hide_alert()
+            self._show_alert(
+                "Web tasdiqlandi. Yuzlar sinxroni boshlandi"
+                + (f" ({name})." if name else ".")
+            )
+            self.note.configure(
+                text=(
+                    "Webda «Подтвердить привязку» bajarildi. "
+                    "Qurilma platformaga mustahkamlandi; xodimlar yuzlari "
+                    "sinxronlanadi. Yangi admin parolni Web → Устройства "
+                    "sahifasida ko‘ring."
+                )
+            )
+            messagebox.showinfo(
+                "Tasdiqlandi",
+                "Web admin ulanishni tasdiqladi.\n\n"
+                "Qurilma tayyor — yuzlar sinxroni avtomatik ishga tushadi.\n"
+                "Parol: Web → Устройства → Показать / Копировать.",
+            )
+            return
+        # Keep waiting (also retry after transient API errors).
+        self._confirm_poll_job = self.root.after(3000, self._poll_confirm_once)
+
     def _on_close(self) -> None:
         try:
             self.session.stop()
         except Exception:
             pass
+        self._cancel_confirm_poll()
         if self._tick_job is not None:
             try:
                 self.root.after_cancel(self._tick_job)

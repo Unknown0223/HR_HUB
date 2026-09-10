@@ -123,7 +123,18 @@ export class AttendanceService {
   }
 
   private gwHttpException(e: unknown, fallback: string) {
-    const msg = e instanceof Error && e.message.trim() ? e.message : fallback;
+    let msg = e instanceof Error && e.message.trim() ? e.message : fallback;
+    const lower = msg.toLowerCase();
+    if (
+      lower.startsWith('<!doctype') ||
+      lower.startsWith('<html') ||
+      lower.includes('cloudflare tunnel error') ||
+      (lower.includes('<title>') && lower.includes('<'))
+    ) {
+      msg =
+        'Связь с терминалом недоступна (Cloudflare tunnel / office-link). ' +
+        'Запустите HR HUB Link и повторите.';
+    }
     const status =
       e && typeof e === 'object' && 'status' in e
         ? Number((e as { status?: unknown }).status)
@@ -634,9 +645,23 @@ export class AttendanceService {
   ) {
     const device = await this.prisma.device.findFirst({ where: { id, tenantId } });
     if (!device) throw new NotFoundException('Device not found');
-    const ref = device.gatewayRef || device.id;
+    // Re-register before verify — GW is in-memory and loses devices after restart/tunnel reopen.
+    let gatewayRef = device.gatewayRef || device.id;
     try {
-      await this.gw.verifyPassword(ref, password);
+      const reg = await this.gw.registerFromDevice({
+        ...device,
+        passwordEnc: password,
+      });
+      if (reg?.id) gatewayRef = reg.id;
+    } catch (e) {
+      this.logger.warn(
+        `syncDevicePassword register failed for ${id}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+    try {
+      await this.gw.verifyPassword(gatewayRef, password);
     } catch (e) {
       throw this.gwHttpException(e, 'Пароль терминала не принят — проверьте текущий пароль на устройстве');
     }
@@ -656,6 +681,7 @@ export class AttendanceService {
       data: {
         passwordEnc: password,
         status: 'online',
+        gatewayRef,
         meta: meta as Prisma.InputJsonValue,
       },
       include: this.deviceInclude,
@@ -3367,6 +3393,84 @@ export class AttendanceService {
       percent: session.percent,
       expiresAt: pairing.expiresAt?.toISOString() ?? null,
       ...(linkKey ? { linkKey } : {}),
+    };
+  }
+
+  /**
+   * Office-link polls this while waiting for Web «Подтвердить привязку».
+   * Returns sealed/pending without vault passwords.
+   */
+  async getProvisionSession(
+    pairing: PairingAuthContext,
+    sessionId: string,
+  ) {
+    const session = await this.prisma.deviceProvisionSession.findFirst({
+      where: { id: sessionId, tenantId: pairing.tenantId },
+      select: {
+        id: true,
+        status: true,
+        step: true,
+        percent: true,
+        host: true,
+        serial: true,
+        deviceId: true,
+        meta: true,
+        updatedAt: true,
+      },
+    });
+    if (!session) throw new NotFoundException('Provision session not found');
+
+    const meta = this.asMeta(session.meta);
+    let pendingAdminConfirm = meta.pendingAdminConfirm === true;
+    let sealed = false;
+    let deviceStatus: string | null = null;
+    let deviceName: string | null = null;
+
+    if (session.deviceId) {
+      const device = await this.prisma.device.findFirst({
+        where: { id: session.deviceId, tenantId: pairing.tenantId },
+        select: { name: true, status: true, meta: true },
+      });
+      if (device) {
+        deviceStatus = device.status;
+        deviceName = device.name;
+        const dMeta = this.asMeta(device.meta);
+        const auth =
+          dMeta.auth && typeof dMeta.auth === 'object' && !Array.isArray(dMeta.auth)
+            ? (dMeta.auth as Record<string, unknown>)
+            : {};
+        if (auth.pendingAdminConfirm === true) pendingAdminConfirm = true;
+        if (auth.pendingAdminConfirm === false) pendingAdminConfirm = false;
+        sealed =
+          auth.ownedByPlatform === true &&
+          auth.pendingAdminConfirm !== true &&
+          Boolean(auth.linkSealedAt);
+      }
+    }
+
+    if (
+      session.status === 'linked' &&
+      (session.step === 'sealed' || session.percent >= 100)
+    ) {
+      sealed = true;
+      pendingAdminConfirm = false;
+    }
+
+    return {
+      ok: true,
+      sessionId: session.id,
+      status: session.status,
+      step: session.step,
+      percent: session.percent,
+      host: session.host,
+      serial: session.serial,
+      deviceId: session.deviceId,
+      deviceName,
+      deviceStatus,
+      pendingAdminConfirm,
+      sealed,
+      message: typeof meta.message === 'string' ? meta.message : null,
+      updatedAt: session.updatedAt.toISOString(),
     };
   }
 

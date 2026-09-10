@@ -592,6 +592,43 @@ class ProvisionEngine:
         except Exception as exc:
             _emit(on_status, f"Tiklanish pochtasi: {exc} — Ulash davom etadi")
 
+        # Face anti-spoof / living-body — strongest ISAPI level on this model.
+        try:
+            from device_security import ensure_live_detection
+
+            _emit(on_status, "1c/4 Yuz aldov himoyasi (professional)…")
+            _progress(
+                session,
+                status="configuring",
+                step="live_detection",
+                percent=38,
+                message="Living body / anti-spoof → professional",
+            )
+            live_res = ensure_live_detection(
+                session.chosen.host,
+                username,
+                password,
+            )
+            if live_res.get("ok") and live_res.get("ready"):
+                _emit(
+                    on_status,
+                    "Yuz aldov himoyasi: livingBody + professional + anti-attack ON",
+                )
+            elif live_res.get("ok"):
+                _emit(
+                    on_status,
+                    "Yuz aldov himoyasi yangilandi "
+                    f"(level={live_res.get('liveDetLevelSet')})",
+                )
+            else:
+                _emit(
+                    on_status,
+                    "Yuz aldov himoyasini yozib bo‘lmadi "
+                    f"({live_res.get('error') or 'xato'}) — Ulash davom etadi",
+                )
+        except Exception as exc:
+            _emit(on_status, f"Yuz aldov himoyasi: {exc} — Ulash davom etadi")
+
         session.password = password
         session.location_id = location_id
         session.username = username

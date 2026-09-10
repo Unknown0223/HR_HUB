@@ -267,6 +267,29 @@ def create_pairing_session(
     )
 
 
+def get_provision_session(
+    api: str,
+    key: str,
+    *,
+    session_id: str,
+    pairing_token: str | None = None,
+) -> tuple[int, Any]:
+    """GET /office-link/session/:id — poll admin confirm / sealed state."""
+    sid = (session_id or "").strip()
+    token = (pairing_token or "").strip()
+    if not sid:
+        return 0, {"skipped": True, "reason": "no_session"}
+    if not token:
+        return 0, {"skipped": True, "reason": "no_pairing_token"}
+    return api_req(
+        api,
+        "GET",
+        f"/api/attendance/office-link/session/{sid}",
+        key,
+        pairing_token=token,
+    )
+
+
 def detect_device(
     api: str,
     key: str,
