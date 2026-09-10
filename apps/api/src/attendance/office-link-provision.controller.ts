@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   createParamDecorator,
+  Delete,
   ExecutionContext,
   Get,
   Param,
@@ -76,6 +77,16 @@ export class OfficeLinkProvisionController {
   @Get('sessions')
   listSessions(@CurrentTenant() tenantId: string | null) {
     return this.attendance.listProvisionSessions(
+      this.attendance.requireTenant(tenantId),
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin)
+  @Delete('sessions')
+  clearSessions(@CurrentTenant() tenantId: string | null) {
+    return this.attendance.clearProvisionSessions(
       this.attendance.requireTenant(tenantId),
     );
   }

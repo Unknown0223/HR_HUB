@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch, getAccessToken, getSession } from '@/lib/api';
+import { confirm } from '@/lib/dialogs';
 import styles from './page.module.css';
 import shared from '../../../../page-shared.module.css';
 
@@ -60,6 +61,7 @@ function statusPill(status: string) {
 export default function DeviceLinkPage() {
   const [busy, setBusy] = useState(false);
   const [boundBusy, setBoundBusy] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
   const [error, setError] = useState('');
   const [pairing, setPairing] = useState<PairingResult | null>(null);
   const [download, setDownload] = useState<DownloadInfo | null>(null);
@@ -193,6 +195,33 @@ export default function DeviceLinkPage() {
     }
   }
 
+  async function clearSessions() {
+    if (!sessions.length) return;
+    const ok = await confirm({
+      title: 'Сессии подключения',
+      message: `Ro‘yxatdagi barcha ulanish sessiyalarini o‘chirish (${sessions.length})?`,
+      confirmText: 'Tozalash',
+      cancelText: 'Bekor',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setClearBusy(true);
+    setError('');
+    try {
+      await apiFetch<{ ok: boolean; deleted: number }>(
+        '/api/attendance/office-link/sessions',
+        { method: 'DELETE' },
+      );
+      setSessions([]);
+      setPairing(null);
+      await loadSessions();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Сессии очистить не удалось');
+    } finally {
+      setClearBusy(false);
+    }
+  }
+
   return (
     <div className={styles.wrap}>
       <PageSubnav groupKey="devices" />
@@ -318,9 +347,19 @@ export default function DeviceLinkPage() {
       <section className={styles.cardWide}>
         <div className={styles.cardHeadRow}>
           <h2 className={styles.cardTitle}>3. Сессии подключения</h2>
-          <button type="button" className={styles.ghostBtn} onClick={() => void loadSessions()}>
-            Обновить
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              disabled={clearBusy || sessions.length === 0}
+              onClick={() => void clearSessions()}
+            >
+              {clearBusy ? 'Tozalanmoqda…' : 'Tozalash'}
+            </button>
+            <button type="button" className={styles.ghostBtn} onClick={() => void loadSessions()}>
+              Обновить
+            </button>
+          </div>
         </div>
         <div className={styles.tableWrap}>
           <table className={styles.table}>

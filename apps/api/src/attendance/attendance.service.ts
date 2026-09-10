@@ -2952,6 +2952,13 @@ export class AttendanceService {
     });
   }
 
+  async clearProvisionSessions(tenantId: string) {
+    const result = await this.prisma.deviceProvisionSession.deleteMany({
+      where: { tenantId },
+    });
+    return { ok: true, deleted: result.count };
+  }
+
   getOfficeLinkDownload() {
     const url = (this.config.get<string>('OFFICE_LINK_DOWNLOAD_URL') ?? '').trim();
     const version =
