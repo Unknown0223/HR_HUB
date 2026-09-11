@@ -26,6 +26,7 @@ a = Analysis(
         "passwords",
         "api_client",
         "runtime_setup",
+        "tunnel_watch",
         "credential_store",
         "device_email",
         "device_security",
