@@ -182,11 +182,15 @@ class OfficeLinkApp:
         self.busy = False
         self._tick_job: str | None = None
         self._confirm_poll_job: str | None = None
+        self._tunnel_poll_job: str | None = None
+        self._tunnel_busy = False
         self._confirm_notified = False
         self._locations: list[dict] = []
+        self._keep_tunnel_on_close = True
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.after(200, self._bootstrap)
+        self.root.after(1500, self._poll_tunnel_once)
 
     def _set_icon(self) -> None:
         icon = _icon_path()
@@ -357,6 +361,43 @@ class OfficeLinkApp:
         ).pack(anchor="w", pady=(6, 0))
         self.reconnect_steps_frame.pack_forget()
 
+        # Tunnel / GW card — autonomous heal
+        tun = self._card(frm, "Internet tunnel (GW)")
+        self.tunnel_status_var = tk.StringVar(value="Tekshirilmoqda…")
+        ttk.Label(
+            tun, textvariable=self.tunnel_status_var, style="Body.TLabel", wraplength=460
+        ).pack(anchor="w")
+        self.tunnel_url_var = tk.StringVar(value="URL: —")
+        ttk.Label(
+            tun, textvariable=self.tunnel_url_var, style="Muted.TLabel", wraplength=460
+        ).pack(anchor="w", pady=(4, 0))
+        self.tunnel_auto_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            tun,
+            text="Avtomatik tiklash (tunnel o‘chsa o‘zi ochadi)",
+            variable=self.tunnel_auto_var,
+        ).pack(anchor="w", pady=(8, 4))
+        tun_btns = ttk.Frame(tun, style="Card.TFrame")
+        tun_btns.pack(fill=tk.X, pady=(4, 0))
+        self.tunnel_restore_btn = ttk.Button(
+            tun_btns,
+            text="Tunnelni tiklash",
+            style="Secondary.TButton",
+            command=self._on_restore_tunnel,
+        )
+        self.tunnel_restore_btn.pack(side=tk.LEFT)
+        ttk.Label(
+            tun,
+            text=(
+                "Web sinxron (yuzlar) uchun PC da GW+tunnel doim kerak. "
+                "Quick Cloudflare tunnel tez-tez yangilanadi — auto-heal "
+                "yangi URL ni platformaga announce qiladi. Oyna yopilganda "
+                "ham fon ishchi tunnelni saqlaydi."
+            ),
+            style="Muted.TLabel",
+            wraplength=460,
+        ).pack(anchor="w", pady=(8, 0))
+
         # Connection card
         conn = self._card(frm, "Ulanish sozlamalari")
         try:
@@ -505,9 +546,9 @@ class OfficeLinkApp:
                 "Web → Связь с офисом dan pairing token oling (nusxalang). "
                 "Shu yerda Ctrl+V / Shift+Insert yoki «Joylashtir», so‘ng «Saqlash». "
                 "Birinchi ulash: «Ulash» — yangi parol o‘rnatadi. "
-                "Wi‑Fi / IP o‘zgasa: «Tarmoqni qayta ulash» — LAN skaner, "
-                "web bilan serial/parol solishtirish, tunnel + host avtomatik "
-                "yangilanadi (parol va yuzlar saqlanadi)."
+                "Wi‑Fi / IP o‘zgasa: «Tarmoqni qayta ulash». "
+                "Tunnel o‘chsa: «Internet tunnel» kartasida avtomatik tiklash "
+                "yoki «Tunnelni tiklash»."
             ),
             style="Hint.TLabel",
             wraplength=480,
@@ -1239,11 +1280,16 @@ class OfficeLinkApp:
             try:
                 self.session.write_service_handoff()
                 svc_note = (
-                    " Service: data\\service.json yozildi. "
-                    "install-service.bat ni ADMIN qilib ishga tushiring (SERVICE.txt)."
+                    " Tunnel auto-heal yoqildi (fon ishchi). "
+                    "Ixtiyoriy: install-service.bat (SERVICE.txt) — Windows Service."
                 )
             except Exception:
-                svc_note = " Oyna ochiq tursin (yoki SERVICE.txt)."
+                svc_note = " Tunnel kartasidan «Tunnelni tiklash» / auto-heal."
+            try:
+                self.session.ensure_tunnel_supervisor()
+            except Exception:
+                pass
+            self.root.after(500, self._poll_tunnel_once)
             extra = f" Web: {web}." if web else ""
             if needs_confirm:
                 self._show_alert(
@@ -1444,9 +1490,123 @@ class OfficeLinkApp:
         # Keep waiting (also retry after transient API errors).
         self._confirm_poll_job = self.root.after(3000, self._poll_confirm_once)
 
-    def _on_close(self) -> None:
+    def _poll_tunnel_once(self) -> None:
+        if self._tunnel_poll_job is not None:
+            try:
+                self.root.after_cancel(self._tunnel_poll_job)
+            except Exception:
+                pass
+            self._tunnel_poll_job = None
+
+        def work() -> None:
+            try:
+                health = self.session.tunnel_health()
+            except Exception as e:
+                self.root.after(
+                    0,
+                    lambda: self._apply_tunnel_health_error(str(e)[:160]),
+                )
+                return
+            self.root.after(0, lambda h=health: self._apply_tunnel_health(h))
+
+        threading.Thread(target=work, daemon=True).start()
+        self._tunnel_poll_job = self.root.after(12000, self._poll_tunnel_once)
+
+    def _apply_tunnel_health_error(self, msg: str) -> None:
+        self.tunnel_status_var.set(f"Xato: {msg}")
+        self.tunnel_url_var.set("URL: —")
+
+    def _apply_tunnel_health(self, health) -> None:
+        mode = getattr(health, "mode", "?")
+        ok = bool(getattr(health, "ok", False))
+        msg = getattr(health, "message", "") or ""
+        url = getattr(health, "tunnel_url", "") or ""
+        self.tunnel_status_var.set(
+            f"{'OK' if ok else 'UZILGAN'} · {mode} · {msg}"
+        )
+        short = url if len(url) < 64 else url[:28] + "…" + url[-20:]
+        self.tunnel_url_var.set(f"URL: {short or '—'}")
+        if (
+            ok
+            or self._tunnel_busy
+            or self.busy
+            or not self.tunnel_auto_var.get()
+        ):
+            return
+        # Only auto-heal when handoff / credentials already exist.
         try:
-            self.session.stop()
+            from paths import load_service_config, read_link_key
+
+            svc = load_service_config(self.session.root)
+            if not svc and not read_link_key(self.session.root):
+                return
+        except Exception:
+            return
+        self._start_restore_tunnel(auto=True)
+
+    def _on_restore_tunnel(self) -> None:
+        self._start_restore_tunnel(auto=False)
+
+    def _start_restore_tunnel(self, *, auto: bool) -> None:
+        if self._tunnel_busy or self.busy:
+            return
+        self._tunnel_busy = True
+        self.tunnel_restore_btn.configure(state=tk.DISABLED)
+        self.tunnel_status_var.set(
+            "Avtomatik tiklanmoqda…" if auto else "Tunnel tiklanmoqda…"
+        )
+
+        def work() -> None:
+            def progress(msg: str) -> None:
+                self.root.after(0, lambda m=msg: self.tunnel_status_var.set(m[:120]))
+
+            result = self.session.restore_tunnel(progress)
+            self.root.after(0, lambda: self._restore_tunnel_done(result, auto=auto))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _restore_tunnel_done(self, result: SubmitResult, *, auto: bool) -> None:
+        self._tunnel_busy = False
+        self.tunnel_restore_btn.configure(state=tk.NORMAL)
+        if result.kind == "tunnel_ok":
+            url = (result.device or {}).get("tunnelUrl") or ""
+            self.tunnel_status_var.set(result.message or "Tunnel OK")
+            self.tunnel_url_var.set(f"URL: {url or '—'}")
+            if not auto:
+                messagebox.showinfo(
+                    "Tunnel",
+                    "Tunnel tiklandi va platformaga announce qilindi.\n"
+                    "Endi Web → Синхронизировать qayta urinib ko‘ring.",
+                )
+        else:
+            self.tunnel_status_var.set(result.message or "Tunnel xato")
+            if not auto:
+                messagebox.showerror(
+                    "Tunnel",
+                    result.message or "Tunnelni tiklab bo‘lmadi",
+                )
+
+    def _on_close(self) -> None:
+        if self._tunnel_poll_job is not None:
+            try:
+                self.root.after_cancel(self._tunnel_poll_job)
+            except Exception:
+                pass
+            self._tunnel_poll_job = None
+        try:
+            # Keep GW+tunnel alive; spawn detached worker for auto-heal.
+            if self._keep_tunnel_on_close:
+                try:
+                    self.session.write_service_handoff()
+                except Exception:
+                    pass
+                try:
+                    self.session.ensure_tunnel_supervisor()
+                except Exception:
+                    pass
+                self.session.stop(kill_tunnel=False)
+            else:
+                self.session.stop(kill_tunnel=True)
         except Exception:
             pass
         self._cancel_confirm_poll()

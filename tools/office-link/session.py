@@ -199,8 +199,49 @@ class OfficeLinkSession:
                 "locationId": self.location_id or "",
                 "tunnelUrl": tunnel,
                 "namedTunnelUrl": named_url,
+                "autoHeal": True,
             },
         )
+
+    def tunnel_health(self):
+        from tunnel_watch import snapshot_health
+
+        return snapshot_health(self.services, self.root)
+
+    def restore_tunnel(self, on_status: StatusFn | None = None) -> SubmitResult:
+        """Restart GW + Cloudflare tunnel and re-announce (no device password)."""
+        from tunnel_watch import restore_tunnel, spawn_detached_worker
+
+        try:
+            bundle, url = restore_tunnel(
+                root=self.root,
+                bundle=self.services,
+                on_status=on_status,
+                keep_bundle=True,
+            )
+            self.services = bundle
+            self.write_service_handoff()
+            spawn_detached_worker(self.root)
+            return SubmitResult(
+                kind="tunnel_ok",
+                message=f"Tunnel tiklandi: {url}",
+                device={"tunnelUrl": url},
+            )
+        except Exception as e:
+            return SubmitResult(kind="tunnel_error", message=str(e)[:240])
+
+    def ensure_tunnel_supervisor(self) -> bool:
+        """Start background worker if handoff exists and tunnel is down."""
+        from paths import load_service_config
+        from tunnel_watch import snapshot_health, spawn_detached_worker
+
+        svc = load_service_config(self.root)
+        if not svc or svc.get("enabled") is False:
+            return False
+        health = snapshot_health(self.services, self.root)
+        if health.ok:
+            return False
+        return spawn_detached_worker(self.root)
 
     def submit_password(self, password: str) -> SubmitResult:
         password = (password or "").strip()
@@ -847,7 +888,11 @@ class OfficeLinkSession:
             ip_hint=ip_hint,
         )
 
-    def stop(self) -> None:
+    def stop(self, *, kill_tunnel: bool = True) -> None:
+        if not kill_tunnel:
+            # Leave GW/tunnel running for auto-heal / Windows Service.
+            self.services = None
+            return
         if self.services is not None:
             self.services.stop()
             self.services = None

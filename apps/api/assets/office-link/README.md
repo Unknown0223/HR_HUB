@@ -1,4 +1,4 @@
-# Office-link packages
+# Office-link packages (Windows + Android)
 
 | File | Purpose |
 |------|---------|
@@ -9,6 +9,9 @@
 API:
 - `GET /api/attendance/office-link/download-bound` — tenant-bound Windows zip
 - `GET /api/attendance/office-link/download-android` — Android APK
+
+Windows tunnel: GUI «Internet tunnel» card + `service_worker.py` auto-heal
+restart cloudflared and re-announce when quick tunnels die.
 
 Rebuild Windows:
 ```

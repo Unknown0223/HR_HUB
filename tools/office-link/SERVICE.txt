@@ -6,6 +6,13 @@ Maqsad
 GUI («Ulash») yopilganda ham device-gw (8800) + Cloudflare tunnel ishlab tursin.
 Punch / face sync platformadan ofis LAN qurilmasiga yetib borsin.
 
+Auto-heal
+---------
+• GUI: «Internet tunnel» kartasi — holat, «Tunnelni tiklash», avtomatik tiklash
+• service_worker.py: jarayon yoki tunnel URL o‘lik bo‘lsa qayta ochadi + announce
+• Oyna yopilganda tunnel o‘chirilmaydi; fon ishchi (yoki Service) davom etadi
+• Quick trycloudflare URL har restartda yangilanadi — announce majburiy
+
 Tayyorgarlik
 ------------
 1. Web → Устройства → Связь с офисом — pairing token

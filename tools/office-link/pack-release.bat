@@ -38,8 +38,9 @@ if exist "%CD%\hrhub-link.ico" copy /Y "%CD%\hrhub-link.ico" "%REL%\" >nul
 if exist "%CD%\hrhub-link-256.png" copy /Y "%CD%\hrhub-link-256.png" "%REL%\" >nul
 copy /Y "%CD%\link.ps1" "%REL%\" >nul
 copy /Y "%CD%\service_worker.py" "%REL%\" >nul
+copy /Y "%CD%\tunnel_watch.py" "%REL%\" >nul
 copy /Y "%CD%\bulk_provision.py" "%REL%\" >nul
-for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provision.py session.py runtime_setup.py office_link_app.py office_link_gui.py office_link_run.py credential_store.py device_email.py device_security.py) do (
+for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provision.py session.py runtime_setup.py tunnel_watch.py office_link_app.py office_link_gui.py office_link_run.py credential_store.py device_email.py device_security.py) do (
   if exist "%CD%\%%F" copy /Y "%CD%\%%F" "%REL%\" >nul
 )
 

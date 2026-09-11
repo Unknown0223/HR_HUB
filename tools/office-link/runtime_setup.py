@@ -407,36 +407,44 @@ def start_quick_tunnel(
         _kill_pid(old)
     _status(cb, "Internet tunnel ochilmoqda...")
     env = _clean_child_env()
-    # Keep PIPE so we can parse trycloudflare URL; drain aggressively below.
-    proc = _popen_hidden(
-        [str(exe), "tunnel", "--url", f"http://127.0.0.1:{GW_PORT}"],
-        cwd=rt,
-        env=env,
-    )
+    log_path = rt / "tunnel.log"
+    # Never leave stdout on PIPE after URL parse — buffer fill freezes cloudflared.
+    log_f = open(log_path, "a", encoding="utf-8", errors="replace")
+    try:
+        log_f.write(f"\n--- quick tunnel start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        log_f.flush()
+        proc = _popen_hidden(
+            [str(exe), "tunnel", "--url", f"http://127.0.0.1:{GW_PORT}"],
+            cwd=rt,
+            env=env,
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
+        )
+    except Exception:
+        log_f.close()
+        raise
     _write_pid(rt / "tunnel.pid", proc.pid)
-    buf: list[str] = []
     pattern = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
     deadline = time.time() + 70
+    offset = max(0, log_path.stat().st_size - 4096) if log_path.is_file() else 0
     while time.time() < deadline:
         if proc.poll() is not None:
-            raise RuntimeError("Tunnel ochilmadi.")
-        line = ""
+            detail = _tail_text(log_path)
+            raise RuntimeError(
+                "Tunnel ochilmadi."
+                + (f" {detail[:180]}" if detail else "")
+            )
         try:
-            if proc.stdout:
-                line = proc.stdout.readline() or ""
-        except Exception:
-            line = ""
-        if line:
-            buf.append(line)
-            m = pattern.search(line)
-            if m:
-                return proc, m.group(0)
-        else:
-            time.sleep(0.2)
-        joined = "".join(buf[-40:])
-        m = pattern.search(joined)
-        if m:
-            return proc, m.group(0)
+            with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+                fh.seek(offset)
+                chunk = fh.read()
+            if chunk:
+                m = pattern.search(chunk)
+                if m:
+                    return proc, m.group(0)
+        except OSError:
+            pass
+        time.sleep(0.35)
     raise RuntimeError("Tunnel URL topilmadi.")
 
 
