@@ -73,6 +73,10 @@ export type GwSyncFace = {
 export class DeviceGwClient implements OnModuleInit {
   private readonly logger = new Logger(DeviceGwClient.name);
   private announcedUrl: string | null = null;
+  /** Short TTL so multi-instance Railway always sees the latest announce from DB. */
+  private cachedDbUrl: string | null = null;
+  private cachedDbUrlAt = 0;
+  private readonly dbUrlTtlMs = 5_000;
   private readonly fetchTimeoutMs = 8_000;
   private readonly fetchRetries = 1;
 
@@ -81,12 +85,51 @@ export class DeviceGwClient implements OnModuleInit {
     private readonly prisma: PrismaService,
   ) {}
 
-  private get baseUrl(): string {
+  private envBaseUrl(): string {
     return (
-      this.announcedUrl ||
-      this.config.get<string>('DEVICE_GW_URL') ||
-      'http://127.0.0.1:8000'
+      this.config.get<string>('DEVICE_GW_URL') || 'http://127.0.0.1:8000'
     ).replace(/\/$/, '');
+  }
+
+  private async resolveBaseUrl(): Promise<string> {
+    if (this.announcedUrl) return this.announcedUrl;
+    const now = Date.now();
+    if (this.cachedDbUrl && now - this.cachedDbUrlAt < this.dbUrlTtlMs) {
+      return this.cachedDbUrl;
+    }
+    try {
+      const fromDb = await this.loadAnnouncedUrlFromDb();
+      if (fromDb) {
+        this.cachedDbUrl = fromDb;
+        this.cachedDbUrlAt = now;
+        return fromDb;
+      }
+    } catch (e) {
+      this.logger.warn(`Device GW URL DB refresh failed: ${e}`);
+    }
+    this.cachedDbUrl = null;
+    this.cachedDbUrlAt = now;
+    return this.envBaseUrl();
+  }
+
+  private async loadAnnouncedUrlFromDb(): Promise<string | null> {
+    const rows = await this.prisma.tenantSetting.findMany({ take: 30 });
+    for (const row of rows) {
+      const extras =
+        row.extras && typeof row.extras === 'object' && !Array.isArray(row.extras)
+          ? (row.extras as Record<string, unknown>)
+          : {};
+      const link =
+        extras.deviceLink &&
+        typeof extras.deviceLink === 'object' &&
+        !Array.isArray(extras.deviceLink)
+          ? (extras.deviceLink as Record<string, unknown>)
+          : null;
+      if (typeof link?.gwUrl === 'string' && /^https?:\/\//i.test(link.gwUrl)) {
+        return link.gwUrl.replace(/\/$/, '');
+      }
+    }
+    return null;
   }
 
   private async gwFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -95,12 +138,15 @@ export class DeviceGwClient implements OnModuleInit {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), this.fetchTimeoutMs);
       try {
-        return await fetch(`${this.baseUrl}${path}`, {
+        const base = await this.resolveBaseUrl();
+        return await fetch(`${base}${path}`, {
           ...init,
           signal: ctrl.signal,
         });
       } catch (e) {
         lastErr = e;
+        // Drop stale memory/DB cache once so next attempt re-reads announce.
+        this.cachedDbUrlAt = 0;
         if (attempt < this.fetchRetries) {
           await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
           continue;
@@ -114,23 +160,12 @@ export class DeviceGwClient implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      const rows = await this.prisma.tenantSetting.findMany({ take: 30 });
-      for (const row of rows) {
-        const extras =
-          row.extras && typeof row.extras === 'object' && !Array.isArray(row.extras)
-            ? (row.extras as Record<string, unknown>)
-            : {};
-        const link =
-          extras.deviceLink &&
-          typeof extras.deviceLink === 'object' &&
-          !Array.isArray(extras.deviceLink)
-            ? (extras.deviceLink as Record<string, unknown>)
-            : null;
-        if (typeof link?.gwUrl === 'string' && /^https?:\/\//i.test(link.gwUrl)) {
-          this.announcedUrl = link.gwUrl.replace(/\/$/, '');
-          this.logger.log(`Device GW URL from office-link: ${this.announcedUrl}`);
-          break;
-        }
+      const url = await this.loadAnnouncedUrlFromDb();
+      if (url) {
+        this.announcedUrl = url;
+        this.cachedDbUrl = url;
+        this.cachedDbUrlAt = Date.now();
+        this.logger.log(`Device GW URL from office-link: ${this.announcedUrl}`);
       }
     } catch (e) {
       this.logger.warn(`Device GW URL load skipped: ${e}`);
@@ -143,6 +178,8 @@ export class DeviceGwClient implements OnModuleInit {
       throw new Error('Invalid gateway URL');
     }
     this.announcedUrl = clean;
+    this.cachedDbUrl = clean;
+    this.cachedDbUrlAt = Date.now();
     const existing = await this.prisma.tenantSetting.findUnique({
       where: { tenantId },
     });
@@ -161,6 +198,11 @@ export class DeviceGwClient implements OnModuleInit {
       create: { tenantId, extras: extras as Prisma.InputJsonValue },
       update: { extras: extras as Prisma.InputJsonValue },
     });
+  }
+
+  /** Current public/base URL used for GW calls (memory → DB → env). */
+  async currentBaseUrl(): Promise<string> {
+    return this.resolveBaseUrl();
   }
 
   mapAdapter(adapterType?: string | null): 'mock' | 'hikvision_isapi' | 'zkteco_push' {

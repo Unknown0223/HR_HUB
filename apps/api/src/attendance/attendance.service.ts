@@ -991,7 +991,9 @@ export class AttendanceService {
     const refreshed = await this.getDevice(tenantId, id);
     const gatewayRef = refreshed.gatewayRef;
     if (!gatewayRef) {
-      throw new BadGatewayException('Device gateway not registered — check DEVICE_GW_URL / tunnel');
+      throw new BadGatewayException(
+        'Device gateway not registered — PC office-link (GW+tunnel) ishga tushiring',
+      );
     }
 
     const faceSyncs = await this.prisma.deviceFaceSync.findMany({
@@ -1116,6 +1118,40 @@ export class AttendanceService {
       });
     }
 
+    // After Android Ulash (or any drift), vault password may not match terminal.
+    // Surface the Web «Сохранить пароль» banner when GW rejects credentials.
+    try {
+      const plain = await this.passwordForGw(
+        tenantId,
+        id,
+        refreshed.passwordEnc,
+      );
+      if (plain) {
+        await this.gw.verifyPassword(gatewayRef, plain);
+      }
+    } catch {
+      const fresh = await this.getDevice(tenantId, id);
+      const meta = this.asMeta(fresh.meta);
+      const prevAuth =
+        meta.auth && typeof meta.auth === 'object' && !Array.isArray(meta.auth)
+          ? { ...(meta.auth as Record<string, unknown>) }
+          : {};
+      meta.auth = {
+        ...prevAuth,
+        passwordOutOfSync: true,
+        authFailStreak: Math.max(Number(prevAuth.authFailStreak || 0), 3),
+        lastError: 'Пароль на терминале не совпадает с сервером',
+        failedAt: new Date().toISOString(),
+      };
+      await this.prisma.device.update({
+        where: { id },
+        data: {
+          meta: meta as Prisma.InputJsonValue,
+          status: 'offline',
+        },
+      });
+    }
+
     return this.getDevice(tenantId, id).then((d) => ({
       ok: true,
       synced,
@@ -1234,18 +1270,31 @@ export class AttendanceService {
       ...device,
       passwordEnc: plain,
     });
-    if (!reg?.id) return device.gatewayRef || device.id;
-    if (reg.id !== device.gatewayRef) {
-      await this.prisma.device.update({
-        where: { id: device.id },
-        data: {
-          gatewayRef: reg.id,
-          status: reg.status || 'online',
-          lastSeenAt: new Date(),
-        },
-      });
+    if (reg?.id) {
+      if (reg.id !== device.gatewayRef) {
+        await this.prisma.device.update({
+          where: { id: device.id },
+          data: {
+            gatewayRef: reg.id,
+            status: reg.status || 'online',
+            lastSeenAt: new Date(),
+          },
+        });
+      }
+      return reg.id;
     }
-    return reg.id;
+
+    const health = await this.gw.health();
+    if (!health.ok) {
+      const base = await this.gw.currentBaseUrl();
+      throw new BadGatewayException(
+        `Device gateway not reachable (${base}) — PC office-link (GW+tunnel) ishga tushiring va announce qiling`,
+      );
+    }
+    if (device.gatewayRef) return device.gatewayRef;
+    throw new BadGatewayException(
+      'Device gateway not registered — PC office-link Ulash/reconnect yoki Web «Сохранить пароль» + Синхронизировать',
+    );
   }
 
   async remoteDeviceCommand(
