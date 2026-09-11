@@ -3061,6 +3061,12 @@ export class AttendanceService {
     loadedAt: number;
   } | null = null;
 
+  private officeLinkApkCache: {
+    buf: Buffer;
+    source: string;
+    loadedAt: number;
+  } | null = null;
+
   private officeLinkAssetDirs(): string[] {
     const cwd = process.cwd();
     return [
@@ -3080,6 +3086,16 @@ export class AttendanceService {
     ].filter(Boolean);
   }
 
+  private officeLinkApkCandidates(): string[] {
+    const fromEnv = (this.config.get<string>('OFFICE_LINK_ANDROID_APK') ?? '').trim();
+    return [
+      fromEnv,
+      ...this.officeLinkAssetDirs().map((d) =>
+        path.join(d, 'HRHUB-Link-Android.apk'),
+      ),
+    ].filter(Boolean);
+  }
+
   private officeLinkBaseZipCandidates(): string[] {
     const fromEnv = (this.config.get<string>('OFFICE_LINK_BASE_ZIP') ?? '').trim();
     return [
@@ -3094,10 +3110,35 @@ export class AttendanceService {
     return this.officeLinkSetupCandidates().some((p) => existsSync(p));
   }
 
+  private hasOfficeLinkApkSource(): boolean {
+    return this.officeLinkApkCandidates().some((p) => existsSync(p));
+  }
+
   private hasOfficeLinkBaseZipSource(): boolean {
     if (this.hasOfficeLinkSetupSource()) return true;
     if (this.officeLinkBaseZipCandidates().some((p) => existsSync(p))) return true;
     return Boolean((this.config.get<string>('OFFICE_LINK_DOWNLOAD_URL') ?? '').trim());
+  }
+
+  async loadOfficeLinkAndroidApk(): Promise<{
+    buf: Buffer;
+    source: string;
+  } | null> {
+    const ttlMs = 60 * 60 * 1000;
+    const cached = this.officeLinkApkCache;
+    if (cached && Date.now() - cached.loadedAt < ttlMs) {
+      return { buf: cached.buf, source: cached.source };
+    }
+    for (const p of this.officeLinkApkCandidates()) {
+      if (!existsSync(p)) continue;
+      const buf = await readFile(p);
+      // APK is a zip; reject tiny/corrupt placeholders.
+      if (buf.length < 100_000) continue;
+      this.officeLinkApkCache = { buf, source: p, loadedAt: Date.now() };
+      this.logger.log(`Office-link Android APK loaded (${buf.length} bytes)`);
+      return { buf, source: p };
+    }
+    return null;
   }
 
   private async loadOfficeLinkSetupExe(): Promise<{
@@ -3255,6 +3296,7 @@ export class AttendanceService {
       installerAvailable: Boolean(download.url) || setupAvailable,
       fullPackageAvailable,
       setupAvailable,
+      androidApkAvailable: this.hasOfficeLinkApkSource(),
     };
   }
 

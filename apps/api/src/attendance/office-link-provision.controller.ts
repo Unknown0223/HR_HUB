@@ -5,6 +5,7 @@ import {
   Delete,
   ExecutionContext,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -105,6 +106,30 @@ export class OfficeLinkProvisionController {
       return;
     }
     return info;
+  }
+
+  /**
+   * Android office-link APK (same pairing / Ulash flow as Windows; face sync
+   * still needs PC GW+tunnel).
+   */
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Get('download-android')
+  async downloadAndroid(@Res() res: Response) {
+    const apk = await this.attendance.loadOfficeLinkAndroidApk();
+    if (!apk) {
+      throw new NotFoundException(
+        'Android APK topilmadi — serverda assets/office-link/HRHUB-Link-Android.apk kerak',
+      );
+    }
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="HRHUB-Link-Android.apk"',
+    );
+    res.setHeader('Content-Length', String(apk.buf.length));
+    res.send(apk.buf);
   }
 
   /**

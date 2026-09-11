@@ -24,6 +24,7 @@ type BindInfo = {
   version?: string | null;
   installerAvailable?: boolean;
   fullPackageAvailable?: boolean;
+  androidApkAvailable?: boolean;
 };
 
 type SessionRow = {
@@ -56,6 +57,7 @@ function statusPill(status: string) {
 export default function DeviceLinkPage() {
   const [busy, setBusy] = useState(false);
   const [boundBusy, setBoundBusy] = useState(false);
+  const [apkBusy, setApkBusy] = useState(false);
   const [clearBusy, setClearBusy] = useState(false);
   const [error, setError] = useState('');
   const [pairing, setPairing] = useState<PairingResult | null>(null);
@@ -144,6 +146,49 @@ export default function DeviceLinkPage() {
       setBoundBusy(false);
     }
   }
+
+  async function downloadAndroidApk() {
+    setApkBusy(true);
+    setError('');
+    try {
+      const session = getSession();
+      const headers = new Headers();
+      const token = getAccessToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const tenantId = session?.tenant?.id ?? session?.user.tenantId;
+      if (tenantId) headers.set('X-Tenant-Id', tenantId);
+      const res = await fetch('/api/attendance/office-link/download-android', {
+        headers,
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        let message = res.statusText;
+        try {
+          const body = await res.json();
+          message = body.message || message;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(
+          typeof message === 'string' ? message : 'Android APK yuklab bo‘lmadi',
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'HRHUB-Link-Android.apk';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Android APK yuklanmadi');
+    } finally {
+      setApkBusy(false);
+    }
+  }
+
   async function createPairing() {
     setBusy(true);
     setError('');
@@ -268,14 +313,31 @@ export default function DeviceLinkPage() {
               {boundBusy
                 ? 'Tayyorlanmoqda…'
                 : bind?.fullPackageAvailable
-                  ? 'Shu web uchun to‘liq ilova (.zip)'
-                  : 'Shu web uchun bog‘langan config (.zip)'}
+                  ? 'Windows — to‘liq ilova (.zip)'
+                  : 'Windows — bog‘langan config (.zip)'}
+            </button>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              disabled={apkBusy || bind?.androidApkAvailable === false}
+              onClick={() => void downloadAndroidApk()}
+              title={
+                bind?.androidApkAvailable === false
+                  ? 'Serverda Android APK hali yo‘q'
+                  : 'Android uchun HRHUB-Link APK'
+              }
+            >
+              {apkBusy
+                ? 'APK yuklanmoqda…'
+                : bind?.androidApkAvailable === false
+                  ? 'Android APK (tez orada)'
+                  : 'Android — APK yuklash'}
             </button>
           </div>
           <p className={styles.muted} style={{ marginTop: '0.75rem' }}>
             {bind?.fullPackageAvailable ? (
               <>
-                Bitta zip: <code>HRHUB-Qurilma.exe</code> + shu webga
+                Windows: <code>HRHUB-Qurilma.exe</code> + shu webga
                 moslashtirilgan <code>config.json</code> /{' '}
                 <code>connection.hrhub</code>. Ochib{' '}
                 <code>BOSHLASH.bat</code> ni ishga tushiring — pairing token
@@ -289,6 +351,14 @@ export default function DeviceLinkPage() {
                 <code>BUILD-EXE.bat</code> / <code>pack-release.bat</code>.
               </>
             )}
+            {bind?.androidApkAvailable !== false ? (
+              <>
+                {' '}
+                Android APK: telefon/planshetda o‘rnating, xuddi Windows kabi
+                pairing token + Ulash. Yuz sinxroni uchun ofis PC da office-link
+                (GW+tunnel) ishlashi kerak.
+              </>
+            ) : null}
           </p>
         </section>
 

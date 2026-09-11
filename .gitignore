@@ -24,6 +24,8 @@ out/
 apps/mobile/**/app/build/
 *.apk
 *.aab
+# Allow shipping office-link Android APK with the API image
+!apps/api/assets/office-link/*.apk
 
 # Python
 .venv/
