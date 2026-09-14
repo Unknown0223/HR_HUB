@@ -2655,8 +2655,10 @@ export class AttendanceService {
       include: this.deviceInclude,
     });
 
+    // HttpHost (hikPush) mode: punches go device→API; do not block reconnect on dead GW.
     let gwOk = false;
-    if (plain) {
+    const pushMode = this.isHikPushMode(meta);
+    if (plain && !pushMode) {
       try {
         const reg = await this.gw.registerFromDevice({
           ...updated,
@@ -2676,15 +2678,24 @@ export class AttendanceService {
       }
     }
 
+    const pendingConfirm =
+      updated.status === 'pending_confirm' ||
+      (meta.auth as Record<string, unknown>).pendingAdminConfirm === true;
+    const nextStatus = pushMode
+      ? pendingConfirm
+        ? 'pending_confirm'
+        : 'online'
+      : gwOk
+        ? 'online'
+        : pendingConfirm
+          ? 'pending_confirm'
+          : 'registered';
+
     const final = await this.prisma.device.update({
       where: { id: device.id },
       data: {
         gatewayRef: gatewayRef || device.gatewayRef,
-        status: gwOk
-          ? 'online'
-          : updated.status === 'pending_confirm'
-            ? 'pending_confirm'
-            : 'registered',
+        status: nextStatus,
         lastSeenAt: new Date(),
       },
       include: this.deviceInclude,

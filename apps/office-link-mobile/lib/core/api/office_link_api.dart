@@ -53,8 +53,17 @@ class OfficeLinkApi {
       );
       return (status: res.statusCode ?? 0, data: res.data);
     } on DioException catch (e) {
-      final msg = e.message ?? '$e';
-      return (status: 0, data: {'error': msg});
+      final detail = e.error?.toString() ?? e.message ?? '$e';
+      final tip = detail.contains('connection abort') ||
+              detail.contains('Connection refused') ||
+              detail.contains('Failed host lookup') ||
+              detail.contains('SocketException') ||
+              e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout
+          ? 'Telefon Railway API ga ulana olmadi (internet yo‘q yoki uzildi). '
+              'Ofis Wi‑Fi da internet borligini tekshiring; terminalga LAN yetishi kifoya emas.'
+          : detail;
+      return (status: 0, data: {'error': tip, 'message': tip});
     }
   }
 
