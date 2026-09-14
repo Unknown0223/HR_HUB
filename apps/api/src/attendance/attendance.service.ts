@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'crypto';
+﻿import { createHash, randomBytes, randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
@@ -1119,7 +1119,7 @@ export class AttendanceService {
     }
 
     // After Android Ulash (or any drift), vault password may not match terminal.
-    // Surface the Web «Сохранить пароль» banner when GW rejects credentials.
+    // Surface the Web «РЎРѕС…СЂР°РЅРёС‚СЊ РїР°СЂРѕР»СЊ» banner when GW rejects credentials.
     try {
       const plain = await this.passwordForGw(
         tenantId,
@@ -3331,7 +3331,7 @@ export class AttendanceService {
       '2) Shartlarga «Roziman» bosing, papkani tanlang, O‘rnatish.',
       '3) Setup yonidagi config.json va connection.hrhub avtomatik',
       '   o‘rnatilgan papkaga ko‘chiriladi (shu webga bog‘lanadi).',
-      '4) Ilovani oching → Web dan pairing token → Ulash.',
+      '4) Ilovani oching в†’ Web dan pairing token в†’ Ulash.',
       '',
       'Zipda endi yuzlab fayl YO‘Q — faqat Setup + bog‘lash fayllari.',
       '',
@@ -3488,7 +3488,7 @@ export class AttendanceService {
   }
 
   /**
-   * Office-link polls this while waiting for Web «Подтвердить привязку».
+   * Office-link polls this while waiting for Web «РџРѕРґС‚РІРµСЂРґРёС‚СЊ РїСЂРёРІСЏР·РєСѓ».
    * Returns sealed/pending without vault passwords.
    */
   async getProvisionSession(
@@ -4481,8 +4481,8 @@ export class AttendanceService {
           : dto.isValid === true
             ? 'Сделана действительной'
             : dto.markType
-              ? 'Изменён тип'
-              : 'Изменена',
+              ? 'Рзменён тип'
+              : 'Рзменена',
       occurredAt: occurredAt.toISOString(),
       markType: dto.markType || prevPayload.markType || 'mark',
       markTypeLabel: mtLabel,
@@ -4628,7 +4628,7 @@ export class AttendanceService {
                 ? 'Сделана недействительной'
                 : action === 'set_valid'
                   ? 'Сделана действительной'
-                  : 'Изменён тип',
+                  : 'Рзменён тип',
             occurredAt: mark.occurredAt.toISOString(),
             markType: dto.markType || prevPayload.markType || 'mark',
             markTypeLabel: mtLabel,
@@ -5042,10 +5042,11 @@ export class AttendanceService {
     } else if (
       markTypeRaw === 'estimated_out' ||
       markTypeRaw === 'такминий уход' ||
+      markTypeRaw === 'примерный уход' ||
       markTypeRaw === 'taxminiy' ||
       payload.dayRole === 'estimated_out'
     ) {
-      markTypeLabel = 'Такминий уход';
+      markTypeLabel = 'Примерный уход';
       markTypeKey = 'estimated_out';
     } else if (
       markTypeRaw === 'приход' ||
@@ -5292,8 +5293,8 @@ export class AttendanceService {
     const norm = (s: string) =>
       s
         .toLowerCase()
-        .replace(/ё/g, 'е')
-        .replace(/[^a-zа-я0-9]+/gi, ' ')
+        .replace(/С‘/g, 'е')
+        .replace(/[^a-zР°-СЏ0-9]+/gi, ' ')
         .trim()
         .replace(/\s+/g, ' ');
 
@@ -5397,8 +5398,8 @@ export class AttendanceService {
               note: note || null,
               identificationType: resolvedPhoto
                 ? 'Распознавание лица'
-                : 'Импорт',
-              deviceType: 'Импорт',
+                : 'Рмпорт',
+              deviceType: 'Рмпорт',
               isValid,
               photoUrl: resolvedPhoto,
               faceRecognized: Boolean(resolvedPhoto),
@@ -5892,7 +5893,7 @@ export class AttendanceService {
     occurredAt = guardResult.occurredAt;
     const photoB64 = this.extractPunchPhotoBase64(dto);
 
-    // Dedupe: same employee within ±60s of this punch (not all future marks).
+    // Dedupe: same employee within В±60s of this punch (not all future marks).
     const recent = await this.prisma.attendanceMark.findFirst({
       where: {
         tenantId,
@@ -6076,7 +6077,7 @@ export class AttendanceService {
       prev.markType = nextType;
       prev.dayRole = role;
       prev.markTypeLabel =
-        role === 'in' ? 'Приход' : role === 'out' ? 'Уход' : 'Такминий уход';
+        role === 'in' ? 'Приход' : role === 'out' ? 'Уход' : 'Примерный уход';
       await this.prisma.attendanceMark.update({
         where: { id: mark.id },
         data: {
@@ -6112,7 +6113,7 @@ export class AttendanceService {
       });
     }
 
-    // Production / week pattern: day off (no punches → day_off; punches still recorded as work)
+    // Production / week pattern: day off (no punches в†’ day_off; punches still recorded as work)
     const plannedOff = isDayOffByPattern(workDate, pattern);
     if (plannedOff && !firstIn) {
       status = DayStatus.day_off;
@@ -6146,8 +6147,8 @@ export class AttendanceService {
         const grace = employee?.schedule?.graceMinutes ?? 15;
         const { h, m } = parseHm(start);
         const planned = new Date(workDate);
-        // Дозволено (allowed/loyal): late only after start+grace
-        // Строго (strict): late counted from raw start
+        // Р”РѕР·РІРѕР»РµРЅРѕ (allowed/loyal): late only after start+grace
+        // РЎС‚СЂРѕРіРѕ (strict): late counted from raw start
         const graceUsed = delayMode === 'strict' ? 0 : grace;
         planned.setHours(h, m + graceUsed, 0, 0);
         if (firstIn.occurredAt > planned) {
@@ -6155,7 +6156,7 @@ export class AttendanceService {
           lateMinutes = Math.round(
             (firstIn.occurredAt.getTime() - planned.getTime()) / 60000,
           );
-          // If «считать опоздание в дозволенной зоне» — also count minutes inside grace
+          // If «СЃС‡РёС‚Р°С‚СЊ РѕРїРѕР·РґР°РЅРёРµ РІ РґРѕР·РІРѕР»РµРЅРЅРѕР№ Р·РѕРЅРµ» — also count minutes inside grace
           if (settings.lateInGraceZone && delayMode !== 'strict' && grace > 0) {
             const rawStart = new Date(workDate);
             rawStart.setHours(h, m, 0, 0);

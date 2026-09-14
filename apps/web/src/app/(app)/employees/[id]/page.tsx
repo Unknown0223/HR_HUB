@@ -583,7 +583,7 @@ function markTypeMeta(m: {
   if (key === 'estimated_out')
     return {
       key: 'estimated_out',
-      label: m.markTypeLabel || 'Такминий уход',
+      label: m.markTypeLabel || 'Примерный уход',
       tone: 'mark' as const,
     };
   if (key === 'break_out')
@@ -5309,7 +5309,7 @@ export default function EmployeeDetailPage() {
                                 [
                                   ['in', 'Приход'],
                                   ['out', 'Уход'],
-                                  ['estimated_out', 'Такминий уход'],
+                                  ['estimated_out', 'Примерный уход'],
                                   ['mark', 'Отметка'],
                                   ['break_out', 'Перерыв уход'],
                                   ['break_in', 'Перерыв приход'],

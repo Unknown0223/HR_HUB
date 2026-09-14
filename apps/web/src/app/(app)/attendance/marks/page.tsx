@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { confirm as confirmDialog } from '@/lib/dialogs';
 
 import Link from 'next/link';
@@ -94,14 +94,14 @@ const marksListPrefs = prefsConfigFromColumns({
 const MARK_TYPE_OPTS = [
   { key: 'in', label: 'Приход' },
   { key: 'out', label: 'Уход' },
-  { key: 'estimated_out', label: 'Такминий уход' },
+  { key: 'estimated_out', label: 'Примерный уход' },
   { key: 'mark', label: 'Отметка' },
   { key: 'break_in', label: 'Перерыв приход' },
   { key: 'break_out', label: 'Перерыв уход' },
 ];
 
 function empName(e?: Emp | null) {
-  if (!e) return '—';
+  if (!e) return 'вЂ”';
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
 }
 
@@ -120,7 +120,7 @@ function typeClass(t: string) {
 }
 
 function markPhotoSrc(m: Mark): string | null {
-  // Only the punch capture snapshot — never the employee profile face photo.
+  // Only the punch capture snapshot вЂ” never the employee profile face photo.
   return mediaSrc(m.photoUrl);
 }
 
@@ -135,7 +135,7 @@ function markCell(m: Mark, key: string): string {
     case 'photo':
       return markPhotoSrc(m) ? 'есть' : '';
     case 'person':
-      return empName(m.employee) === '—' ? '' : empName(m.employee);
+      return empName(m.employee) === 'вЂ”' ? '' : empName(m.employee);
     case 'location':
       return m.locationName || m.device?.location?.name || '';
     case 'deviceType':
@@ -146,7 +146,7 @@ function markCell(m: Mark, key: string): string {
       return m.identificationType || '';
     case 'time': {
       const t = fmtDt(m.occurredAt);
-      return m.clockTamper ? `${t} ⚠` : t;
+      return m.clockTamper ? `${t} вљ ` : t;
     }
     case 'division':
       return m.employee?.division?.name || '';
@@ -218,9 +218,9 @@ function MarksInner() {
     };
     const date =
       dateFrom && dateTo && dateFrom !== dateTo
-        ? `${fmt(dateFrom)} – ${fmt(dateTo)}`
+        ? `${fmt(dateFrom)} вЂ“ ${fmt(dateTo)}`
         : fmt(dateFrom || dateTo);
-    return [emp, date].filter(Boolean).join(' · ');
+    return [emp, date].filter(Boolean).join(' В· ');
   }, [employees, filters.dateFrom, filters.dateTo, filters.employeeId, searchParams]);
 
   const checkedIds = useMemo(
@@ -372,10 +372,10 @@ function MarksInner() {
         const obj: Record<string, unknown> = {};
         for (const k of visibleCols) {
           if (k === 'photo') {
-            obj[prefs.labelOf(k)] = markPhotoSrc(m) ? 'есть' : '—';
+            obj[prefs.labelOf(k)] = markPhotoSrc(m) ? 'есть' : 'вЂ”';
             continue;
           }
-          obj[prefs.labelOf(k)] = markCell(m, k) || '—';
+          obj[prefs.labelOf(k)] = markCell(m, k) || 'вЂ”';
         }
         return obj;
       }),
@@ -400,7 +400,7 @@ function MarksInner() {
         method: 'POST',
         body: JSON.stringify({ ids: checkedIds, action, markType }),
       });
-      setInfo(`Готово: ${res.affected}`);
+      setInfo(`Р“РѕС‚РѕРІРѕ: ${res.affected}`);
       setChecked({});
       setConfirm(null);
       setTypeOpen(false);
@@ -446,9 +446,9 @@ function MarksInner() {
           <i className="fas fa-fingerprint" aria-hidden />
         </div>
         <div className={shared.pageHeaderText}>
-          <h1 className={shared.pageTitle}>Отметки</h1>
+          <h1 className={shared.pageTitle}>РћС‚РјРµС‚РєРё</h1>
           <p className={shared.pageSubtitle}>
-            Журнал отметок посещаемости: приход, уход, перерывы
+            Р–СѓСЂРЅР°Р» РѕС‚РјРµС‚РѕРє РїРѕСЃРµС‰Р°РµРјРѕСЃС‚Рё: РїСЂРёС…РѕРґ, СѓС…РѕРґ, РїРµСЂРµСЂС‹РІС‹
           </p>
         </div>
         <div className={shared.pageHeaderActions}>
@@ -477,15 +477,15 @@ function MarksInner() {
               onClick={() => setCreateOpen((v) => !v)}
             >
               <i className="fas fa-plus" aria-hidden />
-              Создать ▾
+              РЎРѕР·РґР°С‚СЊ в–ѕ
             </button>
             {createOpen ? (
               <div className={styles.menu}>
                 <Link href="/attendance/marks/copy" onClick={() => setCreateOpen(false)}>
-                  Копирование отметок
+                  РљРѕРїРёСЂРѕРІР°РЅРёРµ РѕС‚РјРµС‚РѕРє
                 </Link>
                 <Link href="/attendance/marks/import" onClick={() => setCreateOpen(false)}>
-                  Импорт
+                  РРјРїРѕСЂС‚
                 </Link>
               </div>
             ) : null}
@@ -540,7 +540,7 @@ function MarksInner() {
                 void load(p);
               }}
             >
-              ‹
+              вЂ№
             </button>
             <button type="button" className={styles.pageBtnActive}>
               {page}
@@ -554,7 +554,7 @@ function MarksInner() {
                 void load(p);
               }}
             >
-              ›
+              вЂє
             </button>
           </div>
           <button
@@ -588,7 +588,7 @@ function MarksInner() {
       {checkedIds.length > 0 ? (
         <div className={styles.bulkBar}>
           <span className={styles.bulkMeta}>
-            Выбрано: <strong>{checkedIds.length}</strong>
+            Р’С‹Р±СЂР°РЅРѕ: <strong>{checkedIds.length}</strong>
           </span>
           <div className={styles.dropdown}>
             <button
@@ -598,7 +598,7 @@ function MarksInner() {
               onClick={() => setTypeOpen((v) => !v)}
             >
               <i className="fas fa-exchange-alt" aria-hidden />
-              Изменить тип
+              РР·РјРµРЅРёС‚СЊ С‚РёРї
             </button>
             {typeOpen ? (
               <div className={styles.menu}>
@@ -608,7 +608,7 @@ function MarksInner() {
                     type="button"
                     onClick={() =>
                       setConfirm({
-                        title: `Изменить тип на «${t.label}» для ${checkedIds.length}?`,
+                        title: `РР·РјРµРЅРёС‚СЊ С‚РёРї РЅР° В«${t.label}В» РґР»СЏ ${checkedIds.length}?`,
                         action: 'set_type',
                         markType: t.key,
                       })
@@ -627,13 +627,13 @@ function MarksInner() {
               disabled={busy}
               onClick={() =>
                 setConfirm({
-                  title: `Сделать действительными отметки в количестве ${selectedInvalid}?`,
+                  title: `РЎРґРµР»Р°С‚СЊ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅС‹РјРё РѕС‚РјРµС‚РєРё РІ РєРѕР»РёС‡РµСЃС‚РІРµ ${selectedInvalid}?`,
                   action: 'set_valid',
                 })
               }
             >
               <i className="fas fa-check" aria-hidden />
-              Действ. {selectedInvalid}
+              Р”РµР№СЃС‚РІ. {selectedInvalid}
             </button>
           ) : null}
           {selectedValid > 0 ? (
@@ -643,13 +643,13 @@ function MarksInner() {
               disabled={busy}
               onClick={() =>
                 setConfirm({
-                  title: `Сделать недействительными отметки в количестве ${selectedValid}?`,
+                  title: `РЎРґРµР»Р°С‚СЊ РЅРµРґРµР№СЃС‚РІРёС‚РµР»СЊРЅС‹РјРё РѕС‚РјРµС‚РєРё РІ РєРѕР»РёС‡РµСЃС‚РІРµ ${selectedValid}?`,
                   action: 'set_invalid',
                 })
               }
             >
               <i className="fas fa-ban" aria-hidden />
-              Недейств. {selectedValid}
+              РќРµРґРµР№СЃС‚РІ. {selectedValid}
             </button>
           ) : null}
           <button
@@ -658,13 +658,13 @@ function MarksInner() {
             disabled={busy}
             onClick={() =>
               setConfirm({
-                title: `Удалить отметки в количестве ${checkedIds.length}?`,
+                title: `РЈРґР°Р»РёС‚СЊ РѕС‚РјРµС‚РєРё РІ РєРѕР»РёС‡РµСЃС‚РІРµ ${checkedIds.length}?`,
                 action: 'delete',
               })
             }
           >
             <i className="fas fa-trash" aria-hidden />
-            Удалить
+            РЈРґР°Р»РёС‚СЊ
           </button>
           <button
             type="button"
@@ -678,7 +678,7 @@ function MarksInner() {
             }}
           >
             <i className="fas fa-sliders-h" aria-hidden />
-            Настройки
+            РќР°СЃС‚СЂРѕР№РєРё
           </button>
           <button
             type="button"
@@ -686,7 +686,7 @@ function MarksInner() {
             disabled={busy}
             onClick={() => setChecked({})}
           >
-            Снять выделение
+            РЎРЅСЏС‚СЊ РІС‹РґРµР»РµРЅРёРµ
           </button>
         </div>
       ) : null}
@@ -716,14 +716,14 @@ function MarksInner() {
               {loading && !displayRows.length ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
-                    Загрузка…
+                    Р—Р°РіСЂСѓР·РєР°вЂ¦
                   </td>
                 </tr>
               ) : null}
               {!loading && !displayRows.length ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
-                    Нет данных
+                    РќРµС‚ РґР°РЅРЅС‹С…
                   </td>
                 </tr>
               ) : null}
@@ -732,7 +732,7 @@ function MarksInner() {
                 const slides = displayRows
                   .map((x) => ({
                     src: markPhotoSrc(x) || '',
-                    caption: `${empName(x.employee)} · ${x.markTypeLabel || x.markType} · ${fmtDt(x.occurredAt)}`,
+                    caption: `${empName(x.employee)} В· ${x.markTypeLabel || x.markType} В· ${fmtDt(x.occurredAt)}`,
                   }))
                   .filter((s) => s.src);
                 const idx = photo ? slides.findIndex((s) => s.src === photo) : -1;
@@ -805,11 +805,11 @@ function MarksInner() {
                               }
                             >
                               {fmtDt(m.occurredAt)}
-                              {m.clockTamper ? ' ⚠' : ''}
+                              {m.clockTamper ? ' вљ ' : ''}
                             </td>
                           );
                         }
-                        return <td key={key}>{markCell(m, key) || '—'}</td>;
+                        return <td key={key}>{markCell(m, key) || 'вЂ”'}</td>;
                       })}
                     </tr>
                     {open ? (
@@ -818,7 +818,7 @@ function MarksInner() {
                           <div className={styles.rowActions}>
                             <Link href={`/attendance/marks/${m.id}`}>
                               <i className="fas fa-eye" aria-hidden />
-                              Просмотреть
+                              РџСЂРѕСЃРјРѕС‚СЂРµС‚СЊ
                             </Link>
                             <button
                               type="button"
@@ -847,7 +847,7 @@ function MarksInner() {
                               }}
                             >
                               <i className="fas fa-exchange-alt" aria-hidden />
-                              Изменить тип
+                              РР·РјРµРЅРёС‚СЊ С‚РёРї
                             </button>
                             <button
                               type="button"
@@ -858,7 +858,7 @@ function MarksInner() {
                               }}
                             >
                               <i className="fas fa-trash" aria-hidden />
-                              Удалить
+                              РЈРґР°Р»РёС‚СЊ
                             </button>
                           </div>
                         </td>
@@ -872,7 +872,7 @@ function MarksInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            Показано <strong>{rows.length}</strong> из <strong>{total}</strong>
+            РџРѕРєР°Р·Р°РЅРѕ <strong>{rows.length}</strong> РёР· <strong>{total}</strong>
           </p>
         </div>
       </div>
@@ -892,20 +892,20 @@ function MarksInner() {
                 confirm && void runBulk(confirm.action, confirm.markType)
               }
             >
-              Да
+              Р”Р°
             </button>
             <button
               type="button"
               className={modal.btnGhost}
               onClick={() => setConfirm(null)}
             >
-              Нет
+              РќРµС‚
             </button>
           </>
         }
       >
         <p style={{ margin: 0, color: '#64788f', fontSize: 13 }}>
-          Подтвердите выполнение операции для выбранных отметок.
+          РџРѕРґС‚РІРµСЂРґРёС‚Рµ РІС‹РїРѕР»РЅРµРЅРёРµ РѕРїРµСЂР°С†РёРё РґР»СЏ РІС‹Р±СЂР°РЅРЅС‹С… РѕС‚РјРµС‚РѕРє.
         </p>
       </FormModal>
 
@@ -924,21 +924,21 @@ function MarksInner() {
                 router.push('/catalog/devices');
               }}
             >
-              Применить
+              РџСЂРёРјРµРЅРёС‚СЊ
             </button>
             <button
               type="button"
               className={modal.btnGhost}
               onClick={() => setApplyOpen(false)}
             >
-              Отменить
+              РћС‚РјРµРЅРёС‚СЊ
             </button>
           </>
         }
       >
         <div className={modal.fields}>
           <label className={modal.field}>
-            <span>Дата начала</span>
+            <span>Р”Р°С‚Р° РЅР°С‡Р°Р»Р°</span>
             <input
               type="date"
               value={applyFrom}
@@ -946,7 +946,7 @@ function MarksInner() {
             />
           </label>
           <label className={modal.field}>
-            <span>Дата окончания</span>
+            <span>Р”Р°С‚Р° РѕРєРѕРЅС‡Р°РЅРёСЏ</span>
             <input
               type="date"
               value={applyTo}
@@ -962,7 +962,7 @@ function MarksInner() {
 
 export default function MarksPage() {
   return (
-    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
+    <Suspense fallback={<p className={shared.muted}>Р—Р°РіСЂСѓР·РєР°вЂ¦</p>}>
       <MarksInner />
     </Suspense>
   );

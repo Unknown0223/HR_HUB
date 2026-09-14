@@ -113,19 +113,19 @@ def snapshot_health(
 
     if gw_http and (tun_http is True or (tun_http is None and tun_proc)):
         ok = True
-        message = "GW + tunnel ishlayapti"
+        message = "Шлюз и туннель работают"
     elif not gw_http:
         ok = False
-        message = "Lokal gateway (8800) javob bermayapti"
+        message = "Локальный шлюз (8800) не отвечает"
     elif tun_http is False:
         ok = False
-        message = "Tunnel URL o‘lik — qayta ochish kerak"
+        message = "URL туннеля мёртв — нужно открыть снова"
     elif not tun_proc:
         ok = False
-        message = "cloudflared jarayoni yo‘q"
+        message = "Процесс cloudflared отсутствует"
     else:
         ok = False
-        message = "Tunnel holati noma’lum"
+        message = "Состояние туннеля неизвестно"
 
     return TunnelHealth(
         gw_process=gw_proc,
@@ -197,35 +197,35 @@ def restore_tunnel(
     tenant = str(svc.get("tenantCode") or cfg.get("tenantCode") or "demo")
     key = read_link_key(root)
     if not api_url:
-        raise RuntimeError("apiUrl yo‘q (config / service.json)")
+        raise RuntimeError("apiUrl отсутствует (config / service.json)")
     if not key:
-        raise RuntimeError("data/link.key yo‘q — avval Ulash / pairing")
+        raise RuntimeError("Нет data/link.key — сначала подключение / pairing")
 
     def emit(msg: str) -> None:
         if on_status:
             on_status(msg)
 
-    emit("Runtime tekshirilmoqda…")
+    emit("Проверка runtime…")
     ensure_runtime(root, on_status)
 
     if bundle is None:
         bundle = ServiceBundle()
         bundle.root = root
     else:
-        emit("Eski GW/tunnel to‘xtatilmoqda…")
+        emit("Остановка старого GW/tunnel…")
         bundle.stop()
 
-    emit("Gateway yoqilmoqda…")
+    emit("Запуск gateway…")
     bundle.gw = start_gateway(api_url, key, root, on_status)
-    emit("Tunnel ochilmoqda…")
+    emit("Открытие туннеля…")
     proc, url = start_tunnel(root, on_status)
     bundle.tunnel = proc
     bundle.tunnel_url = url
     if not url:
-        raise RuntimeError("Tunnel URL olinmadi")
+        raise RuntimeError("URL туннеля не получен")
 
     write_tunnel_url(url, root)
-    emit("Platformaga announce…")
+    emit("Announce на платформу…")
     ok = announce_best_effort(root, api_url, tenant, url)
     mode = "named" if resolve_tunnel_token(cfg, root) else "quick"
     write_service_config(
@@ -249,7 +249,7 @@ def restore_tunnel(
             "apiUrl": api_url,
             "tenantCode": tenant,
             "announced": ok,
-            "message": "Tunnel tiklandi" if ok else "Tunnel ochildi (announce xato — qayta uriniladi)",
+            "message": "Туннель восстановлен" if ok else "Туннель открыт (ошибка announce — повторная попытка)",
         },
     )
     if not keep_bundle:

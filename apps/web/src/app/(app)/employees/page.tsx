@@ -2,8 +2,8 @@
 import { confirm } from '@/lib/dialogs';
 
 import Link from 'next/link';
-import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { FormEvent, Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -72,6 +72,23 @@ type PersonOpt = {
   lastName: string;
   middleName?: string | null;
   gender?: string | null;
+};
+
+type FormerMatch = {
+  employeeId: string;
+  fullName: string;
+  tabNumber: string;
+  status: string;
+  hiredAt: string | null;
+  dismissedAt: string | null;
+  division: string | null;
+  position: string | null;
+  pinflMasked: string | null;
+  passportMasked: string | null;
+  birthDate: string | null;
+  matchKind: string;
+  matchLabel: string;
+  score: number;
 };
 
 type Tab = 'active' | 'dismissed' | 'gph' | 'all';
@@ -175,6 +192,7 @@ function cellOf(row: Emp, key: string): string {
 
 function EmployeesPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [tab] = useUrlParam('tab', 'active', TABS);
   const filters = useFilterFromUrl(FILTER_KEYS);
   const q = filters.q;
@@ -206,10 +224,110 @@ function EmployeesPageInner() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [passportScan, setPassportScan] = useState<PassportScanResult | null>(null);
+  const [createDraft, setCreateDraft] = useState({
+    lastName: '',
+    firstName: '',
+    middleName: '',
+    pinfl: '',
+    passportSeries: '',
+    passportNumber: '',
+    birthDate: '',
+  });
+  const [formerMatches, setFormerMatches] = useState<FormerMatch[]>([]);
+  const [matchBusy, setMatchBusy] = useState(false);
+  const [rehireBusy, setRehireBusy] = useState(false);
   const photos = usePhotoLightbox();
   const menuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const createFormRef = useRef<HTMLFormElement>(null);
+  const matchSeq = useRef(0);
+
+  const resetCreateDraft = useCallback(() => {
+    setCreateDraft({
+      lastName: '',
+      firstName: '',
+      middleName: '',
+      pinfl: '',
+      passportSeries: '',
+      passportNumber: '',
+      birthDate: '',
+    });
+    setFormerMatches([]);
+    setPassportScan(null);
+  }, []);
+
+  const runMatchFormer = useCallback(async (draft: typeof createDraft) => {
+    const hasSignal =
+      draft.pinfl.replace(/\D/g, '').length >= 10 ||
+      (draft.passportSeries.trim() && draft.passportNumber.trim()) ||
+      (draft.lastName.trim() && draft.firstName.trim());
+    if (!hasSignal) {
+      setFormerMatches([]);
+      return;
+    }
+    const seq = ++matchSeq.current;
+    setMatchBusy(true);
+    try {
+      const p = new URLSearchParams();
+      if (draft.pinfl.trim()) p.set('pinfl', draft.pinfl.trim());
+      if (draft.passportSeries.trim()) p.set('passportSeries', draft.passportSeries.trim());
+      if (draft.passportNumber.trim()) p.set('passportNumber', draft.passportNumber.trim());
+      if (draft.lastName.trim()) p.set('lastName', draft.lastName.trim());
+      if (draft.firstName.trim()) p.set('firstName', draft.firstName.trim());
+      if (draft.middleName.trim()) p.set('middleName', draft.middleName.trim());
+      if (draft.birthDate.trim()) p.set('birthDate', draft.birthDate.trim());
+      const data = await apiFetch<{ matches: FormerMatch[] }>(
+        `/api/employees/match-former?${p.toString()}`,
+      );
+      if (seq !== matchSeq.current) return;
+      setFormerMatches(data.matches ?? []);
+    } catch {
+      if (seq !== matchSeq.current) return;
+      setFormerMatches([]);
+    } finally {
+      if (seq === matchSeq.current) setMatchBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (panel !== 'create') return;
+    const t = window.setTimeout(() => {
+      void runMatchFormer(createDraft);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [panel, createDraft, runMatchFormer]);
+
+  function applyPassportScan(scan: PassportScanResult) {
+    setPassportScan(scan);
+    setCreateDraft((d) => ({
+      ...d,
+      lastName: scan.lastName || d.lastName,
+      firstName: scan.firstName || d.firstName,
+      middleName: scan.middleName || d.middleName,
+      pinfl: scan.pinfl || d.pinfl,
+      passportSeries: scan.series || d.passportSeries,
+      passportNumber: scan.docNumber || d.passportNumber,
+      birthDate: scan.birthDate || d.birthDate,
+    }));
+  }
+
+  async function onRehire(match: FormerMatch) {
+    setRehireBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/employees/${match.employeeId}/rehire`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      resetCreateDraft();
+      setPanel('none');
+      router.push(`/employees/${match.employeeId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось повторно принять');
+    } finally {
+      setRehireBusy(false);
+    }
+  }
 
   const subnavKey =
     tab === 'dismissed'
@@ -412,30 +530,37 @@ function EmployeesPageInner() {
 
   async function onCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (formerMatches.length > 0) {
+      setError(
+        'Найден бывший сотрудник. Создать дубликат нельзя — нажмите «Повторно принять».',
+      );
+      return;
+    }
     const form = e.currentTarget;
     const fd = new FormData(form);
     setSaving(true);
+    setError('');
     try {
       const scan = passportScan;
       await apiFetch('/api/employees', {
         method: 'POST',
         body: JSON.stringify({
           tabNumber: fd.get('tabNumber'),
-          firstName: fd.get('firstName'),
-          lastName: fd.get('lastName'),
-          middleName: fd.get('middleName') || undefined,
+          firstName: createDraft.firstName || fd.get('firstName'),
+          lastName: createDraft.lastName || fd.get('lastName'),
+          middleName: createDraft.middleName || fd.get('middleName') || undefined,
           email: fd.get('email') || undefined,
           divisionId: fd.get('divisionId') || undefined,
           positionId: fd.get('positionId') || undefined,
           employmentType: fd.get('employmentType') || 'staff',
           externalId: fd.get('externalId') || undefined,
           hiredAt: fd.get('hiredAt') || undefined,
-          pinfl: scan?.pinfl || undefined,
-          birthDate: scan?.birthDate || undefined,
+          pinfl: createDraft.pinfl || scan?.pinfl || undefined,
+          birthDate: createDraft.birthDate || scan?.birthDate || undefined,
           gender: scan?.gender || undefined,
           nationality: scan?.nationality || undefined,
-          passportSeries: scan?.series || undefined,
-          passportNumber: scan?.docNumber || undefined,
+          passportSeries: createDraft.passportSeries || scan?.series || undefined,
+          passportNumber: createDraft.passportNumber || scan?.docNumber || undefined,
           passportDocType: scan?.docType || undefined,
           passportIssuer: scan?.issuer || undefined,
           passportIssuedAt: scan?.issuedAt || undefined,
@@ -443,7 +568,7 @@ function EmployeesPageInner() {
         }),
       });
       form.reset();
-      setPassportScan(null);
+      resetCreateDraft();
       setPanel('none');
       await load();
     } catch (err) {
@@ -515,6 +640,7 @@ function EmployeesPageInner() {
               type="button"
               className={`${styles.btnSuccess} ${styles.splitBtnMain}`}
               onClick={() => {
+                resetCreateDraft();
                 setPanel('create');
                 setMenuOpen(false);
                 setError('');
@@ -693,7 +819,7 @@ function EmployeesPageInner() {
         title="Создать сотрудника"
         onClose={() => {
           setPanel('none');
-          setPassportScan(null);
+          resetCreateDraft();
         }}
         width="lg"
         footer={
@@ -702,7 +828,12 @@ function EmployeesPageInner() {
               type="submit"
               form="emp-create-form"
               className={modal.btnPrimary}
-              disabled={saving}
+              disabled={saving || formerMatches.length > 0 || rehireBusy}
+              title={
+                formerMatches.length > 0
+                  ? 'Найден бывший сотрудник — используйте повторный приём'
+                  : undefined
+              }
             >
               {saving ? 'Сохранение…' : 'Сохранить'}
             </button>
@@ -711,7 +842,7 @@ function EmployeesPageInner() {
               className={modal.btnGhost}
               onClick={() => {
                 setPanel('none');
-                setPassportScan(null);
+                resetCreateDraft();
               }}
             >
               Отмена
@@ -721,6 +852,89 @@ function EmployeesPageInner() {
       >
         {error && panel === 'create' ? (
           <p className={modal.error}>{error}</p>
+        ) : null}
+        {formerMatches.length > 0 ? (
+          <div
+            role="alert"
+            style={{
+              marginBottom: '0.85rem',
+              padding: '0.85rem 1rem',
+              borderRadius: 10,
+              border: '1px solid #f0c000',
+              background: '#fff8db',
+              color: '#7a5b00',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'flex-start' }}>
+              <span
+                aria-hidden
+                style={{
+                  flexShrink: 0,
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: '#f0c000',
+                  color: '#3d2e00',
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.05rem',
+                  lineHeight: 1,
+                }}
+              >
+                !
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <strong style={{ display: 'block', marginBottom: 4 }}>
+                  Возможен повторный приём
+                </strong>
+                <p style={{ margin: '0 0 0.65rem', fontSize: '0.88rem' }}>
+                  Найден уволенный сотрудник с совпадающими данными. Новый дубликат создать
+                  нельзя — проверьте карточку и нажмите «Повторно принять».
+                  {matchBusy ? ' Обновление…' : ''}
+                </p>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+                  {formerMatches.map((m) => (
+                    <li
+                      key={m.employeeId}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #f0d878',
+                        borderRadius: 8,
+                        padding: '0.65rem 0.75rem',
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{m.fullName}</div>
+                      <div style={{ fontSize: '0.82rem', marginTop: 2, color: '#5c4a10' }}>
+                        Таб. № {m.tabNumber}
+                        {m.division ? ` · ${m.division}` : ''}
+                        {m.position ? ` · ${m.position}` : ''}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', marginTop: 2, color: '#6b5a20' }}>
+                        Приём: {m.hiredAt || '—'} · Увольнение: {m.dismissedAt || '—'}
+                        {m.birthDate ? ` · ДР: ${m.birthDate}` : ''}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', marginTop: 2, color: '#6b5a20' }}>
+                        Совпадение: {m.matchLabel}
+                        {m.pinflMasked ? ` · ПИНФЛ ${m.pinflMasked}` : ''}
+                        {m.passportMasked ? ` · паспорт ${m.passportMasked}` : ''}
+                      </div>
+                      <button
+                        type="button"
+                        className={modal.btnPrimary}
+                        style={{ marginTop: 8 }}
+                        disabled={rehireBusy}
+                        onClick={() => void onRehire(m)}
+                      >
+                        {rehireBusy ? 'Приём…' : 'Повторно принять'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
         ) : null}
         <div style={{ marginBottom: '0.75rem' }}>
           <button
@@ -766,8 +980,10 @@ function EmployeesPageInner() {
               <input
                 name="lastName"
                 required
-                defaultValue={passportScan?.lastName || ''}
-                key={`ln-${passportScan?.docNumber || 'x'}-${passportScan?.lastName || ''}`}
+                value={createDraft.lastName}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, lastName: e.target.value }))
+                }
               />
             </label>
             <label className={modal.field}>
@@ -777,8 +993,10 @@ function EmployeesPageInner() {
               <input
                 name="firstName"
                 required
-                defaultValue={passportScan?.firstName || ''}
-                key={`fn-${passportScan?.docNumber || 'x'}-${passportScan?.firstName || ''}`}
+                value={createDraft.firstName}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, firstName: e.target.value }))
+                }
               />
             </label>
           </div>
@@ -786,25 +1004,58 @@ function EmployeesPageInner() {
             <span>Отчество</span>
             <input
               name="middleName"
-              defaultValue={passportScan?.middleName || ''}
-              key={`mn-${passportScan?.docNumber || 'x'}-${passportScan?.middleName || ''}`}
+              value={createDraft.middleName}
+              onChange={(e) =>
+                setCreateDraft((d) => ({ ...d, middleName: e.target.value }))
+              }
             />
           </label>
-          {passportScan ? (
-            <div className={modal.row2}>
-              <label className={modal.field}>
-                <span>Паспорт серия / рақам</span>
-                <input
-                  readOnly
-                  value={[passportScan.series, passportScan.docNumber].filter(Boolean).join(' ')}
-                />
-              </label>
-              <label className={modal.field}>
-                <span>ПИНФЛ</span>
-                <input readOnly value={passportScan.pinfl || '—'} />
-              </label>
-            </div>
-          ) : null}
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>ПИНФЛ</span>
+              <input
+                name="pinfl"
+                inputMode="numeric"
+                value={createDraft.pinfl}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, pinfl: e.target.value }))
+                }
+              />
+            </label>
+            <label className={modal.field}>
+              <span>Дата рождения</span>
+              <input
+                name="birthDate"
+                type="date"
+                value={createDraft.birthDate}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, birthDate: e.target.value }))
+                }
+              />
+            </label>
+          </div>
+          <div className={modal.row2}>
+            <label className={modal.field}>
+              <span>Паспорт серия</span>
+              <input
+                name="passportSeries"
+                value={createDraft.passportSeries}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, passportSeries: e.target.value }))
+                }
+              />
+            </label>
+            <label className={modal.field}>
+              <span>Паспорт номер</span>
+              <input
+                name="passportNumber"
+                value={createDraft.passportNumber}
+                onChange={(e) =>
+                  setCreateDraft((d) => ({ ...d, passportNumber: e.target.value }))
+                }
+              />
+            </label>
+          </div>
           <div className={modal.row2}>
             <label className={modal.field}>
               <span>Подразделение</span>
@@ -853,7 +1104,7 @@ function EmployeesPageInner() {
         open={scanOpen}
         onClose={() => setScanOpen(false)}
         onConfirm={(result) => {
-          setPassportScan(result);
+          applyPassportScan(result);
           setScanOpen(false);
         }}
       />

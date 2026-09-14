@@ -158,6 +158,36 @@ export class EmployeesController {
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
+  @Get('match-former')
+  @ApiQuery({ name: 'pinfl', required: false })
+  @ApiQuery({ name: 'passportSeries', required: false })
+  @ApiQuery({ name: 'passportNumber', required: false })
+  @ApiQuery({ name: 'lastName', required: false })
+  @ApiQuery({ name: 'firstName', required: false })
+  @ApiQuery({ name: 'middleName', required: false })
+  @ApiQuery({ name: 'birthDate', required: false })
+  matchFormer(
+    @CurrentTenant() tenantId: string | null,
+    @Query('pinfl') pinfl?: string,
+    @Query('passportSeries') passportSeries?: string,
+    @Query('passportNumber') passportNumber?: string,
+    @Query('lastName') lastName?: string,
+    @Query('firstName') firstName?: string,
+    @Query('middleName') middleName?: string,
+    @Query('birthDate') birthDate?: string,
+  ) {
+    return this.employees.matchFormer(this.employees.requireTenant(tenantId), {
+      pinfl,
+      passportSeries,
+      passportNumber,
+      lastName,
+      firstName,
+      middleName,
+      birthDate,
+    });
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
   @Get(':id/hire-document')
   hireDocument(
     @CurrentTenant() tenantId: string | null,
@@ -973,6 +1003,20 @@ export class EmployeesController {
     @Body() dto: CreateEmployeeDto,
   ) {
     return this.employees.create(this.employees.requireTenant(tenantId), dto);
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Post(':id/rehire')
+  rehire(
+    @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body?: { hiredAt?: string },
+  ) {
+    return this.employees.rehire(this.employees.requireTenant(tenantId), id, {
+      hiredAt: body?.hiredAt,
+      userId: user?.userId ?? null,
+    });
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)

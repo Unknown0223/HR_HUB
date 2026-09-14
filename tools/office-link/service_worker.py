@@ -50,7 +50,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
     tenant = str(svc.get("tenantCode") or cfg.get("tenantCode") or "demo")
     key = read_link_key(root)
     if not api_url:
-        write_status(root, {"ok": False, "state": "error", "message": "apiUrl yo‘q"})
+        write_status(root, {"ok": False, "state": "error", "message": "apiUrl отсутствует"})
         return 1
     if not key:
         write_status(
@@ -58,7 +58,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
             {
                 "ok": False,
                 "state": "waiting_key",
-                "message": "data/link.key yo‘q — avval GUI Ulash yoki pairing",
+                "message": "Нет data/link.key — сначала подключение в GUI или pairing",
             },
         )
         while True:
@@ -71,11 +71,11 @@ def run_forever(poll_sec: float = 8.0) -> int:
                 {
                     "ok": False,
                     "state": "waiting_key",
-                    "message": "data/link.key yo‘q — avval GUI Ulash yoki pairing",
+                    "message": "Нет data/link.key — сначала подключение в GUI или pairing",
                 },
             )
 
-    write_status(root, {"ok": False, "state": "starting", "message": "Runtime tayyorlanmoqda"})
+    write_status(root, {"ok": False, "state": "starting", "message": "Подготовка runtime"})
     try:
         ensure_runtime(root)
     except Exception as exc:
@@ -108,7 +108,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
             "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
             "apiUrl": api_url,
             "tenantCode": tenant,
-            "message": "GW + tunnel ishlayapti (auto-heal)",
+            "message": "Шлюз и туннель работают (auto-heal)",
             "autoHeal": True,
         },
     )
@@ -154,7 +154,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     "tunnelUrl": current,
                     "apiUrl": api_url,
                     "tenantCode": tenant,
-                    "message": "GW + tunnel ishlayapti (auto-heal)",
+                    "message": "Шлюз и туннель работают (auto-heal)",
                     "autoHeal": True,
                     "gwHttp": True,
                     "tunnelProcess": tun_proc,
@@ -186,7 +186,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     "tunnelUrl": url or read_tunnel_url(root),
                     "apiUrl": api_url,
                     "tenantCode": tenant,
-                    "message": "Avtomatik qayta ishga tushirildi",
+                    "message": "Автоматически перезапущено",
                     "autoHeal": True,
                 },
             )

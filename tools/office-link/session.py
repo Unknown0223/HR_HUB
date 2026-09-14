@@ -154,7 +154,7 @@ class OfficeLinkSession:
 
         token = self.pairing_token()
         if not token:
-            return False, "Pairing token yo‘q."
+            return False, "Pairing-токен отсутствует."
         host = self.chosen.host if self.chosen else None
         serial = (self.verified or {}).get("serialNumber") if self.verified else None
         code, data = api_client.create_pairing_session(
@@ -169,7 +169,7 @@ class OfficeLinkSession:
             msg = ""
             if isinstance(data, dict):
                 msg = str(data.get("message") or data.get("error") or "")
-            return False, msg or f"Pairing sessiya xato (HTTP {code})."
+            return False, msg or f"Ошибка pairing-сессии (HTTP {code})."
         sid = str(data.get("sessionId") or "").strip()
         if sid:
             self.provision_session_id = sid
@@ -224,7 +224,7 @@ class OfficeLinkSession:
             spawn_detached_worker(self.root)
             return SubmitResult(
                 kind="tunnel_ok",
-                message=f"Tunnel tiklandi: {url}",
+                message=f"Туннель восстановлен: {url}",
                 device={"tunnelUrl": url},
             )
         except Exception as e:
@@ -248,22 +248,22 @@ class OfficeLinkSession:
         if self.auth.is_locked():
             return SubmitResult(
                 kind=LOCKED,
-                message="Qulflangan",
+                message="Заблокировано",
                 remaining=self.auth.remaining_seconds(),
             )
         if not password:
-            return SubmitResult(kind="empty", message="Parol kiritilmadi.")
+            return SubmitResult(kind="empty", message="Пароль не введён.")
         if not self.chosen:
-            return SubmitResult(kind="no_device", message="Qurilma topilmadi.")
+            return SubmitResult(kind="no_device", message="Устройство не найдено.")
         online = probe_online(self.chosen.host, self.chosen.port)
         if not online.online:
             self.auth.record_offline()
-            return SubmitResult(kind=OFFLINE, message="Qurilma onlayn emas.")
+            return SubmitResult(kind=OFFLINE, message="Устройство не в сети.")
         if online.kind == TIMEOUT:
             self.auth.record_timeout()
             return SubmitResult(
                 kind=TIMEOUT,
-                message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+                message="Таймаут сети. Попытка пароля не засчитана.",
             )
         result = verify_password(
             self.chosen.host,
@@ -275,33 +275,33 @@ class OfficeLinkSession:
             self.auth.record_timeout()
             return SubmitResult(
                 kind=TIMEOUT,
-                message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+                message="Таймаут сети. Попытка пароля не засчитана.",
             )
         if result.kind in (OFFLINE, ERROR):
             if result.kind == OFFLINE:
                 self.auth.record_offline()
             return SubmitResult(
                 kind=result.kind,
-                message="Tarmoq xatosi. Parol urinishi hisoblanmadi.",
+                message="Ошибка сети. Попытка пароля не засчитана.",
             )
         if result.kind == UNAUTHORIZED:
             phase = self.auth.record_401()
             if phase == LOCKED:
                 return SubmitResult(
                     kind=LOCKED,
-                    message="Parol noto‘g‘ri. Qulflangan",
+                    message="Неверный пароль. Заблокировано",
                     remaining=self.auth.remaining_seconds(),
                 )
             return SubmitResult(
                 kind=CONFIRM,
-                message="Parol noto‘g‘ri. Qayta kiriting.",
+                message="Неверный пароль. Введите снова.",
             )
         if result.kind == OK:
             self.auth.record_success()
             self.verified = result.as_device()
             self.password = password
             return SubmitResult(kind=OK, message="Online", device=self.verified)
-        return SubmitResult(kind=ERROR, message="Tekshirib bo‘lmadi.")
+        return SubmitResult(kind=ERROR, message="Не удалось проверить.")
 
     def link_to_cloud(self, on_status: StatusFn | None = None) -> SubmitResult:
         """Full provision: rotate/register via ProvisionEngine (Faza 1/2)."""
@@ -311,12 +311,12 @@ class OfficeLinkSession:
         if not location_id:
             return SubmitResult(
                 kind="location",
-                message="Lokatsiya tanlanmagan. Ulashdan oldin lokatsiyani tanlang.",
+                message="Локация не выбрана. Выберите локацию перед подключением.",
             )
         if not self.has_credentials():
             return SubmitResult(
                 kind="no_key",
-                message="Pairing token yoki admin kaliti kerak.",
+                message="Требуется pairing-токен или ключ администратора.",
             )
 
         engine = ProvisionEngine()
@@ -325,7 +325,7 @@ class OfficeLinkSession:
             return engine.provision_new(self, self.password or "", location_id, on_status)
 
         if not self.verified or not self.password:
-            return SubmitResult(kind=ERROR, message="Avval parolni tasdiqlang.")
+            return SubmitResult(kind=ERROR, message="Сначала подтвердите пароль.")
         return engine.provision_configured(
             self,
             self.password,
@@ -350,7 +350,7 @@ class OfficeLinkSession:
             msg = ""
             if isinstance(data, dict):
                 msg = str(data.get("message") or data.get("error") or "")
-            return False, [], msg or f"Qurilmalar ro‘yxati xato (HTTP {code})."
+            return False, [], msg or f"Ошибка списка устройств (HTTP {code})."
         raw = data.get("devices")
         devices = [d for d in raw if isinstance(d, dict)] if isinstance(raw, list) else []
         return True, devices, "OK"
@@ -362,9 +362,9 @@ class OfficeLinkSession:
         sid = (self.provision_session_id or "").strip()
         token = self.pairing_token() or ""
         if not sid:
-            return False, {}, "Provision session yo‘q."
+            return False, {}, "Сессия provision отсутствует."
         if not token:
-            return False, {}, "Pairing token kerak."
+            return False, {}, "Требуется pairing-токен."
         code, data = api_client.get_provision_session(
             self.api_url,
             read_link_key(self.root),
@@ -375,7 +375,7 @@ class OfficeLinkSession:
             msg = ""
             if isinstance(data, dict):
                 msg = str(data.get("message") or data.get("error") or "")
-            return False, {}, msg or f"Session holati xato (HTTP {code})."
+            return False, {}, msg or f"Ошибка состояния сессии (HTTP {code})."
         return True, data, "OK"
 
     @staticmethod
@@ -458,7 +458,7 @@ class OfficeLinkSession:
                     "username": str(d0.get("username") or "admin").strip() or "admin",
                 }
             if not devices:
-                err = err or "Webda faol qurilma yo‘q."
+                err = err or "На Web нет активного устройства."
         elif err:
             pass
 
@@ -475,7 +475,7 @@ class OfficeLinkSession:
             "device": None,
             "username": self.username or "admin",
             "error": err
-            or "Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash.",
+            or "Пароль не найден — введите вручную или выполните полное подключение.",
         }
 
     def _password_candidates(
@@ -576,11 +576,11 @@ class OfficeLinkSession:
         hint = (ip_hint or "").strip()
         for host in list(known_hosts or []) + ([hint] if hint else []):
             if on_status:
-                on_status(f"Tekshirilmoqda: {host}")
+                on_status(f"Проверка: {host}")
             take(probe_online(host, 80))
 
         if on_status:
-            on_status("LAN skaner… Hikvision qidirilmoqda")
+            on_status("Сканирование LAN… поиск Hikvision")
         # Full subnet scan (ignores hint-only empty path in scan()).
         for info in find_devices():
             take(info)
@@ -609,12 +609,12 @@ class OfficeLinkSession:
         if not lan_devices:
             return SubmitResult(
                 kind=OFFLINE,
-                message="LAN da Hikvision topilmadi — IP yozing yoki tarmoqni tekshiring.",
+                message="Hikvision в LAN не найден — укажите IP или проверьте сеть.",
             )
         if not web_devices:
             return SubmitResult(
                 kind="api",
-                message="Webda faol qurilma yo‘q. Avval to‘liq Ulash qiling.",
+                message="На Web нет активного устройства. Сначала выполните полное подключение.",
             )
 
         from credential_store import read_device_credential
@@ -637,14 +637,14 @@ class OfficeLinkSession:
         if not candidates:
             return SubmitResult(
                 kind="empty",
-                message="Parol topilmadi — qo‘lda kiriting yoki to‘liq Ulash.",
+                message="Пароль не найден — введите вручную или выполните полное подключение.",
             )
 
         matches: list[ReconnectMatch] = []
         timeouts = 0
         for lan in ordered_lan:
             if on_status:
-                on_status(f"Solishtirish: {lan.host}…")
+                on_status(f"Сравнение: {lan.host}…")
             for pwd, username, source, bound_web in candidates:
                 result = verify_password(lan.host, int(lan.port or 80), username, pwd)
                 if result.kind == TIMEOUT:
@@ -700,13 +700,13 @@ class OfficeLinkSession:
             if timeouts and timeouts >= len(ordered_lan):
                 return SubmitResult(
                     kind=TIMEOUT,
-                    message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+                    message="Таймаут сети. Попытка пароля не засчитана.",
                 )
             return SubmitResult(
                 kind=UNAUTHORIZED,
                 message=(
-                    "LAN qurilma(lar) topildi, lekin webdagi parol/serial mos kelmadi. "
-                    "Parolni qo‘lda kiriting yoki to‘liq Ulash."
+                    "В LAN найдено устройство(а), но пароль/serial с Web не совпали. "
+                    "Введите пароль вручную или выполните полное подключение."
                 ),
             )
 
@@ -736,8 +736,8 @@ class OfficeLinkSession:
             return SubmitResult(
                 kind="api",
                 message=(
-                    f"Bir nechta qurilma mos keldi ({1 + len(rivals)}). "
-                    "IP maydoniga aniq manzil yozing."
+                    f"Найдено несколько подходящих устройств ({1 + len(rivals)}). "
+                    "Укажите точный адрес в поле IP."
                 ),
             )
         return best
@@ -762,25 +762,25 @@ class OfficeLinkSession:
         if not self.has_credentials():
             return SubmitResult(
                 kind="no_key",
-                message="Pairing token yoki admin kaliti kerak.",
+                message="Требуется pairing-токен или ключ администратора.",
             )
 
         for sid in RECONNECT_STEPS:
             step(sid, "pending")
 
         # 1) Web devices first (known hosts help scan priority).
-        step("web", "active", "Webdan qurilmalar olinmoqda…")
+        step("web", "active", "Получение устройств с Web…")
         ok, web_devices, err = self.fetch_web_devices()
         if not ok:
-            step("web", "fail", err or "Web o‘qilmadi")
+            step("web", "fail", err or "Не удалось прочитать Web")
             return SubmitResult(
                 kind="api",
-                message=err or "Webdan qurilmalar o‘qilmadi.",
+                message=err or "Не удалось получить устройства с Web.",
             )
-        step("web", "done", f"Web: {len(web_devices)} ta qurilma")
+        step("web", "done", f"Web: {len(web_devices)} устройств")
 
         # 2) LAN scan
-        step("scan", "active", "Tarmoq skaneri…")
+        step("scan", "active", "Сканирование сети…")
         known = self._priority_hosts(
             ip_hint=(ip_hint or "").strip(),
             web_devices=web_devices,
@@ -791,15 +791,15 @@ class OfficeLinkSession:
             on_status=on_status,
         )
         if not lan:
-            step("scan", "fail", "LAN da topilmadi")
+            step("scan", "fail", "В LAN не найдено")
             return SubmitResult(
                 kind=OFFLINE,
-                message="Qurilma topilmadi yoki onlayn emas. IP yozing yoki Qidirish.",
+                message="Устройство не найдено или не в сети. Укажите IP или выполните поиск.",
             )
-        step("scan", "done", f"LAN: {len(lan)} ta Hikvision")
+        step("scan", "done", f"LAN: {len(lan)} Hikvision")
 
         # 3) Match
-        step("match", "active", "Web bilan solishtirilmoqda…")
+        step("match", "active", "Сравнение с Web…")
         resolved = self.resolve_reconnect_match(
             lan,
             web_devices,
@@ -808,7 +808,7 @@ class OfficeLinkSession:
         )
         if isinstance(resolved, SubmitResult):
             if resolved.kind in (UNAUTHORIZED, "empty", TIMEOUT):
-                step("match", "done", "Solishtirish yakunlandi")
+                step("match", "done", "Сравнение завершено")
                 step("auth", "fail", resolved.message)
             else:
                 step("match", "fail", resolved.message)
@@ -818,9 +818,9 @@ class OfficeLinkSession:
         self.chosen = match.lan
         self._refresh_detected_state()
         change_note = (
-            f"IP o‘zgargan: {match.web.get('host')} → {match.lan.host}"
+            f"IP изменился: {match.web.get('host')} → {match.lan.host}"
             if match.host_changed
-            else f"IP bir xil ({match.lan.host}) — tunnel/GW yangilanadi"
+            else f"IP тот же ({match.lan.host}) — обновление tunnel/GW"
         )
         step(
             "match",
@@ -832,7 +832,7 @@ class OfficeLinkSession:
         step(
             "auth",
             "active",
-            f"Parol OK ({match.password_source}) · serial={match.serial or '—'}",
+            f"Пароль OK ({match.password_source}) · serial={match.serial or '—'}",
         )
         self.auth.record_success()
         self.verified = {
@@ -844,10 +844,10 @@ class OfficeLinkSession:
         }
         self.password = match.password
         self.username = match.username
-        step("auth", "done", f"Parol manbai: {match.password_source}")
+        step("auth", "done", f"Источник пароля: {match.password_source}")
 
         # 5) Link / provision
-        step("link", "active", "Gateway + tunnel + web host yangilanmoqda…")
+        step("link", "active", "Обновление gateway + tunnel + web host…")
         engine = ProvisionEngine()
 
         def _status(msg: str) -> None:
@@ -863,13 +863,13 @@ class OfficeLinkSession:
             on_status=_status,
         )
         if result.kind == "reconnected":
-            step("link", "done", "Tarmoq web bilan sinxron")
+            step("link", "done", "Сеть синхронизирована с Web")
             if isinstance(result.device, dict):
                 result.device["passwordSource"] = match.password_source
                 result.device["hostChanged"] = match.host_changed
                 result.device["serialNumber"] = match.serial
         else:
-            step("link", "fail", result.message or "Ulash xato")
+            step("link", "fail", result.message or "Ошибка подключения")
         return result
 
     def reconnect_network(

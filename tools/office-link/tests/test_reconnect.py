@@ -259,7 +259,7 @@ class ReconnectNetworkTests(unittest.TestCase):
         ):
             r = self.sess.auto_reconnect_network("wrong")
         self.assertEqual(r.kind, UNAUTHORIZED)
-        self.assertIn("Ulash", r.message)
+        self.assertIn("подключение", r.message.lower())
 
 
 if __name__ == "__main__":

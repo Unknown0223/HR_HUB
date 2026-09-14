@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Logger,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { EmploymentStatus, EmploymentType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +18,18 @@ import {
   defaultReportSettings,
   normalizeReportKind,
 } from './report-settings';
+import {
+  buildMatchHits,
+  isExactMatchKind,
+  normalizePassport,
+  normalizePinfl,
+  normalizeText,
+  queryHasMatchSignal,
+  toYmd,
+  type MatchFormerCandidate,
+  type MatchFormerHit,
+  type MatchFormerQuery,
+} from './match-former';
 
 /** Query strings reach us untyped — reject unknown enum values with 400, not a Prisma 500. */
 function assertEnum<T extends Record<string, string>>(
@@ -1831,7 +1849,256 @@ export class EmployeesService {
     };
   }
 
+  private fullNameOf(e: {
+    lastName: string;
+    firstName: string;
+    middleName: string | null;
+  }): string {
+    return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
+  }
+
+  private toMatchCandidate(emp: {
+    id: string;
+    tabNumber: string;
+    status: EmploymentStatus;
+    hiredAt: Date | null;
+    dismissedAt: Date | null;
+    lastName: string;
+    firstName: string;
+    middleName: string | null;
+    division: { name: string } | null;
+    position: { name: string } | null;
+    person: {
+      pinfl: string | null;
+      passport: string | null;
+      birthDate: Date | null;
+    } | null;
+    documents?: { docNumber: string; payload: unknown }[];
+  }): MatchFormerCandidate {
+    let passport = emp.person?.passport || null;
+    if (!passport && emp.documents?.length) {
+      for (const d of emp.documents) {
+        const payload =
+          d.payload && typeof d.payload === 'object'
+            ? (d.payload as Record<string, unknown>)
+            : {};
+        const series = String(payload.series || '').trim();
+        const num = String(d.docNumber || '').trim();
+        if (num) {
+          passport = [series, num].filter(Boolean).join(' ').trim();
+          break;
+        }
+      }
+    }
+    return {
+      employeeId: emp.id,
+      fullName: this.fullNameOf(emp),
+      tabNumber: emp.tabNumber,
+      status: emp.status,
+      hiredAt: toYmd(emp.hiredAt),
+      dismissedAt: toYmd(emp.dismissedAt),
+      division: emp.division?.name || null,
+      position: emp.position?.name || null,
+      pinfl: emp.person?.pinfl || null,
+      passport,
+      birthDate: toYmd(emp.person?.birthDate),
+      lastName: emp.lastName,
+      firstName: emp.firstName,
+      middleName: emp.middleName,
+    };
+  }
+
+  async matchFormer(
+    tenantId: string,
+    query: MatchFormerQuery,
+  ): Promise<{ matches: MatchFormerHit[] }> {
+    if (!queryHasMatchSignal(query)) {
+      return { matches: [] };
+    }
+
+    const or: Prisma.EmployeeWhereInput[] = [];
+    const pinfl = normalizePinfl(query.pinfl);
+    if (pinfl.length >= 10) {
+      or.push({ person: { is: { pinfl } } });
+    }
+    const pass = normalizePassport(query.passportSeries, query.passportNumber);
+    if (pass.length >= 6) {
+      // Loose contains on person.passport; refine in memory.
+      const series = String(query.passportSeries || '').trim();
+      const number = String(query.passportNumber || '').trim();
+      if (number) {
+        or.push({
+          person: {
+            is: {
+              passport: { contains: number, mode: 'insensitive' },
+            },
+          },
+        });
+        or.push({
+          personDocuments: {
+            some: {
+              docNumber: { equals: number, mode: 'insensitive' },
+            },
+          },
+        });
+      }
+      if (series && number) {
+        or.push({
+          person: {
+            is: {
+              passport: {
+                contains: `${series} ${number}`,
+                mode: 'insensitive',
+              },
+            },
+          },
+        });
+      }
+    }
+    const last = normalizeText(query.lastName);
+    const first = normalizeText(query.firstName);
+    if (last && first) {
+      or.push({
+        AND: [
+          { lastName: { equals: query.lastName!.trim(), mode: 'insensitive' } },
+          { firstName: { equals: query.firstName!.trim(), mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (!or.length) return { matches: [] };
+
+    const rows = await this.prisma.employee.findMany({
+      where: {
+        tenantId,
+        status: { in: [EmploymentStatus.dismissed, EmploymentStatus.leave] },
+        OR: or,
+      },
+      take: 40,
+      orderBy: [{ dismissedAt: 'desc' }, { lastName: 'asc' }],
+      select: {
+        id: true,
+        tabNumber: true,
+        status: true,
+        hiredAt: true,
+        dismissedAt: true,
+        lastName: true,
+        firstName: true,
+        middleName: true,
+        division: { select: { name: true } },
+        position: { select: { name: true } },
+        person: {
+          select: { pinfl: true, passport: true, birthDate: true },
+        },
+        personDocuments: {
+          where: { docType: { in: ['PASSPORT', 'ID_CARD'] } },
+          take: 3,
+          select: { docNumber: true, payload: true },
+        },
+      },
+    });
+
+    const candidates = rows.map((r) =>
+      this.toMatchCandidate({
+        ...r,
+        documents: r.personDocuments,
+      }),
+    );
+    return { matches: buildMatchHits(query, candidates, 5) };
+  }
+
+  async findExactFormerConflict(
+    tenantId: string,
+    dto: Pick<
+      CreateEmployeeDto,
+      'pinfl' | 'passportSeries' | 'passportNumber' | 'lastName' | 'firstName' | 'middleName' | 'birthDate'
+    >,
+  ): Promise<MatchFormerHit | null> {
+    const { matches } = await this.matchFormer(tenantId, {
+      pinfl: dto.pinfl,
+      passportSeries: dto.passportSeries,
+      passportNumber: dto.passportNumber,
+      lastName: dto.lastName,
+      firstName: dto.firstName,
+      middleName: dto.middleName,
+      birthDate: dto.birthDate,
+    });
+    return matches.find((m) => isExactMatchKind(m.matchKind)) || null;
+  }
+
+  async rehire(
+    tenantId: string,
+    id: string,
+    opts: { hiredAt?: string; userId?: string | null } = {},
+  ) {
+    const emp = await this.prisma.employee.findFirst({
+      where: { id, tenantId },
+      select: {
+        id: true,
+        status: true,
+        dismissedAt: true,
+        hiredAt: true,
+        tabNumber: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+      },
+    });
+    if (!emp) throw new NotFoundException('Employee not found');
+    if (emp.status === EmploymentStatus.active) {
+      throw new BadRequestException('Сотрудник уже в статусе «Работает»');
+    }
+
+    const hiredAt = opts.hiredAt
+      ? new Date(opts.hiredAt.slice(0, 10))
+      : new Date();
+
+    const updated = await this.prisma.employee.update({
+      where: { id },
+      data: {
+        status: EmploymentStatus.active,
+        dismissedAt: null,
+        hiredAt,
+      },
+      include: {
+        division: { select: { id: true, name: true, code: true } },
+        position: { select: { id: true, name: true, code: true } },
+        region: { select: { id: true, name: true, code: true } },
+        grade: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: opts.userId || undefined,
+        action: 'employee.rehire',
+        entity: 'Employee',
+        entityId: id,
+        meta: {
+          previousStatus: emp.status,
+          previousDismissedAt: emp.dismissedAt?.toISOString() ?? null,
+          hiredAt: hiredAt.toISOString().slice(0, 10),
+          tabNumber: emp.tabNumber,
+          fullName: this.fullNameOf(emp),
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return updated;
+  }
+
   async create(tenantId: string, dto: CreateEmployeeDto) {
+    const exact = await this.findExactFormerConflict(tenantId, dto);
+    if (exact) {
+      throw new ConflictException({
+        message:
+          'Найден уволенный сотрудник с тем же ПИНФЛ/паспортом. Используйте повторный приём.',
+        code: 'FORMER_EMPLOYEE_MATCH',
+        match: exact,
+      });
+    }
+
     const hasPassportBits = Boolean(
       dto.pinfl ||
         dto.birthDate ||

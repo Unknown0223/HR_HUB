@@ -27,16 +27,16 @@ STATE_CONFIGURED = "configured"
 STATE_UNKNOWN = "unknown"
 
 STATE_LABELS_UZ = {
-    STATE_NEW: "Yangi",
-    STATE_CONFIGURED: "Admin bor",
-    STATE_UNKNOWN: "Noma'lum",
+    STATE_NEW: "Новое",
+    STATE_CONFIGURED: "Есть admin",
+    STATE_UNKNOWN: "Неизвестно",
 }
 
 # Clear operator message when activation cannot complete (kept if attempts fail).
 ACTIVATION_STUB_UZ = (
-    "Yangi (aktivatsiya) qurilma uchun avto-sozlash hali to‘liq emas. "
-    "Avval terminalda admin parolini o‘rnating (yoki SADP), keyin «Admin bor» yo‘li bilan ulang. "
-    "Ba’zi Hikvision modellarda ISAPI aktivatsiya ishlamaydi."
+    "Автонастройка для нового (активация) устройства пока неполная. "
+    "Сначала задайте admin-пароль на терминале (или через SADP), затем подключите по пути «Есть admin». "
+    "На некоторых моделях Hikvision ISAPI-активация не работает."
 )
 
 # Common Hikvision activation / status probes (best-effort; model-specific).
@@ -160,7 +160,7 @@ def attempt_factory_activation(
         return {
             "ok": True,
             "reason": "already_activated",
-            "message": "Qurilma allaqachon aktivatsiya qilingan.",
+            "message": "Устройство уже активировано.",
             "meta": meta,
         }
 
@@ -202,7 +202,7 @@ def attempt_factory_activation(
                     return {
                         "ok": True,
                         "reason": "activated",
-                        "message": "Aktivatsiya muvaffaqiyatli (best-effort).",
+                        "message": "Активация успешна (best-effort).",
                         "meta": meta,
                     }
             except (OSError, socket.timeout) as exc:
@@ -367,7 +367,7 @@ class ProvisionEngine:
         # Always invent — operator must not keep this password.
         platform_pwd = generate_terminal_password(username)
 
-        _emit(on_status, "Yangi qurilma: platforma parol o‘ylab aktivatsiya...")
+        _emit(on_status, "Новое устройство: генерация platform-пароля и активация...")
         _progress(
             session,
             status="configuring",
@@ -378,7 +378,7 @@ class ProvisionEngine:
 
         result = attempt_factory_activation(host, platform_pwd, port=port)
         if result.get("ok"):
-            _emit(on_status, "Aktivatsiya OK — boshqaruv platformaga topshirilmoqda...")
+            _emit(on_status, "Активация OK — управление передаётся платформе...")
             _progress(
                 session,
                 status="configuring",
@@ -395,7 +395,7 @@ class ProvisionEngine:
                 rotate_password=False,
             )
 
-        _emit(on_status, "Aktivatsiya muvaffaqiyatsiz — qo‘lda admin o‘rnating.")
+        _emit(on_status, "Активация не удалась — задайте admin вручную.")
         _progress(
             session,
             status="failed",
@@ -427,13 +427,13 @@ class ProvisionEngine:
         if not location_id:
             return SubmitResult(
                 kind="location",
-                message="Lokatsiya tanlanmagan. Ulashdan oldin lokatsiyani tanlang.",
+                message="Локация не выбрана. Выберите локацию перед подключением.",
             )
         password = (password or "").strip()
         if not password:
-            return SubmitResult(kind="empty", message="Parol kiritilmadi.")
+            return SubmitResult(kind="empty", message="Пароль не введён.")
         if not session.chosen:
-            return SubmitResult(kind="no_device", message="Qurilma topilmadi.")
+            return SubmitResult(kind="no_device", message="Устройство не найдено.")
 
         key = read_link_key(session.root)
         pairing = ""
@@ -442,7 +442,7 @@ class ProvisionEngine:
         if not key and not pairing:
             return SubmitResult(
                 kind="no_key",
-                message="Pairing token yoki admin kaliti kerak.",
+                message="Требуется pairing-токен или ключ администратора.",
             )
 
         username = (getattr(session, "username", None) or "admin").strip() or "admin"
@@ -452,9 +452,9 @@ class ProvisionEngine:
             status="configuring",
             step="verify_password",
             percent=20,
-            message="Parol tekshirilmoqda",
+            message="Проверка пароля",
         )
-        _emit(on_status, "Joriy parol tekshirilmoqda...")
+        _emit(on_status, "Проверка текущего пароля...")
         result = verify_password(
             session.chosen.host,
             session.chosen.port,
@@ -464,7 +464,7 @@ class ProvisionEngine:
         if result.kind == TIMEOUT:
             return SubmitResult(
                 kind=TIMEOUT,
-                message="Tarmoq kutish vaqti tugadi. Parol urinishi hisoblanmadi.",
+                message="Таймаут сети. Попытка пароля не засчитана.",
             )
         if result.kind in (UNAUTHORIZED,):
             _progress(
@@ -472,13 +472,13 @@ class ProvisionEngine:
                 status="failed",
                 step="bad_password",
                 percent=20,
-                message="Parol noto‘g‘ri",
+                message="Неверный пароль",
             )
-            return SubmitResult(kind=UNAUTHORIZED, message="Parol noto‘g‘ri.")
+            return SubmitResult(kind=UNAUTHORIZED, message="Неверный пароль.")
         if result.kind != OK:
             return SubmitResult(
                 kind=result.kind,
-                message="Parolni tekshirib bo‘lmadi.",
+                message="Не удалось проверить пароль.",
             )
 
         session.auth.record_success()
@@ -491,11 +491,11 @@ class ProvisionEngine:
                 status="configuring",
                 step="change_password",
                 percent=30,
-                message="Platforma yangi parol o‘rnatmoqda",
+                message="Платформа устанавливает новый пароль",
             )
             _emit(
                 on_status,
-                "1/4 Admin paroli almashtirilmoqda (yangi parol platformaga tegishli)...",
+                "1/4 Смена admin-пароля (новый пароль принадлежит платформе)...",
             )
             changed = change_admin_password(
                 session.chosen.host,
@@ -506,7 +506,7 @@ class ProvisionEngine:
             )
             if not changed.get("ok"):
                 reason = str(changed.get("reason") or "")
-                msg = str(changed.get("message") or "Parolni almashtirib bo‘lmadi")
+                msg = str(changed.get("message") or "Не удалось сменить пароль")
                 _progress(
                     session,
                     status="failed",
@@ -548,14 +548,14 @@ class ProvisionEngine:
                 return SubmitResult(
                     kind=ERROR,
                     message=(
-                        "Parol terminalda o‘zgardi, lekin yangi parol bilan "
-                        "qayta kirib bo‘lmadi. Ulash to‘xtatildi. "
-                        f"TIKLASH PAROLI: {password}"
+                        "Пароль на терминале изменён, но повторный вход с новым паролем не удался. "
+                        "Подключение остановлено. "
+                        f"ПАРОЛЬ ВОССТАНОВЛЕНИЯ: {password}"
                     ),
                 )
-            _emit(on_status, "1/4 Tayyor: yangi admin paroli terminalda ishlayapti (lokal saqlandi)")
+            _emit(on_status, "1/4 Готово: новый admin-пароль работает на терминале (сохранён локально)")
         else:
-            _emit(on_status, "1/4 Parol allaqachon platformaga tegishli")
+            _emit(on_status, "1/4 Пароль уже принадлежит платформе")
 
         # Tiklanish pochtasi (parol unutilganda) — config.json recoveryEmail
         try:
@@ -563,7 +563,7 @@ class ProvisionEngine:
 
             cfg = getattr(session, "cfg", None) or {}
             email_target = normalize_recovery_email(str(cfg.get("recoveryEmail") or ""))
-            _emit(on_status, f"1b/4 Tiklanish pochtasi: {email_target}")
+            _emit(on_status, f"1b/4 Почта восстановления: {email_target}")
             _progress(
                 session,
                 status="configuring",
@@ -581,22 +581,22 @@ class ProvisionEngine:
             if email_res.get("ok"):
                 _emit(
                     on_status,
-                    f"Tiklanish pochtasi o‘rnatildi: {email_res.get('email') or email_target}",
+                    f"Почта восстановления установлена: {email_res.get('email') or email_target}",
                 )
             else:
                 _emit(
                     on_status,
-                    "Tiklanish pochtasini yozib bo‘lmadi "
-                    f"({email_res.get('message') or 'xato'}) — Ulash davom etadi",
+                    "Не удалось записать почту восстановления "
+                    f"({email_res.get('message') or 'ошибка'}) — подключение продолжается",
                 )
         except Exception as exc:
-            _emit(on_status, f"Tiklanish pochtasi: {exc} — Ulash davom etadi")
+            _emit(on_status, f"Почта восстановления: {exc} — подключение продолжается")
 
         # Face anti-spoof / living-body — strongest ISAPI level on this model.
         try:
             from device_security import ensure_live_detection
 
-            _emit(on_status, "1c/4 Yuz aldov himoyasi (professional)…")
+            _emit(on_status, "1c/4 Защита от подмены лица (professional)…")
             _progress(
                 session,
                 status="configuring",
@@ -612,22 +612,22 @@ class ProvisionEngine:
             if live_res.get("ok") and live_res.get("ready"):
                 _emit(
                     on_status,
-                    "Yuz aldov himoyasi: livingBody + professional + anti-attack ON",
+                    "Защита от подмены лица: livingBody + professional + anti-attack ON",
                 )
             elif live_res.get("ok"):
                 _emit(
                     on_status,
-                    "Yuz aldov himoyasi yangilandi "
+                    "Защита от подмены лица обновлена "
                     f"(level={live_res.get('liveDetLevelSet')})",
                 )
             else:
                 _emit(
                     on_status,
-                    "Yuz aldov himoyasini yozib bo‘lmadi "
-                    f"({live_res.get('error') or 'xato'}) — Ulash davom etadi",
+                    "Не удалось записать защиту от подмены лица "
+                    f"({live_res.get('error') or 'ошибка'}) — подключение продолжается",
                 )
         except Exception as exc:
-            _emit(on_status, f"Yuz aldov himoyasi: {exc} — Ulash davom etadi")
+            _emit(on_status, f"Защита от подмены лица: {exc} — подключение продолжается")
 
         session.password = password
         session.location_id = location_id
@@ -646,7 +646,7 @@ class ProvisionEngine:
                 percent=40,
                 message="Gateway",
             )
-            _emit(on_status, "2/4 Gateway + tunnel ochilmoqda...")
+            _emit(on_status, "2/4 Открытие gateway + tunnel...")
             bundle.gw = runtime_setup.start_gateway(
                 session.api_url, gw_key, session.root, on_status
             )
@@ -667,23 +667,22 @@ class ProvisionEngine:
                     status="failed",
                     step="tunnel_url_missing",
                     percent=55,
-                    message="Tunnel URL yo‘q",
+                    message="URL туннеля отсутствует",
                 )
                 return SubmitResult(
                     kind="api",
                     message=(
-                        "Tunnel URL topilmadi. trycloudflare yoki config.json da "
-                        "namedTunnelUrl / cloudflareTunnelToken ni tekshiring."
+                        "URL туннеля не найден. Проверьте trycloudflare или namedTunnelUrl / cloudflareTunnelToken в config.json."
                     ),
                 )
 
-            _emit(on_status, "3/4 Yangi parol + qurilma Web serverga yozilmoqda...")
+            _emit(on_status, "3/4 Запись нового пароля и устройства на Web-сервер...")
             _progress(
                 session,
                 status="configuring",
                 step="ping",
                 percent=65,
-                message="Platforma ping",
+                message="Ping платформы",
             )
             code, _ping = api_client.ping(
                 session.api_url, key, session.tenant, pairing_token=pairing or None
@@ -695,11 +694,11 @@ class ProvisionEngine:
                     status="failed",
                     step="ping_failed",
                     percent=65,
-                    message="Platformaga ulanmadi",
+                    message="Не удалось подключиться к платформе",
                 )
                 return SubmitResult(
                     kind="api",
-                    message="Platformaga ulanmadi. Internet yoki pairing/admin kalitini tekshiring.",
+                    message="Не удалось подключиться к платформе. Проверьте интернет или pairing/ключ администратора.",
                 )
 
             _progress(
@@ -723,11 +722,11 @@ class ProvisionEngine:
                     status="failed",
                     step="announce_failed",
                     percent=75,
-                    message="Tunnel yozilmadi",
+                    message="Туннель не записан",
                 )
                 return SubmitResult(
                     kind="api",
-                    message=f"Tunnel platformaga yozilmadi (HTTP {code}).",
+                    message=f"Туннель не записан на платформу (HTTP {code}).",
                 )
 
             _progress(
@@ -754,7 +753,7 @@ class ProvisionEngine:
                     status="failed",
                     step="register_failed",
                     percent=90,
-                    message="Register xato",
+                    message="Ошибка register",
                 )
                 recovery = (session.password or "").strip()
                 try:
@@ -773,15 +772,15 @@ class ProvisionEngine:
                 except Exception:
                     pass
                 tip = (
-                    f" TIKLASH PAROLI (nusxa oling): {recovery}"
+                    f" ПАРОЛЬ ВОССТАНОВЛЕНИЯ (скопируйте): {recovery}"
                     if recovery
-                    else " data\\device-credential.json ni tekshiring."
+                    else " проверьте data\\device-credential.json."
                 )
                 return SubmitResult(
                     kind="api",
                     message=(
-                        f"Qurilma/parol platformaga yozilmadi (HTTP {code}). "
-                        "Terminaldagi yangi parol lokalga saqlandi."
+                        f"Устройство/пароль не записаны на платформу (HTTP {code}). "
+                        "Новый пароль на терминале сохранён локально."
                         + tip
                     ),
                 )
@@ -828,12 +827,12 @@ class ProvisionEngine:
                 step="awaiting_admin_confirm" if needs_confirm else ("sealed" if sealed else "linked"),
                 percent=90 if needs_confirm else 100,
                 message=(
-                    "Web admindan tasdiq kutilmoqda"
+                    "Ожидается подтверждение web-admin"
                     if needs_confirm
                     else (
-                        "Ulanish mustahkamlandi"
+                        "Подключение закреплено"
                         if sealed
-                        else "Ulandi — boshqaruv Webda"
+                        else "Подключено — управление в Web"
                     )
                 ),
                 device_id=device_id,
@@ -843,30 +842,30 @@ class ProvisionEngine:
             if needs_confirm:
                 _emit(
                     on_status,
-                    "4/4 Parol terminalga o‘rnatildi va Webga yuborildi — admin bildirishnomasidan tasdiqlasin",
+                    "4/4 Пароль установлен на терминале и отправлен на Web — подтвердите в уведомлении admin",
                 )
             elif sealed:
                 _emit(
                     on_status,
-                    "4/4 Ulanish mustahkamlandi: parol serverda saqlandi va GW orqali tasdiqlandi",
+                    "4/4 Подключение закреплено: пароль сохранён на сервере и подтверждён через GW",
                 )
             else:
                 _emit(
                     on_status,
-                    "4/4 Ulandi (parol serverga yozildi). Webdan «Синхронизировать» bosing.",
+                    "4/4 Подключено (пароль записан на сервер). В Web нажмите «Синхронизировать».",
                 )
             return SubmitResult(
                 kind="linked",
                 message=(
-                    "Parol o‘rnatildi va Webga yuborildi. "
-                    "Tenant admin bildirishnomada tasdiqlagach, "
-                    "yuzlar va qurilma to‘liq sinxronlanadi."
+                    "Пароль установлен и отправлен на Web. "
+                    "После подтверждения tenant-admin в уведомлении "
+                    "лица и устройство будут полностью синхронизированы."
                     if needs_confirm
                     else (
-                        "Ulanish mustahkamlandi. Keyingi sozlash faqat Web dan. "
-                        "Yangi admin parol operatorga ko‘rsatilmaydi."
+                        "Подключение закреплено. Дальнейшая настройка только из Web. "
+                        "Новый admin-пароль оператору не показывается."
                         if sealed
-                        else "Ulandi. Yangi admin parol operatorga ko‘rsatilmaydi."
+                        else "Подключено. Новый admin-пароль оператору не показывается."
                     )
                 ),
                 device={
@@ -907,13 +906,13 @@ class ProvisionEngine:
         password = (password or "").strip()
         device_id = (device_id or "").strip()
         if not password:
-            return SubmitResult(kind="empty", message="Parol kiritilmadi.")
+            return SubmitResult(kind="empty", message="Пароль не введён.")
         if not device_id:
-            return SubmitResult(kind="api", message="deviceId yo‘q.")
+            return SubmitResult(kind="api", message="deviceId отсутствует.")
         if not session.chosen:
-            return SubmitResult(kind="no_device", message="Qurilma topilmadi.")
+            return SubmitResult(kind="no_device", message="Устройство не найдено.")
         if not session.verified:
-            return SubmitResult(kind=ERROR, message="Avval parolni tasdiqlang.")
+            return SubmitResult(kind=ERROR, message="Сначала подтвердите пароль.")
 
         key = read_link_key(session.root)
         pairing = ""
@@ -922,7 +921,7 @@ class ProvisionEngine:
         if not key and not pairing:
             return SubmitResult(
                 kind="no_key",
-                message="Pairing token yoki admin kaliti kerak.",
+                message="Требуется pairing-токен или ключ администратора.",
             )
 
         username = (getattr(session, "username", None) or "admin").strip() or "admin"
@@ -945,7 +944,7 @@ class ProvisionEngine:
                 message="Gateway",
                 device_id=device_id,
             )
-            _emit(on_status, "1/3 Gateway + tunnel ochilmoqda...")
+            _emit(on_status, "1/3 Открытие gateway + tunnel...")
             bundle.gw = runtime_setup.start_gateway(
                 session.api_url, gw_key, session.root, on_status
             )
@@ -965,12 +964,11 @@ class ProvisionEngine:
                 return SubmitResult(
                     kind="api",
                     message=(
-                        "Tunnel URL topilmadi. trycloudflare yoki config.json da "
-                        "namedTunnelUrl / cloudflareTunnelToken ni tekshiring."
+                        "URL туннеля не найден. Проверьте trycloudflare или namedTunnelUrl / cloudflareTunnelToken в config.json."
                     ),
                 )
 
-            _emit(on_status, "2/3 Tunnel platformaga yozilmoqda...")
+            _emit(on_status, "2/3 Запись туннеля на платформу...")
             code, _ping = api_client.ping(
                 session.api_url, key, session.tenant, pairing_token=pairing or None
             )
@@ -978,7 +976,7 @@ class ProvisionEngine:
                 bundle.stop()
                 return SubmitResult(
                     kind="api",
-                    message="Platformaga ulanmadi. Internet yoki pairing/admin kalitini tekshiring.",
+                    message="Не удалось подключиться к платформе. Проверьте интернет или pairing/ключ администратора.",
                 )
 
             code, _ann = api_client.announce(
@@ -992,10 +990,10 @@ class ProvisionEngine:
                 bundle.stop()
                 return SubmitResult(
                     kind="api",
-                    message=f"Tunnel platformaga yozilmadi (HTTP {code}).",
+                    message=f"Туннель не записан на платформу (HTTP {code}).",
                 )
 
-            _emit(on_status, "3/3 Yangi IP serverga yozilmoqda (parol o‘zgarmaydi)...")
+            _emit(on_status, "3/3 Запись нового IP на сервер (пароль не меняется)...")
             _progress(
                 session,
                 status="configuring",
@@ -1022,7 +1020,7 @@ class ProvisionEngine:
                 return SubmitResult(
                     kind="api",
                     message=(
-                        f"Tarmoq yangilanmadi (HTTP {code}). {tip}".strip()
+                        f"Сеть не обновлена (HTTP {code}). {tip}".strip()
                     ),
                 )
 
@@ -1058,13 +1056,13 @@ class ProvisionEngine:
                 status="linked",
                 step="reconnected",
                 percent=100,
-                message="Tarmoq yangilandi",
+                message="Сеть обновлена",
                 device_id=device_id,
             )
-            _emit(on_status, "Tarmoq yangilandi — parol o‘zgarmadi, yuzlar saqlanadi")
+            _emit(on_status, "Сеть обновлена — пароль не изменился, лица сохранены")
             return SubmitResult(
                 kind="reconnected",
-                message="Tarmoq yangilandi. Parol o‘zgarmadi, yuzlar qayta yuklanmaydi.",
+                message="Сеть обновлена. Пароль не изменился, лица не перезагружаются.",
                 device={
                     "name": name,
                     "host": host,

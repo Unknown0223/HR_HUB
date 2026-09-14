@@ -24,10 +24,10 @@ def hikvision_password_error(password: str, username: str = "") -> str | None:
     """Match device-gw MinMoe rules (8–16 chars, ≥2 classes, no username)."""
     pwd = password or ""
     if len(pwd) < 8 or len(pwd) > 16:
-        return "Parol 8–16 belgidan iborat bo‘lishi kerak"
+        return "Пароль должен содержать 8–16 символов"
     user = (username or "").strip()
     if user and user.lower() in pwd.lower():
-        return "Parol foydalanuvchi nomini o‘z ichiga olmasligi kerak"
+        return "Пароль не должен содержать имя пользователя"
     classes = 0
     if any(c.islower() for c in pwd):
         classes += 1
@@ -38,7 +38,7 @@ def hikvision_password_error(password: str, username: str = "") -> str | None:
     if any(not c.isalnum() for c in pwd):
         classes += 1
     if classes < 2:
-        return "Kamida 2 xil belgi turi kerak (katta/kichik/raqam/maxsus)"
+        return "Нужно минимум 2 типа символов (верхний/нижний регистр/цифры/спецсимволы)"
     return None
 
 
@@ -167,7 +167,7 @@ def change_admin_password(
     old_password = (old_password or "").strip()
     new_password = (new_password or "").strip()
     if not host or not old_password or not new_password:
-        return {"ok": False, "reason": "missing", "message": "Parol yoki host yo‘q"}
+        return {"ok": False, "reason": "missing", "message": "Пароль или host отсутствует"}
     rule = hikvision_password_error(new_password, user)
     if rule:
         return {"ok": False, "reason": "policy", "message": rule}
@@ -195,25 +195,25 @@ def change_admin_password(
             timeout=timeout,
         )
     except (socket.timeout, TimeoutError):
-        return {"ok": False, "reason": TIMEOUT, "message": "Tarmoq kutish vaqti tugadi"}
+        return {"ok": False, "reason": TIMEOUT, "message": "Таймаут сети"}
     except OSError as exc:
         msg = str(exc).lower()
         if "timed out" in msg or "timeout" in msg:
-            return {"ok": False, "reason": TIMEOUT, "message": "Tarmoq kutish vaqti tugadi"}
-        return {"ok": False, "reason": OFFLINE, "message": f"Tarmoq xatosi: {exc}"[:160]}
+            return {"ok": False, "reason": TIMEOUT, "message": "Таймаут сети"}
+        return {"ok": False, "reason": OFFLINE, "message": f"Ошибка сети: {exc}"[:160]}
 
     if status == 401:
         return {
             "ok": False,
             "reason": UNAUTHORIZED,
-            "message": "Joriy parol noto‘g‘ri yoki ruxsat yo‘q",
+            "message": "Текущий пароль неверный или нет доступа",
         }
     if status >= 400:
         detail = (body or b"")[:240].decode("utf-8", errors="replace")
         return {
             "ok": False,
             "reason": ERROR,
-            "message": f"Terminal parolni rad etdi (HTTP {status}): {detail}",
+            "message": f"Терминал отклонил пароль (HTTP {status}): {detail}",
         }
 
     check = verify_password(host, port, user, new_password, timeout=min(timeout, 8.0))
@@ -221,6 +221,6 @@ def change_admin_password(
         return {
             "ok": False,
             "reason": "verify_failed",
-            "message": "Parol o‘zgardi, lekin yangi parol bilan tekshirib bo‘lmadi",
+            "message": "Пароль изменён, но проверка с новым паролем не удалась",
         }
-    return {"ok": True, "reason": "changed", "message": "Parol platformaga topshirildi", "userId": uid}
+    return {"ok": True, "reason": "changed", "message": "Пароль передан платформе", "userId": uid}

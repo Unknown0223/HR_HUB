@@ -46,9 +46,9 @@ def save_device_credential(
         "phase": phase,
         "savedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "note": (
-            "HR HUB Link recovery — yangi admin parol. "
-            "Web vault ishlamasa shu fayldan tiklang. "
-            "Admin menyu: «Saqlangan parolni ko‘rsat»."
+            "HR HUB Link recovery — новый admin-пароль. "
+            "Если Web vault не работает — восстановите из этого файла. "
+            "Меню Admin: «Показать сохранённый пароль»."
         ),
     }
     path = credential_file(root)
@@ -80,20 +80,20 @@ def format_credential_for_display(data: dict[str, Any] | None) -> str:
     path = credential_file(find_root())
     if not data:
         return (
-            "Saqlangan parol yo‘q.\n\n"
-            "Sabab: hali «Ulash» muvaffaqiyatli tugamagan yoki fayl yozilmagan.\n"
-            "Ulashdan keyin fayl shu yerda paydo bo‘ladi:\n"
+            "Сохранённый пароль отсутствует.\n\n"
+            "Причина: подключение ещё не завершено успешно или файл не записан.\n"
+            "После подключения файл появится здесь:\n"
             f"{path}\n\n"
-            "Eslatma: Program Files ga yozib bo‘lmasa, fayl "
-            "%LOCALAPPDATA%\\HRHUB-Link\\data\\ ichida bo‘ladi."
+            "Примечание: если нельзя писать в Program Files, файл будет в "
+            "%LOCALAPPDATA%\\HRHUB-Link\\data\\."
         )
     return (
         f"Host: {data.get('host') or '—'}\n"
         f"Port: {data.get('port') or 80}\n"
         f"Login: {data.get('username') or 'admin'}\n"
-        f"Parol: {data.get('password')}\n"
+        f"Пароль: {data.get('password')}\n"
         f"Serial: {data.get('serialNumber') or '—'}\n"
-        f"Bosqich: {data.get('phase') or '—'}\n"
-        f"Saqlangan: {data.get('savedAt') or '—'}\n"
-        f"Fayl: {path}"
+        f"Этап: {data.get('phase') or '—'}\n"
+        f"Сохранено: {data.get('savedAt') or '—'}\n"
+        f"Файл: {path}"
     )

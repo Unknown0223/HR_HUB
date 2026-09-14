@@ -41,7 +41,7 @@ class SessionPasswordTests(unittest.TestCase):
             ) as vp:
                 r = self.sess.submit_password("bad-one")
         self.assertEqual(r.kind, CONFIRM)
-        self.assertIn("Qayta", r.message)
+        self.assertIn("снова", r.message)
         vp.assert_called_once()
 
     def test_second_401_locks_and_no_further_verify(self):
@@ -107,6 +107,7 @@ class MockedLinkTests(unittest.TestCase):
             "model": "DS",
         }
         sess.password = "GoodPass1"
+        sess.set_location_id("loc-test-uuid")
 
         class DummyBundle:
             def __init__(self):
@@ -120,6 +121,14 @@ class MockedLinkTests(unittest.TestCase):
 
         dummy = DummyBundle()
 
+        ok = VerifyResult(
+            kind=OK,
+            host="192.168.1.50",
+            port=80,
+            name="Gate",
+            serialNumber="SN",
+            model="DS",
+        )
         with patch("runtime_setup.ensure_runtime"), patch(
             "runtime_setup.ServiceBundle", return_value=dummy
         ), patch("runtime_setup.start_gateway", return_value=object()), patch(
@@ -128,11 +137,30 @@ class MockedLinkTests(unittest.TestCase):
             "api_client.announce", return_value=(200, {"ok": True})
         ) as ann, patch(
             "api_client.register_device",
-            return_value=(200, {"ok": True, "device": {"name": "Gate", "host": "192.168.1.50"}}),
-        ) as reg, patch("session.read_link_key", return_value="dummy-key"):
+            return_value=(
+                200,
+                {
+                    "ok": True,
+                    "device": {"name": "Gate", "host": "192.168.1.50", "id": "dev-1"},
+                },
+            ),
+        ) as reg, patch("session.read_link_key", return_value="dummy-key"), patch(
+            "provision.verify_password", return_value=ok
+        ), patch(
+            "passwords.change_admin_password",
+            return_value={"ok": True, "message": "Пароль передан платформе"},
+        ), patch(
+            "passwords.generate_terminal_password", return_value="HrHub9xK2mP4q"
+        ), patch("credential_store.save_device_credential"), patch(
+            "device_email.apply_recovery_email_from_config",
+            return_value={"ok": True, "email": "r@example.com"},
+        ), patch(
+            "device_security.ensure_live_detection",
+            return_value={"ok": True, "ready": True},
+        ):
             r = sess.link_to_cloud()
         self.assertEqual(r.kind, "linked")
-        self.assertEqual(r.message, "Ulandi")
+        self.assertIn("Пароль", r.message)
         ann.assert_called_once()
         reg.assert_called_once()
         self.assertNotIn("dummy-key", json.dumps(r.device))
