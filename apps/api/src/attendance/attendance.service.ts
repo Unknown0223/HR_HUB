@@ -32,6 +32,11 @@ import {
   type OfficeLinkBindPayload,
 } from './office-link-bind';
 import {
+  buildHikPushHostConfig,
+  parseHikvisionEventBody,
+  type HikPushHostConfig,
+} from './hikvision-event.parser';
+import {
   CreateDeviceDto,
   CreateLocationDto,
   CreateProductionCalendarDto,
@@ -978,6 +983,24 @@ export class AttendanceService {
     await this.appendCommands(tenantId, deviceId, [cmd]);
   }
 
+  private isGwConnectivityError(msg: string): boolean {
+    const m = (msg || '').toLowerCase();
+    return (
+      m.includes('device gateway not reachable') ||
+      m.includes('econnrefused') ||
+      m.includes('enotfound') ||
+      m.includes('fetch failed') ||
+      m.includes('network') ||
+      m.includes('timed out') ||
+      m.includes('timeout') ||
+      m.includes('502') ||
+      m.includes('503') ||
+      m.includes('bad gateway') ||
+      m.includes('trycloudflare') ||
+      m.includes('tunnel')
+    );
+  }
+
   async syncDevice(
     tenantId: string,
     id: string,
@@ -993,6 +1016,13 @@ export class AttendanceService {
     if (!gatewayRef) {
       throw new BadGatewayException(
         'Device gateway not registered — PC office-link (GW+tunnel) ishga tushiring',
+      );
+    }
+    // Do not burn the whole queue as "failed" when the terminal is offline.
+    if ((refreshed.status || '').toLowerCase() !== 'online') {
+      const host = refreshed.host || 'unknown';
+      throw new BadGatewayException(
+        `Устройство offline (${host}) — терминални yoqing / IP ni tekshiring, keyin office-link Ulash + Web «Синхронизировать»`,
       );
     }
 
@@ -1050,7 +1080,7 @@ export class AttendanceService {
                   lastError: 'No face photo on employee',
                 },
               });
-              return { ok: false as const, name };
+              return { ok: false as const, name, connectivity: false as const };
             }
             const res = await this.gw.syncFace(gatewayRef, {
               employee_external_id: empNo,
@@ -1074,25 +1104,49 @@ export class AttendanceService {
                 lastError: ok ? null : 'Device rejected face enroll',
               },
             });
-            return { ok, name };
+            return { ok, name, connectivity: false as const };
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
+            const connectivity = this.isGwConnectivityError(msg);
             await this.prisma.deviceFaceSync.update({
               where: { id: fs.id },
-              data: { syncStatus: FaceSyncStatus.failed, lastError: msg },
+              data: {
+                // Keep queue retryable when GW/tunnel/device path is down.
+                syncStatus: connectivity
+                  ? FaceSyncStatus.pending
+                  : FaceSyncStatus.failed,
+                lastError: msg,
+              },
             });
-            return { ok: false as const, name };
+            return { ok: false as const, name, connectivity, error: msg };
           }
         }),
       );
+      const linkDown = results.find((r) => r.connectivity);
       for (const r of results) {
         if (r.ok) synced += 1;
-        else failed += 1;
+        else if (!r.connectivity) failed += 1;
         commandBatch.push({
           type: 'Person Edit',
           employeeName: r.name,
           status: r.ok ? 'completed' : 'failed',
         });
+      }
+      if (linkDown) {
+        const remainingIds = faceSyncs.slice(i + concurrency).map((fs) => fs.id);
+        if (remainingIds.length) {
+          await this.prisma.deviceFaceSync.updateMany({
+            where: { id: { in: remainingIds } },
+            data: {
+              syncStatus: FaceSyncStatus.pending,
+              lastError: 'Paused — gateway/device unreachable',
+            },
+          });
+        }
+        throw new BadGatewayException(
+          linkDown.error ||
+            'Device gateway/terminal unreachable — office-link (GW+tunnel) va qurilmani tekshiring',
+        );
       }
       const counts = await this.faceSyncCounts(tenantId, id);
       await this.writePersonsSyncProgress(tenantId, id, {
@@ -1303,8 +1357,13 @@ export class AttendanceService {
     action: 'heartbeat' | 'sync' | 'sync_clock' | 'pull_events' | 'open_door' | 'reboot',
   ) {
     if (action === 'sync') {
-      const synced = await this.syncDevice(tenantId, id);
-      return { ...synced, ok: true, action, message: 'Синхронизация выполнена' };
+      const queued = await this.syncDevicePersons(tenantId, id, { force: true });
+      return {
+        ...queued,
+        ok: true,
+        action,
+        message: 'Очередь лиц подготовлена — загрузите с телефона (Yuzlarni yuklash)',
+      };
     }
     if (action === 'heartbeat') {
       const device = await this.heartbeat(tenantId, id);
@@ -2607,10 +2666,13 @@ export class AttendanceService {
 
     await this.credentialAudit.record(tenantId, device.id, 'sync', actor);
 
+    const hikPush = await this.ensureHikPushConfig(device.id, tenantId);
+
     return {
       ok: true,
       reconnected: true,
       gwVerified: gwOk,
+      hikPush,
       device: {
         id: final.id,
         name: final.name,
@@ -2622,6 +2684,224 @@ export class AttendanceService {
         gatewayRef: final.gatewayRef,
       },
     };
+  }
+
+  /** Ensure device.meta.hikPush.pushToken exists; return HttpHost config for Ulash. */
+  async ensureHikPushConfig(deviceId: string, tenantId: string): Promise<HikPushHostConfig> {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, tenantId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+    const meta = this.asMeta(device.meta);
+    const prev =
+      meta.hikPush && typeof meta.hikPush === 'object' && !Array.isArray(meta.hikPush)
+        ? { ...(meta.hikPush as Record<string, unknown>) }
+        : {};
+    let token = String(prev.pushToken || '').trim();
+    if (!token || token.length < 24) {
+      token = randomBytes(24).toString('hex');
+    }
+    const apiBase = this.resolvePublicApiUrl();
+    const cfg = buildHikPushHostConfig(apiBase, token);
+    meta.hikPush = {
+      ...prev,
+      pushToken: token,
+      protocol: cfg.protocolType,
+      hostName: cfg.hostName,
+      portNo: cfg.portNo,
+      urlPath: cfg.urlPath,
+      configuredAt: new Date().toISOString(),
+      mode: 'device_http_host',
+    };
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: { meta: meta as Prisma.InputJsonValue },
+    });
+    return cfg;
+  }
+
+  /**
+   * Terminal → cloud punch push (HttpHostNotification). Auth = URL pushToken.
+   */
+  async ingestHikvisionHttpHostEvent(
+    pushToken: string,
+    body: string | Buffer | Record<string, unknown> | null,
+    contentType?: string,
+  ) {
+    const token = (pushToken || '').trim();
+    if (!token || token.length < 16) {
+      throw new BadRequestException('Invalid push token');
+    }
+    const device = await this.prisma.device.findFirst({
+      where: {
+        isActive: true,
+        meta: { path: ['hikPush', 'pushToken'], equals: token },
+      },
+    });
+    if (!device) {
+      throw new NotFoundException('Unknown device push token');
+    }
+
+    const punches = parseHikvisionEventBody(body, contentType);
+    if (!punches.length) {
+      // Hikvision retries on non-2xx; acknowledge empty/keepalive payloads.
+      return { ok: true, ingested: 0, ignored: true };
+    }
+
+    const results: Array<{ ok: boolean; reason?: string }> = [];
+    for (const p of punches) {
+      const dir =
+        p.direction === 'IN'
+          ? PunchDirection.IN
+          : p.direction === 'OUT'
+            ? PunchDirection.OUT
+            : PunchDirection.AUTO;
+      let occurredAt = p.occurredAt;
+      try {
+        const d = new Date(occurredAt);
+        if (Number.isNaN(d.getTime())) occurredAt = new Date().toISOString();
+        else occurredAt = d.toISOString();
+      } catch {
+        occurredAt = new Date().toISOString();
+      }
+      const res = await this.ingestPunch({
+        tenantId: device.tenantId,
+        deviceId: device.id,
+        gatewayRef: device.gatewayRef || device.id,
+        serialNumber: device.serialNumber || undefined,
+        employeeExternalId: p.employeeExternalId,
+        direction: dir,
+        occurredAt,
+        source: 'hikvision_http_host',
+        raw: p.raw,
+      });
+      results.push(res as { ok: boolean; reason?: string });
+    }
+
+    const meta = this.asMeta(device.meta);
+    const prev =
+      meta.hikPush && typeof meta.hikPush === 'object' && !Array.isArray(meta.hikPush)
+        ? { ...(meta.hikPush as Record<string, unknown>) }
+        : {};
+    meta.hikPush = {
+      ...prev,
+      lastEventAt: new Date().toISOString(),
+      lastIngested: results.filter((r) => r.ok).length,
+    };
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        status: 'online',
+        lastSeenAt: new Date(),
+        meta: meta as Prisma.InputJsonValue,
+      },
+    });
+
+    return {
+      ok: true,
+      ingested: results.filter((r) => r.ok).length,
+      results,
+    };
+  }
+
+  /**
+   * Pending faces for on-demand LAN enroll from phone/PC Link (no always-on GW).
+   */
+  async officeLinkPendingFaces(tenantId: string, deviceId: string) {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, tenantId },
+      select: { id: true, host: true, port: true, username: true },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
+    const rows = await this.prisma.deviceFaceSync.findMany({
+      where: {
+        tenantId,
+        deviceId,
+        syncStatus: {
+          in: [FaceSyncStatus.pending, FaceSyncStatus.failed, FaceSyncStatus.syncing],
+        },
+      },
+      include: {
+        faceProfile: {
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                tabNumber: true,
+                externalId: true,
+              },
+            },
+          },
+        },
+      },
+      take: 40,
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    const items: Array<{
+      faceSyncId: string;
+      employeeId: string;
+      employeeNo: string;
+      employeeName: string;
+      faceBase64: string | null;
+    }> = [];
+
+    for (const row of rows) {
+      const emp = row.faceProfile.employee;
+      const faceB64 = await this.resolveFaceBase64(row.faceProfile);
+      items.push({
+        faceSyncId: row.id,
+        employeeId: emp.id,
+        employeeNo: this.deviceEmployeeNo(emp),
+        employeeName: [emp.lastName, emp.firstName].filter(Boolean).join(' '),
+        faceBase64: faceB64,
+      });
+    }
+
+    return {
+      ok: true,
+      device: {
+        id: device.id,
+        host: device.host,
+        port: device.port || 80,
+        username: device.username || 'admin',
+      },
+      items,
+      count: items.length,
+    };
+  }
+
+  async officeLinkAckFaceSync(
+    tenantId: string,
+    deviceId: string,
+    faceSyncId: string,
+    dto: { ok: boolean; error?: string },
+  ) {
+    const row = await this.prisma.deviceFaceSync.findFirst({
+      where: { id: faceSyncId, tenantId, deviceId },
+    });
+    if (!row) throw new NotFoundException('Face sync row not found');
+    const ok = Boolean(dto.ok);
+    await this.prisma.deviceFaceSync.update({
+      where: { id: row.id },
+      data: {
+        syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
+        lastSyncedAt: ok ? new Date() : undefined,
+        lastError: ok ? null : (dto.error || 'LAN enroll failed').slice(0, 400),
+      },
+    });
+    await this.prisma.faceProfile.update({
+      where: { id: row.faceProfileId },
+      data: {
+        syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
+        lastSyncedAt: ok ? new Date() : undefined,
+        lastError: ok ? null : (dto.error || 'LAN enroll failed').slice(0, 400),
+      },
+    });
+    return { ok: true, faceSyncId, synced: ok };
   }
 
   async officeLinkDevice(
@@ -2817,6 +3097,7 @@ export class AttendanceService {
       sealed: false,
       needsAdminConfirm: true,
       gwVerified: gwOk,
+      hikPush: await this.ensureHikPushConfig(device.id, tenant.id),
       device: {
         id: device.id,
         name: device.name,

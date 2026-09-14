@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -322,11 +323,43 @@ export class AttendanceController {
   @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Post('devices/:id/sync')
-  syncDevice(
+  async syncDevice(
     @CurrentTenant() tenantId: string | null,
     @Param('id') id: string,
   ) {
-    return this.attendance.syncDevice(this.attendance.requireTenant(tenantId), id);
+    const tid = this.attendance.requireTenant(tenantId);
+    // Queue like persons/sync so the Web confirm modal is not blocked for minutes.
+    const queued = await this.attendance.syncDevicePersons(tid, id, {
+      force: true,
+    });
+    return { ok: true, queued: true, persons: queued };
+  }
+
+  /**
+   * Hikvision HttpHostNotification → cloud punches (no PC gateway required).
+   * Auth is the per-device pushToken in the URL path.
+   */
+  @Public()
+  @SkipTenant()
+  @HttpCode(200)
+  @Post('hikvision/events/:pushToken')
+  async hikvisionHttpHostEvent(
+    @Param('pushToken') pushToken: string,
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    const ct = String(req.headers['content-type'] || '');
+    let payload: string | Buffer | Record<string, unknown> | null = null;
+    if (body && typeof body === 'object' && !Buffer.isBuffer(body)) {
+      payload = body as Record<string, unknown>;
+    } else if (typeof body === 'string') {
+      payload = body;
+    } else if (Buffer.isBuffer(body)) {
+      payload = body;
+    } else if (typeof (req as { rawBody?: Buffer }).rawBody !== 'undefined') {
+      payload = (req as { rawBody?: Buffer }).rawBody || null;
+    }
+    return this.attendance.ingestHikvisionHttpHostEvent(pushToken, payload, ct);
   }
 
   @ApiBearerAuth()

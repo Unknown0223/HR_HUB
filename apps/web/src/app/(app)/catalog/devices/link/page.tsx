@@ -277,12 +277,11 @@ export default function DeviceLinkPage() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <p className={styles.serviceNote}>
-        <strong>Faza 2 (Service):</strong> GUI yopilganda tunnel/GW ishlashi uchun Windows Service
-        o‘rnatish mumkin (`install-service.bat` / <code>SERVICE.txt</code>). Yo‘riqnoma:{' '}
-        <code>tools/office-link/QOLLAMA.txt</code>.
+        <strong>Asosiy:</strong> telefon Ulash → otmetkalar terminaldan webga (HttpHost).
+        Yuzlar: Web «Синхронизировать» → telefon <strong>Yuzlarni yuklash</strong> (ofis Wi‑Fi).
         {' '}
-        Wi‑Fi o‘zgasa office-link → <strong>Tarmoqni qayta ulash</strong> (parol va yuzlar
-        saqlanadi; to‘liq Ulash shart emas).
+        Wi‑Fi o‘zgasa → <strong>Tarmoqni qayta ulash</strong>. PC GW+tunnel — ixtiyoriy fallback
+        (`START-GW.bat` / <code>SERVICE.txt</code>).
       </p>
 
       <div className={styles.grid}>
@@ -354,9 +353,9 @@ export default function DeviceLinkPage() {
             {bind?.androidApkAvailable !== false ? (
               <>
                 {' '}
-                Android APK: telefon/planshetda o‘rnating, xuddi Windows kabi
-                pairing token + Ulash. Yuz sinxroni uchun ofis PC da office-link
-                (GW+tunnel) ishlashi kerak.
+                Android APK: telefon/planshetda o‘rnating, pairing token + Ulash.
+                Otmetkalar terminaldan to‘g‘ridan webga ketadi. Yuzlar uchun ofis
+                Wi‑Fi da Link → «Yuzlarni yuklash» (PC tunnel majburiy emas).
               </>
             ) : null}
           </p>

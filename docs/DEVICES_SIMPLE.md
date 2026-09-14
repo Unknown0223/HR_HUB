@@ -1,33 +1,34 @@
 # Qurilmalarni Railway platformaga ulash (sodda)
 
-## Bitta buyruq
+## Asosiy yo‘l (tavsiya): telefon Link — setup-only
+
+1. Web → **Устройства → Привязка** → pairing token
+2. Ofis Wi‑Fi da **HR HUB Link (Android)** → Ulash (`192.168.x.x`)
+3. Webda **«Подтвердить привязку»**
+4. Ilovani yopishingiz mumkin
+
+| Funksiya | Qanday ishlaydi |
+|----------|-----------------|
+| Otmetkalar | Terminal **HttpHostNotification** → HTTPS → Railway API |
+| Yangi yuzlar | Web «Синхронизировать» (navbat) → telefon **«Yuzlarni yuklash»** (qisqa, ofis Wi‑Fi) |
+| Doimiy ochiq PC | **Kerak emas** |
+
+Wi‑Fi / IP o‘zgasa: telefon → **Tarmoqni qayta ulash** (host yangilanadi + HttpHost qayta yoziladi).
+
+## Fallback: ofis PC + tunnel
+
+Agar HttpHost firmware da ishlamasa yoki masofaviy ISAPI kerak bo‘lsa:
 
 ```powershell
-cd D:\hr-hub
-npm run devices:up
+cd D:\hr-hub\tools\office-link
+.\START-GW.bat
 ```
 
-Bu avtomatik:
+yoki `npm run devices:up` — lokal device-gw + Cloudflare tunnel.
 
-1. Lokal **device-gw** ni yoqadi (Hikvision bilan gaplashadi)
-2. **Cloudflare tunnel** ochadi (internet orqali Railway topadi)
-3. Railway dagi `DEVICE_GW_URL` ni yangilaydi
+Bu **ixtiyoriy** fallback; asosiy rejim — terminal → web push + telefon on-demand yuz.
 
-To‘xtatish: `Ctrl+C`
+## Demo
 
-## Keyin brauzerda
-
-1. https://hr-hubweb-production.up.railway.app  
-2. `admin@demo.local` / `Demo1234!`  
-3. **Каталог → Устройства** — har bir terminalni qo‘shing (IP + admin + parol)  
-4. Register / Online → ishlatishingiz mumkin  
-
-## Nima uchun shunday?
-
-| Nima | Qayerda | Nima uchun |
-|------|---------|------------|
-| Web / API / DB | Railway (cloud) | Har joydan ochiladi |
-| Device gateway | Sizning PC (LAN) | Terminal lokal IP da |
-| Tunnel | Cloudflare | Cloud ↔ PC bog‘lanishi |
-
-Bitta PC + bitta `npm run devices:up` = shu ofisdagi **barcha** Face ID terminallar Railway ga ulanadi.
+- Web: https://hr-hubweb-production.up.railway.app  
+- `admin@demo.local` / `Demo1234!`

@@ -5,6 +5,7 @@ import {
   ExecutionContext,
   Get,
   HttpCode,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -112,5 +113,65 @@ export class OfficeLinkController {
       });
     }
     return this.attendance.officeLinkReconnectByCode(dto.tenantCode || 'demo', dto);
+  }
+
+  /** Pending faces for on-demand LAN enroll (phone/PC on office Wi‑Fi). */
+  @Get('devices/:deviceId/pending-faces')
+  pendingFaces(
+    @Param('deviceId') deviceId: string,
+    @Query('tenantCode') tenantCode?: string,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    if (auth?.pairing?.tenantId) {
+      return this.attendance.officeLinkPendingFaces(
+        auth.pairing.tenantId,
+        deviceId,
+      );
+    }
+    return this.attendance.resolveTenantByCode(tenantCode || 'demo').then((t) =>
+      this.attendance.officeLinkPendingFaces(t.id, deviceId),
+    );
+  }
+
+  @Post('devices/:deviceId/faces/:faceSyncId/ack')
+  @HttpCode(200)
+  ackFace(
+    @Param('deviceId') deviceId: string,
+    @Param('faceSyncId') faceSyncId: string,
+    @Body() body: { ok?: boolean; error?: string },
+    @Query('tenantCode') tenantCode?: string,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    const dto = { ok: Boolean(body?.ok), error: body?.error };
+    if (auth?.pairing?.tenantId) {
+      return this.attendance.officeLinkAckFaceSync(
+        auth.pairing.tenantId,
+        deviceId,
+        faceSyncId,
+        dto,
+      );
+    }
+    return this.attendance.resolveTenantByCode(tenantCode || 'demo').then((t) =>
+      this.attendance.officeLinkAckFaceSync(t.id, deviceId, faceSyncId, dto),
+    );
+  }
+
+  @Post('devices/:deviceId/ensure-push')
+  @HttpCode(200)
+  ensurePush(
+    @Param('deviceId') deviceId: string,
+    @Query('tenantCode') tenantCode?: string,
+    @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
+  ) {
+    if (auth?.pairing?.tenantId) {
+      return this.attendance
+        .ensureHikPushConfig(deviceId, auth.pairing.tenantId)
+        .then((hikPush) => ({ ok: true, hikPush }));
+    }
+    return this.attendance.resolveTenantByCode(tenantCode || 'demo').then((t) =>
+      this.attendance
+        .ensureHikPushConfig(deviceId, t.id)
+        .then((hikPush) => ({ ok: true, hikPush })),
+    );
   }
 }

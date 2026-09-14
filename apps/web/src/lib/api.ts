@@ -49,8 +49,8 @@ function sanitizeApiErrorMessage(message: string, fallback: string): string {
     (lower.includes('<title>') && lower.includes('<'))
   ) {
     return (
-      'Связь с терминалом недоступна (Cloudflare tunnel / office-link). ' +
-      'Запустите HR HUB Link и повторите.'
+      'Связь с терминалом по LAN сейчас недоступна. ' +
+      'Otmetkalar: terminal HttpHost → web. Yuzlar: ofis Wi‑Fi da telefon Link → «Yuzlarni yuklash».'
     );
   }
   return msg.length > 280 ? `${msg.slice(0, 280)}…` : msg;

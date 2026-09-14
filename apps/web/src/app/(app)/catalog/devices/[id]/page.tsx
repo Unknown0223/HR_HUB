@@ -592,22 +592,23 @@ function DeviceDetailInner() {
   }
 
   async function doSync() {
+    setSyncOpen(false);
     setBusy(true);
     setError('');
-    setSyncNotice('');
+    setSyncNotice('Очередь лиц готовится…');
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
-      setSyncOpen(false);
-      setSyncNotice('Синхронизация лиц запущена');
+      setSyncNotice(
+        'Очередь лиц готова. Ofis Wi‑Fi da telefon HR HUB Link → «Yuzlarni yuklash».',
+      );
       await loadDevice();
       await loadSyncProgress();
       await loadTabData();
     } catch (e) {
-      setSyncOpen(false);
       setError(
         e instanceof Error
           ? e.message
-          : 'Синхронизация не удалась — проверьте office-link / DEVICE_GW_URL',
+          : 'Не удалось поставить лица в очередь',
       );
       await loadSyncProgress().catch(() => undefined);
     } finally {
@@ -835,13 +836,38 @@ function DeviceDetailInner() {
                   под контролем другого сотрудника.
                 </div>
               ) : null}
+              {(device.meta as { hikPush?: { mode?: string; lastEventAt?: string } } | null)
+                ?.hikPush?.mode === 'device_http_host' ? (
+                <div
+                  className={styles.lockBanner}
+                  style={{ background: '#eef8f0', borderColor: '#b7e0c0' }}
+                >
+                  <strong>Режим: терминал → Web (HttpHost).</strong> Отметки идут с
+                  устройства на сервер без постоянного PC office-link. Лица: Web
+                  «Синхронизировать» ставит в очередь → телефон на ofis Wi‑Fi →
+                  «Yuzlarni yuklash».
+                  {(device.meta as { hikPush?: { lastEventAt?: string } }).hikPush
+                    ?.lastEventAt
+                    ? ` Последнее событие: ${
+                        (device.meta as { hikPush?: { lastEventAt?: string } }).hikPush
+                          ?.lastEventAt
+                      }`
+                    : ''}
+                </div>
+              ) : (
+                <div className={styles.lockBanner}>
+                  После Ulash на телефоне терминал настраивается на прямую отправку
+                  отметок в Web. Если баннер «HttpHost» не появился — снова «Tarmoqni
+                  qayta ulash» / Ulash на ofis Wi‑Fi.
+                </div>
+              )}
               {pendingAdminConfirm(device.meta, device.status) ? (
                 <div className={styles.lockBanner}>
                   <p style={{ margin: '0 0 10px' }}>
                     <strong>Требуется подтверждение привязки.</strong> Office-link установил
                     пароль на терминале и отправил его на сервер. Проверьте пароль и нажмите
-                    «Подтвердить привязку» — после этого запустится полная синхронизация лиц и
-                    устройство будет полностью связано с Web.
+                    «Подтвердить привязку» — после этого отметки идут с терминала на Web,
+                    а лица загружаются с телефона (ofis Wi‑Fi → «Yuzlarni yuklash»).
                   </p>
                   {device.passwordEnc ? (
                     <div className={styles.pwdRevealRow} style={{ marginBottom: 10 }}>
@@ -909,7 +935,7 @@ function DeviceDetailInner() {
                   <p style={{ margin: '0 0 10px' }}>
                     Пароль на терминале изменён локально и не совпадает с сервером.
                     Введите <strong>текущий</strong> пароль терминала и сохраните —
-                    иначе синхронизация лиц и управление не работают.
+                    иначе управление и загрузка лиц с телефона не работают.
                   </p>
                   <div className={styles.pwdInlineRow}>
                     <input
@@ -1494,7 +1520,7 @@ function DeviceDetailInner() {
                   disabled={busy}
                   onClick={() => void doSync()}
                 >
-                  Да
+                  {busy ? '…' : 'Да'}
                 </button>
               </div>
             </div>

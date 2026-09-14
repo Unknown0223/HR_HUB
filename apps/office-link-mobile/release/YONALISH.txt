@@ -1,0 +1,24 @@
+﻿HR HUB Link — Android
+
+APK:
+  D:\hr-hub\apps\office-link-mobile\release\HRHUB-Link-Android.apk
+
+O'rnatish:
+  1) APK ni telefonga nusxa qiling
+  2) "Noma'lum manbalar" dan o'rnatishga ruxsat bering
+  3) HR HUB Link ni oching
+
+Parol saqlash (Ulashdan keyin):
+  Encrypted storage + fayl:
+  /data/data/com.hrhub.hrhub_office_link/app_flutter/HRHUB-Link/data/device-credential.json
+  Ilova: Admin → Saqlangan terminal parolini ko'rsat
+
+Kod:
+  D:\hr-hub\apps\office-link-mobile
+
+Ishga tushirish (dev):
+  cd D:\hr-hub\apps\office-link-mobile
+  flutter run
+
+Build qayta:
+  flutter build apk --release --no-tree-shake-icons

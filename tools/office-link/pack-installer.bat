@@ -22,7 +22,11 @@ copy /Y "%CD%\uninstall-service.bat" "%DIST%\uninstall-service.bat" >nul
 copy /Y "%CD%\SERVICE.txt" "%DIST%\SERVICE.txt" >nul
 copy /Y "%CD%\QOLLAMA.txt" "%DIST%\QOLLAMA.txt" >nul
 if exist "%CD%\service_worker.py" copy /Y "%CD%\service_worker.py" "%DIST%\service_worker.py" >nul
+if exist "%CD%\tunnel_watch.py" copy /Y "%CD%\tunnel_watch.py" "%DIST%\tunnel_watch.py" >nul
 if exist "%CD%\bulk_provision.py" copy /Y "%CD%\bulk_provision.py" "%DIST%\bulk_provision.py" >nul
+for %%F in (api_client.py paths.py runtime_setup.py session.py provision.py discovery.py credential_store.py) do (
+  if exist "%CD%\%%F" copy /Y "%CD%\%%F" "%DIST%\%%F" >nul
+)
 
 echo ZIP yig'ilmoqda: %ZIP%
 if exist "%ZIP%" del /F /Q "%ZIP%"

@@ -808,6 +808,32 @@ class ProvisionEngine:
             except Exception:
                 pass
 
+            # Device → cloud punch push (HttpHostNotification). Soft-fail.
+            try:
+                from device_push import apply_hik_push_from_api_response
+
+                hik_push = (
+                    linked.get("hikPush") if isinstance(linked, dict) else None
+                )
+                if isinstance(hik_push, dict) and hik_push.get("urlPath"):
+                    _emit(on_status, "3b/4 HttpHost (otmetkalar → web)…")
+                    push_res = apply_hik_push_from_api_response(
+                        session.chosen.host if session.chosen else "",
+                        int(session.chosen.port or 80) if session.chosen else 80,
+                        username,
+                        session.password or "",
+                        hik_push,
+                    )
+                    if push_res.get("ok"):
+                        _emit(on_status, "HttpHost OK — otmetkalar to‘g‘ridan webga")
+                    else:
+                        _emit(
+                            on_status,
+                            f"HttpHost: {push_res.get('message') or push_res.get('status')} — davom",
+                        )
+            except Exception as exc:
+                _emit(on_status, f"HttpHost: {exc} — davom")
+
             session.services = bundle
             # Do NOT wipe recovery file. Clear in-memory only.
             session.password = ""
@@ -857,15 +883,14 @@ class ProvisionEngine:
             return SubmitResult(
                 kind="linked",
                 message=(
-                    "Пароль установлен и отправлен на Web. "
-                    "После подтверждения tenant-admin в уведомлении "
-                    "лица и устройство будут полностью синхронизированы."
+                    "Parol o‘rnatildi. Otmetkalar → web (HttpHost). "
+                    "Webda tasdiqlang; yuzlar uchun telefon «Yuzlarni yuklash»."
                     if needs_confirm
                     else (
-                        "Подключение закреплено. Дальнейшая настройка только из Web. "
-                        "Новый admin-пароль оператору не показывается."
+                        "Ulandi. Otmetkalar to‘g‘ridan webga. "
+                        "Yuzlar — ofis Wi‑Fi da Link «Yuzlarni yuklash»."
                         if sealed
-                        else "Подключено. Новый admin-пароль оператору не показывается."
+                        else "Ulandi. Otmetkalar → web; yuzlar — telefon Link."
                     )
                 ),
                 device={
@@ -877,6 +902,7 @@ class ProvisionEngine:
                     "needsAdminConfirm": needs_confirm,
                     "id": device_id,
                     "ownedByPlatform": True,
+                    "hikPush": linked.get("hikPush") if isinstance(linked, dict) else None,
                 },
             )
         except Exception as exc:

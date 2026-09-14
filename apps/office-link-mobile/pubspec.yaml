@@ -1,0 +1,31 @@
+name: hrhub_office_link
+description: HR HUB Link — ofis Face ID terminalini platformaga ulash (Android)
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  dio: ^5.8.0+1
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.5.3
+  crypto: ^3.0.6
+  xml: ^6.5.0
+  network_info_plus: ^6.1.4
+  path_provider: ^2.1.6
+  permission_handler: ^12.0.0+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/config.json
