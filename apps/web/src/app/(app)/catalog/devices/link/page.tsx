@@ -277,11 +277,11 @@ export default function DeviceLinkPage() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <p className={styles.serviceNote}>
-        <strong>Asosiy:</strong> telefon Ulash → otmetkalar terminaldan webga (HttpHost).
-        Yuzlar: Web «Синхронизировать» → telefon <strong>Yuzlarni yuklash</strong> (ofis Wi‑Fi).
+        <strong>Asosiy:</strong> Link (telefon/PC) faqat Ulash / reconnect.
+        Otmetkalar: terminal → Web (HttpHost). Yuzlar: Web «Синхронизировать» →
+        ofisda PC office-link <strong>GW+tunnel</strong> (`START-GW.bat`) → terminal.
         {' '}
-        Wi‑Fi o‘zgasa → <strong>Tarmoqni qayta ulash</strong>. PC GW+tunnel — ixtiyoriy fallback
-        (`START-GW.bat` / <code>SERVICE.txt</code>).
+        Wi‑Fi o‘zgasa → <strong>Tarmoqni qayta ulash</strong>.
       </p>
 
       <div className={styles.grid}>
@@ -353,9 +353,8 @@ export default function DeviceLinkPage() {
             {bind?.androidApkAvailable !== false ? (
               <>
                 {' '}
-                Android APK: telefon/planshetda o‘rnating, pairing token + Ulash.
-                Otmetkalar terminaldan to‘g‘ridan webga ketadi. Yuzlar uchun ofis
-                Wi‑Fi da Link → «Yuzlarni yuklash» (PC tunnel majburiy emas).
+                Android APK: telefon/planshetda o‘rnating — faqat pairing + Ulash /
+                reconnect. Yuzlar Web «Синхронизировать» orqali PC GW+tunnel dan ketadi.
               </>
             ) : null}
           </p>

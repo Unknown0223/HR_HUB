@@ -599,7 +599,7 @@ function DeviceDetailInner() {
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
       setSyncNotice(
-        'Navbat tayyor. Ofis Wi‑Fi da telefon HR HUB Link → «Yuzlarni yuklash» (yangi APK kerak).',
+        'Синхронизация запущена: лица грузятся через PC office-link (GW+tunnel). Телефон не нужен.',
       );
       await loadDevice();
       await loadSyncProgress();
@@ -843,9 +843,8 @@ function DeviceDetailInner() {
                   style={{ background: '#eef8f0', borderColor: '#b7e0c0' }}
                 >
                   <strong>Режим: терминал → Web (HttpHost).</strong> Отметки идут с
-                  устройства на сервер без постоянного PC office-link. Лица: Web
-                  «Синхронизировать» ставит в очередь → телефон на ofis Wi‑Fi →
-                  «Yuzlarni yuklash».
+                  устройства на сервер. Лица: Web «Синхронизировать» → PC office-link
+                  (GW+tunnel) → терминал. Телефон только для Ulash / reconnect.
                   {(device.meta as { hikPush?: { lastEventAt?: string } }).hikPush
                     ?.lastEventAt
                     ? ` Последнее событие: ${
@@ -867,7 +866,7 @@ function DeviceDetailInner() {
                     <strong>Требуется подтверждение привязки.</strong> Office-link установил
                     пароль на терминале и отправил его на сервер. Проверьте пароль и нажмите
                     «Подтвердить привязку» — после этого отметки идут с терминала на Web,
-                    а лица загружаются с телефона (ofis Wi‑Fi → «Yuzlarni yuklash»).
+                    а лица — через Web «Синхронизировать» (PC office-link GW+tunnel).
                   </p>
                   {device.passwordEnc ? (
                     <div className={styles.pwdRevealRow} style={{ marginBottom: 10 }}>
@@ -935,7 +934,7 @@ function DeviceDetailInner() {
                   <p style={{ margin: '0 0 10px' }}>
                     Пароль на терминале изменён локально и не совпадает с сервером.
                     Введите <strong>текущий</strong> пароль терминала и сохраните —
-                    иначе управление и загрузка лиц с телефона не работают.
+                    иначе управление и загрузка лиц через PC office-link не работают.
                   </p>
                   <div className={styles.pwdInlineRow}>
                     <input

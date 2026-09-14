@@ -1,34 +1,30 @@
 # Qurilmalarni Railway platformaga ulash (sodda)
 
-## Asosiy yo‘l (tavsiya): telefon Link — setup-only
+## Asosiy model
 
 1. Web → **Устройства → Привязка** → pairing token
-2. Ofis Wi‑Fi da **HR HUB Link (Android)** → Ulash (`192.168.x.x`)
+2. Ofis Wi‑Fi da **HR HUB Link** (telefon yoki PC) → **Ulash** (`192.168.x.x`)
 3. Webda **«Подтвердить привязку»**
-4. Ilovani yopishingiz mumkin
+4. Ofis PC da **GW+tunnel** ochiq tursin (`START-GW.bat` / service) — yuzlar uchun
+5. Link ilovasini yopishingiz mumkin (faqat Ulash / reconnect kerak)
 
 | Funksiya | Qanday ishlaydi |
 |----------|-----------------|
 | Otmetkalar | Terminal **HttpHostNotification** → HTTPS → Railway API |
-| Yangi yuzlar | Web «Синхронизировать» (navbat) → telefon **«Yuzlarni yuklash»** (qisqa, ofis Wi‑Fi) |
-| Doimiy ochiq PC | **Kerak emas** |
+| Yangi yuzlar | Web «Синхронизировать» → API → **PC office-link GW+tunnel** → terminal ISAPI |
+| Link ilovasi | Faqat **Ulash** / **Tarmoqni qayta ulash** |
 
-Wi‑Fi / IP o‘zgasa: telefon → **Tarmoqni qayta ulash** (host yangilanadi + HttpHost qayta yoziladi).
+Wi‑Fi / IP o‘zgasa: Link → **Tarmoqni qayta ulash**.
 
-## Fallback: ofis PC + tunnel
+## Ofis PC + tunnel (yuzlar uchun majburiy)
 
-Agar HttpHost firmware da ishlamasa yoki masofaviy ISAPI kerak bo‘lsa:
+Railway ofis LAN (`192.168.x.x`) ga kira olmaydi. Shuning uchun yuz yozish uchun ofisda:
 
 ```powershell
 cd D:\hr-hub\tools\office-link
 .\START-GW.bat
 ```
 
-yoki `npm run devices:up` — lokal device-gw + Cloudflare tunnel.
+yoki `npm run devices:up` — lokal device-gw + Cloudflare tunnel (announce).
 
-Bu **ixtiyoriy** fallback; asosiy rejim — terminal → web push + telefon on-demand yuz.
-
-## Demo
-
-- Web: https://hr-hubweb-production.up.railway.app  
-- `admin@demo.local` / `Demo1234!`
+Otmetkalar uchun doimiy PC **shart emas**; yuz sync uchun GW+tunnel **kerak**.

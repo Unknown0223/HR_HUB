@@ -48,7 +48,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   String _detectLine = '';
   String _alert = '';
   String _note =
-      'Pairing tokenni Webdan oling. Otmetkalar terminaldan to‘g‘ridan webga ketadi. Yuzlar uchun ofis Wi‑Fi da «Yuzlarni yuklash».';
+      'Pairing tokenni Webdan oling. Faqat Ulash / tarmoqni tiklash. Yuzlar: Web «Синхронизировать» + ofisda PC office-link (GW+tunnel).';
 
   List<Map<String, dynamic>> _locations = [];
   String? _locationId;
@@ -306,7 +306,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
             ? 'Parol terminalga o‘rnatildi va serverga yuborildi. Web → bildirishnoma / Устройства → «Подтвердить привязку».'
             : 'Ulanish mustahkamlandi.';
         _note = needs
-            ? 'Keyingi qadam: Webda «Подтвердить привязку». Otmetkalar webga ketadi; yuzlar — «Yuzlarni yuklash».'
+            ? 'Keyingi qadam: Webda «Подтвердить привязку». Keyin yuzlar: Web sync + PC GW+tunnel.'
             : 'Ulandi. Yangi parolni Web → Устройства sahifasida ko‘ring.';
       });
       if (needs) {
@@ -356,7 +356,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         _status = 'Ulanish mustahkamlandi';
         _setBadge('ULANDI', tone: 'ok');
         _alert =
-            'Web tasdiqlandi. Otmetkalar to‘g‘ridan webga. Yuzlar: ofis Wi‑Fi da «Yuzlarni yuklash»${info['deviceName'] != null ? ' (${info['deviceName']})' : ''}.';
+            'Web tasdiqlandi. Otmetkalar to‘g‘ridan webga. Yuzlar: Web «Синхронизировать» + PC office-link${info['deviceName'] != null ? ' (${info['deviceName']})' : ''}.';
         _note =
             'Webda «Подтвердить привязку» bajarildi. Parol: Web → Устройства → Показать.';
       });
@@ -367,7 +367,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
             title: const Text('Tasdiqlandi'),
             content: const Text(
               'Web admin ulanishni tasdiqladi.\n\n'
-              'Otmetkalar terminaldan webga. Yangi yuzlar uchun shu yerda «Yuzlarni yuklash».',
+              'Otmetkalar terminaldan webga. Yuzlar: Web «Синхронизировать» (ofisda PC office-link GW+tunnel).',
             ),
             actions: [
               FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
@@ -426,7 +426,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           _setBadge('YANGILANDI', tone: 'ok');
           _alert = 'Host yangilandi; otmetkalar → web.';
           _note =
-              'Web tasdiqlangan. Otmetkalar to‘g‘ridan webga. Yuzlar: «Yuzlarni yuklash».';
+              'Web tasdiqlangan. Otmetkalar to‘g‘ridan webga. Yuzlar: Web sync + PC GW+tunnel.';
         });
       } else {
         setState(() {
@@ -713,10 +713,6 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
                   TextButton(
                     onPressed: _busy ? null : _reconnect,
                     child: const Text('Tarmoqni qayta ulash'),
-                  ),
-                  TextButton(
-                    onPressed: _busy ? null : _pushFaces,
-                    child: const Text('Yuzlarni yuklash'),
                   ),
                   const Spacer(),
                   FilledButton(

@@ -50,7 +50,7 @@ function sanitizeApiErrorMessage(message: string, fallback: string): string {
   ) {
     return (
       'Связь с терминалом по LAN сейчас недоступна. ' +
-      'Otmetkalar: terminal HttpHost → web. Yuzlar: ofis Wi‑Fi da telefon Link → «Yuzlarni yuklash».'
+      'Otmetkalar: terminal HttpHost → web. Yuzlar: Web sync → PC office-link (GW+tunnel).'
     );
   }
   return msg.length > 280 ? `${msg.slice(0, 280)}…` : msg;

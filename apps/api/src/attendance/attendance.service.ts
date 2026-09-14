@@ -1362,7 +1362,8 @@ export class AttendanceService {
         ...queued,
         ok: true,
         action,
-        message: 'Очередь лиц подготовлена — загрузите с телефона (Yuzlarni yuklash)',
+        message:
+          'Очередь лиц подготовлена — загрузка через PC office-link (GW+tunnel). Телефон не нужен.',
       };
     }
     if (action === 'heartbeat') {
@@ -2159,22 +2160,18 @@ export class AttendanceService {
       const requeued = toRequeueIds.length;
       const counts = await this.faceSyncCounts(tenantId, deviceId);
       const pushMode = this.isHikPushMode(device.meta);
+      // Punches may use HttpHost; faces always go Web → office GW/tunnel → terminal.
+      // Link apps are only for Ulash/reconnect — not for manual face upload.
 
       await this.writePersonsSyncProgress(tenantId, deviceId, {
-        running: pushMode ? false : true,
-        phase: pushMode
-          ? 'awaiting_phone'
-          : alreadyRunning
-            ? 'uploading'
-            : 'queuing',
-        message: pushMode
-          ? `Navbat tayyor: ${counts.pending} yuz. Ofis Wi‑Fi da telefon HR HUB Link → «Yuzlarni yuklash».`
-          : alreadyRunning
-            ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
-            : `Очередь подготовлена: +${created}, повтор ${requeued} (всего ${counts.total})`,
+        running: true,
+        phase: alreadyRunning ? 'uploading' : 'queuing',
+        message: alreadyRunning
+          ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
+          : `Очередь подготовлена: +${created}, повтор ${requeued} (всего ${counts.total}). Загрузка через PC office-link (GW+tunnel)…`,
         currentNames: [],
         ...(alreadyRunning ? {} : { startedAt: new Date().toISOString() }),
-        finishedAt: pushMode ? new Date().toISOString() : null,
+        finishedAt: null,
         total: counts.total,
         synced: counts.synced,
         pending: counts.pending,
@@ -2187,28 +2184,23 @@ export class AttendanceService {
         type: 'Person Sync',
         employeeName: `queued +${created}/requeue ${requeued}${
           opts.force ? ' force' : ''
-        }${pushMode ? ' (phone push)' : ''} (loc employees ${withFace.length})`,
+        }${pushMode ? ' (hikPush punches)' : ''} (loc employees ${withFace.length})`,
         status: 'completed',
       });
 
       if (!alreadyRunning) {
-        if (pushMode) {
-          // Faces enroll from phone on LAN — do not spin GW waves (looks "stuck" at 0%).
-          this.personsSyncInFlight.delete(deviceId);
-        } else {
-          const run = this.runPersonsSyncWaves(tenantId, deviceId)
-            .catch((e) => {
-              this.logger.warn(
-                `Persons sync waves failed device=${deviceId}: ${
-                  e instanceof Error ? e.message : e
-                }`,
-              );
-            })
-            .finally(() => {
-              this.personsSyncInFlight.delete(deviceId);
-            });
-          this.personsSyncInFlight.set(deviceId, run);
-        }
+        const run = this.runPersonsSyncWaves(tenantId, deviceId)
+          .catch((e) => {
+            this.logger.warn(
+              `Persons sync waves failed device=${deviceId}: ${
+                e instanceof Error ? e.message : e
+              }`,
+            );
+          })
+          .finally(() => {
+            this.personsSyncInFlight.delete(deviceId);
+          });
+        this.personsSyncInFlight.set(deviceId, run);
       }
 
       return {
@@ -2217,7 +2209,7 @@ export class AttendanceService {
         alreadyRunning,
         created,
         pushMode,
-        awaitingPhone: pushMode,
+        awaitingPhone: false,
         requeued,
         withPhoto: withFace.length,
         force: Boolean(opts.force),
@@ -2655,10 +2647,9 @@ export class AttendanceService {
       include: this.deviceInclude,
     });
 
-    // HttpHost (hikPush) mode: punches go device→API; do not block reconnect on dead GW.
+    // Always try GW register: punches use hikPush; faces still need office GW+tunnel.
     let gwOk = false;
-    const pushMode = this.isHikPushMode(meta);
-    if (plain && !pushMode) {
+    if (plain) {
       try {
         const reg = await this.gw.registerFromDevice({
           ...updated,
@@ -2681,12 +2672,13 @@ export class AttendanceService {
     const pendingConfirm =
       updated.status === 'pending_confirm' ||
       (meta.auth as Record<string, unknown>).pendingAdminConfirm === true;
-    const nextStatus = pushMode
+    const pushMode = this.isHikPushMode(meta);
+    const nextStatus = gwOk
       ? pendingConfirm
         ? 'pending_confirm'
         : 'online'
-      : gwOk
-        ? 'online'
+      : pushMode && !pendingConfirm
+        ? 'registered'
         : pendingConfirm
           ? 'pending_confirm'
           : 'registered';
