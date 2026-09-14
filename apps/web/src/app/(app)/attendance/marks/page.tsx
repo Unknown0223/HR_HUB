@@ -101,7 +101,7 @@ const MARK_TYPE_OPTS = [
 ];
 
 function empName(e?: Emp | null) {
-  if (!e) return 'вЂ”';
+  if (!e) return '—';
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
 }
 
@@ -120,7 +120,7 @@ function typeClass(t: string) {
 }
 
 function markPhotoSrc(m: Mark): string | null {
-  // Only the punch capture snapshot вЂ” never the employee profile face photo.
+  // Only the punch capture snapshot — never the employee profile face photo.
   return mediaSrc(m.photoUrl);
 }
 
@@ -135,7 +135,7 @@ function markCell(m: Mark, key: string): string {
     case 'photo':
       return markPhotoSrc(m) ? 'есть' : '';
     case 'person':
-      return empName(m.employee) === 'вЂ”' ? '' : empName(m.employee);
+      return empName(m.employee) === '—' ? '' : empName(m.employee);
     case 'location':
       return m.locationName || m.device?.location?.name || '';
     case 'deviceType':
@@ -146,7 +146,7 @@ function markCell(m: Mark, key: string): string {
       return m.identificationType || '';
     case 'time': {
       const t = fmtDt(m.occurredAt);
-      return m.clockTamper ? `${t} вљ ` : t;
+      return m.clockTamper ? `${t} ⚠` : t;
     }
     case 'division':
       return m.employee?.division?.name || '';
@@ -218,7 +218,7 @@ function MarksInner() {
     };
     const date =
       dateFrom && dateTo && dateFrom !== dateTo
-        ? `${fmt(dateFrom)} вЂ“ ${fmt(dateTo)}`
+        ? `${fmt(dateFrom)} – ${fmt(dateTo)}`
         : fmt(dateFrom || dateTo);
     return [emp, date].filter(Boolean).join(' В· ');
   }, [employees, filters.dateFrom, filters.dateTo, filters.employeeId, searchParams]);
@@ -372,10 +372,10 @@ function MarksInner() {
         const obj: Record<string, unknown> = {};
         for (const k of visibleCols) {
           if (k === 'photo') {
-            obj[prefs.labelOf(k)] = markPhotoSrc(m) ? 'есть' : 'вЂ”';
+            obj[prefs.labelOf(k)] = markPhotoSrc(m) ? 'есть' : '—';
             continue;
           }
-          obj[prefs.labelOf(k)] = markCell(m, k) || 'вЂ”';
+          obj[prefs.labelOf(k)] = markCell(m, k) || '—';
         }
         return obj;
       }),
@@ -446,9 +446,9 @@ function MarksInner() {
           <i className="fas fa-fingerprint" aria-hidden />
         </div>
         <div className={shared.pageHeaderText}>
-          <h1 className={shared.pageTitle}>РћС‚РјРµС‚РєРё</h1>
+          <h1 className={shared.pageTitle}>Отметки</h1>
           <p className={shared.pageSubtitle}>
-            Р–СѓСЂРЅР°Р» РѕС‚РјРµС‚РѕРє РїРѕСЃРµС‰Р°РµРјРѕСЃС‚Рё: РїСЂРёС…РѕРґ, СѓС…РѕРґ, РїРµСЂРµСЂС‹РІС‹
+            Журнал отметок посещаемости: приход, уход, перерывы
           </p>
         </div>
         <div className={shared.pageHeaderActions}>
@@ -477,15 +477,15 @@ function MarksInner() {
               onClick={() => setCreateOpen((v) => !v)}
             >
               <i className="fas fa-plus" aria-hidden />
-              РЎРѕР·РґР°С‚СЊ в–ѕ
+              Создать ▾
             </button>
             {createOpen ? (
               <div className={styles.menu}>
                 <Link href="/attendance/marks/copy" onClick={() => setCreateOpen(false)}>
-                  РљРѕРїРёСЂРѕРІР°РЅРёРµ РѕС‚РјРµС‚РѕРє
+                  Копирование отметок
                 </Link>
                 <Link href="/attendance/marks/import" onClick={() => setCreateOpen(false)}>
-                  РРјРїРѕСЂС‚
+                  Импорт
                 </Link>
               </div>
             ) : null}
@@ -540,7 +540,7 @@ function MarksInner() {
                 void load(p);
               }}
             >
-              вЂ№
+              ‹
             </button>
             <button type="button" className={styles.pageBtnActive}>
               {page}
@@ -554,7 +554,7 @@ function MarksInner() {
                 void load(p);
               }}
             >
-              вЂє
+              ›
             </button>
           </div>
           <button
@@ -598,7 +598,7 @@ function MarksInner() {
               onClick={() => setTypeOpen((v) => !v)}
             >
               <i className="fas fa-exchange-alt" aria-hidden />
-              РР·РјРµРЅРёС‚СЊ С‚РёРї
+              Изменить тип
             </button>
             {typeOpen ? (
               <div className={styles.menu}>
@@ -608,7 +608,7 @@ function MarksInner() {
                     type="button"
                     onClick={() =>
                       setConfirm({
-                        title: `РР·РјРµРЅРёС‚СЊ С‚РёРї РЅР° В«${t.label}В» РґР»СЏ ${checkedIds.length}?`,
+                        title: `Изменить тип на «${t.label}» для ${checkedIds.length}?`,
                         action: 'set_type',
                         markType: t.key,
                       })
@@ -627,13 +627,13 @@ function MarksInner() {
               disabled={busy}
               onClick={() =>
                 setConfirm({
-                  title: `РЎРґРµР»Р°С‚СЊ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅС‹РјРё РѕС‚РјРµС‚РєРё РІ РєРѕР»РёС‡РµСЃС‚РІРµ ${selectedInvalid}?`,
+                  title: `Сделать действительными отметки в количестве ${selectedInvalid}?`,
                   action: 'set_valid',
                 })
               }
             >
               <i className="fas fa-check" aria-hidden />
-              Р”РµР№СЃС‚РІ. {selectedInvalid}
+              Действ. {selectedInvalid}
             </button>
           ) : null}
           {selectedValid > 0 ? (
@@ -643,13 +643,13 @@ function MarksInner() {
               disabled={busy}
               onClick={() =>
                 setConfirm({
-                  title: `РЎРґРµР»Р°С‚СЊ РЅРµРґРµР№СЃС‚РІРёС‚РµР»СЊРЅС‹РјРё РѕС‚РјРµС‚РєРё РІ РєРѕР»РёС‡РµСЃС‚РІРµ ${selectedValid}?`,
+                  title: `Сделать недействительными отметки в количестве ${selectedValid}?`,
                   action: 'set_invalid',
                 })
               }
             >
               <i className="fas fa-ban" aria-hidden />
-              РќРµРґРµР№СЃС‚РІ. {selectedValid}
+              Недейств. {selectedValid}
             </button>
           ) : null}
           <button
@@ -658,13 +658,13 @@ function MarksInner() {
             disabled={busy}
             onClick={() =>
               setConfirm({
-                title: `РЈРґР°Р»РёС‚СЊ РѕС‚РјРµС‚РєРё РІ РєРѕР»РёС‡РµСЃС‚РІРµ ${checkedIds.length}?`,
+                title: `Удалить отметки в количестве ${checkedIds.length}?`,
                 action: 'delete',
               })
             }
           >
             <i className="fas fa-trash" aria-hidden />
-            РЈРґР°Р»РёС‚СЊ
+            УРґР°Р»РёС‚СЊ
           </button>
           <button
             type="button"
@@ -678,7 +678,7 @@ function MarksInner() {
             }}
           >
             <i className="fas fa-sliders-h" aria-hidden />
-            РќР°СЃС‚СЂРѕР№РєРё
+            РќР°СЃС‚СЂРѕР№Рєи
           </button>
           <button
             type="button"
@@ -686,7 +686,7 @@ function MarksInner() {
             disabled={busy}
             onClick={() => setChecked({})}
           >
-            РЎРЅСЏС‚СЊ РІС‹РґРµР»РµРЅРёРµ
+            Снять выделение
           </button>
         </div>
       ) : null}
@@ -716,14 +716,14 @@ function MarksInner() {
               {loading && !displayRows.length ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
-                    Р—Р°РіСЂСѓР·РєР°вЂ¦
+                    Загрузка…
                   </td>
                 </tr>
               ) : null}
               {!loading && !displayRows.length ? (
                 <tr>
                   <td colSpan={colCount} className={styles.empty}>
-                    РќРµС‚ РґР°РЅРЅС‹С…
+                    Нет данных
                   </td>
                 </tr>
               ) : null}
@@ -805,11 +805,11 @@ function MarksInner() {
                               }
                             >
                               {fmtDt(m.occurredAt)}
-                              {m.clockTamper ? ' вљ ' : ''}
+                              {m.clockTamper ? ' ⚠' : ''}
                             </td>
                           );
                         }
-                        return <td key={key}>{markCell(m, key) || 'вЂ”'}</td>;
+                        return <td key={key}>{markCell(m, key) || '—'}</td>;
                       })}
                     </tr>
                     {open ? (
@@ -847,7 +847,7 @@ function MarksInner() {
                               }}
                             >
                               <i className="fas fa-exchange-alt" aria-hidden />
-                              РР·РјРµРЅРёС‚СЊ С‚РёРї
+                              Изменить тип
                             </button>
                             <button
                               type="button"
@@ -858,7 +858,7 @@ function MarksInner() {
                               }}
                             >
                               <i className="fas fa-trash" aria-hidden />
-                              РЈРґР°Р»РёС‚СЊ
+                              УРґР°Р»РёС‚СЊ
                             </button>
                           </div>
                         </td>
@@ -892,20 +892,20 @@ function MarksInner() {
                 confirm && void runBulk(confirm.action, confirm.markType)
               }
             >
-              Р”Р°
+              Да
             </button>
             <button
               type="button"
               className={modal.btnGhost}
               onClick={() => setConfirm(null)}
             >
-              РќРµС‚
+              Нет
             </button>
           </>
         }
       >
         <p style={{ margin: 0, color: '#64788f', fontSize: 13 }}>
-          РџРѕРґС‚РІРµСЂРґРёС‚Рµ РІС‹РїРѕР»РЅРµРЅРёРµ РѕРїРµСЂР°С†РёРё РґР»СЏ РІС‹Р±СЂР°РЅРЅС‹С… РѕС‚РјРµС‚РѕРє.
+          Подтвердите выполнение операции для выбранных отметок.
         </p>
       </FormModal>
 
@@ -931,14 +931,14 @@ function MarksInner() {
               className={modal.btnGhost}
               onClick={() => setApplyOpen(false)}
             >
-              РћС‚РјРµРЅРёС‚СЊ
+              Отменить
             </button>
           </>
         }
       >
         <div className={modal.fields}>
           <label className={modal.field}>
-            <span>Р”Р°С‚Р° РЅР°С‡Р°Р»Р°</span>
+            <span>Дата начала</span>
             <input
               type="date"
               value={applyFrom}
@@ -946,7 +946,7 @@ function MarksInner() {
             />
           </label>
           <label className={modal.field}>
-            <span>Р”Р°С‚Р° РѕРєРѕРЅС‡Р°РЅРёСЏ</span>
+            <span>Дата окончания</span>
             <input
               type="date"
               value={applyTo}
@@ -962,7 +962,7 @@ function MarksInner() {
 
 export default function MarksPage() {
   return (
-    <Suspense fallback={<p className={shared.muted}>Р—Р°РіСЂСѓР·РєР°вЂ¦</p>}>
+    <Suspense fallback={<p className={shared.muted}>Загрузка…</p>}>
       <MarksInner />
     </Suspense>
   );
