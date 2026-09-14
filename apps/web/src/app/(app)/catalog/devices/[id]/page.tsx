@@ -599,7 +599,7 @@ function DeviceDetailInner() {
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
       setSyncNotice(
-        'Очередь лиц готова. Ofis Wi‑Fi da telefon HR HUB Link → «Yuzlarni yuklash».',
+        'Navbat tayyor. Ofis Wi‑Fi da telefon HR HUB Link → «Yuzlarni yuklash» (yangi APK kerak).',
       );
       await loadDevice();
       await loadSyncProgress();

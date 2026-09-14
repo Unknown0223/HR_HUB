@@ -2019,6 +2019,18 @@ export class AttendanceService {
     });
   }
 
+  private isHikPushMode(meta: unknown): boolean {
+    const m = this.asMeta(meta);
+    const hik =
+      m.hikPush && typeof m.hikPush === 'object' && !Array.isArray(m.hikPush)
+        ? (m.hikPush as Record<string, unknown>)
+        : {};
+    return (
+      hik.mode === 'device_http_host' ||
+      Boolean(String(hik.pushToken || '').trim())
+    );
+  }
+
   private async runPersonsSyncWaves(tenantId: string, deviceId: string) {
     let totalSynced = 0;
     let totalFailed = 0;
@@ -2146,16 +2158,23 @@ export class AttendanceService {
       const created = toCreate.length;
       const requeued = toRequeueIds.length;
       const counts = await this.faceSyncCounts(tenantId, deviceId);
+      const pushMode = this.isHikPushMode(device.meta);
 
       await this.writePersonsSyncProgress(tenantId, deviceId, {
-        running: true,
-        phase: alreadyRunning ? 'uploading' : 'queuing',
-        message: alreadyRunning
-          ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
-          : `Очередь подготовлена: +${created}, повтор ${requeued} (всего ${counts.total})`,
+        running: pushMode ? false : true,
+        phase: pushMode
+          ? 'awaiting_phone'
+          : alreadyRunning
+            ? 'uploading'
+            : 'queuing',
+        message: pushMode
+          ? `Navbat tayyor: ${counts.pending} yuz. Ofis Wi‑Fi da telefon HR HUB Link → «Yuzlarni yuklash».`
+          : alreadyRunning
+            ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
+            : `Очередь подготовлена: +${created}, повтор ${requeued} (всего ${counts.total})`,
         currentNames: [],
         ...(alreadyRunning ? {} : { startedAt: new Date().toISOString() }),
-        finishedAt: null,
+        finishedAt: pushMode ? new Date().toISOString() : null,
         total: counts.total,
         synced: counts.synced,
         pending: counts.pending,
@@ -2168,23 +2187,28 @@ export class AttendanceService {
         type: 'Person Sync',
         employeeName: `queued +${created}/requeue ${requeued}${
           opts.force ? ' force' : ''
-        } (loc employees ${withFace.length})`,
+        }${pushMode ? ' (phone push)' : ''} (loc employees ${withFace.length})`,
         status: 'completed',
       });
 
       if (!alreadyRunning) {
-        const run = this.runPersonsSyncWaves(tenantId, deviceId)
-          .catch((e) => {
-            this.logger.warn(
-              `Persons sync waves failed device=${deviceId}: ${
-                e instanceof Error ? e.message : e
-              }`,
-            );
-          })
-          .finally(() => {
-            this.personsSyncInFlight.delete(deviceId);
-          });
-        this.personsSyncInFlight.set(deviceId, run);
+        if (pushMode) {
+          // Faces enroll from phone on LAN — do not spin GW waves (looks "stuck" at 0%).
+          this.personsSyncInFlight.delete(deviceId);
+        } else {
+          const run = this.runPersonsSyncWaves(tenantId, deviceId)
+            .catch((e) => {
+              this.logger.warn(
+                `Persons sync waves failed device=${deviceId}: ${
+                  e instanceof Error ? e.message : e
+                }`,
+              );
+            })
+            .finally(() => {
+              this.personsSyncInFlight.delete(deviceId);
+            });
+          this.personsSyncInFlight.set(deviceId, run);
+        }
       }
 
       return {
@@ -2192,6 +2216,8 @@ export class AttendanceService {
         queued: true,
         alreadyRunning,
         created,
+        pushMode,
+        awaitingPhone: pushMode,
         requeued,
         withPhoto: withFace.length,
         force: Boolean(opts.force),
