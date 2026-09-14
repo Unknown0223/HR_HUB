@@ -102,20 +102,36 @@ function splitNames(nameField: string): {
  * Biometric MRZ often has 14 + 1–2 trailing check digits → drop last 2 when ≥16,
  * or drop 1 when length is 15.
  */
+export function looksLikePinfl(digits: string): boolean {
+  if (!/^[1-6]\d{13}$/.test(digits)) return false;
+  const dd = Number(digits.slice(1, 3));
+  const mm = Number(digits.slice(3, 5));
+  return dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12;
+}
+
 export function normalizePinflDigits(raw: string): string {
   const digits = String(raw || '').replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.length === 14) return digits;
-  if (digits.length === 15) return digits.slice(0, 14);
-  if (digits.length >= 16) {
-    // User rule: remove last 2 extras, then take 14 digits
-    const trimmed = digits.slice(0, -2);
-    if (trimmed.length >= 14) return trimmed.slice(0, 14);
-    return trimmed;
+  if (digits.length === 14) return looksLikePinfl(digits) ? digits : digits;
+  if (digits.length === 15) {
+    const a = digits.slice(0, 14);
+    return looksLikePinfl(a) ? a : a;
   }
-  // Prefer a plausible UZ PINFL start (century/gender digit 1–6)
-  const embedded = digits.match(/[1-6]\d{13}/);
-  if (embedded) return embedded[0];
+  if (digits.length >= 16) {
+    const trimmed = digits.slice(0, -2);
+    const cand = trimmed.length >= 14 ? trimmed.slice(0, 14) : trimmed;
+    if (looksLikePinfl(cand)) return cand;
+    // Prefer embedded plausible PINFL inside the digit string
+    const embedded = digits.match(/[1-6]\d{13}/g) || [];
+    for (const e of embedded) {
+      if (looksLikePinfl(e)) return e;
+    }
+    return cand;
+  }
+  const embedded = digits.match(/[1-6]\d{13}/g) || [];
+  for (const e of embedded) {
+    if (looksLikePinfl(e)) return e;
+  }
   return '';
 }
 
@@ -127,8 +143,29 @@ export function extractMrzLines(text: string): string[] {
     .filter((l) => l.length >= 28);
   const out: string[] = [];
   for (const l of lines) {
-    if (/^[A-Z0-9<]{28,44}$/.test(l)) out.push(l.slice(0, 44));
+    // OCR may pad extra '<' beyond ICAO 30/44 — accept and truncate
+    if (/^[A-Z0-9<]{28,60}$/.test(l)) {
+      const capped = l.length > 44 && (l.startsWith('P') || l.startsWith('IP'))
+        ? l.slice(0, 44)
+        : l.length > 44 && !l.startsWith('P') && !l.startsWith('I') && !l.startsWith('A') && !l.startsWith('C')
+          ? l.slice(0, 44)
+          : l.startsWith('I') || l.startsWith('A') || (l.startsWith('C') && !l.startsWith('AC') && !l.startsWith('AA'))
+            ? l.slice(0, 30)
+            : l.slice(0, 44);
+      // Document number lines often start with series letters (AC/AA) — keep 44 for TD3 line2
+      const line =
+        /^[A-Z]{2}\d{7}/.test(l) || /^[A-Z0-9]{9}\d?[A-Z]{3}\d{6}/.test(l)
+          ? l.slice(0, 44)
+          : capped;
+      out.push(line);
+    }
   }
+  // Prefer P</I lines first, then number lines
+  out.sort((a, b) => {
+    const score = (x: string) =>
+      x.startsWith('P') || x.startsWith('IP') ? 0 : x.startsWith('I') ? 1 : 2;
+    return score(a) - score(b);
+  });
   return out;
 }
 
@@ -260,9 +297,16 @@ function findPinfl(text: string): string {
     );
   if (labeled) {
     const n = normalizePinflDigits(labeled[1]);
+    if (n && looksLikePinfl(n)) return n;
     if (n) return n;
   }
   const runs = text.match(/\d{14,20}/g) || [];
+  const plausible: string[] = [];
+  for (const run of runs) {
+    const n = normalizePinflDigits(run);
+    if (n && looksLikePinfl(n)) plausible.push(n);
+  }
+  if (plausible.length) return plausible[plausible.length - 1];
   for (const run of runs) {
     const n = normalizePinflDigits(run);
     if (n) return n;
@@ -306,21 +350,40 @@ function findIsoDates(text: string): string[] {
 
 function findNamesCyrillic(text: string): Partial<PassportScanFields> {
   const block = text.replace(/\r/g, '\n');
+  const stop = String.raw`(?=\s*(?:TUG|ТУГ|MILLAT|JINS|KIM|ISMI|FAMILIYASI|OTASINING|ПИНФЛ|PINFL|\n[A-ZА-Я]{3,}|\nP<)|$)`;
   const last =
-    block.match(/(?:Familiyasi|Фамилия|Surname)\s*[:\-]?\s*([A-ZА-ЯЁʻʼ'\- ]{2,40})/i)?.[1] ||
-    '';
+    block.match(
+      new RegExp(
+        String.raw`(?:Familiyasi|FAMILIYASI|Фамилия|Surname)\s*[:\-]?\s*([A-ZА-ЯЁЎҒҚҲʻʼ''\-]{2,40})`,
+        'i',
+      ),
+    )?.[1] || '';
   const first =
-    block.match(/(?:Ismi|Имя|Given names?|Name)\s*[:\-]?\s*([A-ZА-ЯЁʻʼ'\- ]{2,40})/i)?.[1] ||
-    '';
+    block.match(
+      new RegExp(
+        String.raw`(?:(?:^|\n)\s*Ismi|ISMI|Имя|Given names?|GIVEN NAMES?)\s*[:\-]?\s*([A-ZА-ЯЁЎҒҚҲʻʼ''\-]{2,40})`,
+        'i',
+      ),
+    )?.[1] || '';
   const middle =
     block.match(
-      /(?:Otasining ismi|Отчество|Father'?s? name)\s*[:\-]?\s*([A-ZА-ЯЁʻʼ'\- ]{2,40})/i,
-    )?.[1] || '';
+      new RegExp(
+        String.raw`(?:Otasining\s*ismi|OTASINING\s*ISMI|Отчество|Father'?s?\s*name)\s*[:\-]?\s*([A-ZА-ЯЁЎҒҚҲʻʼ''Oʻ\-\s]{2,45}?)${stop}`,
+        'i',
+      ),
+    )?.[1] ||
+    block.match(/\b([A-ZА-ЯЁЎҒҚҲʻʼ']{2,30}\s+O[ʻ'`]?G[ʻ'`]?LI)\b/i)?.[1] ||
+    block.match(/\b([A-ZА-ЯЁЎҒҚҲʻʼ']{2,30}\s+QIZI)\b/i)?.[1] ||
+    '';
   const clean = (s: string) =>
     s
       .replace(/\s+/g, ' ')
       .trim()
       .split(' ')
+      .filter(
+        (w) =>
+          !/^(FAMILIYASI|ISMI|OTASINING|SURNAME|NAME|TUG.?ILGAN|SANASI)$/i.test(w),
+      )
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
       .join(' ');
   return {
@@ -355,9 +418,13 @@ export function parsePassportOcrText(text: string): PassportScanFields {
 
   if (fromMrz) Object.assign(result, fromMrz);
 
-  const pinfl = findPinfl(raw);
-  if (pinfl) result.pinfl = pinfl;
-  else if (result.pinfl) result.pinfl = normalizePinflDigits(result.pinfl);
+  // Prefer MRZ personal-number PINFL; only fall back to OCR text search if empty
+  if (!result.pinfl) {
+    const pinfl = findPinfl(raw);
+    if (pinfl) result.pinfl = pinfl;
+  } else {
+    result.pinfl = normalizePinflDigits(result.pinfl) || result.pinfl;
+  }
 
   if (!result.series || !result.docNumber) {
     const book = findBookPassport(raw);

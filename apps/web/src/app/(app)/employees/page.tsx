@@ -299,12 +299,13 @@ function EmployeesPageInner() {
 
   function applyPassportScan(scan: PassportScanResult) {
     setPassportScan(scan);
+    const pinfl = String(scan.pinfl || '').replace(/\D/g, '').slice(0, 14);
     setCreateDraft((d) => ({
       ...d,
       lastName: scan.lastName || d.lastName,
       firstName: scan.firstName || d.firstName,
       middleName: scan.middleName || d.middleName,
-      pinfl: scan.pinfl || d.pinfl,
+      pinfl: pinfl || d.pinfl,
       passportSeries: scan.series || d.passportSeries,
       passportNumber: scan.docNumber || d.passportNumber,
       birthDate: scan.birthDate || d.birthDate,
@@ -951,6 +952,10 @@ function EmployeesPageInner() {
                 passportScan.pinfl ||
                 'FIO'}{' '}
               ({passportScan.docType === 'ID_CARD' ? 'ID-карта' : 'паспорт'})
+              {passportScan.pinfl ? ` · ПИНФЛ ${passportScan.pinfl}` : ' · ПИНФЛ топилмади'}
+              {passportScan.middleName
+                ? ` · ${passportScan.middleName}`
+                : ' · отчество MRZда йўқ (қўлда)'}
             </p>
           ) : null}
         </div>
@@ -1094,8 +1099,14 @@ function EmployeesPageInner() {
             </label>
           </div>
           <label className={modal.field}>
-            <span>Face / external ID</span>
-            <input name="externalId" placeholder="face-0003" />
+            <span>Внешний ID (терминал Face ID)</span>
+            <input
+              name="externalId"
+              placeholder="необязательно — номер на терминале"
+            />
+            <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>
+              Паспортдан эмас. Face ID терминалдаги ходим рақами (бўш қолдириш мумкин).
+            </span>
           </label>
         </form>
       </FormModal>

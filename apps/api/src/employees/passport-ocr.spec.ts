@@ -83,4 +83,19 @@ ${l2}
     const r = parsePassportOcrText(text);
     assert.equal(r.pinfl, '30101990123456');
   });
+
+  it('extracts patronymic from UZ visual zone (not in MRZ)', () => {
+    const text = `
+FAMILIYASI UTAMURODOV
+ISMI JASURBEK
+OTASINING ISMI SHERALI O'G'LI
+TUG'ILGAN SANASI 08 02 2003
+P<UZBUTAMURODOV<<JASURBEK<<<<<<<<<<<<<<<<<<<<<<<
+AC16268638UZB0302081M29021425080203866002648
+`;
+    const r = parsePassportOcrText(text);
+    assert.equal(r.pinfl, '50802038660026');
+    assert.match(r.middleName.toUpperCase(), /SHERALI/);
+    assert.match(r.middleName.toUpperCase(), /G.?LI/);
+  });
 });
