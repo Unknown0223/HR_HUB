@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import {
+  mergePassportScanFields,
   parsePassportOcrText,
   type PassportScanFields,
 } from '@/lib/passport-ocr';
@@ -30,7 +31,28 @@ const EMPTY: PassportScanFields = {
 
 export type PassportScanResult = PassportScanFields & {
   imageDataUrl: string;
+  imageDataUrlBack?: string;
 };
+
+async function ocrDataUrl(
+  dataUrl: string,
+  onProgress?: (msg: string) => void,
+): Promise<PassportScanFields> {
+  const { createWorker } = await import('tesseract.js');
+  const worker = await createWorker(['eng', 'rus'], 1, {
+    logger: (m) => {
+      if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+        onProgress?.(`OCR ${Math.round(m.progress * 100)}%`);
+      }
+    },
+  });
+  try {
+    const { data } = await worker.recognize(dataUrl);
+    return parsePassportOcrText(data.text || '');
+  } finally {
+    await worker.terminate();
+  }
+}
 
 export function PassportScanModal({
   open,
@@ -41,15 +63,19 @@ export function PassportScanModal({
   onClose: () => void;
   onConfirm: (result: PassportScanResult) => void;
 }) {
-  const [imageDataUrl, setImageDataUrl] = useState<string>('');
+  const [imageFront, setImageFront] = useState('');
+  const [imageBack, setImageBack] = useState('');
   const [fields, setFields] = useState<PassportScanFields>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
 
+  const isIdCard = fields.docType === 'ID_CARD' || fields.docKind === 'id_card';
+
   useEffect(() => {
     if (!open) {
-      setImageDataUrl('');
+      setImageFront('');
+      setImageBack('');
       setFields(EMPTY);
       setBusy(false);
       setError('');
@@ -58,41 +84,45 @@ export function PassportScanModal({
   }, [open]);
 
   const canConfirm = useMemo(
-    () => Boolean(fields.docNumber.trim() || fields.pinfl.trim() || fields.lastName.trim()),
+    () =>
+      Boolean(
+        fields.docNumber.trim() || fields.pinfl.trim() || fields.lastName.trim(),
+      ),
     [fields],
   );
 
-  async function onFile(file: File | null) {
-    if (!file) return;
-    setError('');
+  async function runOcr(front: string, back: string) {
+    if (!front && !back) return;
     setBusy(true);
-    setProgress('Расм ўқиляпти…');
+    setError('');
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setImageDataUrl(dataUrl);
-      setProgress('OCR…');
-      const { createWorker } = await import('tesseract.js');
-      const worker = await createWorker(['eng', 'rus'], 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text' && typeof m.progress === 'number') {
-            setProgress(`OCR ${Math.round(m.progress * 100)}%`);
-          }
-        },
-      });
-      try {
-        const { data } = await worker.recognize(dataUrl);
-        const parsed = parsePassportOcrText(data.text || '');
-        setFields(parsed);
-        setProgress(
-          parsed.confidence === 'high'
-            ? 'MRZ топилди'
+      const parts: PassportScanFields[] = [];
+      if (front) {
+        setProgress('Old tomon OCR…');
+        parts.push(await ocrDataUrl(front, setProgress));
+      }
+      if (back) {
+        setProgress('Orqa tomon OCR…');
+        parts.push(await ocrDataUrl(back, setProgress));
+      }
+      const parsed = mergePassportScanFields(...parts);
+      // Keep user-selected doc type if they already switched
+      if (fields.docType === 'ID_CARD' && parsed.docKind === 'unknown') {
+        parsed.docType = 'ID_CARD';
+        parsed.docKind = 'id_card';
+      }
+      setFields(parsed);
+      setProgress(
+        parsed.pinfl
+          ? parsed.confidence === 'high'
+            ? 'MRZ + ПИНФЛ топилди'
+            : 'ПИНФЛ топилди — текширинг'
+          : parsed.confidence === 'high'
+            ? 'MRZ топилди (ПИНФЛни текширинг)'
             : parsed.confidence === 'medium'
               ? 'Қисман топилди — текширинг'
               : 'Текшириб тўлдиринг',
-        );
-      } finally {
-        await worker.terminate();
-      }
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Сканерлашда хато');
       setProgress('');
@@ -101,8 +131,31 @@ export function PassportScanModal({
     }
   }
 
-  function setField<K extends keyof PassportScanFields>(key: K, value: PassportScanFields[K]) {
-    setFields((f) => ({ ...f, [key]: value }));
+  async function onFrontFile(file: File | null) {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setImageFront(dataUrl);
+    await runOcr(dataUrl, imageBack);
+  }
+
+  async function onBackFile(file: File | null) {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setImageBack(dataUrl);
+    await runOcr(imageFront, dataUrl);
+  }
+
+  function setField<K extends keyof PassportScanFields>(
+    key: K,
+    value: PassportScanFields[K],
+  ) {
+    setFields((f) => {
+      const next = { ...f, [key]: value };
+      if (key === 'docType') {
+        next.docKind = value === 'ID_CARD' ? 'id_card' : 'passport_book';
+      }
+      return next;
+    });
   }
 
   return (
@@ -120,13 +173,19 @@ export function PassportScanModal({
             onClick={() =>
               onConfirm({
                 ...fields,
-                imageDataUrl,
+                imageDataUrl: imageFront,
+                ...(imageBack ? { imageDataUrlBack: imageBack } : {}),
               })
             }
           >
             Қабул қилиш
           </button>
-          <button type="button" className={modal.btnGhost} onClick={onClose} disabled={busy}>
+          <button
+            type="button"
+            className={modal.btnGhost}
+            onClick={onClose}
+            disabled={busy}
+          >
             Бекор қилиш
           </button>
         </>
@@ -136,26 +195,45 @@ export function PassportScanModal({
       <div className={styles.layout}>
         <div className={styles.left}>
           <label className={styles.upload}>
-            <span>Паспорт ёки ID расми</span>
+            <span>
+              {isIdCard ? 'ID — олд томон' : 'Биометрик паспорт (битта расм)'}
+            </span>
             <input
               type="file"
               accept="image/*,.pdf"
               disabled={busy}
-              onChange={(e) => void onFile(e.target.files?.[0] || null)}
+              onChange={(e) => void onFrontFile(e.target.files?.[0] || null)}
             />
           </label>
+          {isIdCard ? (
+            <label className={styles.upload}>
+              <span>ID — орқа томон (MRZ / ПИНФЛ)</span>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                disabled={busy}
+                onChange={(e) => void onBackFile(e.target.files?.[0] || null)}
+              />
+            </label>
+          ) : null}
           {progress ? <p className={styles.progress}>{progress}</p> : null}
           <div className={styles.preview}>
-            {imageDataUrl ? (
+            {imageFront ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageDataUrl} alt="Passport scan" />
+              <img src={imageFront} alt="Passport / ID front" />
             ) : (
               <span className={styles.previewEmpty}>Расм шу ерда кўринади</span>
             )}
           </div>
+          {isIdCard && imageBack ? (
+            <div className={styles.preview}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageBack} alt="ID back" />
+            </div>
+          ) : null}
           <p className={styles.hint}>
-            Эски паспорт китобчаси ва янги ID-карта қўллаб-қувватланади. MRZ қаторини аниқ
-            туширинг.
+            Биометрик паспорт китобчаси — 1 расм (MRZ пастки қаторда ПИНФЛ; охирги 2
+            текширув рақами олиб ташланади). Янги ID-карта — олд + орқа томон.
           </p>
         </div>
         <div className={styles.right}>
@@ -165,7 +243,10 @@ export function PassportScanModal({
               <select
                 value={fields.docType}
                 onChange={(e) =>
-                  setField('docType', e.target.value === 'ID_CARD' ? 'ID_CARD' : 'PASSPORT')
+                  setField(
+                    'docType',
+                    e.target.value === 'ID_CARD' ? 'ID_CARD' : 'PASSPORT',
+                  )
                 }
               >
                 <option value="PASSPORT">Паспорт (китобча)</option>
@@ -203,7 +284,10 @@ export function PassportScanModal({
           <div className={modal.row2}>
             <label className={modal.field}>
               <span>Серия</span>
-              <input value={fields.series} onChange={(e) => setField('series', e.target.value)} />
+              <input
+                value={fields.series}
+                onChange={(e) => setField('series', e.target.value)}
+              />
             </label>
             <label className={modal.field}>
               <span>Рақам</span>
@@ -215,8 +299,14 @@ export function PassportScanModal({
           </div>
           <div className={modal.row2}>
             <label className={modal.field}>
-              <span>ПИНФЛ</span>
-              <input value={fields.pinfl} onChange={(e) => setField('pinfl', e.target.value)} />
+              <span>ПИНФЛ (ЖШШИР)</span>
+              <input
+                value={fields.pinfl}
+                onChange={(e) => setField('pinfl', e.target.value)}
+                inputMode="numeric"
+                maxLength={14}
+                placeholder="14 рақам"
+              />
             </label>
             <label className={modal.field}>
               <span>Жинс</span>
@@ -267,7 +357,10 @@ export function PassportScanModal({
           </div>
           <label className={modal.field}>
             <span>Ким берган</span>
-            <input value={fields.issuer} onChange={(e) => setField('issuer', e.target.value)} />
+            <input
+              value={fields.issuer}
+              onChange={(e) => setField('issuer', e.target.value)}
+            />
           </label>
         </div>
       </div>

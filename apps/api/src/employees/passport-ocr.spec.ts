@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  normalizePinflDigits,
   parsePassportOcrText,
   parseTd1,
   parseTd3,
@@ -23,8 +24,25 @@ describe('passport-ocr', () => {
     assert.equal(p!.expiresAt, '2030-01-01');
   });
 
-  it('parses UZ ID-card MRZ TD1', () => {
-    const l1 = 'IDUZBAA9876547<<<<<<<<<<<<<<<';
+  it('extracts PINFL from real UZ biometric MRZ (Utamurodov)', () => {
+    const l1 = 'P<UZBUTAMURODOV<<JASURBEK<<<<<<<<<<<<<<<<<<<<<<<';
+    const l2 = 'AC16268638UZB0302081M29021425080203866002648';
+    const p = parseTd3(l1, l2);
+    assert.ok(p);
+    assert.equal(p!.series, 'AC');
+    assert.equal(p!.docNumber, '1626863');
+    assert.equal(p!.birthDate, '2003-02-08');
+    assert.equal(p!.pinfl, '50802038660026');
+  });
+
+  it('strips last 2 check digits from biometric PINFL (16→14)', () => {
+    assert.equal(normalizePinflDigits('3010199012345699'), '30101990123456');
+    assert.equal(normalizePinflDigits('301019901234569'), '30101990123456');
+    assert.equal(normalizePinflDigits('30101990123456'), '30101990123456');
+  });
+
+  it('parses UZ ID-card MRZ TD1 with PINFL in optional data', () => {
+    const l1 = 'IDUZBAA9876547X30101990123456<';
     const l2 = '9001011M3001015UZB<<<<<<<<<<<6';
     const l3 = 'KARIMOVA<<DILNOZA<<<<<<<<<<<<<';
     const p = parseTd1(l1, l2, l3);
@@ -36,7 +54,7 @@ describe('passport-ocr', () => {
     assert.equal(p!.series, 'AA');
     assert.equal(p!.docNumber, '9876547');
     assert.equal(p!.birthDate, '1990-01-01');
-    assert.equal(p!.gender, 'male');
+    assert.equal(p!.pinfl, '30101990123456');
   });
 
   it('extracts PINFL and series from noisy OCR text', () => {
@@ -58,5 +76,11 @@ ${l2}
     assert.equal(r.docNumber, '1234567');
     assert.ok(r.confidence === 'high' || r.confidence === 'medium');
     assert.ok(r.lastName.toLowerCase().includes('botirov'));
+  });
+
+  it('extracts JSHSHIR label with trailing extras', () => {
+    const text = 'ЖШШИР: 3010199012345699 Фамилия: TEST';
+    const r = parsePassportOcrText(text);
+    assert.equal(r.pinfl, '30101990123456');
   });
 });

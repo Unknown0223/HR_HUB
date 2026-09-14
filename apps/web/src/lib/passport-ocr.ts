@@ -1,8 +1,11 @@
 /**
  * Uzbekistan passport / ID-card field extraction from OCR text.
  * Supports:
- * - old booklet passport (MRZ TD3, series AA + 7 digits)
- * - biometric ID-card (MRZ TD1)
+ * - old booklet biometric passport (MRZ TD3) — 1 image, PINFL in personal-number field
+ * - new ID-card (MRZ TD1) — typically front+back images
+ *
+ * PINFL (JSHSHIR): 14 digits. Biometric MRZ may append 1–2 check digits;
+ * strip trailing extras and keep 14.
  */
 
 export type PassportDocKind = 'passport_book' | 'id_card' | 'unknown';
@@ -94,6 +97,28 @@ function splitNames(nameField: string): {
   };
 }
 
+/**
+ * Normalize PINFL / JSHSHIR to exactly 14 digits.
+ * Biometric MRZ often has 14 + 1–2 trailing check digits → drop last 2 when ≥16,
+ * or drop 1 when length is 15.
+ */
+export function normalizePinflDigits(raw: string): string {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 14) return digits;
+  if (digits.length === 15) return digits.slice(0, 14);
+  if (digits.length >= 16) {
+    // User rule: remove last 2 extras, then take 14 digits
+    const trimmed = digits.slice(0, -2);
+    if (trimmed.length >= 14) return trimmed.slice(0, 14);
+    return trimmed;
+  }
+  // Prefer a plausible UZ PINFL start (century/gender digit 1–6)
+  const embedded = digits.match(/[1-6]\d{13}/);
+  if (embedded) return embedded[0];
+  return '';
+}
+
 /** Find MRZ-looking lines in noisy OCR text. */
 export function extractMrzLines(text: string): string[] {
   const lines = text
@@ -105,6 +130,51 @@ export function extractMrzLines(text: string): string[] {
     if (/^[A-Z0-9<]{28,44}$/.test(l)) out.push(l.slice(0, 44));
   }
   return out;
+}
+
+function pinflFromTd3Line2(l2: string): string {
+  // ICAO: personal number positions 29–42 (1-based) = slice(28, 42);
+  // include trailing check digit(s) OCR may glue on (43–44).
+  const personal = l2.slice(28, 44).replace(/</g, '');
+  let pinfl = normalizePinflDigits(personal);
+  if (pinfl) return pinfl;
+
+  // Tail may be longer/shorter if OCR dropped '<' fillers
+  const tailDigits = l2.slice(28).replace(/\D/g, '');
+  pinfl = normalizePinflDigits(tailDigits);
+  if (pinfl) return pinfl;
+
+  // After sex + expiry(+check): capture 14–16 digit PINFL block
+  const m = l2.match(/[MF]\d{6}\d(\d{14,16})/);
+  if (m) {
+    pinfl = normalizePinflDigits(m[1]);
+    if (pinfl) return pinfl;
+  }
+
+  // Last digit run on the line (often PINFL + 2 checks)
+  const runs = l2.match(/\d{14,16}/g);
+  if (runs?.length) {
+    // Prefer a run whose digits 2–7 look like DDMMYY
+    for (let i = runs.length - 1; i >= 0; i--) {
+      const cand = normalizePinflDigits(runs[i]);
+      if (!cand) continue;
+      const dd = Number(cand.slice(1, 3));
+      const mm = Number(cand.slice(3, 5));
+      if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) return cand;
+    }
+    return normalizePinflDigits(runs[runs.length - 1]);
+  }
+  return '';
+}
+
+function pinflFromTd1(l1: string, l2: string): string {
+  const opt1 = l1.slice(15, 30).replace(/</g, '');
+  const opt2 = l2.slice(18, 29).replace(/</g, '');
+  return (
+    normalizePinflDigits(opt1) ||
+    normalizePinflDigits(opt2) ||
+    normalizePinflDigits(`${opt1}${opt2}`)
+  );
 }
 
 export function parseTd3(line1: string, line2: string): Partial<PassportScanFields> | null {
@@ -124,6 +194,7 @@ export function parseTd3(line1: string, line2: string): Partial<PassportScanFiel
     series = m[1];
     number = m[2];
   }
+  const pinfl = pinflFromTd3Line2(l2);
   return {
     docKind: 'passport_book',
     docType: 'PASSPORT',
@@ -134,6 +205,7 @@ export function parseTd3(line1: string, line2: string): Partial<PassportScanFiel
     expiresAt,
     series,
     docNumber: number || docNumber,
+    pinfl,
     mrzRaw: `${l1}\n${l2}`,
     confidence: 'high',
     issuer: 'IIV',
@@ -162,6 +234,7 @@ export function parseTd1(
     series = m[1];
     number = m[2];
   }
+  const pinfl = pinflFromTd1(l1, l2);
   return {
     docKind: 'id_card',
     docType: 'ID_CARD',
@@ -172,6 +245,7 @@ export function parseTd1(
     expiresAt,
     series,
     docNumber: number || docNumber,
+    pinfl,
     mrzRaw: `${l1}\n${l2}\n${l3}`,
     confidence: 'high',
     issuer: 'IIV',
@@ -179,8 +253,21 @@ export function parseTd1(
 }
 
 function findPinfl(text: string): string {
-  const m = text.replace(/\s+/g, ' ').match(/\b(\d{14})\b/);
-  return m ? m[1] : '';
+  const labeled = text
+    .replace(/\s+/g, ' ')
+    .match(
+      /(?:ПИНФЛ|PINFL|JSHSHIR|ЖШШИР|JSHR|ЖШР|Ж\.?\s*Ш\.?\s*Ш\.?\s*И\.?\s*Р)\s*[:\-№#]?\s*([\d\s]{14,22})/i,
+    );
+  if (labeled) {
+    const n = normalizePinflDigits(labeled[1]);
+    if (n) return n;
+  }
+  const runs = text.match(/\d{14,20}/g) || [];
+  for (const run of runs) {
+    const n = normalizePinflDigits(run);
+    if (n) return n;
+  }
+  return '';
 }
 
 function findBookPassport(text: string): { series: string; docNumber: string } | null {
@@ -218,7 +305,6 @@ function findIsoDates(text: string): string[] {
 }
 
 function findNamesCyrillic(text: string): Partial<PassportScanFields> {
-  // Common labels near FIO on UZ docs
   const block = text.replace(/\r/g, '\n');
   const last =
     block.match(/(?:Familiyasi|Фамилия|Surname)\s*[:\-]?\s*([A-ZА-ЯЁʻʼ'\- ]{2,40})/i)?.[1] ||
@@ -250,14 +336,12 @@ export function parsePassportOcrText(text: string): PassportScanFields {
   const mrz = extractMrzLines(raw);
 
   let fromMrz: Partial<PassportScanFields> | null = null;
-  // Prefer TD1 (3×~30) then TD3 (2×44)
   const short = mrz.filter((l) => l.length >= 28 && l.length <= 36);
   const long = mrz.filter((l) => l.length >= 40);
   if (short.length >= 3) {
     fromMrz = parseTd1(short[0], short[1], short[2]);
   }
   if (!fromMrz && long.length >= 2) {
-    // pick a P< line if present
     const i = long.findIndex((l) => l.startsWith('P') || l.startsWith('IP'));
     if (i >= 0 && long[i + 1]) fromMrz = parseTd3(long[i], long[i + 1]);
     else fromMrz = parseTd3(long[0], long[1]);
@@ -273,6 +357,7 @@ export function parsePassportOcrText(text: string): PassportScanFields {
 
   const pinfl = findPinfl(raw);
   if (pinfl) result.pinfl = pinfl;
+  else if (result.pinfl) result.pinfl = normalizePinflDigits(result.pinfl);
 
   if (!result.series || !result.docNumber) {
     const book = findBookPassport(raw);
@@ -313,10 +398,48 @@ export function parsePassportOcrText(text: string): PassportScanFields {
     result.birthDate,
   ].filter(Boolean).length;
   if (!fromMrz) {
-    result.confidence = filled >= 4 ? 'medium' : filled >= 2 ? 'low' : 'low';
+    result.confidence = filled >= 4 ? 'medium' : 'low';
   } else if (filled < 3) {
     result.confidence = 'medium';
   }
 
+  return result;
+}
+
+/** Merge OCR results from multiple sides (ID front+back). */
+export function mergePassportScanFields(
+  ...parts: Array<Partial<PassportScanFields> | null | undefined>
+): PassportScanFields {
+  const result: PassportScanFields = { ...EMPTY };
+  for (const p of parts) {
+    if (!p) continue;
+    for (const key of Object.keys(EMPTY) as Array<keyof PassportScanFields>) {
+      const v = p[key];
+      if (v == null || v === '') continue;
+      if (key === 'mrzRaw') {
+        result.mrzRaw = result.mrzRaw
+          ? `${result.mrzRaw}\n---\n${String(v)}`
+          : String(v);
+        continue;
+      }
+      if (key === 'confidence') {
+        const rank = { high: 3, medium: 2, low: 1 } as const;
+        const cur = rank[result.confidence];
+        const next = rank[v as PassportScanFields['confidence']] || 0;
+        if (next > cur) result.confidence = v as PassportScanFields['confidence'];
+        continue;
+      }
+      if (key === 'pinfl') {
+        const n = normalizePinflDigits(String(v));
+        if (n && !result.pinfl) result.pinfl = n;
+        continue;
+      }
+      if (!result[key]) {
+        (result as Record<string, unknown>)[key] = v;
+      }
+    }
+  }
+  if (result.docKind === 'id_card') result.docType = 'ID_CARD';
+  if (result.docKind === 'passport_book') result.docType = 'PASSPORT';
   return result;
 }
