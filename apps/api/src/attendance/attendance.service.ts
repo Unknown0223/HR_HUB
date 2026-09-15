@@ -640,6 +640,9 @@ export class AttendanceService {
     await this.persistDevicePassword(tenantId, id, newPassword, actor?.userId);
     await this.credentialAudit.record(tenantId, id, 'change', actor);
     await this.gw.registerFromDevice(updated);
+    if (updated.locationId) {
+      this.scheduleLocationPersonsSync(tenantId, updated.id);
+    }
     return { ok: true, id };
   }
 
@@ -696,6 +699,10 @@ export class AttendanceService {
     await this.persistDevicePassword(tenantId, id, password, actor?.userId);
     await this.credentialAudit.record(tenantId, id, 'sync', actor);
     await this.gw.registerFromDevice(updated);
+    // After password is known again, re-sync faces and purge terminal orphans.
+    if (updated.locationId) {
+      this.scheduleLocationPersonsSync(tenantId, updated.id);
+    }
     return { ok: true, id, saved: true };
   }
 
@@ -2327,6 +2334,34 @@ export class AttendanceService {
     purgedRemoved = purged.removed;
     purgedFailed = purged.failed;
 
+    // Also remove users that exist only on the terminal (manual admin adds, etc.).
+    try {
+      const keepNos = new Set(
+        desiredEmps.map((e) => this.deviceEmployeeNo(e)).filter(Boolean),
+      );
+      const reachUrl = this.deviceReachBaseUrl(device.meta);
+      const plain =
+        (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) ||
+        '';
+      const username = (device.username || 'admin').trim() || 'admin';
+      if (reachUrl && plain) {
+        const orphan = await this.reach.purgeOrphanUsers(
+          reachUrl,
+          username,
+          plain,
+          keepNos,
+        );
+        purgedRemoved += orphan.removed;
+        purgedFailed += orphan.failed;
+      }
+    } catch (e) {
+      this.logger.warn(
+        `terminal orphan purge skipped device=${deviceId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+
     const initial = await this.faceSyncCounts(tenantId, deviceId);
     await this.writePersonsSyncProgress(tenantId, deviceId, {
       running: true,
@@ -3316,10 +3351,16 @@ export class AttendanceService {
       employeeName: string;
     }> = [];
 
+    let keepEmployeeNos: string[] = [];
     if (device.locationId) {
       try {
         const desired = await this.employeesForDeviceLocation(tenantId, device);
         const desiredIds = new Set(desired.filter((e) => e.faceProfile).map((e) => e.id));
+        keepEmployeeNos = [
+          ...new Set(
+            desired.map((e) => this.deviceEmployeeNo(e)).filter(Boolean),
+          ),
+        ];
         const extras =
           desiredIds.size === 0
             ? await this.prisma.deviceFaceSync.findMany({
@@ -3388,6 +3429,7 @@ export class AttendanceService {
       }
     }
 
+    const syncInFlight = this.personsSyncInFlight.has(deviceId);
     return {
       ok: true,
       device: {
@@ -3400,6 +3442,10 @@ export class AttendanceService {
       deletes,
       count: items.length,
       deleteCount: deletes.length,
+      /** Terminal must only keep these employeeNos (server roster). */
+      keepEmployeeNos,
+      reconcileDevice: true,
+      forceReconcile: syncInFlight || items.length > 0 || deletes.length > 0,
     };
   }
 

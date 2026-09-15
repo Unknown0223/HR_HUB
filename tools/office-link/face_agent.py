@@ -6,6 +6,7 @@ PC Wi‑Fi/LAN) enrolls/deletes via ISAPI. Called from service_worker loop.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from api_client import api_req, is_success
@@ -205,6 +206,128 @@ def delete_user(
     return False, f"Delete HTTP {code}: {body[:160]}"
 
 
+def list_users(
+    *,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    page_size: int = 30,
+    max_users: int = 2000,
+) -> list[dict[str, str]]:
+    """List AccessControl users on the terminal (employeeNo + userType/name)."""
+    import json as _json
+
+    out: list[dict[str, str]] = []
+    pos = 0
+    while pos < max_users:
+        payload = {
+            "UserInfoSearchCond": {
+                "searchID": "1",
+                "searchResultPosition": pos,
+                "maxResults": min(page_size, max_users - pos),
+            }
+        }
+        code, body = _digest_request(
+            host,
+            port,
+            "POST",
+            "/ISAPI/AccessControl/UserInfo/Search?format=json",
+            username,
+            password,
+            json_body=payload,
+            timeout=45.0,
+        )
+        if code >= 400:
+            logger.warning("UserInfo/Search HTTP %s: %s", code, body[:160])
+            break
+        try:
+            data = _json.loads(body) if body.strip().startswith("{") else {}
+        except Exception:
+            break
+        search = data.get("UserInfoSearch") or data
+        rows = search.get("UserInfo") or []
+        if isinstance(rows, dict):
+            rows = [rows]
+        if not isinstance(rows, list) or not rows:
+            break
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            no = _employee_no(
+                str(row.get("employeeNo") or row.get("employeeNoString") or "")
+            )
+            if not no:
+                continue
+            out.append(
+                {
+                    "employeeNo": no,
+                    "name": str(row.get("name") or "").strip(),
+                    "userType": str(row.get("userType") or "").strip().lower(),
+                }
+            )
+        total = int(search.get("totalMatches") or 0)
+        pos += len(rows)
+        if total and pos >= total:
+            break
+        if len(rows) < page_size:
+            break
+    return out
+
+
+def _is_protected_device_user(user: dict[str, str]) -> bool:
+    """Never delete Hikvision administrator AccessControl accounts."""
+    ut = (user.get("userType") or "").lower()
+    if ut in ("administrator", "admin"):
+        return True
+    return False
+
+
+def reconcile_device_users(
+    *,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    keep_employee_nos: set[str],
+) -> tuple[int, int]:
+    """Delete terminal users that are not in the server keep-set.
+
+    keep_employee_nos empty => remove all non-protected users (terminal mirrors
+    an empty location roster).
+    """
+    keep = {_employee_no(x) for x in keep_employee_nos if _employee_no(x)}
+    deleted = 0
+    failed = 0
+    try:
+        users = list_users(
+            host=host, port=port, username=username, password=password,
+        )
+    except Exception as exc:
+        logger.warning("list_users failed: %s", exc)
+        return 0, 1
+    for user in users:
+        no = user.get("employeeNo") or ""
+        if not no or _is_protected_device_user(user):
+            continue
+        if no in keep:
+            continue
+        ok, msg = delete_user(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            employee_no=no,
+        )
+        if ok:
+            deleted += 1
+            logger.info("purged orphan employeeNo=%s name=%s", no, user.get("name"))
+        else:
+            failed += 1
+            logger.warning("purge orphan %s failed: %s", no, msg)
+    return deleted, failed
+
+
 def tick_once(root=None) -> dict[str, Any]:
     """One poll cycle. Safe to call from service_worker every N seconds."""
     root = root or find_root()
@@ -226,6 +349,8 @@ def tick_once(root=None) -> dict[str, Any]:
         "upsertFail": 0,
         "deleteOk": 0,
         "deleteFail": 0,
+        "purgeOk": 0,
+        "purgeFail": 0,
         "message": "",
     }
     if not api or not device_id:
@@ -336,9 +461,53 @@ def tick_once(root=None) -> dict[str, Any]:
                 timeout=30.0,
             )
 
+    # Mirror server roster on the terminal: remove manually added / stale users.
+    keep_raw = data.get("keepEmployeeNos")
+    reconcile = data.get("reconcileDevice")
+    if reconcile is None:
+        reconcile = True
+    force_reconcile = bool(data.get("forceReconcile"))
+    if reconcile and isinstance(keep_raw, list):
+        due = force_reconcile
+        if not due:
+            stamp = root / "data" / "last_device_reconcile.txt"
+            try:
+                age = time.time() - stamp.stat().st_mtime
+                due = age >= 90
+            except OSError:
+                due = True
+        if due:
+            keep = {str(x).strip() for x in keep_raw if str(x).strip()}
+            try:
+                purged, purge_fail = reconcile_device_users(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    keep_employee_nos=keep,
+                )
+                result["purgeOk"] = purged
+                result["purgeFail"] = purge_fail
+                result["deleteOk"] += purged
+                result["deleteFail"] += purge_fail
+                try:
+                    stamp = root / "data" / "last_device_reconcile.txt"
+                    stamp.parent.mkdir(parents=True, exist_ok=True)
+                    stamp.write_text(str(int(time.time())), encoding="utf-8")
+                except OSError:
+                    pass
+            except Exception as exc:
+                result["purgeFail"] = 1
+                logger.warning("reconcile_device_users failed: %s", exc)
+
     result["ok"] = True
     result["message"] = (
         f"upsert +{result['upsertOk']}/-{result['upsertFail']} "
         f"delete +{result['deleteOk']}/-{result['deleteFail']}"
+        + (
+            f" purge +{result['purgeOk']}/-{result['purgeFail']}"
+            if result.get("purgeOk") or result.get("purgeFail")
+            else ""
+        )
     )
     return result

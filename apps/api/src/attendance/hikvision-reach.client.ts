@@ -263,6 +263,99 @@ export class HikvisionReachClient {
     );
   }
 
+  async listUsers(
+    baseUrl: string,
+    username: string,
+    password: string,
+    opts: { pageSize?: number; maxUsers?: number } = {},
+  ): Promise<Array<{ employeeNo: string; name: string; userType: string }>> {
+    const pageSize = Math.max(1, Math.min(50, opts.pageSize ?? 30));
+    const maxUsers = Math.max(pageSize, opts.maxUsers ?? 2000);
+    const out: Array<{ employeeNo: string; name: string; userType: string }> =
+      [];
+    let pos = 0;
+    while (pos < maxUsers) {
+      const payload = {
+        UserInfoSearchCond: {
+          searchID: '1',
+          searchResultPosition: pos,
+          maxResults: Math.min(pageSize, maxUsers - pos),
+        },
+      };
+      const r = await this.digestRequest(
+        baseUrl,
+        '/ISAPI/AccessControl/UserInfo/Search?format=json',
+        {
+          method: 'POST',
+          username,
+          password,
+          body: JSON.stringify(payload),
+          contentType: 'application/json',
+          timeoutMs: 45_000,
+        },
+      );
+      if (r.status >= 400) break;
+      let data: any = {};
+      try {
+        data = JSON.parse(r.text || '{}');
+      } catch {
+        break;
+      }
+      const search = data?.UserInfoSearch || data || {};
+      let rows = search.UserInfo || [];
+      if (!Array.isArray(rows)) rows = rows ? [rows] : [];
+      if (!rows.length) break;
+      for (const row of rows) {
+        const no = hikvisionEmployeeNo(
+          String(row?.employeeNo || row?.employeeNoString || ''),
+        );
+        if (!no) continue;
+        out.push({
+          employeeNo: no,
+          name: String(row?.name || '').trim(),
+          userType: String(row?.userType || '')
+            .trim()
+            .toLowerCase(),
+        });
+      }
+      const total = Number(search.totalMatches || 0);
+      pos += rows.length;
+      if (total && pos >= total) break;
+      if (rows.length < pageSize) break;
+    }
+    return out;
+  }
+
+  async purgeOrphanUsers(
+    baseUrl: string,
+    username: string,
+    password: string,
+    keepEmployeeNos: Iterable<string>,
+  ): Promise<{ removed: number; failed: number }> {
+    const keep = new Set(
+      [...keepEmployeeNos]
+        .map((x) => hikvisionEmployeeNo(String(x || '')))
+        .filter(Boolean),
+    );
+    const users = await this.listUsers(baseUrl, username, password);
+    let removed = 0;
+    let failed = 0;
+    for (const u of users) {
+      const ut = u.userType || '';
+      if (ut === 'administrator' || ut === 'admin') continue;
+      if (!u.employeeNo || keep.has(u.employeeNo)) continue;
+      const ok = await this.deleteUser(
+        baseUrl,
+        username,
+        password,
+        u.employeeNo,
+      );
+      if (ok) removed += 1;
+      else failed += 1;
+    }
+    return { removed, failed };
+  }
+
   async syncFace(
     baseUrl: string,
     username: string,
