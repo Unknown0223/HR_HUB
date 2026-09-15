@@ -2558,6 +2558,50 @@ export class AttendanceService {
     }
   }
 
+  /** Re-queue failed face sync rows (all or selected employees) and kick sync. */
+  async retryFailedFaceSyncs(
+    tenantId: string,
+    deviceId: string,
+    opts: { employeeIds?: string[] } = {},
+  ) {
+    await this.getDevice(tenantId, deviceId);
+    const employeeIds = (opts.employeeIds || [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean);
+    const where: Prisma.DeviceFaceSyncWhereInput = {
+      tenantId,
+      deviceId,
+      syncStatus: FaceSyncStatus.failed,
+      ...(employeeIds.length ? { employeeId: { in: employeeIds } } : {}),
+    };
+    const updated = await this.prisma.deviceFaceSync.updateMany({
+      where,
+      data: { syncStatus: FaceSyncStatus.pending, lastError: null },
+    });
+    if (!updated.count) {
+      return {
+        ok: true,
+        requeued: 0,
+        queued: false,
+        message: 'Нет ошибок для повтора',
+      };
+    }
+    await this.appendCommand(tenantId, deviceId, {
+      type: 'Person Sync Retry',
+      employeeName: employeeIds.length
+        ? `retry failed ${updated.count} (selected ${employeeIds.length})`
+        : `retry failed ${updated.count}`,
+      status: 'completed',
+    });
+    // Kick the same queue/wave path (failed are now pending).
+    const kicked = await this.syncDevicePersons(tenantId, deviceId);
+    return {
+      ...kicked,
+      requeuedFailed: updated.count,
+      message: `Повтор: ${updated.count} в очереди`,
+    };
+  }
+
   async listDeviceMarks(
     tenantId: string,
     deviceId: string,

@@ -667,6 +667,38 @@ function DeviceDetailInner() {
     }
   }
 
+  async function retryFailedPersons(employeeIds?: string[]) {
+    setBusy(true);
+    setError('');
+    setSyncNotice('');
+    try {
+      const res = await apiFetch<{
+        requeuedFailed?: number;
+        requeued?: number;
+        message?: string;
+        alreadyRunning?: boolean;
+      }>(`/api/attendance/devices/${id}/persons/retry-failed`, {
+        method: 'POST',
+        body: JSON.stringify(
+          employeeIds?.length ? { employeeIds } : {},
+        ),
+      });
+      const n = res.requeuedFailed ?? res.requeued ?? 0;
+      setSyncNotice(
+        res.message ||
+          (n > 0
+            ? `Повторная попытка: ${n} в очереди`
+            : 'Нет ошибок для повтора'),
+      );
+      await loadSyncProgress();
+      await loadTabData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить ошибки');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function toggleId(rowId: string) {
     setSelectedIds((prev) =>
       prev.includes(rowId) ? prev.filter((x) => x !== rowId) : [...prev, rowId],
@@ -789,6 +821,18 @@ function DeviceDetailInner() {
               Ошибки: <strong>{syncProgress.failed ?? 0}</strong>
             </span>
           </div>
+          {(syncProgress.failed || 0) > 0 && !syncActive ? (
+            <div className={styles.syncRetryRow}>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                disabled={busy}
+                onClick={() => void retryFailedPersons()}
+              >
+                Повторить ошибки ({syncProgress.failed})
+              </button>
+            </div>
+          ) : null}
           {syncProgress.currentNames && syncProgress.currentNames.length > 0 ? (
             <div className={styles.syncCurrent}>
               Сейчас: {syncProgress.currentNames.join(', ')}
@@ -1121,6 +1165,17 @@ function DeviceDetailInner() {
                   >
                     Синхронизировать
                   </button>
+                  {(syncProgress?.failed || 0) > 0 ||
+                  persons.some((p) => p.syncStatus === 'failed') ? (
+                    <button
+                      type="button"
+                      className={styles.btnRetry}
+                      disabled={busy}
+                      onClick={() => void retryFailedPersons()}
+                    >
+                      Повторить ошибки
+                    </button>
+                  ) : null}
                 </div>
                 <input
                   className={styles.search}
@@ -1137,12 +1192,13 @@ function DeviceDetailInner() {
                     <th>ФИО</th>
                     <th>Роль</th>
                     <th>Синхронизирован</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPersons.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className={styles.empty}>
+                      <td colSpan={5} className={styles.empty}>
                         {search.trim()
                           ? 'Ничего не найдено — проверьте поиск или нажмите «Синхронизировать»'
                           : 'Нет данных — нажмите «Синхронизировать сотрудников локации»'}
@@ -1169,6 +1225,18 @@ function DeviceDetailInner() {
                           </span>
                           {p.syncStatus === 'failed' && p.lastError ? (
                             <div className={styles.syncFailHint}>{p.lastError}</div>
+                          ) : null}
+                        </td>
+                        <td>
+                          {p.syncStatus === 'failed' ? (
+                            <button
+                              type="button"
+                              className={styles.linkBtn}
+                              disabled={busy}
+                              onClick={() => void retryFailedPersons([p.id])}
+                            >
+                              Повторить
+                            </button>
                           ) : null}
                         </td>
                       </tr>

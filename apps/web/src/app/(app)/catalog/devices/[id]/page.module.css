@@ -585,6 +585,56 @@
   word-break: break-word;
 }
 
+.syncRetryRow {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btnRetry {
+  appearance: none;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #9f1239;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btnRetry:hover:not(:disabled) {
+  background: #ffe4e6;
+}
+
+.btnRetry:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.linkBtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #0a85e2;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.linkBtn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.linkBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .syncNotice {
   color: #0f4c81;
   margin: 0 0 12px;

@@ -434,6 +434,35 @@ export class AttendanceController {
 
   @ApiBearerAuth()
   @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Post('devices/:id/persons/retry-failed')
+  @ApiBody({
+    required: false,
+    schema: {
+      type: 'object',
+      properties: {
+        employeeIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: retry only these employees',
+        },
+      },
+    },
+  })
+  retryFailedFaceSyncs(
+    @CurrentTenant() tenantId: string | null,
+    @Param('id') id: string,
+    @Body() body?: { employeeIds?: string[] },
+  ) {
+    return this.attendance.retryFailedFaceSyncs(
+      this.attendance.requireTenant(tenantId),
+      id,
+      { employeeIds: body?.employeeIds },
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
   @Get('devices/:id/persons/sync-progress')
   getDevicePersonsSyncProgress(
