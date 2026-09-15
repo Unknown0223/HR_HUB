@@ -3293,9 +3293,20 @@ export class AttendanceService {
   async officeLinkPendingFaces(tenantId: string, deviceId: string) {
     const device = await this.prisma.device.findFirst({
       where: { id: deviceId, tenantId },
-      select: { id: true, host: true, port: true, username: true, locationId: true, meta: true },
+      select: {
+        id: true,
+        host: true,
+        port: true,
+        username: true,
+        locationId: true,
+        meta: true,
+        passwordEnc: true,
+      },
     });
     if (!device) throw new NotFoundException('Device not found');
+
+    const vaultPassword =
+      (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) || '';
 
     const rows = await this.prisma.deviceFaceSync.findMany({
       where: {
@@ -3437,6 +3448,8 @@ export class AttendanceService {
         host: device.host,
         port: device.port || 80,
         username: device.username || 'admin',
+        /** Current vault password — LAN agent refreshes local credential from this. */
+        password: vaultPassword || undefined,
       },
       items,
       deletes,
@@ -3445,7 +3458,9 @@ export class AttendanceService {
       /** Terminal must only keep these employeeNos (server roster). */
       keepEmployeeNos,
       reconcileDevice: true,
-      forceReconcile: syncInFlight || items.length > 0 || deletes.length > 0,
+      // Always force: Sinhron / password change must immediately drop terminal orphans.
+      forceReconcile: true,
+      syncInFlight,
     };
   }
 

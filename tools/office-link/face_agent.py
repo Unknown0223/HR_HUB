@@ -10,7 +10,7 @@ import time
 from typing import Any
 
 from api_client import api_req, is_success
-from credential_store import read_device_credential
+from credential_store import read_device_credential, save_device_credential
 from paths import find_root, load_config, load_service_config, read_link_key
 
 logger = logging.getLogger("face_agent")
@@ -388,6 +388,26 @@ def tick_once(root=None) -> dict[str, Any]:
     items = data.get("items") if isinstance(data.get("items"), list) else []
     deletes = data.get("deletes") if isinstance(data.get("deletes"), list) else []
     result["pending"] = len(items) + len(deletes)
+
+    # Prefer live vault password from pending-faces (covers Ulash / password sync).
+    device_meta = data.get("device") if isinstance(data.get("device"), dict) else {}
+    vault_pwd = str(device_meta.get("password") or "").strip()
+    if vault_pwd and vault_pwd != password:
+        password = vault_pwd
+        try:
+            save_device_credential(
+                host=host,
+                password=password,
+                username=username,
+                port=port,
+                device_id=device_id,
+                serial=str(cred.get("serialNumber") or ""),
+                location_id=str(cred.get("locationId") or ""),
+                phase="vault_refresh",
+                root=root,
+            )
+        except Exception as exc:
+            logger.warning("vault password refresh save failed: %s", exc)
 
     for raw in deletes:
         if not isinstance(raw, dict):
