@@ -1,7 +1,6 @@
 """Hikvision-style password attempt lock (app-side).
 
-1st 401 → confirm (operator must re-type; no auto-retry).
-2nd 401 → lock further ISAPI auth for lock_seconds (default 30 min).
+Wrong password → warn; after max_fails → short lock (operator can reset).
 Network timeout / offline is not a password fail.
 """
 from __future__ import annotations
@@ -13,7 +12,9 @@ LOCKED = "locked"
 IDLE = "idle"
 SUCCESS = "success"
 
-DEFAULT_LOCK_SECONDS = 30 * 60
+# Office use: enough tries, short lock (was 2 fails / 30 min — felt like “password always wrong”).
+DEFAULT_LOCK_SECONDS = 3 * 60
+DEFAULT_MAX_FAILS = 5
 
 
 class AuthLock:
@@ -21,7 +22,7 @@ class AuthLock:
         self,
         lock_seconds: int = DEFAULT_LOCK_SECONDS,
         now: Callable[[], float] | None = None,
-        max_fails: int = 2,
+        max_fails: int = DEFAULT_MAX_FAILS,
     ) -> None:
         self.lock_seconds = int(lock_seconds)
         self.max_fails = int(max_fails)
@@ -49,7 +50,7 @@ class AuthLock:
     def phase(self) -> str:
         if self.is_locked():
             return LOCKED
-        if self.fail_count == 1:
+        if self.fail_count >= 1:
             return CONFIRM
         return IDLE
 
@@ -71,6 +72,11 @@ class AuthLock:
         return CONFIRM
 
     def record_success(self) -> None:
+        self.fail_count = 0
+        self.lock_until = 0.0
+
+    def reset(self) -> None:
+        """Operator unlock — lock is app-side only, not on the terminal."""
         self.fail_count = 0
         self.lock_until = 0.0
 

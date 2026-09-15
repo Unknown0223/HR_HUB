@@ -15,7 +15,7 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
-from paths import find_root, gw_dir, runtime_dir
+from paths import find_root, gw_dir, runtime_dir, user_data_root
 
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 PYTHON_EMBED_URL = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip"
@@ -120,31 +120,59 @@ def cloudflared_exe(root: Path | None = None) -> Path:
     return runtime_dir(root) / "cloudflared.exe"
 
 
-def copy_gw_sources(root: Path | None = None, cb: StatusFn | None = None) -> Path:
-    root = root or find_root()
-    dest = gw_dir(root)
+def _copy_gw_tree(src: Path, dest: Path, cb: StatusFn | None = None) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "adapters").mkdir(parents=True, exist_ok=True)
+    _status(cb, "Gateway kodlari nusxalanmoqda...")
+    shutil.copy2(src / "main.py", dest / "main.py")
+    if (src / "nats_client.py").is_file():
+        shutil.copy2(src / "nats_client.py", dest / "nats_client.py")
+    if (src / "requirements.txt").is_file():
+        shutil.copy2(src / "requirements.txt", dest / "requirements.txt")
+    adapters = src / "adapters"
+    if adapters.is_dir():
+        for py in adapters.glob("*.py"):
+            shutil.copy2(py, dest / "adapters" / py.name)
+
+
+def copy_gw_sources(root: Path | None = None, cb: StatusFn | None = None) -> Path:
+    """Copy device-gw into a writable gw_dir (never leave Program Files half-updated)."""
+    root = root or find_root()
+    dest = gw_dir(root)
+    install_gw = root / "gw"
     src = None
     for cand in (
         root.parent.parent / "apps" / "device-gw",
         root.parent / "apps" / "device-gw",
         Path(r"D:\hr-hub\apps\device-gw"),
+        # Seed writable user gw from a read-only Program Files install.
+        install_gw if install_gw.resolve() != dest.resolve() else None,
     ):
-        if (cand / "main.py").is_file():
+        if cand is not None and (cand / "main.py").is_file():
             src = cand
             break
-    if src:
-        _status(cb, "Gateway kodlari nusxalanmoqda...")
-        shutil.copy2(src / "main.py", dest / "main.py")
-        if (src / "nats_client.py").is_file():
-            shutil.copy2(src / "nats_client.py", dest / "nats_client.py")
-        if (src / "requirements.txt").is_file():
-            shutil.copy2(src / "requirements.txt", dest / "requirements.txt")
-        adapters = src / "adapters"
-        if adapters.is_dir():
-            for py in adapters.glob("*.py"):
-                shutil.copy2(py, dest / "adapters" / py.name)
+
+    if (dest / "main.py").is_file() and src is None:
+        return dest
+
+    if src is None:
+        raise FileNotFoundError(
+            "Gateway kodlari yo‘q. Avval ADMIN-PAROL.bat ni HR HUB kompyuterida ishga tushiring."
+        )
+
+    try:
+        # Skip overwrite when source and dest are the same tree.
+        if src.resolve() != dest.resolve():
+            _copy_gw_tree(src, dest, cb)
+    except OSError as exc:
+        if (dest / "main.py").is_file():
+            _status(cb, f"Gateway mavjud fayllardan ishlatiladi ({exc})")
+            return dest
+        raise RuntimeError(
+            "Gateway kodlarini yozib bo‘lmadi (Permission denied). "
+            "Ilovani LocalAppData o‘rnatishidan oching yoki administrator bilan qayta o‘rnating."
+        ) from exc
+
     if not (dest / "main.py").is_file():
         raise FileNotFoundError(
             "Gateway kodlari yo‘q. Avval ADMIN-PAROL.bat ni HR HUB kompyuterida ishga tushiring."
@@ -434,6 +462,15 @@ def start_quick_tunnel(
     while time.time() < deadline:
         if proc.poll() is not None:
             detail = _tail_text(log_path)
+            low = detail.lower()
+            if "429" in detail or "1015" in detail or "rate" in low:
+                raise RuntimeError(
+                    "Cloudflare quick tunnel limithi (429). "
+                    "Bir necha daqiqa kutib qayta urining; "
+                    "tez-tez «Восстановить» bosilsa bloklanadi. "
+                    "LAN face sync ishlashi mumkin."
+                    + (f" {detail[-120:]}" if detail else "")
+                )
             raise RuntimeError(
                 "Tunnel ochilmadi."
                 + (f" {detail[:180]}" if detail else "")
@@ -446,6 +483,14 @@ def start_quick_tunnel(
                 m = pattern.search(chunk)
                 if m:
                     return proc, m.group(0)
+                if "429" in chunk or "1015" in chunk:
+                    # cloudflared may still be dying; surface rate-limit early
+                    raise RuntimeError(
+                        "Cloudflare quick tunnel limithi (429). "
+                        "Bir necha daqiqa kutib qayta urining."
+                    )
+        except RuntimeError:
+            raise
         except OSError:
             pass
         time.sleep(0.35)

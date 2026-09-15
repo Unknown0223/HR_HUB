@@ -1245,7 +1245,8 @@ class OfficeLinkApp:
             self.status_var.set("Заблокировано")
             self._set_badge("БЛОКИРОВКА", "danger")
             self._show_alert(
-                f"Заблокировано: {left}  (стиль Hikvision, 30 минут)",
+                f"Заблокировано: {left}  (приложение, не терминал). "
+                "Меню не нужно — перезапустите окно или подождите.",
                 kind="danger",
             )
             self.pwd_entry.configure(state="disabled")

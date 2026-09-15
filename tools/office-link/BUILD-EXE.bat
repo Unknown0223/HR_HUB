@@ -6,9 +6,9 @@ REM Tezkor Python GUI (exe siz): BOSHLASH.bat
 cd /d "%~dp0"
 echo === HR HUB Link — EXE yigish ===
 echo Papka: %CD%
-python -m pip install --disable-pip-version-check -q pyinstaller
+python -m pip install --disable-pip-version-check -q pyinstaller pywebview
 if errorlevel 1 (
-  echo [XATO] PyInstaller o'rnatilmadi. Python/pip ni tekshiring.
+  echo [XATO] PyInstaller/pywebview o'rnatilmadi. Python/pip ni tekshiring.
   echo Muqobil: BOSHLASH.bat (pythonw)
   pause
   exit /b 1

@@ -25,7 +25,7 @@ class AuthLockTests(unittest.TestCase):
 
     def test_second_401_locks(self):
         clock = FakeClock()
-        lock = AuthLock(lock_seconds=1800, now=clock)
+        lock = AuthLock(lock_seconds=1800, now=clock, max_fails=2)
         lock.record_401()
         self.assertEqual(lock.record_401(), LOCKED)
         self.assertTrue(lock.is_locked())
@@ -55,7 +55,7 @@ class AuthLockTests(unittest.TestCase):
 
     def test_lock_expires_then_can_attempt(self):
         clock = FakeClock(10.0)
-        lock = AuthLock(lock_seconds=30, now=clock)
+        lock = AuthLock(lock_seconds=30, now=clock, max_fails=2)
         lock.record_401()
         lock.record_401()
         self.assertTrue(lock.is_locked())
@@ -66,12 +66,21 @@ class AuthLockTests(unittest.TestCase):
 
     def test_401_while_locked_stays_locked(self):
         clock = FakeClock()
-        lock = AuthLock(lock_seconds=60, now=clock)
+        lock = AuthLock(lock_seconds=60, now=clock, max_fails=2)
         lock.record_401()
         lock.record_401()
         until = lock.lock_until
         self.assertEqual(lock.record_401(), LOCKED)
         self.assertEqual(lock.lock_until, until)
+
+    def test_reset_clears_lock(self):
+        lock = AuthLock(lock_seconds=60, now=FakeClock(), max_fails=2)
+        lock.record_401()
+        lock.record_401()
+        self.assertTrue(lock.is_locked())
+        lock.reset()
+        self.assertFalse(lock.is_locked())
+        self.assertEqual(lock.phase(), IDLE)
 
     def test_success_after_confirm_allows_fresh_fails(self):
         lock = AuthLock(now=FakeClock())

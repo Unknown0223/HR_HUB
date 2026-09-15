@@ -22,6 +22,8 @@ from paths import (
     resolve_tunnel_token,
     runtime_dir,
     service_status_file,
+    set_tunnel_cooldown,
+    tunnel_cooldown_remaining,
     write_service_config,
     write_tunnel_url,
 )
@@ -93,7 +95,11 @@ def snapshot_health(
 ) -> TunnelHealth:
     root = root or find_root()
     cfg = load_config(root)
+    svc = load_service_config(root)
     mode = "named" if resolve_tunnel_token(cfg, root) else "quick"
+    reach_mode = str(svc.get("reachMode") or "").strip().lower()
+    # Direct tunnel to the terminal does not use local :8800 gateway.
+    device_reach = reach_mode == "device"
     url = ""
     if bundle is not None:
         url = str(getattr(bundle, "tunnel_url", "") or "").strip()
@@ -109,9 +115,29 @@ def snapshot_health(
         tun_proc = _pidfile_alive(runtime_dir(root) / "tunnel.pid")
 
     gw_http = probe_local_gw()
-    tun_http = probe_tunnel_url(url) if url else None
+    # /health is device-gw only; direct terminal tunnels won't match that body.
+    tun_http = None
+    if url and not device_reach:
+        tun_http = probe_tunnel_url(url)
+    elif url and tun_proc:
+        tun_http = True
+    elif url:
+        tun_http = probe_tunnel_url(url)
 
-    if gw_http and (tun_http is True or (tun_http is None and tun_proc)):
+    if device_reach:
+        if tun_proc and url:
+            ok = True
+            message = "Туннель -> терминал работает"
+        elif tun_proc:
+            ok = False
+            message = "cloudflared есть, URL туннеля пуст"
+        elif url and tun_http is not False:
+            ok = False
+            message = "Процесс cloudflared отсутствует — откройте туннель снова"
+        else:
+            ok = False
+            message = "Туннель к терминалу не активен"
+    elif gw_http and (tun_http is True or (tun_http is None and tun_proc)):
         ok = True
         message = "Шлюз и туннель работают"
     elif not gw_http:
@@ -176,17 +202,21 @@ def announce_best_effort(
     tunnel_url: str,
     device_id: str | None = None,
 ) -> bool:
+    from paths import read_pairing_token
+
     key = read_link_key(root)
-    if not key or not tunnel_url:
+    pairing = read_pairing_token(root)
+    if (not key and not pairing) or not tunnel_url:
         return False
     try:
         import api_client
 
         code, _ = api_client.announce(
             api_url,
-            key,
+            key or "",
             tenant,
             tunnel_url,
+            pairing_token=pairing or None,
             device_id=device_id,
         )
         return 200 <= int(code) < 300
@@ -207,11 +237,14 @@ def restore_tunnel(
     svc = load_service_config(root)
     api_url = str(svc.get("apiUrl") or cfg.get("apiUrl") or "").rstrip("/")
     tenant = str(svc.get("tenantCode") or cfg.get("tenantCode") or "demo")
+    from paths import read_pairing_token
+
     key = read_link_key(root)
+    pairing = read_pairing_token(root)
     if not api_url:
         raise RuntimeError("apiUrl отсутствует (config / service.json)")
-    if not key:
-        raise RuntimeError("Нет data/link.key — сначала подключение / pairing")
+    if not key and not pairing:
+        raise RuntimeError("Нет data/link.key / pairing.token — сначала подключение / pairing")
 
     from credential_store import read_device_credential
 
@@ -227,6 +260,15 @@ def restore_tunnel(
     emit("Проверка runtime…")
     ensure_runtime(root, on_status)
 
+    left = tunnel_cooldown_remaining(root)
+    if left > 0:
+        mins = max(1, (left + 59) // 60)
+        raise RuntimeError(
+            f"Cloudflare limithi hali kuchda. Yana ~{mins} daqiqa kutib, "
+            "keyin bir marta «Восстановить» bosing. "
+            "LAN face sync ishlashi mumkin — yuzlar lokal yuklanadi."
+        )
+
     if bundle is None:
         bundle = ServiceBundle()
         bundle.root = root
@@ -236,19 +278,25 @@ def restore_tunnel(
 
     # Prefer direct tunnel → terminal so API (Railway) can sync faces.
     target = f"http://{host}:{port}" if host else ""
-    if target:
-        emit(f"Туннель → терминал {host}:{port}…")
-        proc, url = start_tunnel(root, on_status, target_url=target)
-        bundle.tunnel = proc
-        bundle.tunnel_url = url
-        bundle.gw = None
-    else:
-        emit("Запуск gateway…")
-        bundle.gw = start_gateway(api_url, key, root, on_status)
-        emit("Открытие туннеля…")
-        proc, url = start_tunnel(root, on_status)
-        bundle.tunnel = proc
-        bundle.tunnel_url = url
+    try:
+        if target:
+            emit(f"Туннель -> терминал {host}:{port}...")
+            proc, url = start_tunnel(root, on_status, target_url=target)
+            bundle.tunnel = proc
+            bundle.tunnel_url = url
+            bundle.gw = None
+        else:
+            emit("Запуск gateway…")
+            bundle.gw = start_gateway(api_url, key, root, on_status)
+            emit("Открытие туннеля…")
+            proc, url = start_tunnel(root, on_status)
+            bundle.tunnel = proc
+            bundle.tunnel_url = url
+    except Exception as exc:
+        msg = str(exc)
+        if "429" in msg or "1015" in msg or "limithi" in msg.lower():
+            set_tunnel_cooldown(900, reason="cloudflare_429", root=root)
+        raise
 
     if not url:
         raise RuntimeError("URL туннеля не получен")
@@ -286,7 +334,7 @@ def restore_tunnel(
             "reachTarget": target or f"127.0.0.1:{GW_PORT}",
             "announced": ok,
             "message": (
-                "Server→terminal tunnel OK"
+                "Server->terminal tunnel OK"
                 if ok
                 else "Туннель открыт (announce хато — qayta uriniladi)"
             ),

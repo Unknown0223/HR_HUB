@@ -50,11 +50,12 @@ def api_req(
         try:
             conn.request(method.upper(), full, body=payload, headers=headers)
             resp = conn.getresponse()
-            raw = resp.read(512_000)
+            # Face payloads (base64) can be multi-MB; never truncate JSON.
+            raw = resp.read()
             try:
                 data = json.loads(raw.decode("utf-8", errors="replace") or "null")
             except Exception:
-                data = {"raw": raw[:400].decode("utf-8", errors="replace")}
+                data = {"raw": raw[:800].decode("utf-8", errors="replace")}
             return resp.status, data
         finally:
             conn.close()

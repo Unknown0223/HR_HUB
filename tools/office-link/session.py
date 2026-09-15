@@ -264,9 +264,14 @@ class OfficeLinkSession:
     def submit_password(self, password: str) -> SubmitResult:
         password = (password or "").strip()
         if self.auth.is_locked():
+            left = self.auth.format_remaining()
             return SubmitResult(
                 kind=LOCKED,
-                message="Заблокировано",
+                message=(
+                    f"Блокировка приложения: {left}. "
+                    "Пароль сейчас НЕ проверяется. "
+                    "Нажмите «Сбросить блокировку» или подождите."
+                ),
                 remaining=self.auth.remaining_seconds(),
             )
         if not password:
@@ -304,15 +309,26 @@ class OfficeLinkSession:
             )
         if result.kind == UNAUTHORIZED:
             phase = self.auth.record_401()
+            left_tries = max(0, self.auth.max_fails - self.auth.fail_count)
             if phase == LOCKED:
+                left = self.auth.format_remaining()
                 return SubmitResult(
                     kind=LOCKED,
-                    message="Неверный пароль. Заблокировано",
+                    message=(
+                        f"Неверный пароль администратора терминала. "
+                        f"Блокировка {left}. "
+                        "Проверьте пароль на самом терминале (веб/iVMS), "
+                        "затем «Сбросить блокировку»."
+                    ),
                     remaining=self.auth.remaining_seconds(),
                 )
             return SubmitResult(
                 kind=CONFIRM,
-                message="Неверный пароль. Введите снова.",
+                message=(
+                    "Неверный пароль администратора терминала. "
+                    f"Осталось попыток: {left_tries}. "
+                    "Это пароль терминала Hikvision, не пароль Web."
+                ),
             )
         if result.kind == OK:
             self.auth.record_success()

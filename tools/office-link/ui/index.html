@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HR HUB Link</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <div class="brand-name">HR HUB Link</div>
+          <div class="brand-sub" id="tenantLabel">Офисный клиент</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="connect" type="button">Подключение</button>
+        <button class="nav-btn" data-tab="reconnect" type="button">Сеть</button>
+        <button class="nav-btn" data-tab="tunnel" type="button">Туннель</button>
+        <button class="nav-btn" data-tab="device" type="button">Устройство</button>
+      </nav>
+      <div class="rail-foot">
+        <div class="pill" id="statusPill">Ожидание</div>
+        <div class="muted small" id="boundWeb">—</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="top">
+        <div>
+          <h1 id="pageTitle">Подключение</h1>
+          <p class="lede" id="pageLede">Привязка Face ID терминала к HR HUB</p>
+        </div>
+        <div class="status-block">
+          <span class="dot" id="statusDot"></span>
+          <div>
+            <div class="status-title" id="statusTitle">Поиск…</div>
+            <div class="status-sub" id="statusSub">Устройство: —</div>
+          </div>
+        </div>
+      </header>
+
+      <div class="alert" id="alert" hidden></div>
+
+      <section class="panel active" id="tab-connect">
+        <div class="stack">
+          <label class="field">
+            <span>Pairing-токен</span>
+            <div class="row">
+              <input id="token" type="password" autocomplete="off" placeholder="Из Web → Связь с офисом" />
+              <button type="button" class="ghost" id="btnPasteToken">Вставить</button>
+              <button type="button" class="ghost" id="btnSaveToken">Сохранить</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>IP-адрес (необязательно)</span>
+            <div class="row">
+              <input id="ip" type="text" placeholder="192.168.1.115" />
+              <button type="button" class="ghost" id="btnScan">Найти</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>Локация</span>
+            <div class="row">
+              <select id="location"></select>
+              <button type="button" class="ghost" id="btnLocRefresh">Обновить</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>Пароль администратора терминала</span>
+            <div class="row">
+              <input id="password" type="password" autocomplete="off" />
+              <button type="button" class="ghost" id="btnTogglePwd">Показать</button>
+            </div>
+          </label>
+          <div class="actions">
+            <button type="button" class="ghost" id="btnUnlock" hidden>Сбросить блокировку</button>
+            <button type="button" class="primary" id="btnConnect">Подключить</button>
+          </div>
+          <p class="hint" id="connectHint">
+            После успешной привязки и подтверждения в Web приложение можно закрыть.
+            Лица синхронизируются только с Web.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-reconnect">
+        <div class="stack">
+          <p class="hint">Если терминал сменил IP в LAN — восстановите связь без полной переустановки.</p>
+          <div class="actions">
+            <button type="button" class="primary" id="btnReconnect">Восстановить сеть</button>
+          </div>
+          <ol class="steps" id="reconnectSteps"></ol>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-tunnel">
+        <div class="stack">
+          <div class="kv">
+            <div><span>Состояние</span><strong id="tunnelState">—</strong></div>
+            <div><span>URL</span><strong id="tunnelUrl" class="mono">—</strong></div>
+          </div>
+          <div class="actions">
+            <button type="button" class="ghost" id="btnTunnelRefresh">Обновить</button>
+            <button type="button" class="primary" id="btnTunnelRestore">Восстановить туннель</button>
+          </div>
+          <p class="hint">Туннель нужен, чтобы сервер мог достучаться до терминала для синхронизации лиц.</p>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-device">
+        <div class="stack kv" id="deviceInfo">
+          <div><span>Имя</span><strong id="devName">—</strong></div>
+          <div><span>IP</span><strong id="devHost">—</strong></div>
+          <div><span>Состояние</span><strong id="devState">—</strong></div>
+          <div><span>Локация</span><strong id="devLocation">—</strong></div>
+          <div><span>API</span><strong id="devApi" class="mono">—</strong></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="busy" id="busy" aria-hidden="true"><div class="spinner"></div><span id="busyText">Работаем…</span></div>
+  <script src="app.js"></script>
+</body>
+</html>

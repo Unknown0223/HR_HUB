@@ -1,9 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller onedir, no console: HRHUB-Qurilma.exe"""
+"""PyInstaller onedir, no console: HRHUB-Qurilma.exe (WebView2 desktop UI)."""
 
 from pathlib import Path
 
 spec_dir = Path(SPECPATH)
+ui_dir = spec_dir / "ui"
 
 a = Analysis(
     [str(spec_dir / "office_link_app.py")],
@@ -13,8 +14,12 @@ a = Analysis(
         (str(spec_dir / "config.json"), "."),
         (str(spec_dir / "hrhub-link.ico"), "."),
         (str(spec_dir / "hrhub-link-256.png"), "."),
+        (str(ui_dir), "ui"),
     ],
     hiddenimports=[
+        "webview",
+        "webview.platforms.edgechromium",
+        "desktop_app",
         "tkinter",
         "tkinter.ttk",
         "office_link_gui",
@@ -30,6 +35,8 @@ a = Analysis(
         "credential_store",
         "device_email",
         "device_security",
+        "face_agent",
+        "service_worker",
     ],
     hookspath=[],
     hooksconfig={},
@@ -53,6 +60,8 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     icon=str(spec_dir / "hrhub-link.ico"),
+    version=str(spec_dir / "file_version_info.txt"),
+    uac_admin=False,
 )
 
 coll = COLLECT(

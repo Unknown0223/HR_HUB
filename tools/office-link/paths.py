@@ -53,31 +53,97 @@ def _dir_is_writable(path: Path) -> bool:
         return False
 
 
+def _has_data_marker(path: Path) -> bool:
+    try:
+        return (path / "device-credential.json").is_file() or (path / "link.key").is_file()
+    except OSError:
+        return False
+
+
+def _sibling_program_data() -> Path | None:
+    """Optional per-user Programs install data (when exe runs from Program Files)."""
+    base = (
+        os.environ.get("LOCALAPPDATA")
+        or os.environ.get("APPDATA")
+        or str(Path.home() / "AppData" / "Local")
+    )
+    cand = Path(base) / "Programs" / "HRHUB-Link" / "data"
+    return cand if cand.is_dir() else None
+
+
 def data_dir(root: Path | None = None) -> Path:
     """
     Prefer <install>/data when writable; otherwise %LOCALAPPDATA%\\HRHUB-Link\\data.
 
     Program Files o‘rnatilganda oddiy foydalanuvchi yozolmasligi mumkin —
     shunda parol fayli AppData ga tushadi (bo‘sh Program Files\\data kutiladi).
+    Never pick a non-writable install data just because credential files exist there
+    (Errno 13 on pairing.token / tunnel_url.txt).
     """
     root = root or find_root()
     install_data = root / "data"
     user_data = user_data_root() / "data"
-
-    # Prefer location that already has recovery / link key
-    for cand in (install_data, user_data):
+    sibling = _sibling_program_data()
+    others = [user_data]
+    if sibling is not None:
         try:
-            if (cand / "device-credential.json").is_file() or (cand / "link.key").is_file():
-                cand.mkdir(parents=True, exist_ok=True)
-                return cand
+            if sibling.resolve() != install_data.resolve() and sibling.resolve() != user_data.resolve():
+                others.append(sibling)
+        except OSError:
+            others.append(sibling)
+
+    chosen: Path | None = None
+    # Writable location that already has recovery / link key (install first if writable).
+    for cand in (install_data, *others):
+        try:
+            if _has_data_marker(cand) and _dir_is_writable(cand):
+                chosen = cand
+                break
         except OSError:
             pass
 
-    if _dir_is_writable(install_data):
-        return install_data
+    if chosen is None:
+        if _dir_is_writable(install_data):
+            chosen = install_data
+        else:
+            user_data.mkdir(parents=True, exist_ok=True)
+            chosen = user_data
 
-    user_data.mkdir(parents=True, exist_ok=True)
-    return user_data
+    # Borrow missing secrets from other data roots into the writable chosen dir.
+    # Prefer the per-user Programs install over a stale Program Files copy.
+    import shutil
+
+    borrow_from: list[Path] = []
+    for cand in (sibling, *others, install_data):
+        if cand is None:
+            continue
+        try:
+            if cand.resolve() == chosen.resolve():
+                continue
+        except OSError:
+            pass
+        if cand not in borrow_from:
+            borrow_from.append(cand)
+
+    for name in (
+        "link.key",
+        "pairing.token",
+        "device-credential.json",
+        "tunnel_url.txt",
+        "service.json",
+    ):
+        try:
+            dest = chosen / name
+            if dest.is_file():
+                continue
+            for other in borrow_from:
+                src = other / name
+                if src.is_file():
+                    shutil.copy2(src, dest)
+                    break
+        except OSError:
+            pass
+    return chosen
 
 
 def runtime_dir(root: Path | None = None) -> Path:
@@ -91,7 +157,19 @@ def runtime_dir(root: Path | None = None) -> Path:
 
 
 def gw_dir(root: Path | None = None) -> Path:
-    return (root or find_root()) / "gw"
+    """
+    Prefer <install>/gw when writable; otherwise %LOCALAPPDATA%\\HRHUB-Link\\gw.
+
+    Program Files installs are read-only for normal users — restore/copy must
+    not try to overwrite gw\\main.py there (Errno 13).
+    """
+    root = root or find_root()
+    install_gw = root / "gw"
+    user_gw = user_data_root() / "gw"
+    if _dir_is_writable(install_gw):
+        return install_gw
+    user_gw.mkdir(parents=True, exist_ok=True)
+    return user_gw
 
 
 def key_file(root: Path | None = None) -> Path:
@@ -208,6 +286,53 @@ def service_status_file(root: Path | None = None) -> Path:
 
 def tunnel_url_file(root: Path | None = None) -> Path:
     return data_dir(root) / "tunnel_url.txt"
+
+
+def tunnel_cooldown_file(root: Path | None = None) -> Path:
+    return data_dir(root) / "tunnel_cooldown.json"
+
+
+def tunnel_cooldown_remaining(root: Path | None = None) -> int:
+    """Seconds left before another quick-tunnel attempt is allowed (0 = ok)."""
+    import json
+    import time
+
+    path = tunnel_cooldown_file(root)
+    if not path.is_file():
+        return 0
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        until = float(data.get("until") or 0)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return 0
+    left = int(until - time.time())
+    return left if left > 0 else 0
+
+
+def set_tunnel_cooldown(seconds: int = 600, *, reason: str = "", root: Path | None = None) -> None:
+    """Block quick-tunnel restores after Cloudflare 429 (default 10 minutes)."""
+    import json
+    import time
+
+    sec = max(60, int(seconds))
+    path = tunnel_cooldown_file(root)
+    payload = {
+        "until": time.time() + sec,
+        "seconds": sec,
+        "reason": (reason or "rate_limit")[:120],
+        "setAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    try:
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def clear_tunnel_cooldown(root: Path | None = None) -> None:
+    try:
+        tunnel_cooldown_file(root).unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def read_tunnel_url(root: Path | None = None) -> str:

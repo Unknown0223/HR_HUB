@@ -41,10 +41,13 @@ class SessionPasswordTests(unittest.TestCase):
             ) as vp:
                 r = self.sess.submit_password("bad-one")
         self.assertEqual(r.kind, CONFIRM)
-        self.assertIn("снова", r.message)
+        self.assertIn("Неверный пароль", r.message)
         vp.assert_called_once()
 
     def test_second_401_locks_and_no_further_verify(self):
+        from auth_lock import AuthLock
+
+        self.sess.auth = AuthLock(max_fails=2, lock_seconds=1800)
         with patch("session.probe_online", return_value=_online()):
             with patch(
                 "session.verify_password",

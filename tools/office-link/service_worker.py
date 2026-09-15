@@ -59,29 +59,33 @@ def run_forever(poll_sec: float = 8.0) -> int:
     api_url = str(svc.get("apiUrl") or cfg.get("apiUrl") or "").rstrip("/")
     tenant = str(svc.get("tenantCode") or cfg.get("tenantCode") or "demo")
     key = read_link_key(root)
+    from paths import read_pairing_token
+
+    pairing = read_pairing_token(root)
     if not api_url:
         write_status(root, {"ok": False, "state": "error", "message": "apiUrl отсутствует"})
         return 1
-    if not key:
+    if not key and not pairing:
         write_status(
             root,
             {
                 "ok": False,
                 "state": "waiting_key",
-                "message": "Нет data/link.key — сначала подключение в GUI или pairing",
+                "message": "Нет data/link.key / pairing.token — сначала подключение в GUI или pairing",
             },
         )
         while True:
             time.sleep(30)
             key = read_link_key(root)
-            if key:
+            pairing = read_pairing_token(root)
+            if key or pairing:
                 break
             write_status(
                 root,
                 {
                     "ok": False,
                     "state": "waiting_key",
-                    "message": "Нет data/link.key — сначала подключение в GUI или pairing",
+                    "message": "Нет data/link.key / pairing.token — сначала подключение в GUI или pairing",
                 },
             )
 

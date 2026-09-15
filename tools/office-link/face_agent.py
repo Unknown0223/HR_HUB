@@ -68,6 +68,9 @@ def enroll_face(
     employee_name: str,
     face_b64: str,
 ) -> tuple[bool, str]:
+    import base64
+    from io import BytesIO
+
     no = _employee_no(employee_no)
     name = (employee_name or no).strip()[:32] or no
     b64 = (face_b64 or "").strip()
@@ -75,6 +78,24 @@ def enroll_face(
         b64 = b64.split(",", 1)[1].strip()
     if not no or not b64:
         return False, "missing employeeNo/face"
+    try:
+        raw = base64.b64decode(b64, validate=False)
+    except Exception as exc:
+        return False, f"bad base64: {exc}"
+    # Oversized JPEGs disconnect some terminals mid-upload.
+    if len(raw) > 100_000:
+        try:
+            from PIL import Image  # type: ignore
+
+            img = Image.open(BytesIO(raw)).convert("RGB")
+            img.thumbnail((480, 480))
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=85)
+            raw = buf.getvalue()
+            b64 = base64.b64encode(raw).decode("ascii")
+        except Exception:
+            pass
+
     begin, end = "2017-08-01T00:00:00", "2037-12-31T23:59:59"
     user = {
         "UserInfo": {
@@ -103,21 +124,60 @@ def enroll_face(
     if code >= 400 and "employeeNoAlreadyExist" not in body:
         return False, f"UserInfo HTTP {code}: {body[:160]}"
 
-    face = {
+    record = {
         "faceLibType": "blackFD",
         "FDID": "1",
         "FPID": no,
         "employeeNo": no,
-        "faceData": b64,
     }
-    code, body = _digest_request(
-        host, port, "POST",
-        "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
-        username, password, json_body=face, timeout=45.0,
-    )
-    if code < 400 or "deviceUserAlreadyExistFace" in body:
-        return True, "ok"
-    return False, f"Face HTTP {code}: {body[:160]}"
+    attempts: list[dict] = [
+        {**record, "faceData": b64},
+        {"FaceDataRecord": {**record, "faceData": b64}},
+        {**record, "faceURL": f"data:image/jpeg;base64,{b64}"},
+        {"FaceDataRecord": {**record, "faceURL": f"data:image/jpeg;base64,{b64}"}},
+    ]
+    last = ""
+    for payload in attempts:
+        code, body = _digest_request(
+            host,
+            port,
+            "POST",
+            "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+            username,
+            password,
+            json_body=payload,
+            timeout=45.0,
+        )
+        last = f"Face HTTP {code}: {body[:160]}"
+        if code < 400 or "deviceUserAlreadyExistFace" in body:
+            return True, "ok"
+
+    # Multipart fallback (DS-K1T / some firmware)
+    try:
+        import httpx
+        from httpx import DigestAuth
+
+        files = {
+            "FaceDataRecord": (None, __import__("json").dumps(record), "application/json"),
+            "FaceImage": ("face.jpg", raw, "image/jpeg"),
+        }
+        with httpx.Client(
+            base_url=f"http://{host}:{int(port or 80)}",
+            auth=DigestAuth(username or "admin", password or ""),
+            timeout=45.0,
+            verify=False,
+        ) as client:
+            resp = client.post(
+                "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+                files=files,
+            )
+            text = resp.text or ""
+            if resp.status_code < 400 or "deviceUserAlreadyExistFace" in text:
+                return True, "ok"
+            last = f"Face multipart HTTP {resp.status_code}: {text[:160]}"
+    except Exception as exc:
+        last = f"Face multipart error: {exc}"
+    return False, last
 
 
 def delete_user(
@@ -184,14 +244,25 @@ def tick_once(root=None) -> dict[str, Any]:
         f"/api/attendance/office-link/devices/{device_id}/pending-faces"
         f"?tenantCode={tenant}",
         key,
-        timeout=60.0,
+        timeout=120.0,
     )
     if not is_success(code) or not isinstance(data, dict):
         result["message"] = f"pending-faces HTTP {code}"
         return result
+    # Tolerate legacy/truncated wrappers if any.
+    if "items" not in data and isinstance(data.get("raw"), str):
+        try:
+            import json as _json
+
+            parsed = _json.loads(data["raw"])
+            if isinstance(parsed, dict):
+                data = parsed
+        except Exception:
+            pass
 
     items = data.get("items") if isinstance(data.get("items"), list) else []
     deletes = data.get("deletes") if isinstance(data.get("deletes"), list) else []
+    result["pending"] = len(items) + len(deletes)
 
     for raw in deletes:
         if not isinstance(raw, dict):
@@ -237,15 +308,18 @@ def tick_once(root=None) -> dict[str, Any]:
                     timeout=30.0,
                 )
             continue
-        ok, msg = enroll_face(
-            host=host,
-            port=port,
-            username=username,
-            password=password,
-            employee_no=emp_no,
-            employee_name=emp_name,
-            face_b64=face_b64,
-        )
+        try:
+            ok, msg = enroll_face(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                employee_no=emp_no,
+                employee_name=emp_name,
+                face_b64=face_b64,
+            )
+        except Exception as exc:
+            ok, msg = False, f"enroll exception: {exc}"[:200]
         if ok:
             result["upsertOk"] += 1
         else:

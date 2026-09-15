@@ -50,5 +50,6 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=str(root / "hrhub-link.ico") if (root / "hrhub-link.ico").is_file() else None,
+    version=str(root / "setup_version_info.txt") if (root / "setup_version_info.txt").is_file() else None,
     uac_admin=True,
 )
