@@ -3,6 +3,7 @@ import { AttendanceController } from './attendance.controller';
 import { OfficeLinkController } from './office-link.controller';
 import { OfficeLinkProvisionController } from './office-link-provision.controller';
 import { AttendanceService } from './attendance.service';
+import { HikvisionReachClient } from './hikvision-reach.client';
 import { PunchConsumerService } from './punch-consumer.service';
 import { DeviceSyncBootstrapService } from './device-sync-bootstrap.service';
 import { PunchIngestGuard } from './punch-ingest.guard';
