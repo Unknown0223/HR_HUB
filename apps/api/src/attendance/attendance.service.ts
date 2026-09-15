@@ -1321,7 +1321,7 @@ export class AttendanceService {
     }
 
     // After Android Ulash (or any drift), vault password may not match terminal.
-    // Surface the Web «РЎРѕС…СЂР°РЅРёС‚СЊ РїР°СЂРѕР»СЊ» banner when GW rejects credentials.
+    // Surface the Web «Сохранить пароль» banner when GW rejects credentials.
     try {
       const plain = await this.passwordForGw(
         tenantId,
@@ -4303,7 +4303,7 @@ export class AttendanceService {
   }
 
   /**
-   * Office-link polls this while waiting for Web «РџРѕРґС‚РІРµСЂРґРёС‚СЊ РїСЂРёРІСЏР·РєСѓ».
+   * Office-link polls this while waiting for Web «Подтвердить привязку».
    * Returns sealed/pending without vault passwords.
    */
   async getProvisionSession(
@@ -6108,8 +6108,8 @@ export class AttendanceService {
     const norm = (s: string) =>
       s
         .toLowerCase()
-        .replace(/С‘/g, 'е')
-        .replace(/[^a-zР°-СЏ0-9]+/gi, ' ')
+        .replace(/ё/g, 'е')
+        .replace(/[^a-zа-я0-9]+/gi, ' ')
         .trim()
         .replace(/\s+/g, ' ');
 
@@ -6962,8 +6962,8 @@ export class AttendanceService {
         const grace = employee?.schedule?.graceMinutes ?? 15;
         const { h, m } = parseHm(start);
         const planned = new Date(workDate);
-        // Р”РѕР·РІРѕР»РµРЅРѕ (allowed/loyal): late only after start+grace
-        // РЎС‚СЂРѕРіРѕ (strict): late counted from raw start
+        // Дозволено (allowed/loyal): late only after start+grace
+        // Строго (strict): late counted from raw start
         const graceUsed = delayMode === 'strict' ? 0 : grace;
         planned.setHours(h, m + graceUsed, 0, 0);
         if (firstIn.occurredAt > planned) {
@@ -6971,7 +6971,7 @@ export class AttendanceService {
           lateMinutes = Math.round(
             (firstIn.occurredAt.getTime() - planned.getTime()) / 60000,
           );
-          // If «СЃС‡РёС‚Р°С‚СЊ РѕРїРѕР·РґР°РЅРёРµ РІ РґРѕР·РІРѕР»РµРЅРЅРѕР№ Р·РѕРЅРµ» — also count minutes inside grace
+          // If «считать опоздание в дозволенной зоне» — also count minutes inside grace
           if (settings.lateInGraceZone && delayMode !== 'strict' && grace > 0) {
             const rawStart = new Date(workDate);
             rawStart.setHours(h, m, 0, 0);

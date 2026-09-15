@@ -400,7 +400,7 @@ function MarksInner() {
         method: 'POST',
         body: JSON.stringify({ ids: checkedIds, action, markType }),
       });
-      setInfo(`Р“РѕС‚РѕРІРѕ: ${res.affected}`);
+      setInfo(`Готово: ${res.affected}`);
       setChecked({});
       setConfirm(null);
       setTypeOpen(false);
@@ -664,7 +664,7 @@ function MarksInner() {
             }
           >
             <i className="fas fa-trash" aria-hidden />
-            УРґР°Р»РёС‚СЊ
+            Удалить
           </button>
           <button
             type="button"
@@ -678,7 +678,7 @@ function MarksInner() {
             }}
           >
             <i className="fas fa-sliders-h" aria-hidden />
-            РќР°СЃС‚СЂРѕР№Рєи
+            Настройки
           </button>
           <button
             type="button"
@@ -858,7 +858,7 @@ function MarksInner() {
                               }}
                             >
                               <i className="fas fa-trash" aria-hidden />
-                              УРґР°Р»РёС‚СЊ
+                              Удалить
                             </button>
                           </div>
                         </td>
