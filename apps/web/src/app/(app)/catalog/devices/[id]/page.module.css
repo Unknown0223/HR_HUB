@@ -571,6 +571,20 @@
   border: 1px solid #fecdd3;
 }
 
+.syncFail {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.syncFailHint {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #9f1239;
+  max-width: 280px;
+  word-break: break-word;
+}
+
 .syncNotice {
   color: #0f4c81;
   margin: 0 0 12px;

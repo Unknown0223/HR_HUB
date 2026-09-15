@@ -166,6 +166,12 @@ function personSyncLabel(p: Person) {
   return p.synchronized ? 'Да' : 'Нет';
 }
 
+function personSyncTitle(p: Person) {
+  const err = (p.lastError || '').trim();
+  if (p.syncStatus === 'failed' && err) return err;
+  return personSyncLabel(p);
+}
+
 function empName(m: Mark) {
   if (m.fullName) return m.fullName;
   if (!m.employee) return '—';
@@ -1153,7 +1159,18 @@ function DeviceDetailInner() {
                           {p.fullName}
                         </td>
                         <td>{p.role || 'Обычный пользователь'}</td>
-                        <td>{personSyncLabel(p)}</td>
+                        <td title={personSyncTitle(p)}>
+                          <span
+                            className={
+                              p.syncStatus === 'failed' ? styles.syncFail : undefined
+                            }
+                          >
+                            {personSyncLabel(p)}
+                          </span>
+                          {p.syncStatus === 'failed' && p.lastError ? (
+                            <div className={styles.syncFailHint}>{p.lastError}</div>
+                          ) : null}
+                        </td>
                       </tr>
                     ))
                   )}
