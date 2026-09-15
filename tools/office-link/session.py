@@ -190,16 +190,24 @@ class OfficeLinkSession:
             tunnel = named_url
         if tunnel:
             write_tunnel_url(tunnel, self.root)
+        from credential_store import read_device_credential
+
+        local = read_device_credential(self.root) or {}
         write_service_config(
             api_url=self.api_url,
             tenant=self.tenant,
             tunnel_mode=mode,
             root=self.root,
             extra={
-                "locationId": self.location_id or "",
+                "locationId": self.location_id or local.get("locationId") or "",
                 "tunnelUrl": tunnel,
                 "namedTunnelUrl": named_url,
                 "autoHeal": True,
+                "faceAgent": True,
+                "deviceId": str(local.get("deviceId") or ""),
+                "host": str(local.get("host") or ""),
+                "port": int(local.get("port") or 80),
+                "username": str(local.get("username") or "admin"),
             },
         )
 

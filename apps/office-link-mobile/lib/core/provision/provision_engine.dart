@@ -491,14 +491,53 @@ class ProvisionEngine {
     final items = (data['items'] is List)
         ? (data['items'] as List).whereType<Map>().toList()
         : <Map>[];
-    if (items.isEmpty) {
+    final deletes = (data['deletes'] is List)
+        ? (data['deletes'] as List).whereType<Map>().toList()
+        : <Map>[];
+    if (items.isEmpty && deletes.isEmpty) {
       return const SubmitResult(
         kind: 'linked',
-        message: 'Yuklash uchun yuz yo‘q (navbat bo‘sh)',
+        message: 'Navbat bo‘sh',
       );
     }
     var okCount = 0;
     var failCount = 0;
+    var delOk = 0;
+    var delFail = 0;
+
+    for (var i = 0; i < deletes.length; i++) {
+      final item = Map<String, dynamic>.from(deletes[i]);
+      final faceSyncId = '${item['faceSyncId'] ?? ''}';
+      final empNo = '${item['employeeNo'] ?? ''}';
+      final empName = '${item['employeeName'] ?? ''}';
+      emit('O‘chirish ${i + 1}/${deletes.length}: $empName…');
+      final del = await device.deleteUser(
+        host: host,
+        port: port,
+        username: username,
+        password: password,
+        employeeNo: empNo,
+      );
+      final ok = del['ok'] == true;
+      if (ok) {
+        delOk += 1;
+      } else {
+        delFail += 1;
+      }
+      if (faceSyncId.isNotEmpty) {
+        await api.ackFaceSync(
+          tenant: config.tenantCode,
+          deviceId: deviceId,
+          faceSyncId: faceSyncId,
+          ok: ok,
+          error: ok ? null : '${del['message'] ?? 'delete failed'}',
+          action: 'delete',
+          pairingToken: pairingToken,
+          linkKey: linkKey,
+        );
+      }
+    }
+
     for (var i = 0; i < items.length; i++) {
       final item = Map<String, dynamic>.from(items[i]);
       final faceSyncId = '${item['faceSyncId'] ?? ''}';
@@ -550,8 +589,13 @@ class ProvisionEngine {
     }
     return SubmitResult(
       kind: 'linked',
-      message: 'Yuzlar: $okCount ok, $failCount xato (jami ${items.length})',
-      device: {'synced': okCount, 'failed': failCount},
+      message:
+          'Yuzlar: $okCount ok / $failCount xato; o‘chirildi: $delOk / $delFail',
+      device: {
+        'synced': okCount,
+        'failed': failCount,
+        'deleted': delOk,
+      },
     );
   }
 }

@@ -1,8 +1,9 @@
-"""Headless supervisor: keep device-gw + cloudflared running (Windows Service).
+"""Headless supervisor: face agent (+ optional GW/tunnel).
+
+Primary job: pull Web face queue and apply on LAN terminal (no tunnel required).
+Optional: keep device-gw + Cloudflare tunnel for remote ISAPI / legacy GW path.
 
 Reads data/service.json written by GUI after successful «Ulash».
-Writes data/service_status.json and data/tunnel_url.txt for operators.
-Autonomously restarts when local GW or Cloudflare tunnel dies.
 """
 from __future__ import annotations
 
@@ -36,6 +37,15 @@ from tunnel_watch import (  # noqa: E402
 
 def _alive(proc) -> bool:
     return proc is not None and proc.poll() is None
+
+
+def _face_tick(root: Path) -> dict:
+    try:
+        from face_agent import tick_once
+
+        return tick_once(root)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "message": f"face_agent: {exc}"[:200]}
 
 
 def run_forever(poll_sec: float = 8.0) -> int:
@@ -86,40 +96,90 @@ def run_forever(poll_sec: float = 8.0) -> int:
     bundle.root = root
     mode = "named" if resolve_tunnel_token(cfg, root) else "quick"
     fail_streak = 0
+    tunnel_ok = False
+    url = ""
 
     def restart() -> str:
         nonlocal bundle
-        bundle, url = restore_tunnel(root=root, bundle=bundle, keep_bundle=True)
-        return url
+        bundle, tun = restore_tunnel(root=root, bundle=bundle, keep_bundle=True)
+        return tun
 
     try:
         url = restart()
+        tunnel_ok = bool(url)
     except Exception as exc:
-        write_status(root, {"ok": False, "state": "error", "message": str(exc)[:240]})
+        # Face agent still works on LAN without Cloudflare.
+        tunnel_ok = False
+        write_status(
+            root,
+            {
+                "ok": True,
+                "state": "face_agent",
+                "message": f"Tunnel yo‘q — faqat face agent: {exc}"[:240],
+                "faceAgent": True,
+                "autoHeal": True,
+            },
+        )
         traceback.print_exc()
-        return 1
 
-    write_status(
-        root,
-        {
-            "ok": True,
-            "state": "running",
-            "tunnelMode": mode,
-            "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
-            "apiUrl": api_url,
-            "tenantCode": tenant,
-            "message": "Шлюз и туннель работают (auto-heal)",
-            "autoHeal": True,
-        },
-    )
+    if tunnel_ok:
+        write_status(
+            root,
+            {
+                "ok": True,
+                "state": "running",
+                "tunnelMode": mode,
+                "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
+                "apiUrl": api_url,
+                "tenantCode": tenant,
+                "message": "Face agent + GW/tunnel",
+                "faceAgent": True,
+                "autoHeal": True,
+            },
+        )
 
     announce_every = 45.0
     health_every = 20.0
+    face_every = 20.0
     last_announce = time.monotonic()
     last_health = time.monotonic()
+    last_face = 0.0
 
     while True:
         time.sleep(poll_sec)
+        now = time.monotonic()
+
+        if now - last_face >= face_every:
+            last_face = now
+            fr = _face_tick(root)
+            write_status(
+                root,
+                {
+                    "ok": True,
+                    "state": "face_agent" if not tunnel_ok else "running",
+                    "tunnelMode": mode if tunnel_ok else "off",
+                    "tunnelUrl": url if tunnel_ok else "",
+                    "apiUrl": api_url,
+                    "tenantCode": tenant,
+                    "faceAgent": True,
+                    "faceLast": fr,
+                    "message": fr.get("message") or "face agent tick",
+                    "autoHeal": True,
+                },
+            )
+
+        if not tunnel_ok:
+            # Periodically retry bringing tunnel up (optional).
+            if fail_streak < 3 and now - last_health >= 120:
+                last_health = now
+                try:
+                    url = restart()
+                    tunnel_ok = bool(url)
+                    fail_streak = 0
+                except Exception:
+                    fail_streak += 1
+            continue
+
         gw_ok = _alive(bundle.gw) and probe_local_gw()
         tun_proc = _alive(bundle.tunnel)
         current = (
@@ -129,15 +189,10 @@ def run_forever(poll_sec: float = 8.0) -> int:
         )
         need_restart = not gw_ok or not tun_proc
 
-        now = time.monotonic()
         if not need_restart and now - last_health >= health_every:
             last_health = now
             edge = probe_tunnel_url(current) if current else None
-            # Quick tunnels: if edge explicitly fails, recreate (new URL + announce).
-            if edge is False and mode == "quick":
-                need_restart = True
-            elif edge is False and mode == "named":
-                # Named hostname stable — restart process only.
+            if edge is False:
                 need_restart = True
 
         if not need_restart:
@@ -145,62 +200,27 @@ def run_forever(poll_sec: float = 8.0) -> int:
             if now - last_announce >= announce_every and current:
                 announce_best_effort(root, api_url, tenant, current)
                 last_announce = now
-            write_status(
-                root,
-                {
-                    "ok": True,
-                    "state": "running",
-                    "tunnelMode": mode,
-                    "tunnelUrl": current,
-                    "apiUrl": api_url,
-                    "tenantCode": tenant,
-                    "message": "Шлюз и туннель работают (auto-heal)",
-                    "autoHeal": True,
-                    "gwHttp": True,
-                    "tunnelProcess": tun_proc,
-                },
-            )
             continue
 
         fail_streak += 1
-        write_status(
-            root,
-            {
-                "ok": False,
-                "state": "restarting",
-                "message": f"auto-heal gw={gw_ok} tunnel_proc={tun_proc} streak={fail_streak}",
-                "autoHeal": True,
-            },
-        )
         try:
             url = restart()
             last_announce = time.monotonic()
             last_health = time.monotonic()
             fail_streak = 0
+            tunnel_ok = bool(url)
+        except Exception as exc:
+            tunnel_ok = False
             write_status(
                 root,
                 {
                     "ok": True,
-                    "state": "running",
-                    "tunnelMode": mode,
-                    "tunnelUrl": url or read_tunnel_url(root),
-                    "apiUrl": api_url,
-                    "tenantCode": tenant,
-                    "message": "Автоматически перезапущено",
+                    "state": "face_agent",
+                    "message": f"tunnel restart fail — face agent: {exc}"[:240],
+                    "faceAgent": True,
                     "autoHeal": True,
                 },
             )
-        except Exception as exc:
-            write_status(
-                root,
-                {
-                    "ok": False,
-                    "state": "error",
-                    "message": f"restart: {exc}"[:240],
-                    "autoHeal": True,
-                },
-            )
-            # Exponential-ish backoff, capped.
             time.sleep(min(60, 10 + fail_streak * 5))
 
 

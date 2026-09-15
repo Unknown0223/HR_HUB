@@ -48,17 +48,20 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   String _detectLine = '';
   String _alert = '';
   String _note =
-      'Pairing tokenni Webdan oling. Faqat Ulash / tarmoqni tiklash. Yuzlar: Web «Синхронизировать» + ofisda PC office-link (GW+tunnel).';
+      'Pairing token + Ulash. Keyin ilova ofis Wi‑Fi da ochiq tursa yuzlar server navbatidan avtomatik yuklanadi. Yoki ofis PC face agent.';
 
   List<Map<String, dynamic>> _locations = [];
   String? _locationId;
 
   Timer? _confirmPoll;
+  Timer? _faceAgent;
   bool _confirmNotified = false;
+  bool _faceAgentBusy = false;
 
   @override
   void dispose() {
     _confirmPoll?.cancel();
+    _faceAgent?.cancel();
     _tokenCtrl.dispose();
     _ipCtrl.dispose();
     _pwdCtrl.dispose();
@@ -82,7 +85,34 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       await _bindAndLoadLocations(showAlert: false);
       await _maybeResumeConfirmPoll();
     }
+    _startFaceAgent();
     if (mounted) setState(() {});
+  }
+
+  void _startFaceAgent() {
+    _faceAgent?.cancel();
+    _faceAgent = Timer.periodic(const Duration(seconds: 45), (_) {
+      unawaited(_faceAgentTick());
+    });
+    unawaited(_faceAgentTick());
+  }
+
+  Future<void> _faceAgentTick() async {
+    if (!mounted || _session == null || _faceAgentBusy || _busy) return;
+    final cred = await _session!.store.readDeviceCredential();
+    final deviceId = '${cred?['deviceId'] ?? ''}'.trim();
+    if (deviceId.isEmpty) return;
+    _faceAgentBusy = true;
+    try {
+      await _session!.pushPendingFaces(
+        password: _pwdCtrl.text,
+        onStatus: (_) {},
+      );
+    } catch (_) {
+      /* silent */
+    } finally {
+      _faceAgentBusy = false;
+    }
   }
 
   void _setBadge(String text, {required String tone}) {
@@ -311,6 +341,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       });
       if (needs) {
         _startConfirmPoll();
+        _startFaceAgent();
         showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(

@@ -259,14 +259,16 @@ def restore_tunnel(
 
 
 def spawn_detached_worker(root: Path | None = None) -> bool:
-    """Start service_worker.py in background if local GW is not already up."""
+    """Start background worker: full service_worker, or face_worker if GW already up."""
     root = root or find_root()
-    if probe_local_gw():
-        # Someone (GUI / prior worker) already owns :8800 — do not start a second GW.
-        return False
-
     worker = root / "service_worker.py"
-    if not worker.is_file():
+    face_only = root / "face_worker.py"
+    if probe_local_gw():
+        # Avoid second GW on :8800 — still run LAN face puller.
+        target = face_only if face_only.is_file() else worker
+    else:
+        target = worker if worker.is_file() else face_only
+    if not target.is_file():
         return False
 
     py = sys.executable
@@ -287,7 +289,7 @@ def spawn_detached_worker(root: Path | None = None) -> bool:
         )
     try:
         subprocess.Popen(
-            [py, str(worker)],
+            [py, str(target)],
             cwd=str(root),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,

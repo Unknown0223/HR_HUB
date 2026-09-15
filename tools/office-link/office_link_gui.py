@@ -1677,8 +1677,9 @@ class OfficeLinkApp:
             try:
                 self.session.write_service_handoff()
                 svc_note = (
-                    " Автовосстановление туннеля включено (фоновый процесс). "
-                    "Опционально: install-service.bat (SERVICE.txt) — Windows Service."
+                    " Yuzlar: fon face agent ishga tushdi (tunnel majburiy emas). "
+                    "Web «Синхронизировать» → agent terminalga yozadi. "
+                    "Ixtiyoriy: install-service.bat — Windows Service."
                 )
             except Exception:
                 svc_note = " На вкладке «Туннель»: «Восстановить туннель» / автовосстановление."
@@ -1735,7 +1736,7 @@ class OfficeLinkApp:
                     "Новый пароль администратора отправлен на Web-сервер.\n"
                     "Его можно посмотреть в Web → Устройства → карточка устройства "
                     "через «Показать» / «Копировать».",
-                )
+            )
             self.pwd_var.set("")
             self.pwd_entry.configure(state="disabled")
             self._set_primary_btn(False)

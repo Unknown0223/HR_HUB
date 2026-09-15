@@ -599,7 +599,7 @@ function DeviceDetailInner() {
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
       setSyncNotice(
-        'Синхронизация: актуальные лица → терминал, лишние/старые — очистка (PC GW+tunnel).',
+        'Синхронизация на сервере: очередь готова. Ofis agent (PC face worker yoki telefon Wi‑Fi) avtomatik yuklaydi/o‘chiradi.',
       );
       await loadDevice();
       await loadSyncProgress();
@@ -842,10 +842,10 @@ function DeviceDetailInner() {
                   className={styles.lockBanner}
                   style={{ background: '#eef8f0', borderColor: '#b7e0c0' }}
                 >
-                  <strong>Режим: терминал → Web (HttpHost).</strong> Отметки идут с
-                  устройства на сервер. Лица: Web «Синхронизировать» → PC office-link
-                  (GW+tunnel): загрузка актуальных + очистка лишних лиц на терминале.
-                  Телефон только для Ulash / reconnect.
+                  <strong>Режим: терминал → Web (HttpHost).</strong> Отметки — напрямую.
+                  Лица: Web «Синхронизировать» ставит очередь на сервере; ofisdagi agent
+                  (PC face worker yoki telefon Link Wi‑Fi) terminalga yozadi/o‘chiradi.
+                  Cloudflare tunnel majburiy emas.
                   {(device.meta as { hikPush?: { lastEventAt?: string } }).hikPush
                     ?.lastEventAt
                     ? ` Последнее событие: ${

@@ -795,6 +795,56 @@ class HikvisionClient {
       return {'ok': false, 'reason': kError, 'message': '$e'};
     }
   }
+
+  /// Remove person from terminal (frees face memory).
+  Future<Map<String, dynamic>> deleteUser({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    required String employeeNo,
+  }) async {
+    final emp = employeeNo.replaceAll(RegExp(r'\D'), '');
+    final no = emp.isEmpty ? employeeNo.trim() : emp;
+    if (no.isEmpty) return {'ok': false, 'message': 'employeeNo empty'};
+    try {
+      final payload = {
+        'UserInfoDelCond': {
+          'EmployeeNoList': [
+            {'employeeNo': no},
+          ],
+        },
+      };
+      final r = await digestRequest(
+        host: host,
+        port: port,
+        method: 'PUT',
+        path: '/ISAPI/AccessControl/UserInfo/Delete?format=json',
+        username: username,
+        password: password,
+        body: utf8.encode(jsonEncode(payload)),
+        contentType: 'application/json',
+        timeout: const Duration(seconds: 20),
+      );
+      final text = utf8.decode(r.body, allowMalformed: true).toLowerCase();
+      if (r.status < 400 ||
+          text.contains('employeenotexist') ||
+          text.contains('usernotexist') ||
+          text.contains('invalidoperation')) {
+        return {'ok': true};
+      }
+      return {
+        'ok': false,
+        'message': 'Delete HTTP ${r.status}: ${text.substring(0, text.length.clamp(0, 160))}',
+      };
+    } on TimeoutException {
+      return {'ok': false, 'reason': kTimeout, 'message': 'Timeout'};
+    } on OfflineException catch (e) {
+      return {'ok': false, 'reason': kOffline, 'message': e.message};
+    } catch (e) {
+      return {'ok': false, 'reason': kError, 'message': '$e'};
+    }
+  }
 }
 
 class TimeoutException implements Exception {

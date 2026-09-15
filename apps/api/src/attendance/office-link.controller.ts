@@ -138,11 +138,15 @@ export class OfficeLinkController {
   ackFace(
     @Param('deviceId') deviceId: string,
     @Param('faceSyncId') faceSyncId: string,
-    @Body() body: { ok?: boolean; error?: string },
+    @Body() body: { ok?: boolean; error?: string; action?: string },
     @Query('tenantCode') tenantCode?: string,
     @CurrentOfficeLinkAuth() auth?: OfficeLinkAuthContext,
   ) {
-    const dto = { ok: Boolean(body?.ok), error: body?.error };
+    const dto = {
+      ok: Boolean(body?.ok),
+      error: body?.error,
+      action: body?.action === 'delete' ? ('delete' as const) : ('upsert' as const),
+    };
     if (auth?.pairing?.tenantId) {
       return this.attendance.officeLinkAckFaceSync(
         auth.pairing.tenantId,

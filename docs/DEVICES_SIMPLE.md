@@ -1,31 +1,20 @@
 # Qurilmalarni Railway platformaga ulash (sodda)
 
-## Asosiy model
+## Model (serverdan yuz sync)
 
-1. Web → **Устройства → Привязка** → pairing token
-2. Ofis Wi‑Fi da **HR HUB Link** (telefon yoki PC) → **Ulash** (`192.168.x.x`)
-3. Webda **«Подтвердить привязку»**
-4. Ofis PC da **GW+tunnel** ochiq tursin (`START-GW.bat` / service) — yuzlar uchun
-5. Link ilovasini yopishingiz mumkin (faqat Ulash / reconnect kerak)
+1. Web → **Устройства → Привязка** → pairing token  
+2. Ofis Wi‑Fi da **HR HUB Link** → **Ulash**  
+3. Webda **«Подтвердить привязку»**  
+4. Web **«Синхронизировать»** — yuzlar **serverda navbatga** tushadi  
+5. Ofisdagi **agent** navbatni olib terminalga yozadi / keraksizlarni o‘chiradi  
 
-| Funksiya | Qanday ishlaydi |
-|----------|-----------------|
-| Otmetkalar | Terminal **HttpHostNotification** → HTTPS → Railway API |
-| Yangi / yangilangan yuzlar | Web «Синхронизировать» → PC GW+tunnel → terminal (upload) |
-| Keraksiz yuzlar | Shu sync: lokatsiyadan chiqqan / foto yo‘q / ignore qilinganlar terminaldan **o‘chiriladi** |
-| Link ilovasi | Faqat **Ulash** / **Tarmoqni qayta ulash** |
+| Funksiya | Qanday |
+|----------|--------|
+| Otmetkalar | Terminal → Web (HttpHost), agent kerak emas |
+| Yuz yuklash / tozalash | Web sync → **server navbati** → ofis agent → terminal |
+| Agent (PC) | Ulashdan keyin fon `face_worker` / `service_worker` (tunnel **majburiy emas**) |
+| Agent (telefon) | Link ochiq + ofis Wi‑Fi — har ~45s avtomatik |
 
-Wi‑Fi / IP o‘zgasa: Link → **Tarmoqni qayta ulash**.
+**Muhim:** Railway `192.168…` ga kira olmaydi. Shuning uchun yozishni ofis tarmog‘idagi agent qiladi — lekin buyruq va navbat **serverdan** (Web sync). Qo‘lda `START-GW.bat` / tunnel endi yuzlar uchun shart emas.
 
-## Ofis PC + tunnel (yuzlar uchun majburiy)
-
-Railway ofis LAN (`192.168.x.x`) ga kira olmaydi. Shuning uchun yuz yozish uchun ofisda:
-
-```powershell
-cd D:\hr-hub\tools\office-link
-.\START-GW.bat
-```
-
-yoki `npm run devices:up` — lokal device-gw + Cloudflare tunnel (announce).
-
-Otmetkalar uchun doimiy PC **shart emas**; yuz sync uchun GW+tunnel **kerak**.
+Wi‑Fi o‘zgasa: Link → **Tarmoqni qayta ulash**.

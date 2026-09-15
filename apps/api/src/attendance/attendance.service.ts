@@ -1363,7 +1363,7 @@ export class AttendanceService {
         ok: true,
         action,
         message:
-          'Синхронизация лиц: загрузка актуальных + очистка лишних на терминале (PC GW+tunnel).',
+          'Очередь на сервере готова — ofis agent (PC/telefon) avtomatik yuklaydi.',
       };
     }
     if (action === 'heartbeat') {
@@ -2315,7 +2315,7 @@ export class AttendanceService {
         phase: alreadyRunning ? 'uploading' : 'queuing',
         message: alreadyRunning
           ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
-          : `Очередь: +${created}, обновление ${requeued} (всего ${counts.total}). Затем очистка лишних лиц + загрузка через PC GW…`,
+          : `Очередь: +${created}, обновление ${requeued} (всего ${counts.total}). Serverdan ofis agentiga…`,
         currentNames: [],
         ...(alreadyRunning ? {} : { startedAt: new Date().toISOString() }),
         finishedAt: null,
@@ -2336,18 +2336,39 @@ export class AttendanceService {
       });
 
       if (!alreadyRunning) {
-        const run = this.runPersonsSyncWaves(tenantId, deviceId)
-          .catch((e) => {
-            this.logger.warn(
-              `Persons sync waves failed device=${deviceId}: ${
-                e instanceof Error ? e.message : e
-              }`,
-            );
-          })
-          .finally(() => {
-            this.personsSyncInFlight.delete(deviceId);
+        const gwHealth = await this.gw.health();
+        if (gwHealth.ok) {
+          // Optional fast path when PC tunnel/GW is up.
+          const run = this.runPersonsSyncWaves(tenantId, deviceId)
+            .catch((e) => {
+              this.logger.warn(
+                `Persons sync waves failed device=${deviceId}: ${
+                  e instanceof Error ? e.message : e
+                }`,
+              );
+            })
+            .finally(() => {
+              this.personsSyncInFlight.delete(deviceId);
+            });
+          this.personsSyncInFlight.set(deviceId, run);
+        } else {
+          // Primary path: office LAN agent (PC service / phone on Wi‑Fi) pulls queue.
+          await this.writePersonsSyncProgress(tenantId, deviceId, {
+            running: counts.pending + counts.syncing > 0,
+            phase: 'awaiting_office_agent',
+            message:
+              `Navbat serverda tayyor (${counts.pending}). ` +
+              `Ofisdagi Link agent (PC service yoki telefon Wi‑Fi) avtomatik yuklaydi/o‘chiradi.`,
+            finishedAt: null,
+            total: counts.total,
+            synced: counts.synced,
+            pending: counts.pending,
+            syncing: counts.syncing,
+            failed: counts.failed,
+            percent: counts.percent,
           });
-        this.personsSyncInFlight.set(deviceId, run);
+          this.personsSyncInFlight.delete(deviceId);
+        }
       }
 
       return {
@@ -2357,6 +2378,7 @@ export class AttendanceService {
         created,
         pushMode,
         awaitingPhone: false,
+        awaitingOfficeAgent: true,
         requeued,
         withPhoto: withFace.length,
         force: Boolean(opts.force),
@@ -2981,12 +3003,13 @@ export class AttendanceService {
   }
 
   /**
-   * Pending faces for on-demand LAN enroll from phone/PC Link (no always-on GW).
+   * Pending face upserts + orphan deletes for office LAN agents (phone/PC).
+   * Server queues work on Web sync; agent applies on the local network.
    */
   async officeLinkPendingFaces(tenantId: string, deviceId: string) {
     const device = await this.prisma.device.findFirst({
       where: { id: deviceId, tenantId },
-      select: { id: true, host: true, port: true, username: true },
+      select: { id: true, host: true, port: true, username: true, locationId: true, meta: true },
     });
     if (!device) throw new NotFoundException('Device not found');
 
@@ -3037,6 +3060,85 @@ export class AttendanceService {
       });
     }
 
+    let deletes: Array<{
+      faceSyncId: string;
+      employeeId: string;
+      employeeNo: string;
+      employeeName: string;
+    }> = [];
+
+    if (device.locationId) {
+      try {
+        const desired = await this.employeesForDeviceLocation(tenantId, device);
+        const desiredIds = new Set(desired.filter((e) => e.faceProfile).map((e) => e.id));
+        const extras =
+          desiredIds.size === 0
+            ? await this.prisma.deviceFaceSync.findMany({
+                where: { tenantId, deviceId },
+                include: {
+                  faceProfile: {
+                    select: {
+                      employee: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          tabNumber: true,
+                          externalId: true,
+                        },
+                      },
+                    },
+                  },
+                },
+                take: 40,
+              })
+            : await this.prisma.deviceFaceSync.findMany({
+                where: {
+                  tenantId,
+                  deviceId,
+                  employeeId: { notIn: [...desiredIds] },
+                },
+                include: {
+                  faceProfile: {
+                    select: {
+                      employee: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          tabNumber: true,
+                          externalId: true,
+                        },
+                      },
+                    },
+                  },
+                },
+                take: 40,
+              });
+        deletes = extras.map((row) => {
+          const emp = row.faceProfile?.employee ?? {
+            id: row.employeeId,
+            firstName: null as string | null,
+            lastName: null as string | null,
+            tabNumber: null as string | null,
+            externalId: null as string | null,
+          };
+          return {
+            faceSyncId: row.id,
+            employeeId: emp.id,
+            employeeNo: this.deviceEmployeeNo(emp),
+            employeeName: [emp.lastName, emp.firstName].filter(Boolean).join(' '),
+          };
+        });
+      } catch (e) {
+        this.logger.warn(
+          `pending-faces deletes skipped device=${deviceId}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+
     return {
       ok: true,
       device: {
@@ -3046,7 +3148,9 @@ export class AttendanceService {
         username: device.username || 'admin',
       },
       items,
+      deletes,
       count: items.length,
+      deleteCount: deletes.length,
     };
   }
 
@@ -3054,13 +3158,30 @@ export class AttendanceService {
     tenantId: string,
     deviceId: string,
     faceSyncId: string,
-    dto: { ok: boolean; error?: string },
+    dto: { ok: boolean; error?: string; action?: 'upsert' | 'delete' },
   ) {
     const row = await this.prisma.deviceFaceSync.findFirst({
       where: { id: faceSyncId, tenantId, deviceId },
     });
     if (!row) throw new NotFoundException('Face sync row not found');
     const ok = Boolean(dto.ok);
+    const action = dto.action === 'delete' ? 'delete' : 'upsert';
+
+    if (action === 'delete') {
+      if (ok) {
+        await this.prisma.deviceFaceSync.delete({ where: { id: row.id } });
+      } else {
+        await this.prisma.deviceFaceSync.update({
+          where: { id: row.id },
+          data: {
+            lastError: (dto.error || 'LAN delete failed').slice(0, 400),
+          },
+        });
+      }
+      await this.refreshPersonsSyncProgressAfterAck(tenantId, deviceId);
+      return { ok: true, faceSyncId, deleted: ok, action };
+    }
+
     await this.prisma.deviceFaceSync.update({
       where: { id: row.id },
       data: {
@@ -3077,7 +3198,39 @@ export class AttendanceService {
         lastError: ok ? null : (dto.error || 'LAN enroll failed').slice(0, 400),
       },
     });
-    return { ok: true, faceSyncId, synced: ok };
+    await this.refreshPersonsSyncProgressAfterAck(tenantId, deviceId);
+    return { ok: true, faceSyncId, synced: ok, action };
+  }
+
+  private async refreshPersonsSyncProgressAfterAck(
+    tenantId: string,
+    deviceId: string,
+  ) {
+    try {
+      const counts = await this.faceSyncCounts(tenantId, deviceId);
+      const remaining = counts.pending + counts.syncing;
+      const inFlight = this.personsSyncInFlight.has(deviceId);
+      await this.writePersonsSyncProgress(tenantId, deviceId, {
+        running: inFlight || remaining > 0,
+        phase: inFlight
+          ? 'uploading'
+          : remaining > 0
+            ? 'awaiting_office_agent'
+            : 'completed',
+        message: remaining > 0
+          ? `Ofis agenti ishlayapti… qolgan ${remaining}`
+          : `Готово: ${counts.synced} из ${counts.total}`,
+        total: counts.total,
+        synced: counts.synced,
+        pending: counts.pending,
+        syncing: counts.syncing,
+        failed: counts.failed,
+        percent: counts.percent,
+        finishedAt: remaining > 0 || inFlight ? null : new Date().toISOString(),
+      });
+    } catch {
+      /* best-effort */
+    }
   }
 
   async officeLinkDevice(

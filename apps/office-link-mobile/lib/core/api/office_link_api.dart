@@ -240,19 +240,24 @@ class OfficeLinkApi {
     );
   }
 
-  Future<({int status, dynamic data})> ackFaceSync({
+    Future<({int status, dynamic data})> ackFaceSync({
     required String tenant,
     required String deviceId,
     required String faceSyncId,
     required bool ok,
     String? error,
+    String action = 'upsert',
     String? pairingToken,
     String? linkKey,
   }) {
     return _req(
       'POST',
       '/api/attendance/office-link/devices/${Uri.encodeComponent(deviceId)}/faces/${Uri.encodeComponent(faceSyncId)}/ack?tenantCode=${Uri.encodeQueryComponent(tenant)}',
-      body: {'ok': ok, if (error != null) 'error': error},
+      body: {
+        'ok': ok,
+        if (error != null) 'error': error,
+        'action': action,
+      },
       pairingToken: pairingToken,
       linkKey: linkKey,
     );
