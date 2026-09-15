@@ -169,14 +169,26 @@ def write_status(root: Path, payload: dict) -> None:
     path.write_text(json.dumps(body, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def announce_best_effort(root: Path, api_url: str, tenant: str, tunnel_url: str) -> bool:
+def announce_best_effort(
+    root: Path,
+    api_url: str,
+    tenant: str,
+    tunnel_url: str,
+    device_id: str | None = None,
+) -> bool:
     key = read_link_key(root)
     if not key or not tunnel_url:
         return False
     try:
         import api_client
 
-        code, _ = api_client.announce(api_url, key, tenant, tunnel_url)
+        code, _ = api_client.announce(
+            api_url,
+            key,
+            tenant,
+            tunnel_url,
+            device_id=device_id,
+        )
         return 200 <= int(code) < 300
     except Exception:
         return False
@@ -189,7 +201,7 @@ def restore_tunnel(
     on_status: StatusFn | None = None,
     keep_bundle: bool = True,
 ) -> tuple[ServiceBundle, str]:
-    """Restart GW + tunnel, announce new URL, persist handoff files."""
+    """Open Cloudflare tunnel to the terminal (preferred) so Railway can reach it."""
     root = root or find_root()
     cfg = load_config(root)
     svc = load_service_config(root)
@@ -200,6 +212,13 @@ def restore_tunnel(
         raise RuntimeError("apiUrl отсутствует (config / service.json)")
     if not key:
         raise RuntimeError("Нет data/link.key — сначала подключение / pairing")
+
+    from credential_store import read_device_credential
+
+    cred = read_device_credential(root) or {}
+    host = str(cred.get("host") or svc.get("host") or "").strip()
+    port = int(cred.get("port") or svc.get("port") or 80)
+    device_id = str(cred.get("deviceId") or svc.get("deviceId") or "").strip()
 
     def emit(msg: str) -> None:
         if on_status:
@@ -215,18 +234,28 @@ def restore_tunnel(
         emit("Остановка старого GW/tunnel…")
         bundle.stop()
 
-    emit("Запуск gateway…")
-    bundle.gw = start_gateway(api_url, key, root, on_status)
-    emit("Открытие туннеля…")
-    proc, url = start_tunnel(root, on_status)
-    bundle.tunnel = proc
-    bundle.tunnel_url = url
+    # Prefer direct tunnel → terminal so API (Railway) can sync faces.
+    target = f"http://{host}:{port}" if host else ""
+    if target:
+        emit(f"Туннель → терминал {host}:{port}…")
+        proc, url = start_tunnel(root, on_status, target_url=target)
+        bundle.tunnel = proc
+        bundle.tunnel_url = url
+        bundle.gw = None
+    else:
+        emit("Запуск gateway…")
+        bundle.gw = start_gateway(api_url, key, root, on_status)
+        emit("Открытие туннеля…")
+        proc, url = start_tunnel(root, on_status)
+        bundle.tunnel = proc
+        bundle.tunnel_url = url
+
     if not url:
         raise RuntimeError("URL туннеля не получен")
 
     write_tunnel_url(url, root)
     emit("Announce на платформу…")
-    ok = announce_best_effort(root, api_url, tenant, url)
+    ok = announce_best_effort(root, api_url, tenant, url, device_id=device_id or None)
     mode = "named" if resolve_tunnel_token(cfg, root) else "quick"
     write_service_config(
         api_url=api_url,
@@ -237,6 +266,11 @@ def restore_tunnel(
             "tunnelUrl": url,
             "namedTunnelUrl": resolve_named_tunnel_url(cfg, root),
             "autoHeal": True,
+            "faceAgent": True,
+            "deviceId": device_id,
+            "host": host,
+            "port": port,
+            "reachMode": "device" if target else "gw",
         },
     )
     write_status(
@@ -248,12 +282,17 @@ def restore_tunnel(
             "tunnelUrl": url,
             "apiUrl": api_url,
             "tenantCode": tenant,
+            "deviceId": device_id,
+            "reachTarget": target or f"127.0.0.1:{GW_PORT}",
             "announced": ok,
-            "message": "Туннель восстановлен" if ok else "Туннель открыт (ошибка announce — повторная попытка)",
+            "message": (
+                "Server→terminal tunnel OK"
+                if ok
+                else "Туннель открыт (announce хато — qayta uriniladi)"
+            ),
         },
     )
     if not keep_bundle:
-        # Caller owns lifecycle elsewhere (e.g. detached worker).
         pass
     return bundle, url
 

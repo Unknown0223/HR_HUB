@@ -26,6 +26,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   providers: [
     AttendanceService,
+    HikvisionReachClient,
     PunchConsumerService,
     DeviceSyncBootstrapService,
     PunchIngestGuard,

@@ -1,20 +1,15 @@
 # Qurilmalarni Railway platformaga ulash (sodda)
 
-## Model (serverdan yuz sync)
+## Server terminalga «kira oladi»
 
-1. Web → **Устройства → Привязка** → pairing token  
-2. Ofis Wi‑Fi da **HR HUB Link** → **Ulash**  
-3. Webda **«Подтвердить привязку»**  
-4. Web **«Синхронизировать»** — yuzlar **serverda navbatga** tushadi  
-5. Ofisdagi **agent** navbatni olib terminalga yozadi / keraksizlarni o‘chiradi  
+1. Ofis PC da **HR HUB Link → Ulash**  
+2. PC fonida tunnel ochiladi: internet → ofis terminal (`192.168…`)  
+3. Web **«Синхронизировать»** → Railway server to‘g‘ridan terminalga yuz yozadi / o‘chiradi  
 
 | Funksiya | Qanday |
 |----------|--------|
-| Otmetkalar | Terminal → Web (HttpHost), agent kerak emas |
-| Yuz yuklash / tozalash | Web sync → **server navbati** → ofis agent → terminal |
-| Agent (PC) | Ulashdan keyin fon `face_worker` / `service_worker` (tunnel **majburiy emas**) |
-| Agent (telefon) | Link ochiq + ofis Wi‑Fi — har ~45s avtomatik |
+| Otmetkalar | Terminal → Web (HttpHost) |
+| Yuzlar | Web sync → **server → tunnel → terminal** |
+| Ofis PC | Ulashdan keyin fon tunnel (yopib qo‘ymang / service) |
 
-**Muhim:** Railway `192.168…` ga kira olmaydi. Shuning uchun yozishni ofis tarmog‘idagi agent qiladi — lekin buyruq va navbat **serverdan** (Web sync). Qo‘lda `START-GW.bat` / tunnel endi yuzlar uchun shart emas.
-
-Wi‑Fi o‘zgasa: Link → **Tarmoqni qayta ulash**.
+Telefon agent — ixtiyoriy zaxira. Asosiy yo‘l: **PC tunnel + Web sync**.

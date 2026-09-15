@@ -54,6 +54,7 @@ export class OfficeLinkController {
     return this.attendance.officeLinkAnnounce(
       dto.tenantCode || 'demo',
       dto.tunnelUrl,
+      dto.deviceId,
     );
   }
 

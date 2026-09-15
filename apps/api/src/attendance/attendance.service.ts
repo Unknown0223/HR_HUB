@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DeviceGwClient } from '../device-gw/device-gw.client';
+import { HikvisionReachClient } from './hikvision-reach.client';
 import { StorageService } from '../storage/storage.service';
 import { DeviceCredentialVaultService } from './device-credential-vault.service';
 import {
@@ -84,6 +85,7 @@ export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gw: DeviceGwClient,
+    private readonly reach: HikvisionReachClient,
     private readonly storage: StorageService,
     private readonly vault: DeviceCredentialVaultService,
     private readonly credentialAudit: DeviceCredentialAuditService,
@@ -1007,6 +1009,152 @@ export class AttendanceService {
     opts: { skipHeartbeat?: boolean } = {},
   ) {
     const device = await this.getDevice(tenantId, id);
+    const reachUrl = this.deviceReachBaseUrl(device.meta);
+    const plain =
+      (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) || '';
+    const username = (device.username || 'admin').trim() || 'admin';
+
+    // Preferred: server → Cloudflare tunnel → terminal (no phone/agent wait).
+    if (reachUrl && plain) {
+      if (!opts.skipHeartbeat) {
+        const ok = await this.reach.probe(reachUrl, username, plain);
+        await this.prisma.device.update({
+          where: { id: device.id },
+          data: {
+            status: ok ? 'online' : 'offline',
+            lastSeenAt: new Date(),
+          },
+        });
+        if (!ok) {
+          throw new BadGatewayException(
+            `Reach tunnel offline (${reachUrl}) — ofis PC Link Ulash / face worker tunnelni qayta oching`,
+          );
+        }
+      }
+
+      const faceSyncs = await this.prisma.deviceFaceSync.findMany({
+        where: {
+          tenantId,
+          deviceId: id,
+          OR: [
+            { syncStatus: FaceSyncStatus.pending },
+            { syncStatus: FaceSyncStatus.failed },
+            { syncStatus: FaceSyncStatus.syncing },
+          ],
+        },
+        include: {
+          faceProfile: {
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  tabNumber: true,
+                  externalId: true,
+                },
+              },
+            },
+          },
+        },
+        take: 500,
+        orderBy: { updatedAt: 'asc' },
+      });
+
+      let synced = 0;
+      let failed = 0;
+      const commandBatch: Array<{
+        type: string;
+        employeeName?: string | null;
+        status?: string;
+      }> = [];
+      const concurrency = 3;
+      for (let i = 0; i < faceSyncs.length; i += concurrency) {
+        const batch = faceSyncs.slice(i, i + concurrency);
+        const results = await Promise.all(
+          batch.map(async (fs) => {
+            const emp = fs.faceProfile.employee;
+            const name = [emp.lastName, emp.firstName].filter(Boolean).join(' ');
+            const empNo = this.deviceEmployeeNo(emp);
+            try {
+              const faceB64 = await this.resolveFaceBase64(fs.faceProfile);
+              if (!faceB64) {
+                await this.prisma.deviceFaceSync.update({
+                  where: { id: fs.id },
+                  data: {
+                    syncStatus: FaceSyncStatus.failed,
+                    lastError: 'No face photo',
+                  },
+                });
+                return { ok: false, name };
+              }
+              const ok = await this.reach.syncFace(
+                reachUrl,
+                username,
+                plain,
+                empNo,
+                name,
+                faceB64,
+              );
+              await this.prisma.deviceFaceSync.update({
+                where: { id: fs.id },
+                data: {
+                  syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
+                  lastSyncedAt: ok ? new Date() : undefined,
+                  lastError: ok ? null : 'Reach ISAPI enroll failed',
+                },
+              });
+              return { ok, name };
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              await this.prisma.deviceFaceSync.update({
+                where: { id: fs.id },
+                data: {
+                  syncStatus: FaceSyncStatus.failed,
+                  lastError: msg.slice(0, 400),
+                },
+              });
+              return { ok: false, name };
+            }
+          }),
+        );
+        for (const r of results) {
+          if (r.ok) synced += 1;
+          else failed += 1;
+          commandBatch.push({
+            type: 'Face Sync',
+            employeeName: r.name,
+            status: r.ok ? 'completed' : 'failed',
+          });
+        }
+        const counts = await this.faceSyncCounts(tenantId, id);
+        await this.writePersonsSyncProgress(tenantId, id, {
+          running: true,
+          phase: 'uploading',
+          message: `Загрузка лиц (server→terminal)… ${counts.done} из ${counts.total}`,
+          currentNames: results.map((r) => r.name).filter(Boolean),
+          total: counts.total,
+          synced: counts.synced,
+          pending: counts.pending,
+          syncing: counts.syncing,
+          failed: counts.failed,
+          percent: counts.percent,
+        });
+      }
+      if (commandBatch.length) {
+        await this.appendCommands(tenantId, id, commandBatch);
+      }
+      const d = await this.getDevice(tenantId, id);
+      return {
+        ok: true,
+        synced,
+        failed,
+        pending: faceSyncs.length,
+        via: 'reach',
+        device: d,
+      };
+    }
+
     await this.ensureGwRegistered(device);
     if (!opts.skipHeartbeat) {
       await this.heartbeat(tenantId, id);
@@ -1015,7 +1163,7 @@ export class AttendanceService {
     const gatewayRef = refreshed.gatewayRef;
     if (!gatewayRef) {
       throw new BadGatewayException(
-        'Device gateway not registered — PC office-link (GW+tunnel) ishga tushiring',
+        'Device reach/GW yo‘q — ofis PC da Link Ulash (tunnel terminalga) qiling',
       );
     }
     // Do not burn the whole queue as "failed" when the terminal is offline.
@@ -2083,16 +2231,23 @@ export class AttendanceService {
     if (!extras.length) return { removed: 0, failed: 0 };
 
     const device = await this.getDevice(tenantId, deviceId);
-    let gatewayRef: string;
-    try {
-      gatewayRef = await this.ensureGwRegistered(device);
-    } catch (e) {
-      this.logger.warn(
-        `purge stale faces: GW unavailable device=${deviceId}: ${
-          e instanceof Error ? e.message : e
-        }`,
-      );
-      return { removed: 0, failed: extras.length };
+    const reachUrl = this.deviceReachBaseUrl(device.meta);
+    const plain =
+      (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) || '';
+    const username = (device.username || 'admin').trim() || 'admin';
+
+    let gatewayRef: string | null = null;
+    if (!reachUrl || !plain) {
+      try {
+        gatewayRef = await this.ensureGwRegistered(device);
+      } catch (e) {
+        this.logger.warn(
+          `purge stale faces: GW unavailable device=${deviceId}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+        return { removed: 0, failed: extras.length };
+      }
     }
 
     let removed = 0;
@@ -2109,7 +2264,19 @@ export class AttendanceService {
       const name =
         [emp.lastName, emp.firstName].filter(Boolean).join(' ') || empNo;
       try {
-        await this.gw.deleteUser(gatewayRef, empNo);
+        if (reachUrl && plain) {
+          const ok = await this.reach.deleteUser(
+            reachUrl,
+            username,
+            plain,
+            empNo,
+          );
+          if (!ok) throw new Error('Reach delete failed');
+        } else if (gatewayRef) {
+          await this.gw.deleteUser(gatewayRef, empNo);
+        } else {
+          throw new Error('No reach/GW');
+        }
         await this.prisma.deviceFaceSync.delete({ where: { id: row.id } });
         removed += 1;
         await this.appendCommand(tenantId, deviceId, {
@@ -2336,9 +2503,9 @@ export class AttendanceService {
       });
 
       if (!alreadyRunning) {
+        const reachUrl = this.deviceReachBaseUrl(device.meta);
         const gwHealth = await this.gw.health();
-        if (gwHealth.ok) {
-          // Optional fast path when PC tunnel/GW is up.
+        if (reachUrl || gwHealth.ok) {
           const run = this.runPersonsSyncWaves(tenantId, deviceId)
             .catch((e) => {
               this.logger.warn(
@@ -2352,13 +2519,12 @@ export class AttendanceService {
             });
           this.personsSyncInFlight.set(deviceId, run);
         } else {
-          // Primary path: office LAN agent (PC service / phone on Wi‑Fi) pulls queue.
           await this.writePersonsSyncProgress(tenantId, deviceId, {
             running: counts.pending + counts.syncing > 0,
             phase: 'awaiting_office_agent',
             message:
-              `Navbat serverda tayyor (${counts.pending}). ` +
-              `Ofisdagi Link agent (PC service yoki telefon Wi‑Fi) avtomatik yuklaydi/o‘chiradi.`,
+              `Navbat tayyor (${counts.pending}). ` +
+              `Ofis PC da Link Ulash qiling — tunnel ochiladi, keyin Web sync serverdan terminalga yozadi.`,
             finishedAt: null,
             total: counts.total,
             synced: counts.synced,
@@ -2672,14 +2838,53 @@ export class AttendanceService {
     return { ok: true, tenantCode: tenant.code, tenantId: tenant.id };
   }
 
-  async officeLinkAnnounce(tenantCode: string, tunnelUrl: string) {
+  async officeLinkAnnounce(
+    tenantCode: string,
+    tunnelUrl: string,
+    deviceId?: string,
+  ) {
     const tenant = await this.resolveTenantByCode(tenantCode);
-    const url = (tunnelUrl || '').trim();
+    const url = (tunnelUrl || '').trim().replace(/\/$/, '');
     if (!/^https:\/\/[a-z0-9.-]+/i.test(url)) {
       throw new BadRequestException('Tunnel URL https bo‘lishi kerak');
     }
     await this.gw.announceUrl(tenant.id, url);
-    return { ok: true, gwUrl: url.replace(/\/$/, '') };
+
+    const id = (deviceId || '').trim();
+    if (id) {
+      const device = await this.prisma.device.findFirst({
+        where: { id, tenantId: tenant.id },
+      });
+      if (device) {
+        const meta = this.asMeta(device.meta);
+        meta.reach = {
+          baseUrl: url,
+          mode: 'cloudflare_device',
+          at: new Date().toISOString(),
+        };
+        await this.prisma.device.update({
+          where: { id: device.id },
+          data: {
+            meta: meta as Prisma.InputJsonValue,
+            status: 'online',
+            lastSeenAt: new Date(),
+          },
+        });
+      }
+    }
+
+    return { ok: true, gwUrl: url, reachDeviceId: id || null };
+  }
+
+  private deviceReachBaseUrl(meta: unknown): string | null {
+    const m = this.asMeta(meta);
+    const reach =
+      m.reach && typeof m.reach === 'object' && !Array.isArray(m.reach)
+        ? (m.reach as Record<string, unknown>)
+        : null;
+    const base = typeof reach?.baseUrl === 'string' ? reach.baseUrl.trim() : '';
+    if (!/^https?:\/\//i.test(base)) return null;
+    return base.replace(/\/$/, '');
   }
 
   async officeLinkListDevicesByCode(tenantCode: string) {

@@ -180,14 +180,14 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     fail_streak += 1
             continue
 
-        gw_ok = _alive(bundle.gw) and probe_local_gw()
+        gw_ok = bundle.gw is None or (_alive(bundle.gw) and probe_local_gw())
         tun_proc = _alive(bundle.tunnel)
         current = (
             bundle.tunnel_url
             or read_tunnel_url(root)
             or resolve_named_tunnel_url(cfg, root)
         )
-        need_restart = not gw_ok or not tun_proc
+        need_restart = not tun_proc or (bundle.gw is not None and not gw_ok)
 
         if not need_restart and now - last_health >= health_every:
             last_health = now

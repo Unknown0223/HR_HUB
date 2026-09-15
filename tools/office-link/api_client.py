@@ -86,13 +86,18 @@ def announce(
     tunnel_url: str,
     *,
     pairing_token: str | None = None,
+    device_id: str | None = None,
 ) -> tuple[int, Any]:
+    body: dict[str, Any] = {"tenantCode": tenant, "tunnelUrl": tunnel_url}
+    did = (device_id or "").strip()
+    if did:
+        body["deviceId"] = did
     return api_req(
         api,
         "POST",
         "/api/attendance/office-link/announce",
         key,
-        {"tenantCode": tenant, "tunnelUrl": tunnel_url},
+        body,
         pairing_token=pairing_token,
     )
 

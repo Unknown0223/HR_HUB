@@ -347,6 +347,8 @@ export class UpdateLocationDto {
 export class OfficeLinkAnnounceDto {
   @ApiPropertyOptional() @IsOptional() @IsString() tenantCode?: string;
   @ApiProperty() @IsString() tunnelUrl!: string;
+  /** When set, tunnel is treated as direct reach to this device (server→terminal). */
+  @ApiPropertyOptional() @IsOptional() @IsUUID() deviceId?: string;
 }
 
 export class OfficeLinkDeviceDto {

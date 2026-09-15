@@ -398,6 +398,7 @@ def start_named_tunnel(
 def start_quick_tunnel(
     root: Path | None = None,
     cb: StatusFn | None = None,
+    target_url: str | None = None,
 ) -> tuple[subprocess.Popen[str], str]:
     root = root or find_root()
     exe = cloudflared_exe(root)
@@ -405,16 +406,19 @@ def start_quick_tunnel(
     old = _read_pid(rt / "tunnel.pid")
     if old:
         _kill_pid(old)
-    _status(cb, "Internet tunnel ochilmoqda...")
+    target = (target_url or "").strip() or f"http://127.0.0.1:{GW_PORT}"
+    _status(cb, f"Internet tunnel ochilmoqda… ({target})")
     env = _clean_child_env()
     log_path = rt / "tunnel.log"
     # Never leave stdout on PIPE after URL parse — buffer fill freezes cloudflared.
     log_f = open(log_path, "a", encoding="utf-8", errors="replace")
     try:
-        log_f.write(f"\n--- quick tunnel start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        log_f.write(
+            f"\n--- quick tunnel start {time.strftime('%Y-%m-%d %H:%M:%S')} target={target} ---\n"
+        )
         log_f.flush()
         proc = _popen_hidden(
-            [str(exe), "tunnel", "--url", f"http://127.0.0.1:{GW_PORT}"],
+            [str(exe), "tunnel", "--url", target],
             cwd=rt,
             env=env,
             stdout=log_f,
@@ -451,18 +455,23 @@ def start_quick_tunnel(
 def start_tunnel(
     root: Path | None = None,
     cb: StatusFn | None = None,
+    target_url: str | None = None,
 ) -> tuple[subprocess.Popen[str], str]:
-    """Prefer named tunnel token; fall back to trycloudflare quick tunnel."""
+    """Prefer named tunnel token; fall back to trycloudflare quick tunnel.
+
+    target_url: when set (e.g. http://192.168.1.115:80), quick tunnel exposes
+    the terminal directly so Railway API can reach it.
+    """
     from paths import load_config, resolve_named_tunnel_url, resolve_tunnel_token
 
     root = root or find_root()
     cfg = load_config(root)
     token = resolve_tunnel_token(cfg, root)
-    if token:
+    if token and not target_url:
         return start_named_tunnel(
             token,
             resolve_named_tunnel_url(cfg, root),
             root,
             cb,
         )
-    return start_quick_tunnel(root, cb)
+    return start_quick_tunnel(root, cb, target_url=target_url)
