@@ -20,11 +20,15 @@ def _ui_dir() -> Path:
     here = Path(__file__).resolve().parent
     if getattr(sys, "frozen", False):
         meipass = getattr(sys, "_MEIPASS", None)
-        candidates = []
+        exe_dir = Path(sys.executable).resolve().parent
+        # Prefer on-disk ui next to the exe so CSS/JS patches apply without rebuild.
+        candidates = [
+            exe_dir / "ui",
+            exe_dir / "_internal" / "ui",
+            here / "ui",
+        ]
         if meipass:
             candidates.append(Path(meipass) / "ui")
-        exe_dir = Path(sys.executable).resolve().parent
-        candidates.extend([exe_dir / "ui", exe_dir / "_internal" / "ui", here / "ui"])
         for cand in candidates:
             if (cand / "index.html").is_file():
                 return cand
