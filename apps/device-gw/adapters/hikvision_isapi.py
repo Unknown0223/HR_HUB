@@ -341,8 +341,22 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             if resp.status_code < 400:
                 logger.info("%s via %s %s", ok_log, method, path)
                 return True
+            body_l = (resp.text or "").lower()
             if "deviceUserAlreadyExistFace" in (resp.text or ""):
                 logger.info("%s already on device via %s %s", ok_log, method, path)
+                return True
+            # Delete paths: treat "already gone" as success (memory already free).
+            if any(
+                token in body_l
+                for token in (
+                    "employeenotexist",
+                    "employeenonoexist",
+                    "usernotexist",
+                    "usernotexisted",
+                    "invalidoperation",
+                )
+            ):
+                logger.info("%s already absent via %s %s", ok_log, method, path)
                 return True
             if "employeeNoAlreadyExist" in (resp.text or ""):
                 logger.info(
@@ -434,6 +448,61 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 client,
                 attempts,
                 f"UserInfo upsert employeeNo={emp_no}",
+            )
+
+    async def delete_user(self, employee_id: str) -> bool:
+        """Remove person (+ face capacity) from terminal by employeeNo."""
+        if not self._client:
+            raise RuntimeError("Adapter not connected")
+        emp_no = hikvision_employee_no(employee_id)
+        if emp_no != str(employee_id):
+            logger.info("employeeNo normalized %s -> %s", employee_id, emp_no)
+
+        del_payload = {
+            "UserInfoDelCond": {
+                "EmployeeNoList": [{"employeeNo": emp_no}],
+            }
+        }
+        # Alternate shapes seen across MinMoe / Access firmware.
+        del_payload_alt = {
+            "UserInfoDetail": {
+                "mode": "byEmployeeNo",
+                "EmployeeNoList": [{"employeeNo": emp_no}],
+            }
+        }
+        xml_body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<UserInfoDelCond>
+  <EmployeeNoList>
+    <employeeNo>{emp_no}</employeeNo>
+  </EmployeeNoList>
+</UserInfoDelCond>"""
+        xml_kw = {
+            "content": xml_body.encode("utf-8"),
+            "headers": {"Content-Type": "application/xml"},
+        }
+        face_del = {
+            "FaceDataRecord": {
+                "faceLibType": "blackFD",
+                "FDID": "1",
+                "FPID": emp_no,
+                "employeeNo": emp_no,
+            }
+        }
+        attempts = [
+            ("PUT", "/ISAPI/AccessControl/UserInfo/Delete?format=json", {"json": del_payload}),
+            ("PUT", "/ISAPI/AccessControl/UserInfoDetail/Delete?format=json", {"json": del_payload_alt}),
+            ("PUT", "/ISAPI/AccessControl/UserInfo/Delete", xml_kw),
+            (
+                "POST",
+                "/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json",
+                {"json": face_del},
+            ),
+        ]
+        async with await self._command_client() as client:
+            return await self._try_requests_on(
+                client,
+                attempts,
+                f"UserInfo delete employeeNo={emp_no}",
             )
 
     async def enroll_face(

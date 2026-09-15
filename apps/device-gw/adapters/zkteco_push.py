@@ -40,6 +40,10 @@ class ZktecoPushAdapter(DeviceAdapter):
         }
         return True
 
+    async def delete_user(self, employee_id: str) -> bool:
+        self._users.pop(employee_id, None)
+        return True
+
     async def enroll_face(
         self,
         employee_id: str,

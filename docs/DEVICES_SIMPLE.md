@@ -11,7 +11,8 @@
 | Funksiya | Qanday ishlaydi |
 |----------|-----------------|
 | Otmetkalar | Terminal **HttpHostNotification** → HTTPS → Railway API |
-| Yangi yuzlar | Web «Синхронизировать» → API → **PC office-link GW+tunnel** → terminal ISAPI |
+| Yangi / yangilangan yuzlar | Web «Синхронизировать» → PC GW+tunnel → terminal (upload) |
+| Keraksiz yuzlar | Shu sync: lokatsiyadan chiqqan / foto yo‘q / ignore qilinganlar terminaldan **o‘chiriladi** |
 | Link ilovasi | Faqat **Ulash** / **Tarmoqni qayta ulash** |
 
 Wi‑Fi / IP o‘zgasa: Link → **Tarmoqni qayta ulash**.

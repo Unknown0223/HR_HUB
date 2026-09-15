@@ -34,6 +34,9 @@ class DeviceAdapter(ABC):
     async def upsert_user(self, employee_id: str, name: str) -> bool: ...
 
     @abstractmethod
+    async def delete_user(self, employee_id: str) -> bool: ...
+
+    @abstractmethod
     async def enroll_face(
         self,
         employee_id: str,

@@ -1363,7 +1363,7 @@ export class AttendanceService {
         ok: true,
         action,
         message:
-          'Очередь лиц подготовлена — загрузка через PC office-link (GW+tunnel). Телефон не нужен.',
+          'Синхронизация лиц: загрузка актуальных + очистка лишних на терминале (PC GW+tunnel).',
       };
     }
     if (action === 'heartbeat') {
@@ -2032,15 +2032,141 @@ export class AttendanceService {
     );
   }
 
+  private async purgeStaleDeviceFaces(
+    tenantId: string,
+    deviceId: string,
+    desiredEmployeeIds: Set<string>,
+  ): Promise<{ removed: number; failed: number }> {
+    const extras =
+      desiredEmployeeIds.size === 0
+        ? await this.prisma.deviceFaceSync.findMany({
+            where: { tenantId, deviceId },
+            include: {
+              faceProfile: {
+                select: {
+                  employee: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      tabNumber: true,
+                      externalId: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : await this.prisma.deviceFaceSync.findMany({
+            where: {
+              tenantId,
+              deviceId,
+              employeeId: { notIn: [...desiredEmployeeIds] },
+            },
+            include: {
+              faceProfile: {
+                select: {
+                  employee: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      tabNumber: true,
+                      externalId: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+    if (!extras.length) return { removed: 0, failed: 0 };
+
+    const device = await this.getDevice(tenantId, deviceId);
+    let gatewayRef: string;
+    try {
+      gatewayRef = await this.ensureGwRegistered(device);
+    } catch (e) {
+      this.logger.warn(
+        `purge stale faces: GW unavailable device=${deviceId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+      return { removed: 0, failed: extras.length };
+    }
+
+    let removed = 0;
+    let failed = 0;
+    for (const row of extras) {
+      const emp = row.faceProfile?.employee ?? {
+        id: row.employeeId,
+        firstName: null,
+        lastName: null,
+        tabNumber: null,
+        externalId: null,
+      };
+      const empNo = this.deviceEmployeeNo(emp);
+      const name =
+        [emp.lastName, emp.firstName].filter(Boolean).join(' ') || empNo;
+      try {
+        await this.gw.deleteUser(gatewayRef, empNo);
+        await this.prisma.deviceFaceSync.delete({ where: { id: row.id } });
+        removed += 1;
+        await this.appendCommand(tenantId, deviceId, {
+          type: 'Person Delete',
+          employeeName: name,
+          status: 'completed',
+        });
+      } catch (e) {
+        failed += 1;
+        const msg = e instanceof Error ? e.message : String(e);
+        await this.prisma.deviceFaceSync.update({
+          where: { id: row.id },
+          data: { lastError: `purge: ${msg}`.slice(0, 500) },
+        });
+        this.logger.warn(
+          `purge face failed device=${deviceId} emp=${empNo}: ${msg}`,
+        );
+      }
+    }
+    return { removed, failed };
+  }
+
   private async runPersonsSyncWaves(tenantId: string, deviceId: string) {
     let totalSynced = 0;
     let totalFailed = 0;
+    let purgedRemoved = 0;
+    let purgedFailed = 0;
     const startedAt = new Date().toISOString();
+    const device = await this.getDevice(tenantId, deviceId);
+    const desiredEmps = await this.employeesForDeviceLocation(tenantId, device);
+    const desiredIds = new Set(
+      desiredEmps.filter((e) => e.faceProfile).map((e) => e.id),
+    );
+
+    await this.writePersonsSyncProgress(tenantId, deviceId, {
+      running: true,
+      phase: 'purging',
+      message: 'Очистка лишних лиц на терминале…',
+      currentNames: [],
+      startedAt,
+      finishedAt: null,
+    });
+    const purged = await this.purgeStaleDeviceFaces(
+      tenantId,
+      deviceId,
+      desiredIds,
+    );
+    purgedRemoved = purged.removed;
+    purgedFailed = purged.failed;
+
     const initial = await this.faceSyncCounts(tenantId, deviceId);
     await this.writePersonsSyncProgress(tenantId, deviceId, {
       running: true,
       phase: 'uploading',
-      message: `Синхронизация сотрудников… 0 из ${initial.total}`,
+      message: `Очистка: −${purgedRemoved}${
+        purgedFailed ? ` (ошибок ${purgedFailed})` : ''
+      }. Загрузка лиц… 0 из ${initial.total}`,
       currentNames: [],
       startedAt,
       finishedAt: null,
@@ -2050,6 +2176,8 @@ export class AttendanceService {
       syncing: initial.syncing,
       failed: initial.failed,
       percent: initial.percent,
+      purged: purgedRemoved,
+      purgeFailed: purgedFailed,
     });
     try {
       // More waves for large location queues (batch size in syncDevice is 500).
@@ -2067,10 +2195,10 @@ export class AttendanceService {
         running: false,
         phase: remaining > 0 ? 'queued' : totalFailed && !totalSynced ? 'failed' : 'completed',
         message: remaining > 0
-          ? `Очередь ещё есть: ${remaining}. Нажмите «Синхронизировать» снова.`
+          ? `Очередь ещё есть: ${remaining}. Нажмите «Синхронизировать» снова. Очищено: −${purgedRemoved}.`
           : totalFailed
-            ? `Готово: ${finalCounts.synced} ок, ${finalCounts.failed} с ошибкой`
-            : `Готово: ${finalCounts.synced} из ${finalCounts.total}`,
+            ? `Готово: ${finalCounts.synced} ок, ${finalCounts.failed} с ошибкой; очищено −${purgedRemoved}`
+            : `Готово: ${finalCounts.synced} из ${finalCounts.total}; очищено −${purgedRemoved}`,
         currentNames: [],
         finishedAt: new Date().toISOString(),
         total: finalCounts.total,
@@ -2079,10 +2207,12 @@ export class AttendanceService {
         syncing: finalCounts.syncing,
         failed: finalCounts.failed,
         percent: finalCounts.percent,
+        purged: purgedRemoved,
+        purgeFailed: purgedFailed,
       });
       await this.appendCommand(tenantId, deviceId, {
         type: 'Person Sync',
-        employeeName: `synced=${totalSynced}; failed=${totalFailed}`,
+        employeeName: `synced=${totalSynced}; failed=${totalFailed}; purged=${purgedRemoved}`,
         status: totalFailed && !totalSynced ? 'failed' : 'completed',
       });
     } catch (e) {
@@ -2092,6 +2222,8 @@ export class AttendanceService {
         phase: 'failed',
         message: `Синхронизация прервана: ${msg}`,
         finishedAt: new Date().toISOString(),
+        purged: purgedRemoved,
+        purgeFailed: purgedFailed,
       });
       throw e;
     }
@@ -2120,7 +2252,12 @@ export class AttendanceService {
       const existing = faceIds.length
         ? await this.prisma.deviceFaceSync.findMany({
             where: { deviceId, faceProfileId: { in: faceIds } },
-            select: { id: true, faceProfileId: true, syncStatus: true },
+            select: {
+              id: true,
+              faceProfileId: true,
+              syncStatus: true,
+              lastSyncedAt: true,
+            },
           })
         : [];
       const existingByFace = new Map(existing.map((r) => [r.faceProfileId, r]));
@@ -2138,8 +2275,18 @@ export class AttendanceService {
             employeeId: emp.id,
             syncStatus: FaceSyncStatus.pending,
           });
-        } else if (opts.force || row.syncStatus !== FaceSyncStatus.synced) {
-          toRequeueIds.push(row.id);
+        } else {
+          const photoNewer =
+            row.lastSyncedAt != null &&
+            profile.updatedAt != null &&
+            profile.updatedAt.getTime() > row.lastSyncedAt.getTime();
+          if (
+            opts.force ||
+            row.syncStatus !== FaceSyncStatus.synced ||
+            photoNewer
+          ) {
+            toRequeueIds.push(row.id);
+          }
         }
       }
 
@@ -2160,15 +2307,15 @@ export class AttendanceService {
       const requeued = toRequeueIds.length;
       const counts = await this.faceSyncCounts(tenantId, deviceId);
       const pushMode = this.isHikPushMode(device.meta);
-      // Punches may use HttpHost; faces always go Web → office GW/tunnel → terminal.
-      // Link apps are only for Ulash/reconnect — not for manual face upload.
+      // Faces: upload current location set + purge orphans (via PC GW).
+      // Punches may still use HttpHost without the Link app.
 
       await this.writePersonsSyncProgress(tenantId, deviceId, {
         running: true,
         phase: alreadyRunning ? 'uploading' : 'queuing',
         message: alreadyRunning
           ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
-          : `Очередь подготовлена: +${created}, повтор ${requeued} (всего ${counts.total}). Загрузка через PC office-link (GW+tunnel)…`,
+          : `Очередь: +${created}, обновление ${requeued} (всего ${counts.total}). Затем очистка лишних лиц + загрузка через PC GW…`,
         currentNames: [],
         ...(alreadyRunning ? {} : { startedAt: new Date().toISOString() }),
         finishedAt: null,

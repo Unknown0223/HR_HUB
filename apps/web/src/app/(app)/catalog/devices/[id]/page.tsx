@@ -599,7 +599,7 @@ function DeviceDetailInner() {
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
       setSyncNotice(
-        'Синхронизация запущена: лица грузятся через PC office-link (GW+tunnel). Телефон не нужен.',
+        'Синхронизация: актуальные лица → терминал, лишние/старые — очистка (PC GW+tunnel).',
       );
       await loadDevice();
       await loadSyncProgress();
@@ -844,7 +844,8 @@ function DeviceDetailInner() {
                 >
                   <strong>Режим: терминал → Web (HttpHost).</strong> Отметки идут с
                   устройства на сервер. Лица: Web «Синхронизировать» → PC office-link
-                  (GW+tunnel) → терминал. Телефон только для Ulash / reconnect.
+                  (GW+tunnel): загрузка актуальных + очистка лишних лиц на терминале.
+                  Телефон только для Ulash / reconnect.
                   {(device.meta as { hikPush?: { lastEventAt?: string } }).hikPush
                     ?.lastEventAt
                     ? ` Последнее событие: ${

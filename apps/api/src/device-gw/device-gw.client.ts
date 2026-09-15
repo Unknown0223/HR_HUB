@@ -298,6 +298,22 @@ export class DeviceGwClient implements OnModuleInit {
     };
   }
 
+  async deleteUser(gatewayRef: string, employeeExternalId: string) {
+    const res = await this.gwFetch(`/devices/${gatewayRef}/delete-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employee_external_id: employeeExternalId }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`GW delete-user ${res.status}: ${text}`);
+    }
+    return (await res.json()) as {
+      deleted: boolean;
+      adapter: string;
+    };
+  }
+
     async health() {
         try {
       const res = await this.gwFetch(`/health`);

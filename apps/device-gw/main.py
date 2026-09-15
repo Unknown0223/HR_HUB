@@ -95,6 +95,10 @@ class SyncFaceRequest(BaseModel):
     face_image_base64: Optional[str] = None
 
 
+class DeleteUserRequest(BaseModel):
+    employee_external_id: str
+
+
 class DeviceRecord:
     def __init__(self, info: DeviceInfo, adapter_impl: DeviceAdapter):
         self.info = info
@@ -556,6 +560,28 @@ async def sync_face(device_id: str, body: SyncFaceRequest) -> dict[str, Any]:
         "employee_external_id": body.employee_external_id,
         "synced": True,
         "face_enrolled": True,
+        "adapter": normalize_adapter(rec.info.adapter).value,
+    }
+
+
+@app.post("/devices/{device_id}/delete-user")
+async def delete_user(device_id: str, body: DeleteUserRequest) -> dict[str, Any]:
+    rec = devices.get(device_id)
+    if not rec:
+        raise HTTPException(404, "Device not found")
+    try:
+        ok = await rec.adapter.delete_user(employee_id=body.employee_external_id)
+        if not ok:
+            raise HTTPException(502, "Device rejected user delete")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("delete-user failed device=%s: %s", device_id, exc)
+        raise HTTPException(502, f"Device delete failed: {exc}") from exc
+    return {
+        "device_id": device_id,
+        "employee_external_id": body.employee_external_id,
+        "deleted": True,
         "adapter": normalize_adapter(rec.info.adapter).value,
     }
 
