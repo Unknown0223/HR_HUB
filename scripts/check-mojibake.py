@@ -55,8 +55,11 @@ def is_mojibake_token(s: str) -> str | None:
 
 def main() -> int:
     bad: list[str] = []
+    self_path = Path(__file__).resolve()
     for path in ROOT.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in EXTS:
+            continue
+        if path.resolve() == self_path:
             continue
         if any(part in SKIP_DIRS for part in path.parts):
             continue
