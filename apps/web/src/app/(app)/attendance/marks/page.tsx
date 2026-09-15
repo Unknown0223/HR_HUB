@@ -588,7 +588,7 @@ function MarksInner() {
       {checkedIds.length > 0 ? (
         <div className={styles.bulkBar}>
           <span className={styles.bulkMeta}>
-            Р’С‹Р±СЂР°РЅРѕ: <strong>{checkedIds.length}</strong>
+            Выбрано: <strong>{checkedIds.length}</strong>
           </span>
           <div className={styles.dropdown}>
             <button
@@ -818,7 +818,7 @@ function MarksInner() {
                           <div className={styles.rowActions}>
                             <Link href={`/attendance/marks/${m.id}`}>
                               <i className="fas fa-eye" aria-hidden />
-                              РџСЂРѕСЃРјРѕС‚СЂРµС‚СЊ
+                              Просмотреть
                             </Link>
                             <button
                               type="button"
@@ -872,7 +872,7 @@ function MarksInner() {
         </div>
         <div className={styles.footer}>
           <p>
-            РџРѕРєР°Р·Р°РЅРѕ <strong>{rows.length}</strong> РёР· <strong>{total}</strong>
+            Показано <strong>{rows.length}</strong> из <strong>{total}</strong>
           </p>
         </div>
       </div>
@@ -924,7 +924,7 @@ function MarksInner() {
                 router.push('/catalog/devices');
               }}
             >
-              РџСЂРёРјРµРЅРёС‚СЊ
+              Применить
             </button>
             <button
               type="button"
