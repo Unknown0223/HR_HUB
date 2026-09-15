@@ -208,15 +208,32 @@ class LinkApi:
         try:
             import api_client
 
-            from paths import read_link_key
+            from paths import read_link_key, write_pairing_token
 
-            pairing = token or self.session.pairing_token()
+            pairing = (token or self.session.pairing_token() or "").strip()
+            link_key = read_link_key(self.session.root)
             code, data = api_client.list_locations(
                 self.session.api_url,
-                read_link_key(self.session.root),
+                link_key,
                 self.session.tenant,
                 pairing_token=pairing or None,
             )
+            # Expired short-lived token must not block long-lived link.key.
+            if code == 401 and pairing and link_key:
+                msg = ""
+                if isinstance(data, dict):
+                    msg = str(data.get("message") or data.get("error") or "")
+                if "expired" in msg.lower() or "invalid" in msg.lower() or not msg:
+                    try:
+                        write_pairing_token("", self.session.root)
+                    except Exception:
+                        pass
+                    code, data = api_client.list_locations(
+                        self.session.api_url,
+                        link_key,
+                        self.session.tenant,
+                        pairing_token=None,
+                    )
         except Exception as exc:
             self._emit(
                 "onLocations",
@@ -242,10 +259,26 @@ class LinkApi:
             self.session.set_location_id(items[0]["id"])
         alert = None
         if not items:
-            alert = {
-                "text": "Локации не найдены. Проверьте токен и доступ к API.",
-                "kind": "warn",
-            }
+            detail = ""
+            if isinstance(data, dict):
+                detail = str(data.get("message") or data.get("error") or "").strip()
+            if code == 401:
+                alert = {
+                    "text": (
+                        "Токен устарел или ключ неверный. "
+                        "Создайте новый pairing-токен в Web или проверьте link.key. "
+                        + (detail[:80] if detail else "")
+                    ).strip(),
+                    "kind": "warn",
+                }
+            else:
+                alert = {
+                    "text": (
+                        "Локации не найдены. Проверьте токен и доступ к API."
+                        + (f" ({detail})" if detail else f" (HTTP {code})")
+                    ),
+                    "kind": "warn",
+                }
         self._emit(
             "onLocations",
             {

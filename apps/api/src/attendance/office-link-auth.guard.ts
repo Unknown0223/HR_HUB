@@ -39,26 +39,27 @@ export class OfficeLinkAuthGuard implements CanActivate {
         where: { pairingTokenHash: tokenHash },
         orderBy: { createdAt: 'desc' },
       });
-      if (!session) {
-        throw new UnauthorizedException('Pairing token invalid');
+      if (session && !(session.expiresAt && session.expiresAt.getTime() < Date.now())) {
+        const pairing: PairingAuthContext = {
+          sessionId: session.id,
+          tenantId: session.tenantId,
+          tokenHash,
+          expiresAt: session.expiresAt,
+          createdById: session.createdById ?? null,
+        };
+        req.pairing = pairing;
+        req.officeLinkAuth = { mode: 'pairing', pairing };
+        return true;
       }
-      if (session.expiresAt && session.expiresAt.getTime() < Date.now()) {
-        throw new UnauthorizedException('Pairing token expired');
-      }
-      const pairing: PairingAuthContext = {
-        sessionId: session.id,
-        tenantId: session.tenantId,
-        tokenHash,
-        expiresAt: session.expiresAt,
-        createdById: session.createdById ?? null,
-      };
-      req.pairing = pairing;
-      req.officeLinkAuth = { mode: 'pairing', pairing };
-      return true;
+      // Expired/invalid pairing: fall through to link key when present
+      // (office PC often still has a valid long-lived link.key).
     }
 
     const expected = this.expectedLinkKey();
     if (!expected) {
+      if (pairingHeader) {
+        throw new UnauthorizedException('Pairing token expired');
+      }
       throw new UnauthorizedException(
         'DEVICE_LINK_KEY sozlanmagan yoki X-Pairing-Token kerak',
       );
@@ -70,6 +71,9 @@ export class OfficeLinkAuthGuard implements CanActivate {
       : '';
     const provided = headerKey || bearer;
     if (!provided || !keysEqual(provided, expected)) {
+      if (pairingHeader) {
+        throw new UnauthorizedException('Pairing token expired');
+      }
       throw new UnauthorizedException('Ulanish kaliti noto‘g‘ri');
     }
     req.officeLinkAuth = { mode: 'link_key' };
