@@ -48,20 +48,17 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   String _detectLine = '';
   String _alert = '';
   String _note =
-      'Pairing token + Ulash. Keyin ilova ofis Wi‑Fi da ochiq tursa yuzlar server navbatidan avtomatik yuklanadi. Yoki ofis PC face agent.';
+      'Faqat sozlash: pairing token + Ulash / tarmoqni tiklash. Yuz sync — faqat Web; bu ilova qatnashmaydi.';
 
   List<Map<String, dynamic>> _locations = [];
   String? _locationId;
 
   Timer? _confirmPoll;
-  Timer? _faceAgent;
   bool _confirmNotified = false;
-  bool _faceAgentBusy = false;
 
   @override
   void dispose() {
     _confirmPoll?.cancel();
-    _faceAgent?.cancel();
     _tokenCtrl.dispose();
     _ipCtrl.dispose();
     _pwdCtrl.dispose();
@@ -85,34 +82,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       await _bindAndLoadLocations(showAlert: false);
       await _maybeResumeConfirmPoll();
     }
-    _startFaceAgent();
     if (mounted) setState(() {});
-  }
-
-  void _startFaceAgent() {
-    _faceAgent?.cancel();
-    _faceAgent = Timer.periodic(const Duration(seconds: 45), (_) {
-      unawaited(_faceAgentTick());
-    });
-    unawaited(_faceAgentTick());
-  }
-
-  Future<void> _faceAgentTick() async {
-    if (!mounted || _session == null || _faceAgentBusy || _busy) return;
-    final cred = await _session!.store.readDeviceCredential();
-    final deviceId = '${cred?['deviceId'] ?? ''}'.trim();
-    if (deviceId.isEmpty) return;
-    _faceAgentBusy = true;
-    try {
-      await _session!.pushPendingFaces(
-        password: _pwdCtrl.text,
-        onStatus: (_) {},
-      );
-    } catch (_) {
-      /* silent */
-    } finally {
-      _faceAgentBusy = false;
-    }
   }
 
   void _setBadge(String text, {required String tone}) {
@@ -341,7 +311,6 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       });
       if (needs) {
         _startConfirmPoll();
-        _startFaceAgent();
         showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -387,9 +356,9 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         _status = 'Ulanish mustahkamlandi';
         _setBadge('ULANDI', tone: 'ok');
         _alert =
-            'Web tasdiqlandi. Otmetkalar to‘g‘ridan webga. Yuzlar: Web «Синхронизировать» + PC office-link${info['deviceName'] != null ? ' (${info['deviceName']})' : ''}.';
+            'Web tasdiqlandi. Otmetkalar → web. Yuzlar faqat Web «Синхронизировать» (bu ilova kerak emas)${info['deviceName'] != null ? ' (${info['deviceName']})' : ''}.';
         _note =
-            'Webda «Подтвердить привязку» bajarildi. Parol: Web → Устройства → Показать.';
+            'Sozlash tugadi. Ilovani yopishingiz mumkin. Yuz sync — Webda.';
       });
       if (mounted) {
         await showDialog<void>(
@@ -398,7 +367,8 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
             title: const Text('Tasdiqlandi'),
             content: const Text(
               'Web admin ulanishni tasdiqladi.\n\n'
-              'Otmetkalar terminaldan webga. Yuzlar: Web «Синхронизировать» (ofisda PC office-link GW+tunnel).',
+              'Otmetkalar terminaldan webga. Yuzlar — faqat Web «Синхронизировать». '
+              'Bu sozlash ilovasini yopishingiz mumkin.',
             ),
             actions: [
               FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
@@ -457,7 +427,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           _setBadge('YANGILANDI', tone: 'ok');
           _alert = 'Host yangilandi; otmetkalar → web.';
           _note =
-              'Web tasdiqlangan. Otmetkalar to‘g‘ridan webga. Yuzlar: Web sync + PC GW+tunnel.';
+              'Sozlash OK. Yuz sync faqat Webda — bu ilova kerak emas.';
         });
       } else {
         setState(() {
@@ -466,33 +436,6 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           _alert = result.message;
         });
       }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _pushFaces() async {
-    await _ensureSession();
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _status = 'Yuzlar yuklanmoqda…';
-      _setBadge('YUZLAR', tone: 'warn');
-    });
-    try {
-      final result = await _session!.pushPendingFaces(
-        password: _pwdCtrl.text,
-        onStatus: (m) {
-          if (mounted) setState(() => _status = m);
-        },
-      );
-      if (!mounted) return;
-      setState(() {
-        _status = result.message;
-        _setBadge(result.kind == 'linked' ? 'OK' : 'XATO',
-            tone: result.kind == 'linked' ? 'ok' : 'danger');
-        _alert = result.message;
-      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }

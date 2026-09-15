@@ -2524,7 +2524,7 @@ export class AttendanceService {
             phase: 'awaiting_office_agent',
             message:
               `Navbat tayyor (${counts.pending}). ` +
-              `Ofis PC da Link Ulash qiling — tunnel ochiladi, keyin Web sync serverdan terminalga yozadi.`,
+              `Ofis PC tunnel yo‘q — bir marta PC Link Ulash qiling (keyin GUI yopiladi; sync faqat Web).`,
             finishedAt: null,
             total: counts.total,
             synced: counts.synced,

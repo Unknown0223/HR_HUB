@@ -1,15 +1,17 @@
-# Qurilmalarni Railway platformaga ulash (sodda)
+# Qurilmalar — sodda model
 
-## Server terminalga «kira oladi»
+## Link ilovasi (telefon / PC GUI)
+**Faqat sozlash:** pairing + Ulash / tarmoqni tiklash.  
+Yuz yuklash, sync — **ilova qatnashmaydi**. Ulashdan keyin yopib qo‘ying.
 
-1. Ofis PC da **HR HUB Link → Ulash**  
-2. PC fonida tunnel ochiladi: internet → ofis terminal (`192.168…`)  
-3. Web **«Синхронизировать»** → Railway server to‘g‘ridan terminalga yuz yozadi / o‘chiradi  
+## Kundalik ish
+| | |
+|--|--|
+| Otmetkalar | Terminal → Web (o‘zi) |
+| Yuz sync | Web «Синхронизировать» → server → ofis PC **fon tunnel** → terminal |
 
-| Funksiya | Qanday |
-|----------|--------|
-| Otmetkalar | Terminal → Web (HttpHost) |
-| Yuzlar | Web sync → **server → tunnel → terminal** |
-| Ofis PC | Ulashdan keyin fon tunnel (yopib qo‘ymang / service) |
+## Ofis PC (bir marta)
+PC da Ulash qilganda fon tunnel + Windows login task o‘rnatiladi.  
+GUI ochiq turishi shart emas. Kompyuter yoniq bo‘lsin.
 
-Telefon agent — ixtiyoriy zaxira. Asosiy yo‘l: **PC tunnel + Web sync**.
+Telefon Link — faqat sozlash (ixtiyoriy); yuz sync uchun kerak emas.

@@ -599,7 +599,7 @@ function DeviceDetailInner() {
     try {
       await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
       setSyncNotice(
-        'Синхронизация: server tunnel orqali terminalga yozadi (ofis PC Link tunnel ochiq bo‘lsin).',
+        'Синхронизация server→terminal (ofis PC fon tunnel). Link ilovasi kerak emas.',
       );
       await loadDevice();
       await loadSyncProgress();
@@ -843,8 +843,8 @@ function DeviceDetailInner() {
                   style={{ background: '#eef8f0', borderColor: '#b7e0c0' }}
                 >
                   <strong>Режим: терминал → Web (HttpHost).</strong> Отметки — напрямую.
-                  Лица: Web «Синхронизировать» → server → ofis PC tunnel → terminal.
-                  Ofis PC da Link Ulash qilingan va fon tunnel ishlashi kerak.
+                  Лица: только Web «Синхронизировать» (server→tunnel→terminal).
+                  Link-приложения — только первичная настройка; в sync не участвуют.
                   {(device.meta as { hikPush?: { lastEventAt?: string } }).hikPush
                     ?.lastEventAt
                     ? ` Последнее событие: ${

@@ -239,17 +239,27 @@ class OfficeLinkSession:
             return SubmitResult(kind="tunnel_error", message=str(e)[:240])
 
     def ensure_tunnel_supervisor(self) -> bool:
-        """Start background worker if handoff exists and tunnel is down."""
+        """Start background tunnel worker + login startup task (no GUI needed later)."""
         from paths import load_service_config
-        from tunnel_watch import snapshot_health, spawn_detached_worker
+        from tunnel_watch import (
+            install_startup_task,
+            snapshot_health,
+            spawn_detached_worker,
+        )
 
+        self.write_service_handoff()
         svc = load_service_config(self.root)
         if not svc or svc.get("enabled") is False:
             return False
+        started = False
         health = snapshot_health(self.services, self.root)
-        if health.ok:
-            return False
-        return spawn_detached_worker(self.root)
+        if not health.ok:
+            started = spawn_detached_worker(self.root)
+        try:
+            install_startup_task(self.root)
+        except Exception:
+            pass
+        return started
 
     def submit_password(self, password: str) -> SubmitResult:
         password = (password or "").strip()

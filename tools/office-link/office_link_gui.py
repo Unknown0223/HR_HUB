@@ -1677,9 +1677,9 @@ class OfficeLinkApp:
             try:
                 self.session.write_service_handoff()
                 svc_note = (
-                    " Yuzlar: fon face agent ishga tushdi (tunnel majburiy emas). "
-                    "Web «Синхронизировать» → agent terminalga yozadi. "
-                    "Ixtiyoriy: install-service.bat — Windows Service."
+                    " Sozlash tugadi — GUI ni yopishingiz mumkin. "
+                    "Fon tunnel Windows login da avtomatik. "
+                    "Yuzlar faqat Web «Синхронизировать» (ilova qatnashmaydi)."
                 )
             except Exception:
                 svc_note = " На вкладке «Туннель»: «Восстановить туннель» / автовосстановление."

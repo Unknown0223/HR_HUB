@@ -297,6 +297,54 @@ def restore_tunnel(
     return bundle, url
 
 
+def install_startup_task(root: Path | None = None) -> bool:
+    """Register ONLOGON scheduled task so tunnel stays up without opening the GUI.
+
+    No admin required for current-user tasks. Returns True if created/updated.
+    """
+    if sys.platform != "win32":
+        return False
+    root = root or find_root()
+    worker = root / "service_worker.py"
+    if not worker.is_file():
+        worker = root / "face_worker.py"
+    if not worker.is_file():
+        return False
+
+    py = sys.executable
+    portable = runtime_dir(root) / "python" / "pythonw.exe"
+    if portable.is_file():
+        py = str(portable)
+    elif Path(sys.executable).with_name("pythonw.exe").is_file():
+        py = str(Path(sys.executable).with_name("pythonw.exe"))
+
+    tr = f'"{py}" "{worker}"'
+    cmd = [
+        "schtasks",
+        "/Create",
+        "/TN",
+        "HRHUB-OfficeLink",
+        "/TR",
+        tr,
+        "/SC",
+        "ONLOGON",
+        "/RL",
+        "LIMITED",
+        "/F",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
 def spawn_detached_worker(root: Path | None = None) -> bool:
     """Start background worker: full service_worker, or face_worker if GW already up."""
     root = root or find_root()
