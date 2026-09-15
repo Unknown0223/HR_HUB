@@ -81,7 +81,7 @@ export class HikvisionReachClient {
       method?: string;
       username: string;
       password: string;
-      body?: string | Buffer;
+      body?: string;
       contentType?: string;
       timeoutMs?: number;
     },

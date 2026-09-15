@@ -883,14 +883,14 @@ class ProvisionEngine:
             return SubmitResult(
                 kind="linked",
                 message=(
-                    "Parol o‘rnatildi. Otmetkalar → web (HttpHost). "
-                    "Webda tasdiqlang; yuzlar uchun telefon «Yuzlarni yuklash»."
+                    "Пароль установлен. Отметки → web (HttpHost). "
+                    "Подтвердите в Web. Лица — только Web «Синхронизировать» (приложение не нужно)."
                     if needs_confirm
                     else (
-                        "Ulandi. Otmetkalar to‘g‘ridan webga. "
-                        "Yuzlar — ofis Wi‑Fi da Link «Yuzlarni yuklash»."
+                        "Подключено. Отметки → web. "
+                        "Лица — только Web «Синхронизировать»."
                         if sealed
-                        else "Ulandi. Otmetkalar → web; yuzlar — telefon Link."
+                        else "Подключено. Отметки → web; лица — Web sync."
                     )
                 ),
                 device={

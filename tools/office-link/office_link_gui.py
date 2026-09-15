@@ -1162,8 +1162,8 @@ class OfficeLinkApp:
         self.location_combo["values"] = labels
         if labels:
             if not self.location_var.get() or self.location_var.get() not in labels:
-            self.location_var.set(labels[0])
-            self.session.set_location_id(items[0]["id"])
+                self.location_var.set(labels[0])
+                self.session.set_location_id(items[0]["id"])
             self._show_alert(f"Локации: {len(labels)}. Выберите из списка.", kind="ok")
             self.root.after(
                 1800,
@@ -1299,7 +1299,7 @@ class OfficeLinkApp:
         self.device_var.set("Устройство: —")
         self.state_var.set("Состояние: —")
         try:
-        self._set_busy(True)
+            self._set_busy(True)
         except Exception:
             self.busy = True
         threading.Thread(target=self._scan_worker, daemon=True).start()
@@ -1315,7 +1315,7 @@ class OfficeLinkApp:
 
     def _scan_done(self, devices: list) -> None:
         try:
-        self._set_busy(False)
+            self._set_busy(False)
         except Exception:
             self.busy = False
         if self.session.auth.is_locked():
@@ -1610,7 +1610,7 @@ class OfficeLinkApp:
         threading.Thread(target=self._ulash_worker, args=(password,), daemon=True).start()
 
     def _ulash_worker(self, password: str) -> None:
-            def progress(msg: str) -> None:
+        def progress(msg: str) -> None:
             self.root.after(0, lambda m=msg: self.status_var.set(m[:120]))
 
         state = (self.session.detected_state or {}).get("state")
@@ -1677,9 +1677,9 @@ class OfficeLinkApp:
             try:
                 self.session.write_service_handoff()
                 svc_note = (
-                    " Sozlash tugadi — GUI ni yopishingiz mumkin. "
-                    "Fon tunnel Windows login da avtomatik. "
-                    "Yuzlar faqat Web «Синхронизировать» (ilova qatnashmaydi)."
+                    " Настройка завершена — GUI можно закрыть. "
+                    "Фоновый tunnel при входе в Windows. "
+                    "Лица только Web «Синхронизировать» (приложение не участвует)."
                 )
             except Exception:
                 svc_note = " На вкладке «Туннель»: «Восстановить туннель» / автовосстановление."
@@ -1695,16 +1695,16 @@ class OfficeLinkApp:
                     "Web → уведомление / Устройства → «Подтвердить привязку».",
                     kind="warn",
                 )
-            self.note.configure(
-                text=(
+                self.note.configure(
+                    text=(
                         "Следующий шаг: администратор tenant в Web открывает уведомление "
                         "и нажимает «Подтвердить привязку». "
                         "После этого лица и устройство полностью синхронизируются. "
                         "Приложение автоматически отслеживает подтверждение."
-                    + extra
-                    + svc_note
+                        + extra
+                        + svc_note
+                    )
                 )
-            )
                 messagebox.showinfo(
                     "Ожидание подтверждения",
                     "Пароль установлен на устройство и отправлен в Web.\n\n"
@@ -1736,7 +1736,7 @@ class OfficeLinkApp:
                     "Новый пароль администратора отправлен на Web-сервер.\n"
                     "Его можно посмотреть в Web → Устройства → карточка устройства "
                     "через «Показать» / «Копировать».",
-            )
+                )
             self.pwd_var.set("")
             self.pwd_entry.configure(state="disabled")
             self._set_primary_btn(False)
@@ -1813,7 +1813,7 @@ class OfficeLinkApp:
                 )
                 self.status_var.set(f"Почта OK: {res.get('email') or email}")
                 self._show_alert("Почта восстановления установлена.", kind="ok")
-        else:
+            else:
                 self._show_alert(
                     str(res.get("message") or "Не удалось установить почту")[:200],
                     kind="danger",
@@ -2061,10 +2061,10 @@ class OfficeLinkApp:
 
     def _on_close(self) -> None:
         if self._tunnel_poll_job is not None:
-        try:
+            try:
                 self.root.after_cancel(self._tunnel_poll_job)
-        except Exception:
-            pass
+            except Exception:
+                pass
             self._tunnel_poll_job = None
         try:
             # Keep GW+tunnel alive; spawn detached worker for auto-heal.
