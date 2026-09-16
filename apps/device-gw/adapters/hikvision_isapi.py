@@ -1304,7 +1304,11 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             logger.info("AcsEvent attached %s capture photos", attached)
 
     async def pull_events(self) -> list[dict[str, Any]]:
-        """Search recent successful face events (minor 75) on the device clock."""
+        """Search successful face events (minor 75) — wide window for reconnect backfill.
+
+        Quick reconnects must not lose terminal history: pull up to ~90 days
+        (device storage permitting), paginated. Dedupes by serialNo.
+        """
         if not self._client:
             return []
 
@@ -1315,15 +1319,22 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 punch["admin_login_blocked"] = True
 
         device_now, tz = await self._device_local_now()
-        day = device_now.strftime("%Y-%m-%d")
-        yesterday = (device_now - timedelta(days=1)).strftime("%Y-%m-%d")
-        start = f"{yesterday}T00:00:00{tz}"
-        end = f"{day}T23:59:59{tz}"
+        # Old terminals reconnected after Wi‑Fi/offline — keep a long lookback.
+        lookback_days = 90
+        start_day = (device_now - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        end_day = device_now.strftime("%Y-%m-%d")
+        start = f"{start_day}T00:00:00{tz}"
+        end = f"{end_day}T23:59:59{tz}"
         punches: list[dict[str, Any]] = list(queued)
+        seen_keys: set[str] = set()
+        for punch in punches:
+            key = str(punch.get("serial_no") or punch.get("occurred_at") or id(punch))
+            seen_keys.add(key)
         position = 0
         page_size = 30
         try:
-            for _ in range(20):
+            # 90d × busy office can be thousands of rows — allow many pages.
+            for _ in range(200):
                 body = {
                     "AcsEventCond": {
                         "searchID": "1",
@@ -1340,7 +1351,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 resp = await self._client.post(
                     "/ISAPI/AccessControl/AcsEvent?format=json",
                     json=body,
-                    timeout=20.0,
+                    timeout=30.0,
                 )
                 if resp.status_code >= 400:
                     logger.warning(
@@ -1366,8 +1377,17 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                     break
                 for item in infos:
                     punch = self._punch_from_acs_item(item)
-                    if punch:
-                        punches.append(punch)
+                    if not punch:
+                        continue
+                    key = str(
+                        punch.get("serial_no")
+                        or punch.get("occurred_at")
+                        or f"{position}-{len(punches)}"
+                    )
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    punches.append(punch)
                 if strg != "MORE":
                     break
                 position += len(infos)
@@ -1385,7 +1405,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                     await self._attach_capture_photos(punches)
                     self._apply_clock_trust(punches, drift)
                     logger.info(
-                        "AcsEvent pulled %s new punches window=%s..%s drift=%ss",
+                        "AcsEvent pulled %s punches window=%s..%s drift=%ss",
                         len(punches),
                         start,
                         end,
@@ -1397,7 +1417,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                         drift,
                         CLOCK_SKEW_SECONDS,
                     )
-                await self.maybe_align_clock(drift)
+                    await self.maybe_align_clock(drift)
             else:
                 logger.warning("device clock unread — skip trust rewrite/align")
                 if punches:
