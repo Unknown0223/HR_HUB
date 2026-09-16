@@ -53,12 +53,27 @@ if exist "%DIST%\ui" xcopy /E /I /Y "%DIST%\ui" "%REL%\ilova\ui\" >nul
 > "%REL%\BOSHLASH.bat" (
   echo @echo off
   echo REM HR HUB Link — ofis ilovasini ochish
+  echo REM Smart App Control imzosiz EXE ni bloklashi mumkin — pythonw birinchi.
   echo cd /d "%%~dp0"
+  echo where pythonw ^>nul 2^>^&1
+  echo if %%ERRORLEVEL%%==0 if exist "%%~dp0office_link_app.py" ^(
+  echo   start "" /D "%%~dp0" pythonw "%%~dp0office_link_app.py"
+  echo   exit /b 0
+  echo ^)
+  echo if exist "%%~dp0runtime\python\pythonw.exe" if exist "%%~dp0office_link_app.py" ^(
+  echo   start "" /D "%%~dp0" "%%~dp0runtime\python\pythonw.exe" "%%~dp0office_link_app.py"
+  echo   exit /b 0
+  echo ^)
   echo if exist "%%~dp0ilova\HRHUB-Qurilma.exe" ^(
   echo   start "" /D "%%~dp0ilova" "%%~dp0ilova\HRHUB-Qurilma.exe"
   echo   exit /b 0
   echo ^)
-  echo echo HRHUB-Qurilma.exe topilmadi. ilova\ papkasini tekshiring.
+  echo echo.
+  echo echo [XATO] Ilova ochilmadi.
+  echo echo Agar Windows «nashriyot tekshirilmadi» deb EXE ni bloklasa:
+  echo echo   Windows xavfsizligi -^> Ilova va brauzer nazorati -^> Smart App Control -^> O'chirish
+  echo echo   yoki Python o'rnatib BOSHLASH.bat ni qayta bosing.
+  echo echo.
   echo pause
   echo exit /b 1
 )
