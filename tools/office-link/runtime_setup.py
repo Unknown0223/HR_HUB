@@ -225,13 +225,13 @@ def install_cloudflared(root: Path | None = None, cb: StatusFn | None = None) ->
 
 
 def _gw_deps_ready(py: Path) -> bool:
-    """True if device-gw imports already work (skip slow pip)."""
+    """True if device-gw + face-agent imports already work (skip slow pip)."""
     try:
         r = _run_hidden(
             [
                 str(py),
                 "-c",
-                "import fastapi,uvicorn,httpx,pydantic_settings,nats,multipart",
+                "import fastapi,uvicorn,httpx,pydantic_settings,nats,multipart,PIL",
             ],
             env=_clean_child_env(),
             timeout=20,

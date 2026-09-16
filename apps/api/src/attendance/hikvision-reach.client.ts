@@ -410,29 +410,43 @@ export class HikvisionReachClient {
       employeeNo: empNo,
     };
     const path = '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json';
-
-    // Clear stale/weak FDLib face before upload (synced≠recognizable otherwise).
-    await this.deleteFace(baseUrl, username, password, empNo);
+    const modifyPath = '/ISAPI/Intelligent/FDLib/FDSetUp?format=json';
 
     // DS-K1T: multipart first; never send faceURL data-URI (badJsonContent/faceURL).
+    // FDSearch/Delete is broken on many firmwares — use FDSetUp PUT to replace.
     const mp = this.buildMultipart(JSON.stringify(record), prepared.raw);
     const attempts: Array<{
       label: string;
+      method: 'POST' | 'PUT';
+      path: string;
       body: string | Uint8Array;
       contentType: string;
     }> = [
       {
         label: 'multipart',
+        method: 'POST',
+        path,
+        body: new Uint8Array(mp.body),
+        contentType: mp.contentType,
+      },
+      {
+        label: 'multipart-FDSetUp',
+        method: 'PUT',
+        path: modifyPath,
         body: new Uint8Array(mp.body),
         contentType: mp.contentType,
       },
       {
         label: 'json-faceData',
+        method: 'POST',
+        path,
         body: JSON.stringify({ ...record, faceData: prepared.b64 }),
         contentType: 'application/json',
       },
       {
         label: 'json-FaceDataRecord',
+        method: 'POST',
+        path,
         body: JSON.stringify({
           FaceDataRecord: { ...record, faceData: prepared.b64 },
         }),
@@ -442,10 +456,9 @@ export class HikvisionReachClient {
 
     let last = 'Face enroll failed';
     let retryable = false;
-    let deletedAgain = false;
     for (const attempt of attempts) {
-      const r = await this.digestRequest(baseUrl, path, {
-        method: 'POST',
+      const r = await this.digestRequest(baseUrl, attempt.path, {
+        method: attempt.method,
         username,
         password,
         body: attempt.body,
@@ -455,24 +468,7 @@ export class HikvisionReachClient {
       if (r.status > 0 && r.status < 400) {
         return { ok: true };
       }
-      if (isFaceAlreadyExists(r.text) && !deletedAgain) {
-        deletedAgain = true;
-        await this.deleteFace(baseUrl, username, password, empNo);
-        const again = await this.digestRequest(baseUrl, path, {
-          method: 'POST',
-          username,
-          password,
-          body: attempt.body,
-          contentType: attempt.contentType,
-          timeoutMs: 90_000,
-        });
-        if (again.status > 0 && again.status < 400) {
-          return { ok: true };
-        }
-        last = snipError(again.status, again.text, `Face(${attempt.label})`);
-      } else {
-        last = snipError(r.status, r.text, `Face(${attempt.label})`);
-      }
+      last = snipError(r.status, r.text, `Face(${attempt.label})`);
       const low = (r.text || '').toLowerCase();
       if (
         isRetryableHttp(r.status, r.text) ||
@@ -489,6 +485,10 @@ export class HikvisionReachClient {
           retryable = false;
           continue;
         }
+      }
+      // Already-exist on create → next attempt is FDSetUp modify.
+      if (isFaceAlreadyExists(r.text) && attempt.label === 'multipart') {
+        continue;
       }
       this.logger.warn(
         `reach enroll emp=${empNo} via ${attempt.label}: ${r.status} ${(r.text || '').slice(0, 120)}`,
