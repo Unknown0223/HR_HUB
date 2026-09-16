@@ -146,7 +146,7 @@ export async function apiFetch<T>(
   const { tenantId, ...init } = options;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
-  const run = async (): Promise<T> => {
+  const run = async (allowStaleBearerRetry = true): Promise<T> => {
     const headers = authHeaders(init.headers, tenantId);
     const isFormData =
       typeof FormData !== 'undefined' && init.body instanceof FormData;
@@ -161,6 +161,17 @@ export async function apiFetch<T>(
     });
 
     if (!res.ok) {
+      // Stale localStorage JWT wins over a valid httpOnly cookie in passport —
+      // drop Bearer once and retry with cookie only (common after redeploy).
+      if (
+        allowStaleBearerRetry &&
+        res.status === 401 &&
+        typeof window !== 'undefined' &&
+        getAccessToken()
+      ) {
+        setMediaAccessToken(null);
+        return run(false);
+      }
       let message = res.statusText;
       try {
         const body = await res.json();
@@ -181,10 +192,10 @@ export async function apiFetch<T>(
     const session = getSession();
     const cacheTenant =
       tenantId ?? session?.tenant?.id ?? session?.user.tenantId ?? null;
-    return withCatalogLookupsCache(normalizedPath, cacheTenant, run);
+    return withCatalogLookupsCache(normalizedPath, cacheTenant, () => run(true));
   }
 
-  return run();
+  return run(true);
 }
 
 /** Authenticated binary download (e.g. .xlsx). */

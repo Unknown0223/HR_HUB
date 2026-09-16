@@ -59,6 +59,7 @@ import {
 } from './dto';
 import { pageResult, parsePagination } from '../common/pagination';
 import { buildExcelBuffer } from '../common/excel';
+import { sanitizeGwErrorText } from '../common/redact';
 import {
   buildYearGrid,
   emptyYearGrid,
@@ -1002,11 +1003,20 @@ export class AttendanceService {
       m.includes('network') ||
       m.includes('timed out') ||
       m.includes('timeout') ||
+      m.includes('aborted') ||
+      m.includes('abort') ||
+      m.includes('econnreset') ||
+      m.includes('socket') ||
+      m.includes('disconnected') ||
       m.includes('502') ||
       m.includes('503') ||
+      m.includes('504') ||
+      m.includes('530') ||
       m.includes('bad gateway') ||
       m.includes('trycloudflare') ||
-      m.includes('tunnel')
+      m.includes('tunnel') ||
+      m.includes('devicebusy') ||
+      m.includes('paused —')
     );
   }
 
@@ -1075,7 +1085,8 @@ export class AttendanceService {
         employeeName?: string | null;
         status?: string;
       }> = [];
-      const concurrency = 3;
+      // Serial through Cloudflare→terminal — concurrency>1 causes enroll drops on DS-K1T.
+      const concurrency = 1;
       for (let i = 0; i < faceSyncs.length; i += concurrency) {
         const batch = faceSyncs.slice(i, i + concurrency);
         const results = await Promise.all(
@@ -1093,9 +1104,9 @@ export class AttendanceService {
                     lastError: 'No face photo',
                   },
                 });
-                return { ok: false, name };
+                return { ok: false, name, connectivity: false as const };
               }
-              const ok = await this.reach.syncFace(
+              const res = await this.reach.syncFace(
                 reachUrl,
                 username,
                 plain,
@@ -1103,36 +1114,69 @@ export class AttendanceService {
                 name,
                 faceB64,
               );
+              const connectivity = Boolean(res.retryable);
               await this.prisma.deviceFaceSync.update({
                 where: { id: fs.id },
                 data: {
-                  syncStatus: ok ? FaceSyncStatus.synced : FaceSyncStatus.failed,
-                  lastSyncedAt: ok ? new Date() : undefined,
-                  lastError: ok ? null : 'Reach ISAPI enroll failed',
+                  // Keep retryable for tunnel blips — do not burn as permanent failed.
+                  syncStatus: res.ok
+                    ? FaceSyncStatus.synced
+                    : connectivity
+                      ? FaceSyncStatus.pending
+                      : FaceSyncStatus.failed,
+                  lastSyncedAt: res.ok ? new Date() : undefined,
+                  lastError: res.ok
+                    ? null
+                    : (res.error || 'Reach ISAPI enroll failed').slice(0, 400),
                 },
               });
-              return { ok, name };
+              return {
+                ok: Boolean(res.ok),
+                name,
+                connectivity,
+                error: res.error,
+              };
             } catch (e) {
               const msg = e instanceof Error ? e.message : String(e);
+              const connectivity = this.isGwConnectivityError(msg);
               await this.prisma.deviceFaceSync.update({
                 where: { id: fs.id },
                 data: {
-                  syncStatus: FaceSyncStatus.failed,
+                  syncStatus: connectivity
+                    ? FaceSyncStatus.pending
+                    : FaceSyncStatus.failed,
                   lastError: msg.slice(0, 400),
                 },
               });
-              return { ok: false, name };
+              return { ok: false, name, connectivity, error: msg };
             }
           }),
         );
+        const linkDown = results.find((r) => r.connectivity);
         for (const r of results) {
           if (r.ok) synced += 1;
-          else failed += 1;
+          else if (!r.connectivity) failed += 1;
           commandBatch.push({
             type: 'Face Sync',
             employeeName: r.name,
             status: r.ok ? 'completed' : 'failed',
           });
+        }
+        if (linkDown) {
+          const remainingIds = faceSyncs.slice(i + concurrency).map((fs) => fs.id);
+          if (remainingIds.length) {
+            await this.prisma.deviceFaceSync.updateMany({
+              where: { id: { in: remainingIds } },
+              data: {
+                syncStatus: FaceSyncStatus.pending,
+                lastError: 'Paused — tunnel/device unreachable',
+              },
+            });
+          }
+          throw new BadGatewayException(
+            linkDown.error ||
+              'Reach tunnel/terminal unreachable — ofis PC tunnelni tekshiring',
+          );
         }
         const counts = await this.faceSyncCounts(tenantId, id);
         await this.writePersonsSyncProgress(tenantId, id, {
@@ -1850,9 +1894,13 @@ export class AttendanceService {
       meta.personsSync && typeof meta.personsSync === 'object' && !Array.isArray(meta.personsSync)
         ? (meta.personsSync as Record<string, unknown>)
         : {};
+    const nextPatch = { ...patch };
+    if (typeof nextPatch.message === 'string') {
+      nextPatch.message = sanitizeGwErrorText(String(nextPatch.message));
+    }
     meta.personsSync = {
       ...prev,
-      ...patch,
+      ...nextPatch,
       updatedAt: new Date().toISOString(),
     };
     await this.prisma.device.update({
@@ -1892,7 +1940,7 @@ export class AttendanceService {
     const currentNames = Array.isArray(stored.currentNames)
       ? stored.currentNames.filter((n): n is string => typeof n === 'string').slice(0, 5)
       : [];
-    const message =
+    const messageRaw =
       typeof stored.message === 'string' && stored.message
         ? stored.message
         : running
@@ -1904,6 +1952,46 @@ export class AttendanceService {
               : counts.total > 0 && remaining === 0
                 ? 'Синхронизация завершена'
                 : 'Синхронизация не запущена';
+    const message = sanitizeGwErrorText(messageRaw);
+
+    // Live error list so UI can retry only these (not full reload).
+    const failureRows =
+      counts.failed > 0
+        ? await this.prisma.deviceFaceSync.findMany({
+            where: {
+              tenantId,
+              deviceId,
+              syncStatus: FaceSyncStatus.failed,
+            },
+            take: 50,
+            orderBy: { updatedAt: 'desc' },
+            include: {
+              faceProfile: {
+                select: {
+                  employee: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      tabNumber: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : [];
+    const failures = failureRows.map((row) => {
+      const emp = row.faceProfile?.employee;
+      const name = emp
+        ? [emp.lastName, emp.firstName].filter(Boolean).join(' ')
+        : '';
+      return {
+        employeeId: row.employeeId,
+        name: name || emp?.tabNumber || row.employeeId,
+        error: sanitizeGwErrorText(String(row.lastError || 'Ошибка')),
+      };
+    });
 
     return {
       running,
@@ -1911,6 +1999,7 @@ export class AttendanceService {
       phase,
       message,
       currentNames,
+      failures,
       total: counts.total,
       synced: counts.synced,
       pending: counts.pending,
@@ -2306,69 +2395,84 @@ export class AttendanceService {
     return { removed, failed };
   }
 
-  private async runPersonsSyncWaves(tenantId: string, deviceId: string) {
+  private async runPersonsSyncWaves(
+    tenantId: string,
+    deviceId: string,
+    opts: { skipPurge?: boolean; failedOnly?: boolean } = {},
+  ) {
     let totalSynced = 0;
     let totalFailed = 0;
     let purgedRemoved = 0;
     let purgedFailed = 0;
     const startedAt = new Date().toISOString();
     const device = await this.getDevice(tenantId, deviceId);
-    const desiredEmps = await this.employeesForDeviceLocation(tenantId, device);
-    const desiredIds = new Set(
-      desiredEmps.filter((e) => e.faceProfile).map((e) => e.id),
-    );
+    const skipPurge = Boolean(opts.skipPurge || opts.failedOnly);
 
-    await this.writePersonsSyncProgress(tenantId, deviceId, {
-      running: true,
-      phase: 'purging',
-      message: 'Очистка лишних лиц на терминале…',
-      currentNames: [],
-      startedAt,
-      finishedAt: null,
-    });
-    const purged = await this.purgeStaleDeviceFaces(
-      tenantId,
-      deviceId,
-      desiredIds,
-    );
-    purgedRemoved = purged.removed;
-    purgedFailed = purged.failed;
-
-    // Also remove users that exist only on the terminal (manual admin adds, etc.).
-    try {
-      const keepNos = new Set(
-        desiredEmps.map((e) => this.deviceEmployeeNo(e)).filter(Boolean),
+    if (!skipPurge) {
+      const desiredEmps = await this.employeesForDeviceLocation(
+        tenantId,
+        device,
       );
-      const reachUrl = this.deviceReachBaseUrl(device.meta);
-      const plain =
-        (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) ||
-        '';
-      const username = (device.username || 'admin').trim() || 'admin';
-      if (reachUrl && plain) {
-        const orphan = await this.reach.purgeOrphanUsers(
-          reachUrl,
-          username,
-          plain,
-          keepNos,
+      const desiredIds = new Set(
+        desiredEmps.filter((e) => e.faceProfile).map((e) => e.id),
+      );
+
+      await this.writePersonsSyncProgress(tenantId, deviceId, {
+        running: true,
+        phase: 'purging',
+        message: 'Очистка лишних лиц на терминале…',
+        currentNames: [],
+        startedAt,
+        finishedAt: null,
+      });
+      const purged = await this.purgeStaleDeviceFaces(
+        tenantId,
+        deviceId,
+        desiredIds,
+      );
+      purgedRemoved = purged.removed;
+      purgedFailed = purged.failed;
+
+      // Also remove users that exist only on the terminal (manual admin adds, etc.).
+      try {
+        const keepNos = new Set(
+          desiredEmps.map((e) => this.deviceEmployeeNo(e)).filter(Boolean),
         );
-        purgedRemoved += orphan.removed;
-        purgedFailed += orphan.failed;
+        const reachUrl = this.deviceReachBaseUrl(device.meta);
+        const plain =
+          (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) ||
+          '';
+        const username = (device.username || 'admin').trim() || 'admin';
+        if (reachUrl && plain) {
+          const orphan = await this.reach.purgeOrphanUsers(
+            reachUrl,
+            username,
+            plain,
+            keepNos,
+          );
+          purgedRemoved += orphan.removed;
+          purgedFailed += orphan.failed;
+        }
+      } catch (e) {
+        this.logger.warn(
+          `terminal orphan purge skipped device=${deviceId}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
       }
-    } catch (e) {
-      this.logger.warn(
-        `terminal orphan purge skipped device=${deviceId}: ${
-          e instanceof Error ? e.message : e
-        }`,
-      );
     }
 
     const initial = await this.faceSyncCounts(tenantId, deviceId);
     await this.writePersonsSyncProgress(tenantId, deviceId, {
       running: true,
       phase: 'uploading',
-      message: `Очистка: −${purgedRemoved}${
-        purgedFailed ? ` (ошибок ${purgedFailed})` : ''
-      }. Загрузка лиц… 0 из ${initial.total}`,
+      message: opts.failedOnly
+        ? `Повтор ошибок… 0 из ${initial.pending + initial.syncing}`
+        : skipPurge
+          ? `Загрузка лиц… 0 из ${initial.total}`
+          : `Очистка: −${purgedRemoved}${
+              purgedFailed ? ` (ошибок ${purgedFailed})` : ''
+            }. Загрузка лиц… 0 из ${initial.total}`,
       currentNames: [],
       startedAt,
       finishedAt: null,
@@ -2380,6 +2484,7 @@ export class AttendanceService {
       percent: initial.percent,
       purged: purgedRemoved,
       purgeFailed: purgedFailed,
+      failedOnly: Boolean(opts.failedOnly),
     });
     try {
       // More waves for large location queues (batch size in syncDevice is 500).
@@ -2397,10 +2502,12 @@ export class AttendanceService {
         running: false,
         phase: remaining > 0 ? 'queued' : totalFailed && !totalSynced ? 'failed' : 'completed',
         message: remaining > 0
-          ? `Очередь ещё есть: ${remaining}. Нажмите «Синхронизировать» снова. Очищено: −${purgedRemoved}.`
+          ? `Очередь ещё есть: ${remaining}. Нажмите «Повторить ошибки» или «Синхронизировать».`
           : totalFailed
-            ? `Готово: ${finalCounts.synced} ок, ${finalCounts.failed} с ошибкой; очищено −${purgedRemoved}`
-            : `Готово: ${finalCounts.synced} из ${finalCounts.total}; очищено −${purgedRemoved}`,
+            ? `Готово: ${finalCounts.synced} ок, ${finalCounts.failed} с ошибкой — нажмите «Повторить ошибки» (только они, не все).`
+            : `Готово: ${finalCounts.synced} из ${finalCounts.total}${
+                purgedRemoved ? `; очищено −${purgedRemoved}` : ''
+              }`,
         currentNames: [],
         finishedAt: new Date().toISOString(),
         total: finalCounts.total,
@@ -2418,7 +2525,11 @@ export class AttendanceService {
         status: totalFailed && !totalSynced ? 'failed' : 'completed',
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const raw = e instanceof Error ? e.message : String(e);
+      const msg = sanitizeGwErrorText(raw, {
+        fallback:
+          'Ofis tunnel uzildi. Tunnelni ochiq qoldiring va «Синхронизировать» ni qayta bosing.',
+      });
       await this.writePersonsSyncProgress(tenantId, deviceId, {
         running: false,
         phase: 'failed',
@@ -2434,7 +2545,12 @@ export class AttendanceService {
   async syncDevicePersons(
     tenantId: string,
     deviceId: string,
-    opts: { force?: boolean } = {},
+    opts: {
+      force?: boolean;
+      failedOnly?: boolean;
+      skipPurge?: boolean;
+      employeeIds?: string[];
+    } = {},
   ) {
     const alreadyRunning = this.personsSyncInFlight.has(deviceId);
     // Claim lock synchronously before any await so parallel requests cannot both start waves.
@@ -2447,8 +2563,18 @@ export class AttendanceService {
       if (!device.locationId) {
         throw new BadRequestException('Сначала назначьте локацию устройству');
       }
+      const failedOnly = Boolean(opts.failedOnly) && !opts.force;
+      const onlyEmpIds = new Set(
+        (opts.employeeIds || [])
+          .map((x) => String(x || '').trim())
+          .filter(Boolean),
+      );
       const employees = await this.employeesForDeviceLocation(tenantId, device);
-      const withFace = employees.filter((emp) => emp.faceProfile);
+      const withFace = employees.filter((emp) => {
+        if (!emp.faceProfile) return false;
+        if (onlyEmpIds.size && !onlyEmpIds.has(emp.id)) return false;
+        return true;
+      });
       const faceIds = withFace.map((e) => e.faceProfile!.id).filter(Boolean);
 
       const existing = faceIds.length
@@ -2466,28 +2592,60 @@ export class AttendanceService {
 
       const toCreate: Prisma.DeviceFaceSyncCreateManyInput[] = [];
       const toRequeueIds: string[] = [];
-      for (const emp of withFace) {
-        const profile = emp.faceProfile!;
-        const row = existingByFace.get(profile.id);
-        if (!row) {
-          toCreate.push({
-            tenantId,
-            deviceId,
-            faceProfileId: profile.id,
-            employeeId: emp.id,
-            syncStatus: FaceSyncStatus.pending,
-          });
-        } else {
-          const photoNewer =
-            row.lastSyncedAt != null &&
-            profile.updatedAt != null &&
-            profile.updatedAt.getTime() > row.lastSyncedAt.getTime();
-          if (
-            opts.force ||
-            row.syncStatus !== FaceSyncStatus.synced ||
-            photoNewer
-          ) {
+
+      if (failedOnly) {
+        // Only re-queue failed rows — synced faces stay untouched.
+        for (const emp of withFace) {
+          const profile = emp.faceProfile!;
+          const row = existingByFace.get(profile.id);
+          if (row && row.syncStatus === FaceSyncStatus.failed) {
             toRequeueIds.push(row.id);
+          }
+        }
+        if (!toRequeueIds.length) {
+          if (!alreadyRunning) {
+            this.personsSyncInFlight.delete(deviceId);
+          }
+          const counts = await this.faceSyncCounts(tenantId, deviceId);
+          return {
+            ok: true,
+            queued: false,
+            alreadyRunning,
+            created: 0,
+            requeued: 0,
+            requeuedFailed: 0,
+            withPhoto: withFace.length,
+            force: false,
+            failedOnly: true,
+            locationId: device.locationId,
+            message: 'Нет ошибок для повтора',
+            ...counts,
+          };
+        }
+      } else {
+        for (const emp of withFace) {
+          const profile = emp.faceProfile!;
+          const row = existingByFace.get(profile.id);
+          if (!row) {
+            toCreate.push({
+              tenantId,
+              deviceId,
+              faceProfileId: profile.id,
+              employeeId: emp.id,
+              syncStatus: FaceSyncStatus.pending,
+            });
+          } else {
+            const photoNewer =
+              row.lastSyncedAt != null &&
+              profile.updatedAt != null &&
+              profile.updatedAt.getTime() > row.lastSyncedAt.getTime();
+            if (
+              opts.force ||
+              row.syncStatus !== FaceSyncStatus.synced ||
+              photoNewer
+            ) {
+              toRequeueIds.push(row.id);
+            }
           }
         }
       }
@@ -2511,13 +2669,16 @@ export class AttendanceService {
       const pushMode = this.isHikPushMode(device.meta);
       // Faces: upload current location set + purge orphans (via PC GW).
       // Punches may still use HttpHost without the Link app.
+      const skipPurge = Boolean(opts.skipPurge || failedOnly);
 
       await this.writePersonsSyncProgress(tenantId, deviceId, {
         running: true,
         phase: alreadyRunning ? 'uploading' : 'queuing',
         message: alreadyRunning
           ? `Синхронизация уже идёт… ${counts.done} из ${counts.total}`
-          : `Очередь: +${created}, обновление ${requeued} (всего ${counts.total}). Serverdan ofis agentiga…`,
+          : failedOnly
+            ? `Повтор только ошибок: ${requeued} в очереди (успешные не трогаем).`
+            : `Очередь: +${created}, обновление ${requeued} (всего ${counts.total}). Serverdan ofis agentiga…`,
         currentNames: [],
         ...(alreadyRunning ? {} : { startedAt: new Date().toISOString() }),
         finishedAt: null,
@@ -2527,12 +2688,13 @@ export class AttendanceService {
         syncing: counts.syncing,
         failed: counts.failed,
         percent: counts.percent,
+        failedOnly,
       });
 
       await this.appendCommand(tenantId, deviceId, {
-        type: 'Person Sync',
+        type: failedOnly ? 'Person Sync Retry' : 'Person Sync',
         employeeName: `queued +${created}/requeue ${requeued}${
-          opts.force ? ' force' : ''
+          opts.force ? ' force' : failedOnly ? ' failedOnly' : ''
         }${pushMode ? ' (hikPush punches)' : ''} (loc employees ${withFace.length})`,
         status: 'completed',
       });
@@ -2541,7 +2703,10 @@ export class AttendanceService {
         const reachUrl = this.deviceReachBaseUrl(device.meta);
         const gwHealth = await this.gw.health();
         if (reachUrl || gwHealth.ok) {
-          const run = this.runPersonsSyncWaves(tenantId, deviceId)
+          const run = this.runPersonsSyncWaves(tenantId, deviceId, {
+            skipPurge,
+            failedOnly,
+          })
             .catch((e) => {
               this.logger.warn(
                 `Persons sync waves failed device=${deviceId}: ${
@@ -2583,6 +2748,7 @@ export class AttendanceService {
         requeued,
         withPhoto: withFace.length,
         force: Boolean(opts.force),
+        failedOnly,
         locationId: device.locationId,
       };
     } catch (e) {
@@ -2593,47 +2759,29 @@ export class AttendanceService {
     }
   }
 
-  /** Re-queue failed face sync rows (all or selected employees) and kick sync. */
+  /** Re-queue failed face sync rows only (synced stay) and kick sync without full purge. */
   async retryFailedFaceSyncs(
     tenantId: string,
     deviceId: string,
     opts: { employeeIds?: string[] } = {},
   ) {
-    await this.getDevice(tenantId, deviceId);
     const employeeIds = (opts.employeeIds || [])
       .map((x) => String(x || '').trim())
       .filter(Boolean);
-    const where: Prisma.DeviceFaceSyncWhereInput = {
-      tenantId,
-      deviceId,
-      syncStatus: FaceSyncStatus.failed,
-      ...(employeeIds.length ? { employeeId: { in: employeeIds } } : {}),
-    };
-    const updated = await this.prisma.deviceFaceSync.updateMany({
-      where,
-      data: { syncStatus: FaceSyncStatus.pending, lastError: null },
+    // failedOnly path itself moves failed→pending; do not pre-update or it finds 0.
+    const kicked = await this.syncDevicePersons(tenantId, deviceId, {
+      failedOnly: true,
+      skipPurge: true,
+      employeeIds,
     });
-    if (!updated.count) {
-      return {
-        ok: true,
-        requeued: 0,
-        queued: false,
-        message: 'Нет ошибок для повтора',
-      };
-    }
-    await this.appendCommand(tenantId, deviceId, {
-      type: 'Person Sync Retry',
-      employeeName: employeeIds.length
-        ? `retry failed ${updated.count} (selected ${employeeIds.length})`
-        : `retry failed ${updated.count}`,
-      status: 'completed',
-    });
-    // Kick the same queue/wave path (failed are now pending).
-    const kicked = await this.syncDevicePersons(tenantId, deviceId);
+    const n = Number(kicked.requeued || 0);
     return {
       ...kicked,
-      requeuedFailed: updated.count,
-      message: `Повтор: ${updated.count} в очереди`,
+      requeuedFailed: n,
+      message:
+        n > 0
+          ? `Повтор только ошибок: ${n} в очереди`
+          : 'Нет ошибок для повтора',
     };
   }
 

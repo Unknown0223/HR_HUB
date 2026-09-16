@@ -323,14 +323,41 @@ export class AttendanceController {
   @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Post('devices/:id/sync')
+  @ApiQuery({
+    name: 'force',
+    required: false,
+    description: 'Re-queue even already synced faces (full reload)',
+  })
+  @ApiBody({
+    required: false,
+    schema: {
+      type: 'object',
+      properties: {
+        force: {
+          type: 'boolean',
+          description: 'Full reload — all faces again',
+        },
+        failedOnly: {
+          type: 'boolean',
+          description: 'Re-queue only failed faces (skip synced)',
+        },
+      },
+    },
+  })
   async syncDevice(
     @CurrentTenant() tenantId: string | null,
     @Param('id') id: string,
+    @Query('force') forceQ?: string,
+    @Body() body?: { force?: boolean; failedOnly?: boolean },
   ) {
     const tid = this.attendance.requireTenant(tenantId);
-    // Queue like persons/sync so the Web confirm modal is not blocked for minutes.
+    const force =
+      body?.force === true || forceQ === '1' || forceQ === 'true';
+    const failedOnly = body?.failedOnly === true && !force;
+    // Default: incremental (new/pending/failed/photo-newer only). force=true = full reload.
     const queued = await this.attendance.syncDevicePersons(tid, id, {
-      force: true,
+      force,
+      failedOnly,
     });
     return { ok: true, queued: true, persons: queued };
   }

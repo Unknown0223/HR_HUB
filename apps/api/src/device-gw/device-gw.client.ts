@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { safeJsonForLog } from '../common/redact';
+import { safeJsonForLog, sanitizeGwErrorText } from '../common/redact';
 
 export type GwDeviceRegister = {
   id?: string;
@@ -78,6 +78,8 @@ export class DeviceGwClient implements OnModuleInit {
   private cachedDbUrlAt = 0;
   private readonly dbUrlTtlMs = 5_000;
   private readonly fetchTimeoutMs = 8_000;
+  /** Face JPEG over trycloudflare often needs >8s; abort looked like Cloudflare 502 HTML. */
+  private readonly syncFaceTimeoutMs = 90_000;
   private readonly fetchRetries = 1;
 
   constructor(
@@ -91,25 +93,43 @@ export class DeviceGwClient implements OnModuleInit {
     ).replace(/\/$/, '');
   }
 
-  private async resolveBaseUrl(): Promise<string> {
-    if (this.announcedUrl) return this.announcedUrl;
+  /** Prefer live office-link announce, then env DEVICE_GW_URL (skip dead trycloudflare hosts). */
+  private async candidateBaseUrls(): Promise<string[]> {
+    const out: string[] = [];
+    const add = (u: string | null | undefined) => {
+      const clean = (u || '').trim().replace(/\/$/, '');
+      if (!clean || !/^https?:\/\//i.test(clean)) return;
+      if (!out.includes(clean)) out.push(clean);
+    };
+    add(this.announcedUrl);
     const now = Date.now();
     if (this.cachedDbUrl && now - this.cachedDbUrlAt < this.dbUrlTtlMs) {
-      return this.cachedDbUrl;
-    }
-    try {
-      const fromDb = await this.loadAnnouncedUrlFromDb();
-      if (fromDb) {
+      add(this.cachedDbUrl);
+    } else {
+      try {
+        const fromDb = await this.loadAnnouncedUrlFromDb();
         this.cachedDbUrl = fromDb;
         this.cachedDbUrlAt = now;
-        return fromDb;
+        add(fromDb);
+      } catch (e) {
+        this.logger.warn(`Device GW URL DB refresh failed: ${e}`);
+        this.cachedDbUrl = null;
+        this.cachedDbUrlAt = now;
       }
-    } catch (e) {
-      this.logger.warn(`Device GW URL DB refresh failed: ${e}`);
     }
+    add(this.envBaseUrl());
+    return out;
+  }
+
+  private async resolveBaseUrl(): Promise<string> {
+    const urls = await this.candidateBaseUrls();
+    return urls[0] || this.envBaseUrl();
+  }
+
+  private clearAnnouncedCache() {
+    this.announcedUrl = null;
     this.cachedDbUrl = null;
-    this.cachedDbUrlAt = now;
-    return this.envBaseUrl();
+    this.cachedDbUrlAt = 0;
   }
 
   private async loadAnnouncedUrlFromDb(): Promise<string | null> {
@@ -132,29 +152,41 @@ export class DeviceGwClient implements OnModuleInit {
     return null;
   }
 
-  private async gwFetch(path: string, init?: RequestInit): Promise<Response> {
+  private async gwFetch(
+    path: string,
+    init?: RequestInit,
+    opts?: { timeoutMs?: number; retries?: number },
+  ): Promise<Response> {
+    const timeoutMs = opts?.timeoutMs ?? this.fetchTimeoutMs;
+    const retries = opts?.retries ?? this.fetchRetries;
+    const bases = await this.candidateBaseUrls();
     let lastErr: unknown;
-    for (let attempt = 0; attempt <= this.fetchRetries; attempt++) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), this.fetchTimeoutMs);
-      try {
-        const base = await this.resolveBaseUrl();
-        return await fetch(`${base}${path}`, {
-          ...init,
-          signal: ctrl.signal,
-        });
-      } catch (e) {
-        lastErr = e;
-        // Drop stale memory/DB cache once so next attempt re-reads announce.
-        this.cachedDbUrlAt = 0;
-        if (attempt < this.fetchRetries) {
-          await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
-          continue;
+    for (const base of bases) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          const res = await fetch(`${base}${path}`, {
+            ...init,
+            signal: ctrl.signal,
+          });
+          // Promote working URL so subsequent face sync / register stay on it.
+          this.announcedUrl = base;
+          this.cachedDbUrl = base;
+          this.cachedDbUrlAt = Date.now();
+          return res;
+        } catch (e) {
+          lastErr = e;
+          if (attempt < retries) {
+            await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+            continue;
+          }
+        } finally {
+          clearTimeout(timer);
         }
-      } finally {
-        clearTimeout(timer);
       }
     }
+    this.clearAnnouncedCache();
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   }
 
@@ -282,20 +314,58 @@ export class DeviceGwClient implements OnModuleInit {
   }
 
   async syncFace(gatewayRef: string, body: GwSyncFace) {
-    const res = await this.gwFetch(`/devices/${gatewayRef}/sync-face`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`GW sync-face ${res.status}: ${text}`);
+    const maxAttempts = 3;
+    let lastErr: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await this.gwFetch(
+          `/devices/${gatewayRef}/sync-face`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+          { timeoutMs: this.syncFaceTimeoutMs, retries: 1 },
+        );
+        if (!res.ok) {
+          const text = await res.text();
+          const clean = sanitizeGwErrorText(text, { status: res.status });
+          const err = new Error(`GW sync-face ${res.status}: ${clean}`);
+          // Transient tunnel / proxy blips — retry a couple of times.
+          if (
+            (res.status === 502 || res.status === 503 || res.status === 504) &&
+            attempt < maxAttempts
+          ) {
+            lastErr = err;
+            await new Promise((r) => setTimeout(r, 800 * attempt));
+            continue;
+          }
+          throw err;
+        }
+        return (await res.json()) as {
+          synced: boolean;
+          face_enrolled: boolean;
+          adapter: string;
+        };
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        lastErr = err;
+        const msg = err.message.toLowerCase();
+        const retryable =
+          msg.includes('abort') ||
+          msg.includes('timeout') ||
+          msg.includes('fetch failed') ||
+          msg.includes('502') ||
+          msg.includes('503') ||
+          msg.includes('504');
+        if (retryable && attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        throw err;
+      }
     }
-    return (await res.json()) as {
-      synced: boolean;
-      face_enrolled: boolean;
-      adapter: string;
-    };
+    throw lastErr ?? new Error('GW sync-face failed');
   }
 
   async deleteUser(gatewayRef: string, employeeExternalId: string) {
@@ -306,7 +376,11 @@ export class DeviceGwClient implements OnModuleInit {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`GW delete-user ${res.status}: ${text}`);
+      throw new Error(
+        `GW delete-user ${res.status}: ${sanitizeGwErrorText(text, {
+          status: res.status,
+        })}`,
+      );
     }
     return (await res.json()) as {
       deleted: boolean;
@@ -314,8 +388,8 @@ export class DeviceGwClient implements OnModuleInit {
     };
   }
 
-    async health() {
-        try {
+  async health() {
+    try {
       const res = await this.gwFetch(`/health`);
       if (!res.ok) return { ok: false };
       return { ok: true, ...(await res.json()) };

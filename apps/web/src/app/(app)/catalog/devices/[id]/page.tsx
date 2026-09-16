@@ -75,6 +75,7 @@ type SyncProgress = {
   phase?: string;
   message?: string;
   currentNames?: string[];
+  failures?: Array<{ employeeId: string; name: string; error: string }>;
   total?: number;
   synced?: number;
   pending?: number;
@@ -167,9 +168,25 @@ function personSyncLabel(p: Person) {
 }
 
 function personSyncTitle(p: Person) {
-  const err = (p.lastError || '').trim();
+  const err = sanitizeSyncMessage((p.lastError || '').trim());
   if (p.syncStatus === 'failed' && err) return err;
   return personSyncLabel(p);
+}
+
+function sanitizeSyncMessage(raw: string) {
+  const msg = (raw || '').trim();
+  if (!msg) return '';
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes('<!doctype') ||
+    lower.includes('<html') ||
+    lower.includes('cloudflare') ||
+    lower.includes('error code 502') ||
+    (lower.includes('<title>') && lower.includes('<'))
+  ) {
+    return 'Ofis tunnel uzildi (502). Tunnelni ochiq qoldiring va «Синхронизировать» ni qayta bosing.';
+  }
+  return msg.length > 280 ? `${msg.slice(0, 280)}…` : msg;
 }
 
 function empName(m: Mark) {
@@ -597,15 +614,31 @@ function DeviceDetailInner() {
     }
   }
 
-  async function doSync() {
+  async function doSync(opts: { force?: boolean; failedOnly?: boolean } = {}) {
     setSyncOpen(false);
     setBusy(true);
     setError('');
-    setSyncNotice('Очередь лиц готовится…');
+    setSyncNotice(
+      opts.failedOnly
+        ? 'Повтор только ошибок…'
+        : opts.force
+          ? 'Полная перезагрузка лиц…'
+          : 'Очередь лиц готовится…',
+    );
     try {
-      await apiFetch(`/api/attendance/devices/${id}/sync`, { method: 'POST' });
+      await apiFetch(`/api/attendance/devices/${id}/sync`, {
+        method: 'POST',
+        body: JSON.stringify({
+          force: Boolean(opts.force),
+          failedOnly: Boolean(opts.failedOnly),
+        }),
+      });
       setSyncNotice(
-        'Синхронизация server→terminal (ofis PC fon tunnel). Link ilovasi kerak emas.',
+        opts.failedOnly
+          ? 'Повтор только ошибок запущен (успешные лица не трогаем).'
+          : opts.force
+            ? 'Полная синхронизация: все лица снова в очереди.'
+            : 'Синхронизация: только новые / изменённые / с ошибкой.',
       );
       await loadDevice();
       await loadSyncProgress();
@@ -796,7 +829,9 @@ function DeviceDetailInner() {
                 {syncActive ? <span className={styles.syncPulse} aria-hidden /> : null}
               </div>
               <div className={styles.syncPanelMsg}>
-                {syncProgress.message || syncNotice || 'Обновление данных на терминале…'}
+                {sanitizeSyncMessage(
+                  syncProgress.message || syncNotice || 'Обновление данных на терминале…',
+                )}
               </div>
             </div>
             <div className={styles.syncPanelPct}>{syncPct}%</div>
@@ -825,12 +860,39 @@ function DeviceDetailInner() {
             <div className={styles.syncRetryRow}>
               <button
                 type="button"
-                className={styles.btnSecondary}
+                className={styles.btnRetry}
                 disabled={busy}
                 onClick={() => void retryFailedPersons()}
               >
-                Повторить ошибки ({syncProgress.failed})
+                Повторить только ошибки ({syncProgress.failed})
               </button>
+            </div>
+          ) : null}
+          {(syncProgress.failures || []).length > 0 && !syncActive ? (
+            <div className={styles.syncFailList}>
+              <div className={styles.syncFailListTitle}>
+                Ошибки ({syncProgress.failures!.length}
+                {(syncProgress.failed || 0) > syncProgress.failures!.length
+                  ? ` из ${syncProgress.failed}`
+                  : ''}
+                ) — при повторе загрузятся только они:
+              </div>
+              <ul className={styles.syncFailUl}>
+                {syncProgress.failures!.slice(0, 12).map((f) => (
+                  <li key={f.employeeId}>
+                    <button
+                      type="button"
+                      className={styles.syncFailItemBtn}
+                      disabled={busy}
+                      onClick={() => void retryFailedPersons([f.employeeId])}
+                      title="Повторить только этого сотрудника"
+                    >
+                      <span className={styles.syncFailName}>{f.name}</span>
+                      <span className={styles.syncFailErr}>{f.error}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
           {syncProgress.currentNames && syncProgress.currentNames.length > 0 ? (
@@ -1173,7 +1235,7 @@ function DeviceDetailInner() {
                       disabled={busy}
                       onClick={() => void retryFailedPersons()}
                     >
-                      Повторить ошибки
+                      Повторить только ошибки
                     </button>
                   ) : null}
                 </div>
@@ -1588,25 +1650,88 @@ function DeviceDetailInner() {
         <ModalPortal>
           <div className={styles.confirmBackdrop}>
             <div className={styles.confirmBox}>
-              <p>Синхронизировать устройство?</p>
-              <div className={styles.confirmActions}>
-                <button
-                  type="button"
-                  className={styles.btnGhost}
-                  disabled={busy}
-                  onClick={() => setSyncOpen(false)}
-                >
-                  Нет
-                </button>
-                <button
-                  type="button"
-                  className={styles.btnPrimary}
-                  disabled={busy}
-                  onClick={() => void doSync()}
-                >
-                  {busy ? '…' : 'Да'}
-                </button>
-              </div>
+              {(syncProgress?.failed || 0) > 0 ? (
+                <>
+                  <p>
+                    Есть <strong>{syncProgress?.failed}</strong> ошибок. Что
+                    загрузить?
+                  </p>
+                  <p className={styles.confirmHint}>
+                    Успешно синхронизированные лица повторно не отправляются —
+                    это быстрее.
+                  </p>
+                  <div className={styles.confirmActionsCol}>
+                    <button
+                      type="button"
+                      className={styles.btnRetry}
+                      disabled={busy}
+                      onClick={() => void doSync({ failedOnly: true })}
+                    >
+                      {busy
+                        ? '…'
+                        : `Только ошибки (${syncProgress?.failed})`}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnSecondary}
+                      disabled={busy}
+                      onClick={() => void doSync({})}
+                    >
+                      Новые и изменённые
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      disabled={busy}
+                      onClick={() => void doSync({ force: true })}
+                    >
+                      Все заново (медленно)
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      disabled={busy}
+                      onClick={() => setSyncOpen(false)}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>Синхронизировать устройство?</p>
+                  <p className={styles.confirmHint}>
+                    По умолчанию — только новые / изменённые / с ошибкой. Уже
+                    загруженные лица не трогаем.
+                  </p>
+                  <div className={styles.confirmActions}>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      disabled={busy}
+                      onClick={() => setSyncOpen(false)}
+                    >
+                      Нет
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnGhost}
+                      disabled={busy}
+                      onClick={() => void doSync({ force: true })}
+                    >
+                      Все заново
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnPrimary}
+                      disabled={busy}
+                      onClick={() => void doSync({})}
+                    >
+                      {busy ? '…' : 'Да'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </ModalPortal>

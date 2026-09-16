@@ -589,6 +589,8 @@
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btnRetry {
@@ -611,6 +613,78 @@
 .btnRetry:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.syncFailList {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #fecdd3;
+}
+
+.syncFailListTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9f1239;
+  margin-bottom: 8px;
+}
+
+.syncFailUl {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.syncFailItemBtn {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #fecdd3;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.syncFailItemBtn:hover:not(:disabled) {
+  background: #fff1f2;
+}
+
+.syncFailItemBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.syncFailName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #881337;
+}
+
+.syncFailErr {
+  font-size: 11px;
+  color: #9f1239;
+  word-break: break-word;
+}
+
+.confirmHint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.confirmActionsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .linkBtn {
