@@ -24,6 +24,7 @@ from paths import (  # noqa: E402
     read_tunnel_url,
     resolve_named_tunnel_url,
     resolve_tunnel_token,
+    tunnel_cooldown_remaining,
 )
 from runtime_setup import ServiceBundle, ensure_runtime  # noqa: E402
 from tunnel_watch import (  # noqa: E402
@@ -49,7 +50,16 @@ def _face_tick(root: Path) -> dict:
 
 
 def run_forever(poll_sec: float = 8.0) -> int:
+    # Prefer the live AppData install when developing from the repo tree,
+    # otherwise GUI and worker write different service_status.json files.
+    from paths import user_data_root
+
     root = find_root()
+    user_root = user_data_root()
+    if (user_root / "data" / "link.key").is_file() or (
+        user_root / "data" / "device-credential.json"
+    ).is_file():
+        root = user_root
     cfg = load_config(root)
     svc = load_service_config(root)
     if svc and svc.get("enabled") is False:
@@ -108,39 +118,58 @@ def run_forever(poll_sec: float = 8.0) -> int:
         bundle, tun = restore_tunnel(root=root, bundle=bundle, keep_bundle=True)
         return tun
 
-    try:
-        url = restart()
-        tunnel_ok = bool(url)
-    except Exception as exc:
-        # Face agent still works on LAN without Cloudflare.
-        tunnel_ok = False
+    # Do not poke Cloudflare at all while rate-limited.
+    cool0 = tunnel_cooldown_remaining(root)
+    if cool0 > 0:
+        mins = max(1, (cool0 + 59) // 60)
         write_status(
             root,
             {
                 "ok": True,
                 "state": "face_agent",
-                "message": f"Tunnel yo‘q — faqat face agent: {exc}"[:240],
+                "tunnelMode": "off",
+                "message": (
+                    f"Tunnel kutilyapti (Cloudflare limithi ~{mins} daqiqa). "
+                    "Avtomatik urinish o‘chirilgan — faqat LAN."
+                ),
                 "faceAgent": True,
-                "autoHeal": True,
+                "autoHeal": False,
             },
         )
-        traceback.print_exc()
+    else:
+        try:
+            url = restart()
+            tunnel_ok = bool(url)
+        except Exception as exc:
+            # Face agent still works on LAN without Cloudflare.
+            tunnel_ok = False
+            write_status(
+                root,
+                {
+                    "ok": True,
+                    "state": "face_agent",
+                    "message": f"Tunnel yo‘q — faqat face agent: {exc}"[:240],
+                    "faceAgent": True,
+                    "autoHeal": False,
+                },
+            )
+            traceback.print_exc()
 
-    if tunnel_ok:
-        write_status(
-            root,
-            {
-                "ok": True,
-                "state": "running",
-                "tunnelMode": mode,
-                "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
-                "apiUrl": api_url,
-                "tenantCode": tenant,
-                "message": "Face agent + GW/tunnel",
-                "faceAgent": True,
-                "autoHeal": True,
-            },
-        )
+        if tunnel_ok:
+            write_status(
+                root,
+                {
+                    "ok": True,
+                    "state": "running",
+                    "tunnelMode": mode,
+                    "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
+                    "apiUrl": api_url,
+                    "tenantCode": tenant,
+                    "message": "Face agent + GW/tunnel",
+                    "faceAgent": True,
+                    "autoHeal": False,
+                },
+            )
 
     announce_every = 45.0
     health_every = 20.0
@@ -168,13 +197,37 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     "faceAgent": True,
                     "faceLast": fr,
                     "message": fr.get("message") or "face agent tick",
-                    "autoHeal": True,
+                    "autoHeal": False,
                 },
             )
 
+        # Never spam Cloudflare while rate-limited — face agent keeps working on LAN.
+        cool_left = tunnel_cooldown_remaining(root)
+        if cool_left > 0:
+            mins = max(1, (cool_left + 59) // 60)
+            write_status(
+                root,
+                {
+                    "ok": True,
+                    "state": "face_agent",
+                    "tunnelMode": "off",
+                    "tunnelUrl": "",
+                    "apiUrl": api_url,
+                    "tenantCode": tenant,
+                    "faceAgent": True,
+                    "autoHeal": False,
+                    "message": (
+                        f"Tunnel kutilyapti (Cloudflare limithi ~{mins} daqiqa). "
+                        "Faqat LAN face sync — avtomatik qayta urinish o‘chirilgan."
+                    ),
+                },
+            )
+            time.sleep(min(60, max(5, cool_left)))
+            continue
+
         if not tunnel_ok:
-            # Periodically retry bringing tunnel up (optional).
-            if fail_streak < 3 and now - last_health >= 120:
+            # Rare manual-style retry only after cooldown, at most 2 times / 5 min.
+            if fail_streak < 2 and now - last_health >= 300:
                 last_health = now
                 try:
                     url = restart()
@@ -222,10 +275,10 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     "state": "face_agent",
                     "message": f"tunnel restart fail — face agent: {exc}"[:240],
                     "faceAgent": True,
-                    "autoHeal": True,
+                    "autoHeal": False,
                 },
             )
-            time.sleep(min(60, 10 + fail_streak * 5))
+            time.sleep(min(120, 30 + fail_streak * 15))
 
 
 if __name__ == "__main__":

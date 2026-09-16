@@ -13,7 +13,7 @@ from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
 from paths import find_root, read_link_key, read_pairing_token
 from session import RECONNECT_STEPS, OfficeLinkSession, SubmitResult
 
-TITLE = "HR HUB — подключение терминала"
+TITLE = "HR HUB Link — sozlash asbobi"
 
 _RECONNECT_STEP_LABELS = {
     "web": "Веб",
@@ -392,19 +392,16 @@ class OfficeLinkApp:
         self.notebook = nb
         nb.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
+        # Product model: setup tool with exactly two jobs (same on Windows + mobile).
+        # 1) Bind device 0→server  2) Restore tunnel / reconnect after network change.
+        # After bind, GUI is not required — faces/punches go device↔server (fon worker).
         tab_connect = ttk.Frame(nb, style="App.TFrame")
-        tab_reconnect = ttk.Frame(nb, style="App.TFrame")
-        tab_tunnel = ttk.Frame(nb, style="App.TFrame")
-        tab_device = ttk.Frame(nb, style="App.TFrame")
-        nb.add(tab_connect, text="Новое подключение")
-        nb.add(tab_reconnect, text="Восстановление сети")
-        nb.add(tab_tunnel, text="Туннель")
-        nb.add(tab_device, text="Устройство")
+        tab_restore = ttk.Frame(nb, style="App.TFrame")
+        nb.add(tab_connect, text="1. Подключение")
+        nb.add(tab_restore, text="2. Восстановление")
 
         self._build_connect_tab(tab_connect)
-        self._build_reconnect_tab(tab_reconnect)
-        self._build_tunnel_tab(tab_tunnel)
-        self._build_device_tab(tab_device)
+        self._build_restore_tab(tab_restore)
 
         if not self.session.has_credentials():
             self._show_alert(
@@ -534,12 +531,11 @@ class OfficeLinkApp:
         self.note = ttk.Label(
             hint,
             text=(
-                "В Web → «Связь с офисом» скопируйте pairing-токен. "
-                "Здесь Ctrl+V / Shift+Insert или «Вставить», затем «Сохранить». "
-                "Первое подключение: «Подключить» — установит новый пароль. "
-                "Если сменились Wi‑Fi / IP: вкладка «Восстановление сети». "
-                "Если туннель упал: вкладка «Туннель» — автовосстановление "
-                "или «Восстановить туннель»."
+                "Это установочный инструмент (как «мастер»): только привязка и восстановление. "
+                "1) Web → «Связь с офисом» → pairing-токен → «Подключить». "
+                "2) После подтверждения в Web — закройте это окно. "
+                "Лица и отметки идут устройство↔сервер без этой программы. "
+                "Если Wi‑Fi/IP или туннель упали — вкладка «2. Восстановление»."
             ),
             style="Hint.TLabel",
             wraplength=520,
@@ -547,14 +543,15 @@ class OfficeLinkApp:
         )
         self.note.pack(anchor="w", padx=14, pady=12, fill=tk.X)
 
-    def _build_reconnect_tab(self, parent: ttk.Frame) -> None:
+    def _build_restore_tab(self, parent: ttk.Frame) -> None:
+        """Two jobs in one place: network reconnect + tunnel restore (+ device status)."""
         frm = self._scrollable(parent)
-        body = self._card(frm, "Восстановление сети")
+        body = self._card(frm, "A) Сеть / IP терминала")
         ttk.Label(
             body,
             text=(
-                "Используются токен, IP и пароль с вкладки «Новое подключение». "
-                "Пароль администратора не меняется — обновляется только сетевая привязка."
+                "Токен, IP и пароль — с вкладки «1. Подключение». "
+                "Пароль администратора не меняется — только сетевая привязка."
             ),
             style="Muted.TLabel",
             wraplength=520,
@@ -611,26 +608,21 @@ class OfficeLinkApp:
         )
         self.reconnect_btn.pack(side=tk.LEFT)
 
-        hint_wrap = ttk.Frame(frm, style="App.TFrame")
-        hint_wrap.pack(fill=tk.X, padx=16, pady=(0, 16))
-        hint_outer = tk.Frame(hint_wrap, bg=C["accent"], bd=0)
-        hint_outer.pack(fill=tk.X)
-        hint = tk.Frame(hint_outer, bg=C["accent_soft"], bd=0)
-        hint.pack(fill=tk.X, padx=(3, 0))
         ttk.Label(
-            hint,
+            frm,
             text=(
-                "Шаги: Веб → Сканер → Сопоставление → Пароль → Связь. "
-                "При смене IP сервер обновит адрес; лица и пароль сохраняются."
+                "Шаги сети: Веб → Сканер → Сопоставление → Пароль → Связь. "
+                "При смене IP лица и пароль сохраняются."
             ),
-            style="Hint.TLabel",
+            style="Muted.TLabel",
             wraplength=520,
-            justify="left",
-        ).pack(anchor="w", padx=14, pady=12, fill=tk.X)
+        ).pack(anchor="w", padx=16, pady=(0, 12))
 
-    def _build_tunnel_tab(self, parent: ttk.Frame) -> None:
-        frm = self._scrollable(parent)
-        tun = self._card(frm, "Интернет-туннель (GW)")
+        self._build_tunnel_section(frm)
+        self._build_device_section(frm)
+
+    def _build_tunnel_section(self, frm: ttk.Frame) -> None:
+        tun = self._card(frm, "B) Туннель (если сервер не видит терминал)")
         ind = tk.Frame(tun, bg=C["surface"])
         ind.pack(fill=tk.X, pady=(0, 8))
         self._tun_ind_vars: dict[str, tk.StringVar] = {}
@@ -669,10 +661,11 @@ class OfficeLinkApp:
         ttk.Label(
             tun, textvariable=self.tunnel_url_var, style="Muted.TLabel", wraplength=500
         ).pack(anchor="w", pady=(4, 0))
-        self.tunnel_auto_var = tk.BooleanVar(value=True)
+        # Default OFF — auto-heal was spamming Cloudflare quick tunnels (429).
+        self.tunnel_auto_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             tun,
-            text="Автовосстановление (если туннель упал — поднять снова)",
+            text="Автовосстановление туннеля (faqat qo‘lda kerak bo‘lsa yoqing)",
             variable=self.tunnel_auto_var,
         ).pack(anchor="w", pady=(8, 4))
         tun_btns = ttk.Frame(tun, style="Card.TFrame")
@@ -687,18 +680,16 @@ class OfficeLinkApp:
         ttk.Label(
             tun,
             text=(
-                "Для синхронизации лиц с Web на ПК нужен постоянный GW+туннель. "
-                "Быстрый Cloudflare-туннель часто обновляет URL — автовосстановление "
-                "анонсирует новый URL на платформу. При закрытии окна "
-                "фоновый процесс сохраняет туннель."
+                "После первой привязки GUI можно закрыть: фоновый worker держит туннель. "
+                "Эта кнопка — только если связь снова оборвалась. "
+                "Лица и отметки не идут через это окно."
             ),
             style="Muted.TLabel",
             wraplength=500,
         ).pack(anchor="w", pady=(8, 0))
 
-    def _build_device_tab(self, parent: ttk.Frame) -> None:
-        frm = self._scrollable(parent)
-        info = self._card(frm, "Привязанное устройство")
+    def _build_device_section(self, frm: ttk.Frame) -> None:
+        info = self._card(frm, "Текущее устройство")
         self.dev_online_var = tk.StringVar(value="—")
         self.dev_name_var = tk.StringVar(value="—")
         self.dev_host_var = tk.StringVar(value="—")
@@ -752,8 +743,12 @@ class OfficeLinkApp:
             text = self.notebook.tab(tab, "text")
         except tk.TclError:
             return
-        if text == "Устройство":
+        if "Восстановление" in text:
             self._refresh_device_tab()
+            try:
+                self._poll_tunnel_once()
+            except Exception:
+                pass
 
     def _refresh_device_tab(self) -> None:
         d = self.session.chosen
@@ -1452,6 +1447,19 @@ class OfficeLinkApp:
         )
         self.root.after(0, lambda: self._reconnect_done(result))
 
+    def _humanize_link_error(self, msg: str) -> str:
+        m = (msg or "").strip()
+        low = m.lower()
+        if "pairing token expired" in low or "token expired" in low:
+            return (
+                "Pairing-токен устарел (~15 мин). "
+                "Web → Устройства → «Связь с офисом» → создайте новый токен → "
+                "вкладка «1. Подключение» → Вставить → Сохранить. "
+                "Затем снова «Восстановить сеть». "
+                "Если нужен только туннель — кнопка «Восстановить туннель» (токен не обязателен)."
+            )
+        return m
+
     def _reconnect_done(self, result: SubmitResult) -> None:
         self._set_busy(False)
         kind = result.kind
@@ -1516,21 +1524,23 @@ class OfficeLinkApp:
         if kind == TIMEOUT:
             self.status_var.set("Таймаут сети")
             self._set_badge("TIMEOUT", "warn")
-            self._show_alert(result.message, kind="warn")
+            self._show_alert(self._humanize_link_error(result.message), kind="warn")
             return
         if kind == OFFLINE:
             self.status_var.set("Устройство не в сети")
             self._set_badge("OFFLINE", "danger")
-            self._show_alert(result.message, kind="danger")
+            self._show_alert(self._humanize_link_error(result.message), kind="danger")
             return
         if kind == "no_key":
             self.status_var.set("Нужен токен")
             self._set_badge("ТОКЕН", "warn")
-            self._show_alert(result.message, kind="warn")
+            self._show_alert(self._humanize_link_error(result.message), kind="warn")
             return
-        self.status_var.set(result.message or "Ошибка")
+        human = self._humanize_link_error(result.message or "Ошибка")
+        self.status_var.set(human.split(".")[0][:80] if human else "Ошибка")
         self._set_badge("ОШИБКА", "danger")
-        self._show_alert(result.message, kind="danger")
+        self._show_alert(human, kind="danger")
+        self.reconnect_detail_var.set(human)
 
     def _on_ulash(self) -> None:
         if self.busy or self.session.auth.is_locked():
@@ -1626,7 +1636,8 @@ class OfficeLinkApp:
             linked = self.session.link_to_cloud(progress)
             self.root.after(0, lambda: self._ulash_done(linked, clear_pwd=True, linked=True))
             return
-        self.root.after(0, lambda: self._ulash_done(result, clear_pwd=result.kind in (CONFIRM, LOCKED)))
+        # Keep typed password on wrong attempt so the operator can edit, not retype.
+        self.root.after(0, lambda: self._ulash_done(result, clear_pwd=result.kind == LOCKED))
 
     def _ulash_done(self, result: SubmitResult, clear_pwd: bool, linked: bool = False) -> None:
         self._set_busy(False)
@@ -1638,7 +1649,10 @@ class OfficeLinkApp:
             self.status_var.set("Неверный пароль")
             self._set_badge("ПАРОЛЬ", "danger")
             self._show_alert(
-                "Неверный пароль. Введите снова (автоповтор отключён).",
+                "Неверный пароль терминала. Проверьте поле или Admin → "
+                "«Показать сохранённый пароль». Если IP сменился — пароль мог "
+                "быть от другого устройства. Pairing-токен обновите в Web "
+                "(~15 мин).",
                 kind="danger",
             )
         elif kind == LOCKED:
@@ -1678,12 +1692,12 @@ class OfficeLinkApp:
             try:
                 self.session.write_service_handoff()
                 svc_note = (
-                    " Настройка завершена — GUI можно закрыть. "
-                    "Фоновый tunnel при входе в Windows. "
-                    "Лица только Web «Синхронизировать» (приложение не участвует)."
+                    " Настройка завершена — это окно можно закрыть. "
+                    "Фоновый worker держит туннель при входе в Windows. "
+                    "Лица и отметки: устройство↔сервер (Link не участвует)."
                 )
             except Exception:
-                svc_note = " На вкладке «Туннель»: «Восстановить туннель» / автовосстановление."
+                svc_note = " При обрыве: вкладка «2. Восстановление»."
             try:
                 self.session.ensure_tunnel_supervisor()
             except Exception:
@@ -1892,18 +1906,19 @@ class OfficeLinkApp:
             self.note.configure(
                 text=(
                     "В Web выполнено «Подтвердить привязку». "
-                    "Устройство закреплено на платформе; лица сотрудников "
-                    "синхронизируются. Новый пароль администратора смотрите "
-                    "в Web → Устройства."
+                    "Устройство закреплено. Лица/отметки — напрямую с сервером. "
+                    "Это окно больше не нужно — можно закрыть."
                 )
             )
             self._refresh_device_tab()
-            messagebox.showinfo(
-                "Подтверждено",
+            if messagebox.askyesno(
+                "Готово — закрыть Link?",
                 "Администратор Web подтвердил привязку.\n\n"
-                "Устройство готово — синхронизация лиц запустится автоматически.\n"
-                "Пароль: Web → Устройства → Показать / Копировать.",
-            )
+                "Устройство готово. Лица синхронизируются из Web.\n"
+                "Link — только мастер настройки; окно можно закрыть.\n\n"
+                "Закрыть сейчас?",
+            ):
+                self._on_close()
             return
         # Keep waiting (also retry after transient API errors).
         self._confirm_poll_job = self.root.after(3000, self._poll_confirm_once)
@@ -1984,12 +1999,25 @@ class OfficeLinkApp:
         )
         short = url if len(url) < 64 else url[:28] + "…" + url[-20:]
         self.tunnel_url_var.set(f"URL: {short or '—'}")
+        cool_left = 0
+        try:
+            from paths import tunnel_cooldown_remaining
+
+            cool_left = int(tunnel_cooldown_remaining(self.session.root) or 0)
+        except Exception:
+            cool_left = 0
         if ok:
             # Soft success banner only when recovering from failure text.
             if "ОТКЛЮЧЁН" in (self.status_var.get() or "") or "туннел" in (
                 self.lock_var.get() or ""
             ).lower():
                 self._show_alert("Туннель и шлюз работают.", kind="ok")
+        elif cool_left > 0:
+            mins = max(1, (cool_left + 59) // 60)
+            self.tunnel_status_var.set(
+                f"KUTILMOQDA · Cloudflare limithi ~{mins} daqiqa — avtomatik o‘chirilgan"
+            )
+            # Do not flash a new alert every poll while cooling down.
         elif msg and not self._tunnel_busy:
             self._show_alert(f"Туннель: {msg}", kind="warn")
         if (
@@ -1997,6 +2025,7 @@ class OfficeLinkApp:
             or self._tunnel_busy
             or self.busy
             or not self.tunnel_auto_var.get()
+            or cool_left > 0
         ):
             return
         # Only auto-heal when handoff / credentials already exist.

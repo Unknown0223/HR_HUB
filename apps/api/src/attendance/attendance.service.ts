@@ -657,25 +657,54 @@ export class AttendanceService {
   ) {
     const device = await this.prisma.device.findFirst({ where: { id, tenantId } });
     if (!device) throw new NotFoundException('Device not found');
+    const username = (device.username || 'admin').trim() || 'admin';
+    const reachUrl = this.deviceReachBaseUrl(device.meta);
+
+    // Prefer Cloudflare reach (server → tunnel → terminal). Local GW is often
+    // absent when Link tunnels straight to the device (reachMode=device).
+    let verified = false;
+    if (reachUrl) {
+      try {
+        verified = await this.reach.probe(reachUrl, username, password);
+      } catch (e) {
+        this.logger.warn(
+          `syncDevicePassword reach probe failed for ${id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+      if (!verified) {
+        throw new BadGatewayException(
+          'Туннель/терминал не принял пароль. Проверьте текущий пароль на устройстве и что PC Link туннель открыт.',
+        );
+      }
+    }
+
     // Re-register before verify — GW is in-memory and loses devices after restart/tunnel reopen.
     let gatewayRef = device.gatewayRef || device.id;
-    try {
-      const reg = await this.gw.registerFromDevice({
-        ...device,
-        passwordEnc: password,
-      });
-      if (reg?.id) gatewayRef = reg.id;
-    } catch (e) {
-      this.logger.warn(
-        `syncDevicePassword register failed for ${id}: ${
-          e instanceof Error ? e.message : e
-        }`,
-      );
-    }
-    try {
-      await this.gw.verifyPassword(gatewayRef, password);
-    } catch (e) {
-      throw this.gwHttpException(e, 'Пароль терминала не принят — проверьте текущий пароль на устройстве');
+    if (!verified) {
+      try {
+        const reg = await this.gw.registerFromDevice({
+          ...device,
+          passwordEnc: password,
+        });
+        if (reg?.id) gatewayRef = reg.id;
+      } catch (e) {
+        this.logger.warn(
+          `syncDevicePassword register failed for ${id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+      try {
+        await this.gw.verifyPassword(gatewayRef, password);
+        verified = true;
+      } catch (e) {
+        throw this.gwHttpException(
+          e,
+          'Пароль терминала не принят — проверьте текущий пароль на устройстве (и туннель PC Link)',
+        );
+      }
     }
     const meta = this.asMeta(device.meta);
     const prevAuth =
@@ -685,8 +714,10 @@ export class AttendanceService {
     meta.auth = {
       ...prevAuth,
       passwordOutOfSync: false,
+      authFailStreak: 0,
       syncedAt: new Date().toISOString(),
       lastError: null,
+      failedAt: null,
     };
     const updated = await this.prisma.device.update({
       where: { id },
@@ -700,7 +731,11 @@ export class AttendanceService {
     });
     await this.persistDevicePassword(tenantId, id, password, actor?.userId);
     await this.credentialAudit.record(tenantId, id, 'sync', actor);
-    await this.gw.registerFromDevice(updated);
+    try {
+      await this.gw.registerFromDevice(updated);
+    } catch {
+      // Reach-only offices have no GW — vault/meta already saved.
+    }
     // After password is known again, re-sync faces and purge terminal orphans.
     if (updated.locationId) {
       this.scheduleLocationPersonsSync(tenantId, updated.id);

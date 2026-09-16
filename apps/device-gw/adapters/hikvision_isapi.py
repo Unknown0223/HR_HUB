@@ -1571,7 +1571,12 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 logger.warning("realtime callback failed: %s", exc)
         self._event_queue.append(punch)
 
-    def _take_orphan_jpeg(self, max_age_s: float = 3.0) -> Optional[str]:
+    def _take_orphan_jpeg(self, max_age_s: float = 0.8) -> Optional[str]:
+        """Only reuse a JPEG that arrived moments ago for the *pending* punch.
+
+        Longer windows caused cross-employee photo mixups (person A recognized,
+        hallway JPEG of person B attached to A's mark).
+        """
         if not self._orphan_jpeg_b64 or not self._orphan_jpeg_at:
             return None
         age = (datetime.now(timezone.utc) - self._orphan_jpeg_at).total_seconds()
@@ -1587,11 +1592,8 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self._pending_realtime_punch = None
         self._pending_realtime_flush = None
         if punch:
-            # Try pictureURL before giving up without a snapshot.
-            if not punch.get("photo_base64"):
-                orphan = self._take_orphan_jpeg()
-                if orphan:
-                    punch["photo_base64"] = orphan
+            # Prefer pictureURL from the same AccessControllerEvent — never a
+            # stale orphan from another recognition.
             if not punch.get("photo_base64"):
                 raw = punch.get("raw") if isinstance(punch.get("raw"), dict) else {}
                 url = None
@@ -1615,6 +1617,11 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 b64 = await self._fetch_capture_jpeg(url)
                 if b64:
                     punch["photo_base64"] = b64
+            # Orphan only if still empty and extremely fresh (same MIME burst).
+            if not punch.get("photo_base64"):
+                orphan = self._take_orphan_jpeg(0.8)
+                if orphan:
+                    punch["photo_base64"] = orphan
             await self._dispatch_realtime_punch(punch)
 
     def _schedule_pending_realtime_flush(self, delay_s: float = 2.5) -> None:
@@ -1677,7 +1684,9 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             punch = self._punch_from_alert_payload(data)
             if not punch:
                 continue
-            orphan = self._take_orphan_jpeg()
+            # Only bind an orphan JPEG that arrived in the same MIME burst
+            # (<0.8s). Older orphans belong to a different recognition.
+            orphan = self._take_orphan_jpeg(0.8)
             if orphan:
                 punch["photo_base64"] = orphan
                 await self._dispatch_realtime_punch(punch)
@@ -1687,7 +1696,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                 await self._flush_pending_realtime()
             # Hold briefly so the following image/* MIME part can attach.
             self._pending_realtime_punch = punch
-            self._schedule_pending_realtime_flush(2.5)
+            self._schedule_pending_realtime_flush(1.2)
 
     @staticmethod
     def _extract_json_objects(text: str) -> list[dict[str, Any]]:

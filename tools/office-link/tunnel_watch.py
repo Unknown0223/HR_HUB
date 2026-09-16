@@ -24,6 +24,7 @@ from paths import (
     service_status_file,
     set_tunnel_cooldown,
     tunnel_cooldown_remaining,
+    user_data_root,
     write_service_config,
     write_tunnel_url,
 )
@@ -393,11 +394,39 @@ def install_startup_task(root: Path | None = None) -> bool:
         return False
 
 
+def _worker_already_running(*script_names: str) -> bool:
+    """True if a service_worker / face_worker process is already alive."""
+    if sys.platform != "win32" or not script_names:
+        return False
+    try:
+        pattern = "|".join(n.replace(".", r"\.") for n in script_names)
+        ps = (
+            "Get-CimInstance Win32_Process | "
+            f"Where-Object {{ $_.CommandLine -match '{pattern}' }} | "
+            "Measure-Object | Select-Object -ExpandProperty Count"
+        )
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps],
+            capture_output=True,
+            text=True,
+            creationflags=CREATE_NO_WINDOW,
+            timeout=8,
+        )
+        return int((proc.stdout or "0").strip() or "0") > 0
+    except Exception:
+        return False
+
+
 def spawn_detached_worker(root: Path | None = None) -> bool:
     """Start background worker: full service_worker, or face_worker if GW already up."""
     root = root or find_root()
+    here = Path(__file__).resolve().parent
     worker = root / "service_worker.py"
     face_only = root / "face_worker.py"
+    if not worker.is_file():
+        worker = here / "service_worker.py"
+    if not face_only.is_file():
+        face_only = here / "face_worker.py"
     if probe_local_gw():
         # Avoid second GW on :8800 — still run LAN face puller.
         target = face_only if face_only.is_file() else worker
@@ -406,8 +435,14 @@ def spawn_detached_worker(root: Path | None = None) -> bool:
     if not target.is_file():
         return False
 
+    # Single-instance: never stack another face/service worker.
+    if _worker_already_running("service_worker.py", "face_worker.py"):
+        return True
+
     py = sys.executable
     portable = runtime_dir(root) / "python" / "pythonw.exe"
+    if not portable.is_file():
+        portable = user_data_root() / "runtime" / "python" / "pythonw.exe"
     if portable.is_file():
         py = str(portable)
     elif sys.platform == "win32":
@@ -425,7 +460,7 @@ def spawn_detached_worker(root: Path | None = None) -> bool:
     try:
         subprocess.Popen(
             [py, str(target)],
-            cwd=str(root),
+            cwd=str(target.parent),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
