@@ -407,8 +407,7 @@ function ListInner() {
                 label: 'Тип графика',
                 options: KINDS.map((k) => ({ value: k.kind, label: k.label })),
               },
-              { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
-            ]}
+                          ]}
           />
         </div>
         <div className={styles.rightTools}>

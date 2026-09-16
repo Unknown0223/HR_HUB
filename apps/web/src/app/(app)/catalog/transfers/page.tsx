@@ -498,8 +498,7 @@ function TransfersPageInner() {
                 fromKey: 'from',
                 toKey: 'to',
               },
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              {
+                            {
                 type: 'postedChecks',
                 key: 'posted',
                 label: 'Проведен',

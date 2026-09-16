@@ -334,8 +334,7 @@ function CareerPathsInner() {
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                            { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
               { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
               {
                 type: 'select',

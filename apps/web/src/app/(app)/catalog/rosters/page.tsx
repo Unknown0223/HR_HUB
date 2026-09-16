@@ -349,8 +349,7 @@ function RostersInner() {
                   { value: 'cancelled', label: 'Отменён' },
                 ],
               },
-              { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
-            ]}
+                          ]}
           />
         </div>
         <div className={styles.rightTools}>

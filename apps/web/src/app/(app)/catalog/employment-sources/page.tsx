@@ -361,8 +361,7 @@ function EmploymentSourcesPageInner() {
                 })),
               },
               { type: 'isActive', key: 'isActive', label: 'Статус' },
-              { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
-            ]}
+                          ]}
           />
           {selected.size > 0 ? (
             <button

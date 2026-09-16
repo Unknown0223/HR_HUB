@@ -6,23 +6,26 @@
   display: inline-flex;
   align-items: center;
   margin: 0;
+  flex: 0 0 auto;
   flex-shrink: 0;
+  max-width: 100%;
 }
 
 .toggleBar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .pageSearch {
   display: inline-flex;
   align-items: center;
   position: relative;
-  min-width: min(100%, 220px);
-  flex: 1 1 220px;
-  max-width: 320px;
+  flex: 0 0 auto;
+  width: 200px;
+  min-width: 160px;
+  max-width: 220px;
 }
 
 .pageSearchIcon {
@@ -35,7 +38,7 @@
 
 .pageSearchInput {
   width: 100%;
-  height: var(--control-height, 40px);
+  height: var(--control-height, 36px);
   padding: 0 0.75rem 0 2rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -48,6 +51,19 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+@media (max-width: 720px) {
+  .toggleBar {
+    flex-wrap: wrap;
+  }
+
+  .pageSearch {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
 }
 
 .toggleBtn,

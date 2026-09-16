@@ -443,8 +443,7 @@ function StaffPositionsInner() {
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              {
+                            {
                 type: 'text',
                 key: 'title',
                 label: 'Название',

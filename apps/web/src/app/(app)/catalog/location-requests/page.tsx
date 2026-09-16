@@ -420,8 +420,7 @@ function LocationRequestsInner() {
                   { value: 'cancelled', label: 'Отменен' },
                 ],
               },
-              { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
-            ]}
+                          ]}
           />
         </div>
         <div className={styles.rightTools}>

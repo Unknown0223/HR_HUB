@@ -488,8 +488,7 @@ function IncidentsInner() {
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
               { type: 'dateRange', label: 'Дата инцидента', fromKey: 'from', toKey: 'to' },
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              { type: 'status', label: 'Статус', options: STATUS_OPTIONS },
+                            { type: 'status', label: 'Статус', options: STATUS_OPTIONS },
             ]}
           />
         </div>

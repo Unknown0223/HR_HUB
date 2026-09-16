@@ -474,8 +474,7 @@ function ApprovalsInner() {
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
+                            { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
               {
                 type: 'select',
                 key: 'groupId',

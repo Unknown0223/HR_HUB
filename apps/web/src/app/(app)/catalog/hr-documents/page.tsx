@@ -571,8 +571,7 @@ function HrDocumentsPageInner() {
                 label: 'Тип документа',
                 options: DOC_TYPES.map((t) => ({ value: t.value, label: t.label })),
               },
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              {
+                            {
                 type: 'postedChecks',
                 key: 'posted',
                 label: 'Проведен',

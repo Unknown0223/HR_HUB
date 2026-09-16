@@ -372,8 +372,7 @@ function TariffGroupsInner() {
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                            { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
               {
                 type: 'text',
                 key: 'fullName',

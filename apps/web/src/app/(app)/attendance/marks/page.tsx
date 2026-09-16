@@ -522,8 +522,7 @@ function MarksInner() {
                 label: 'Тип отметки',
                 options: MARK_TYPE_OPTS.map((t) => ({ value: t.key, label: t.label })),
               },
-              { type: 'text', key: 'q', label: 'Поиск', placeholder: 'Поиск...' },
-            ]}
+                          ]}
           />
         </div>
         <div className={styles.rightTools}>

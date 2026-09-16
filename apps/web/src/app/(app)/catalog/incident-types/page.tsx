@@ -325,8 +325,7 @@ function IncidentTypesInner() {
             open={filtersOpen}
             onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
-              { type: 'search', label: 'Поиск', placeholder: 'Поиск...' },
-              {
+                            {
                 type: 'select',
                 key: 'status',
                 label: 'Статус',
