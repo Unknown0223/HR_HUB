@@ -691,6 +691,14 @@ class HikvisionClient {
     if (b64.contains(',')) b64 = b64.split(',').last.trim();
     if (b64.isEmpty) return {'ok': false, 'message': 'empty face'};
 
+    late final Uint8List jpeg;
+    try {
+      jpeg = base64Decode(b64);
+    } catch (_) {
+      return {'ok': false, 'message': 'bad face base64'};
+    }
+    if (jpeg.length < 32) return {'ok': false, 'message': 'empty face'};
+
     try {
       final userXml = '<?xml version="1.0" encoding="UTF-8"?>'
           '<UserInfo>'
@@ -745,35 +753,37 @@ class HikvisionClient {
         );
       }
 
-      final faceJson = jsonEncode({
-        'faceURL': '',
+      final record = {
         'faceLibType': 'blackFD',
         'FDID': '1',
         'FPID': no,
         'employeeNo': no,
-        'name': name,
-        'faceLib': {
-          'faceLibType': 'blackFD',
-          'FDID': '1',
-        },
-        'FaceDataRecord': {
-          'faceLibType': 'blackFD',
-          'FDID': '1',
-          'FPID': no,
-          'employeeNo': no,
-          'name': name,
-          'faceURL': '',
-        },
-      });
-      // Prefer FaceDataRecord with embedded base64 when firmware accepts it.
-      final facePayload = jsonEncode({
-        'faceLibType': 'blackFD',
-        'FDID': '1',
-        'FPID': no,
-        'employeeNo': no,
-        'name': name,
-        'faceURL': 'data:image/jpeg;base64,$b64',
-      });
+      };
+      final recordJson = jsonEncode(record);
+      final boundary = '----HRHUB${DateTime.now().millisecondsSinceEpoch}';
+      final mp = BytesBuilder();
+      void addStr(String s) => mp.add(utf8.encode(s));
+      addStr('--$boundary\r\n');
+      addStr(
+        'Content-Disposition: form-data; name="FaceDataRecord"\r\n'
+        'Content-Type: application/json\r\n\r\n',
+      );
+      addStr(recordJson);
+      addStr('\r\n--$boundary\r\n');
+      addStr(
+        'Content-Disposition: form-data; name="FaceImage"; filename="face.jpg"\r\n'
+        'Content-Type: image/jpeg\r\n\r\n',
+      );
+      mp.add(jpeg);
+      addStr('\r\n--$boundary--\r\n');
+      final mpBody = mp.toBytes();
+      final mpType = 'multipart/form-data; boundary=$boundary';
+
+      bool already(String text) =>
+          text.contains('deviceUserAlreadyExistFace') ||
+          text.contains('faceAlreadyExist');
+
+      // DS-K1T: multipart first; never faceURL data-URI (badJsonContent/faceURL).
       var f = await digestRequest(
         host: host,
         port: port,
@@ -781,30 +791,56 @@ class HikvisionClient {
         path: '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json',
         username: username,
         password: password,
-        body: utf8.encode(facePayload),
-        contentType: 'application/json',
-        timeout: const Duration(seconds: 30),
+        body: mpBody,
+        contentType: mpType,
+        timeout: const Duration(seconds: 60),
       );
-      if (f.status < 400 ||
-          utf8.decode(f.body, allowMalformed: true).contains('deviceUserAlreadyExistFace')) {
-        return {'ok': true};
+      var text = utf8.decode(f.body, allowMalformed: true);
+      if (f.status > 0 && f.status < 400) return {'ok': true};
+
+      if (already(text)) {
+        f = await digestRequest(
+          host: host,
+          port: port,
+          method: 'PUT',
+          path: '/ISAPI/Intelligent/FDLib/FDSetUp?format=json',
+          username: username,
+          password: password,
+          body: mpBody,
+          contentType: mpType,
+          timeout: const Duration(seconds: 60),
+        );
+        text = utf8.decode(f.body, allowMalformed: true);
+        if (f.status > 0 && f.status < 400) return {'ok': true};
       }
-      // Fallback: put face image as raw multipart-ish JSON record without URL.
-      f = await digestRequest(
-        host: host,
-        port: port,
-        method: 'PUT',
-        path: '/ISAPI/Intelligent/FDLib/FDSetUp?format=json',
-        username: username,
-        password: password,
-        body: utf8.encode(faceJson),
-        contentType: 'application/json',
-        timeout: const Duration(seconds: 20),
-      );
-      if (f.status < 400) return {'ok': true};
+
+      for (final payload in <Map<String, dynamic>>[
+        {...record, 'faceData': b64},
+        {'FaceDataRecord': {...record, 'faceData': b64}},
+      ]) {
+        f = await digestRequest(
+          host: host,
+          port: port,
+          method: 'POST',
+          path: '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json',
+          username: username,
+          password: password,
+          body: utf8.encode(jsonEncode(payload)),
+          contentType: 'application/json',
+          timeout: const Duration(seconds: 45),
+        );
+        text = utf8.decode(f.body, allowMalformed: true);
+        if (f.status > 0 && f.status < 400) return {'ok': true};
+        final low = text.toLowerCase();
+        if (low.contains('faceurl') || low.contains('badjsoncontent')) {
+          break;
+        }
+      }
+
+      final snip = text.length > 180 ? text.substring(0, 180) : text;
       return {
         'ok': false,
-        'message': 'Face enroll HTTP ${f.status}: ${utf8.decode(f.body, allowMalformed: true).substring(0, 180)}',
+        'message': 'Face enroll HTTP ${f.status}: $snip',
       };
     } on TimeoutException {
       return {'ok': false, 'reason': kTimeout, 'message': 'Timeout'};
