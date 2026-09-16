@@ -16,6 +16,27 @@ from paths import find_root, load_config, load_service_config, read_link_key
 logger = logging.getLogger("face_agent")
 
 
+def _is_transient_disconnect(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    needles = (
+        "server disconnected",
+        "connection reset",
+        "connection aborted",
+        "remoteprotocolerror",
+        "readtimeout",
+        "connecttimeout",
+        "timed out",
+        "temporarily unavailable",
+    )
+    return any(n in msg for n in needles) or exc.__class__.__name__ in {
+        "RemoteProtocolError",
+        "ReadTimeout",
+        "ConnectTimeout",
+        "ConnectError",
+        "WriteTimeout",
+    }
+
+
 def _digest_request(
     host: str,
     port: int,
@@ -27,6 +48,7 @@ def _digest_request(
     json_body: dict | None = None,
     xml_body: str | None = None,
     timeout: float = 30.0,
+    retries: int = 3,
 ) -> tuple[int, str]:
     import httpx
     from httpx import DigestAuth
@@ -42,14 +64,27 @@ def _digest_request(
     elif xml_body is not None:
         content = xml_body.encode("utf-8")
         headers["Content-Type"] = "application/xml"
-    with httpx.Client(
-        base_url=base,
-        auth=DigestAuth(username or "admin", password or ""),
-        timeout=timeout,
-        verify=False,
-    ) as client:
-        resp = client.request(method.upper(), path, content=content, headers=headers)
-        return resp.status_code, (resp.text or "")[:500]
+    last_exc: BaseException | None = None
+    attempts = max(1, int(retries or 1))
+    for attempt in range(attempts):
+        try:
+            with httpx.Client(
+                base_url=base,
+                auth=DigestAuth(username or "admin", password or ""),
+                timeout=timeout,
+                verify=False,
+            ) as client:
+                resp = client.request(
+                    method.upper(), path, content=content, headers=headers
+                )
+                return resp.status_code, (resp.text or "")[:500]
+        except Exception as exc:
+            last_exc = exc
+            if attempt + 1 >= attempts or not _is_transient_disconnect(exc):
+                raise
+            time.sleep(0.6 * (attempt + 1))
+    assert last_exc is not None
+    raise last_exc
 
 
 def _employee_no(raw: str) -> str:
@@ -83,19 +118,24 @@ def enroll_face(
         raw = base64.b64decode(b64, validate=False)
     except Exception as exc:
         return False, f"bad base64: {exc}"
-    # Oversized JPEGs disconnect some terminals mid-upload.
-    if len(raw) > 100_000:
-        try:
-            from PIL import Image  # type: ignore
+    # Oversized JPEGs disconnect some terminals mid-upload (esp. DS-K1T).
+    def _shrink(jpeg: bytes, side: int, quality: int) -> bytes:
+        from PIL import Image  # type: ignore
 
-            img = Image.open(BytesIO(raw)).convert("RGB")
-            img.thumbnail((480, 480))
-            buf = BytesIO()
-            img.save(buf, format="JPEG", quality=85)
-            raw = buf.getvalue()
-            b64 = base64.b64encode(raw).decode("ascii")
-        except Exception:
-            pass
+        img = Image.open(BytesIO(jpeg)).convert("RGB")
+        img.thumbnail((side, side))
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        return buf.getvalue()
+
+    try:
+        if len(raw) > 80_000:
+            raw = _shrink(raw, 400, 78)
+        if len(raw) > 55_000:
+            raw = _shrink(raw, 320, 70)
+        b64 = base64.b64encode(raw).decode("ascii")
+    except Exception:
+        pass
 
     begin, end = "2017-08-01T00:00:00", "2037-12-31T23:59:59"
     user = {
@@ -139,45 +179,60 @@ def enroll_face(
     ]
     last = ""
     for payload in attempts:
-        code, body = _digest_request(
-            host,
-            port,
-            "POST",
-            "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
-            username,
-            password,
-            json_body=payload,
-            timeout=45.0,
-        )
+        try:
+            code, body = _digest_request(
+                host,
+                port,
+                "POST",
+                "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+                username,
+                password,
+                json_body=payload,
+                timeout=60.0,
+                retries=3,
+            )
+        except Exception as exc:
+            last = f"Face disconnect: {exc}"[:180]
+            time.sleep(0.8)
+            continue
         last = f"Face HTTP {code}: {body[:160]}"
         if code < 400 or "deviceUserAlreadyExistFace" in body:
             return True, "ok"
 
     # Multipart fallback (DS-K1T / some firmware)
-    try:
-        import httpx
-        from httpx import DigestAuth
+    for mp_try in range(3):
+        try:
+            import httpx
+            from httpx import DigestAuth
 
-        files = {
-            "FaceDataRecord": (None, __import__("json").dumps(record), "application/json"),
-            "FaceImage": ("face.jpg", raw, "image/jpeg"),
-        }
-        with httpx.Client(
-            base_url=f"http://{host}:{int(port or 80)}",
-            auth=DigestAuth(username or "admin", password or ""),
-            timeout=45.0,
-            verify=False,
-        ) as client:
-            resp = client.post(
-                "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
-                files=files,
-            )
-            text = resp.text or ""
-            if resp.status_code < 400 or "deviceUserAlreadyExistFace" in text:
-                return True, "ok"
-            last = f"Face multipart HTTP {resp.status_code}: {text[:160]}"
-    except Exception as exc:
-        last = f"Face multipart error: {exc}"
+            files = {
+                "FaceDataRecord": (
+                    None,
+                    __import__("json").dumps(record),
+                    "application/json",
+                ),
+                "FaceImage": ("face.jpg", raw, "image/jpeg"),
+            }
+            with httpx.Client(
+                base_url=f"http://{host}:{int(port or 80)}",
+                auth=DigestAuth(username or "admin", password or ""),
+                timeout=60.0,
+                verify=False,
+            ) as client:
+                resp = client.post(
+                    "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+                    files=files,
+                )
+                text = resp.text or ""
+                if resp.status_code < 400 or "deviceUserAlreadyExistFace" in text:
+                    return True, "ok"
+                last = f"Face multipart HTTP {resp.status_code}: {text[:160]}"
+                break
+        except Exception as exc:
+            last = f"Face multipart error: {exc}"[:180]
+            if mp_try + 1 >= 3 or not _is_transient_disconnect(exc):
+                break
+            time.sleep(0.8 * (mp_try + 1))
     return False, last
 
 
@@ -453,18 +508,36 @@ def tick_once(root=None) -> dict[str, Any]:
                     timeout=30.0,
                 )
             continue
-        try:
-            ok, msg = enroll_face(
-                host=host,
-                port=port,
-                username=username,
-                password=password,
-                employee_no=emp_no,
-                employee_name=emp_name,
-                face_b64=face_b64,
-            )
-        except Exception as exc:
-            ok, msg = False, f"enroll exception: {exc}"[:200]
+        ok, msg = False, "enroll skipped"
+        for enroll_try in range(3):
+            try:
+                ok, msg = enroll_face(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    employee_no=emp_no,
+                    employee_name=emp_name,
+                    face_b64=face_b64,
+                )
+                if ok:
+                    break
+                if enroll_try + 1 < 3 and (
+                    _is_transient_disconnect(RuntimeError(msg))
+                    or "disconnect" in msg.lower()
+                    or "timeout" in msg.lower()
+                ):
+                    time.sleep(1.0 * (enroll_try + 1))
+                    continue
+                break
+            except Exception as exc:
+                ok, msg = False, f"enroll exception: {exc}"[:200]
+                if enroll_try + 1 < 3 and _is_transient_disconnect(exc):
+                    time.sleep(1.0 * (enroll_try + 1))
+                    continue
+                break
+        # Give weak DS-K1T firmware breathing room between faces.
+        time.sleep(0.35)
         if ok:
             result["upsertOk"] += 1
         else:

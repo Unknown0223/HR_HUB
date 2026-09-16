@@ -13,6 +13,10 @@ API:
 Windows tunnel: GUI «Internet tunnel» card + `service_worker.py` auto-heal
 restart cloudflared and re-announce when quick tunnels die.
 
+**Smart App Control:** unsigned `HRHUB-Qurilma.exe` may be blocked
+(“publisher could not be verified”). Prefer Web Setup/ZIP, or run
+`BOSHLASH.bat` (pythonw), or turn Smart App Control **Off** on that PC.
+
 Rebuild Windows:
 ```
 tools\office-link\BUILD-EXE.bat

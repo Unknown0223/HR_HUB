@@ -19,13 +19,13 @@ ADMIN (5 qadam)
 OPERATOR (7 qadam)
 ------------------
 1) PC va Face ID terminal BIR tarmoqda (WiFi yoki LAN)
-2) BOSHLASH.bat yoki HRHUB-Qurilma.exe ni oching
-3) Pairing tokenni yozing → «Saqlash»
+2) BOSHLASH.bat yoki HRHUB-Qurilma.exe ni oching (Tkinter — Windows ilova)
+3) Bo‘lim «1. Подключение»: pairing token → «Saqlash»
 4) Lokatsiyani tanlang (majburiy)
 5) Qurilma topilmasa IP yozing → «Qidirish»
-6) «Admin bor»: HOZIRGI admin parolini bir marta yozing → «Ulash»
-   (tizim yangi parol o‘ylab o‘rnatadi va serverga yuboradi)
-7) «Ulandi» → install-service.bat (ADMIN), keyin oynani yopish mumkin
+6) HOZIRGI admin parolini bir marta yozing → «Подключить / Ulash»
+7) Web tasdiq → «Готово — закрыть Link?» → yoping.
+   Kundalik: yuz/otmetka Link’siz. IP/tunnel uzilsa — «2. Восстановление».
 
 Holatlar
 --------
@@ -71,6 +71,19 @@ Tez-tez uchraydigan xatolar
 • Yangi qurilma stub       → avval terminalda aktivatsiya/admin
 • Named URL yo‘q           → namedTunnelUrl qo‘shing
 • Parol almashtirish xato  → terminal ISAPI / loginPassword talabi
+• enroll: Server disconnected → terminal LAN da yo‘q / band / katta rasm.
+  PC va Face ID BIR Wi‑Fi/LAN; IP (device-credential.json) to‘g‘riligini
+  tekshiring; Link «2. Восстановление»; Web «Повторить ошибки».
+• Otmetka kelmaydi         → terminal HttpHost yoki ofis PC GW+tunnel yoqilgan
+  bo‘lishi kerak. data\service_status.json da tunnelMode=off bo‘lsa —
+  Link ochib tunnelni tiklang (trycloudflare 429 bo‘lsa 10–15 daqiqa kutib).
+• Windows «Smart App Control» EXE ni bloklaydi (nashriyot tekshirilmadi):
+  1) Web dan HRHUB-Link-Setup.exe / portable ZIP yuklab oling
+  2) yoki manbadan: BOSHLASH.bat (pythonw — EXE emas)
+  3) yoki Sozlamalar → Maxfiylik va xavfsizlik → Windows xavfsizligi
+     → Ilova va brauzer nazorati → Smart App Control → O‘chirish
+     (Evaluation/On dan Off — qaytarib bo‘lmaydi; faqat ofis PCda).
+  Kod imzosi (Authenticode) bo‘lmasa SAC noma’lum nashriyotni bloklaydi.
 
 Muhim (parol / guvoh)
 ---------------------
