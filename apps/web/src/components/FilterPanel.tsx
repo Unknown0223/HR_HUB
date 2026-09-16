@@ -75,6 +75,15 @@ function fieldKey(field: FilterFieldDef): string {
   return DEFAULT_KEYS[field.type] || field.type;
 }
 
+function isPageSearchField(field: FilterFieldDef): boolean {
+  if (field.type === 'search') return true;
+  const key = fieldKey(field);
+  if (field.type === 'text' && (key === 'q' || key === 'search' || key === 'query')) {
+    return true;
+  }
+  return false;
+}
+
 function fieldLabel(field: FilterFieldDef): string {
   if (field.label) return field.label;
   const k = fieldKey(field);
@@ -372,16 +381,38 @@ export function FilterPanel({
   }
 
   const availableToAdd = useMemo(
-    () => allIds.filter((id) => !visibleIds.includes(id)),
-    [allIds, visibleIds],
+    () =>
+      allIds.filter((id) => {
+        if (visibleIds.includes(id)) return false;
+        const f = fieldById.get(id);
+        return f ? !isPageSearchField(f) : true;
+      }),
+    [allIds, visibleIds, fieldById],
   );
 
   const visibleFields = useMemo(
     () =>
       visibleIds
         .map((id) => fieldById.get(id))
-        .filter((f): f is FilterFieldDef => Boolean(f)),
+        .filter((f): f is FilterFieldDef => Boolean(f))
+        .filter((f) => !isPageSearchField(f)),
     [visibleIds, fieldById],
+  );
+
+  const pageSearchFields = useMemo(
+    () => fields.filter(isPageSearchField),
+    [fields],
+  );
+
+  const applySearchNow = useCallback(
+    (key: string, value: string) => {
+      const next = { ...draft, [key]: value };
+      setDraft(next);
+      if (syncUrl) pushToUrl(next);
+      else if (controlledValues !== undefined) onChange?.(key, value);
+      onApply?.();
+    },
+    [controlledValues, draft, onApply, onChange, pushToUrl, syncUrl],
   );
 
   function renderControl(field: FilterFieldDef) {
@@ -554,6 +585,37 @@ export function FilterPanel({
   return (
     <div className={inline ? styles.rootInline : styles.root}>
       <div className={styles.toggleBar}>
+        {pageSearchFields.map((field) => {
+          const key = fieldKey(field);
+          const value = draft[key] ?? '';
+          return (
+            <label key={fieldId(field)} className={styles.pageSearch}>
+              <span className={styles.pageSearchIcon} aria-hidden>
+                ⌕
+              </span>
+              <input
+                className={styles.pageSearchInput}
+                type="search"
+                value={value}
+                placeholder={field.placeholder ?? 'Поиск...'}
+                aria-label={fieldLabel(field)}
+                onChange={(e) => setField(key, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applySearchNow(key, (e.target as HTMLInputElement).value);
+                  }
+                }}
+                onBlur={(e) => {
+                  const next = e.target.value;
+                  if ((sourceValues[key] ?? '') !== next) {
+                    applySearchNow(key, next);
+                  }
+                }}
+              />
+            </label>
+          );
+        })}
         <button
           type="button"
           className={open ? styles.toggleBtnOpen : styles.toggleBtn}

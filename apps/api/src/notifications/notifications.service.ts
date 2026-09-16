@@ -149,4 +149,20 @@ export class NotificationsService {
     });
     return { updated: result.count };
   }
+
+  async deleteOne(tenantId: string, userId: string, id: string) {
+    const row = await this.prisma.notification.findFirst({
+      where: { id, tenantId, userId },
+    });
+    if (!row) throw new NotFoundException('Notification not found');
+    await this.prisma.notification.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  async clearAll(tenantId: string, userId: string) {
+    const result = await this.prisma.notification.deleteMany({
+      where: { tenantId, userId },
+    });
+    return { deleted: result.count };
+  }
 }

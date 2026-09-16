@@ -16,6 +16,40 @@
   flex-wrap: wrap;
 }
 
+.pageSearch {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  min-width: min(100%, 220px);
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+.pageSearchIcon {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--muted, #64748b);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.pageSearchInput {
+  width: 100%;
+  height: var(--control-height, 40px);
+  padding: 0 0.75rem 0 2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--font-size-sm);
+}
+
+.pageSearchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
 .toggleBtn,
 .toggleBtnOpen {
   display: inline-flex;

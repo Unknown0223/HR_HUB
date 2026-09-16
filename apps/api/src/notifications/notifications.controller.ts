@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { NotificationsService } from './notifications.service';
@@ -69,6 +69,21 @@ export class NotificationsController {
     Role.manager,
     Role.employee,
   )
+  @Delete()
+  clearAll(@CurrentTenant() t: string | null, @CurrentUser() user: AuthUser) {
+    return this.notifications.clearAll(
+      this.notifications.requireTenant(t),
+      user.userId,
+    );
+  }
+
+  @Roles(
+    Role.platform_admin,
+    Role.tenant_admin,
+    Role.hr,
+    Role.manager,
+    Role.employee,
+  )
   @Patch(':id/read')
   markRead(
     @CurrentTenant() t: string | null,
@@ -76,6 +91,26 @@ export class NotificationsController {
     @Param('id') id: string,
   ) {
     return this.notifications.markRead(
+      this.notifications.requireTenant(t),
+      user.userId,
+      id,
+    );
+  }
+
+  @Roles(
+    Role.platform_admin,
+    Role.tenant_admin,
+    Role.hr,
+    Role.manager,
+    Role.employee,
+  )
+  @Delete(':id')
+  deleteOne(
+    @CurrentTenant() t: string | null,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.notifications.deleteOne(
       this.notifications.requireTenant(t),
       user.userId,
       id,

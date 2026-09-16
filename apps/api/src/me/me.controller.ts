@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -154,9 +155,19 @@ export class MeController {
     return this.me.markAllNotificationsRead(user);
   }
 
+  @Delete('notifications')
+  clearNotifications(@CurrentUser() user: AuthUser) {
+    return this.me.clearNotifications(user);
+  }
+
   @Patch('notifications/:id/read')
   markRead(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.me.markNotificationRead(user, id);
+  }
+
+  @Delete('notifications/:id')
+  deleteNotification(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.me.deleteNotification(user, id);
   }
 
   @Get('payroll/summary')

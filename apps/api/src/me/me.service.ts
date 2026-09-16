@@ -445,6 +445,16 @@ export class MeService {
     return this.notificationsService.markAllRead(tenantId, user.userId);
   }
 
+  async deleteNotification(user: AuthUser, id: string) {
+    const tenantId = this.requireTenant(user.tenantId);
+    return this.notificationsService.deleteOne(tenantId, user.userId, id);
+  }
+
+  async clearNotifications(user: AuthUser) {
+    if (!user.tenantId) return { deleted: 0 };
+    return this.notificationsService.clearAll(user.tenantId, user.userId);
+  }
+
   /** Topbar global search — employees, persons, divisions (Verifix-like). */
   async globalSearch(user: AuthUser, q: string) {
     const query = q.trim();

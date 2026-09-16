@@ -127,18 +127,38 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       return;
     }
     setLocal(s);
-    // Hydrate JWT for API Bearer + <img> when cross-origin cookie is blocked
-    if (!getAccessToken()) {
-      void apiFetch<{ accessToken: string }>('/api/auth/media-token')
-        .then((r) => {
+    // Validate session against API (clears stale Bearer via apiFetch retry) and
+    // hydrate JWT for <img> when cross-origin cookie alone is not enough.
+    void apiFetch<{
+      id: string;
+      email: string;
+      fullName: string;
+      role: string;
+      tenantId: string | null;
+      tenant: { id: string; code: string; name: string } | null;
+    }>('/api/auth/me')
+      .then(async (me) => {
+        const next: Session = {
+          user: {
+            id: me.id,
+            email: me.email,
+            fullName: me.fullName,
+            role: me.role,
+            tenantId: me.tenantId,
+          },
+          tenant: me.tenant ?? s.tenant,
+        };
+        setSession(next);
+        setLocal(next);
+        if (!getAccessToken()) {
+          const r = await apiFetch<{ accessToken: string }>('/api/auth/media-token');
           if (r?.accessToken) setMediaAccessToken(r.accessToken);
-        })
-        .catch(() => {
-          // Cookie unavailable (common on Railway web≠api hosts) — force re-login
-          setSession(null);
-          router.replace('/');
-        });
-    }
+        }
+      })
+      .catch(() => {
+        setSession(null);
+        router.replace('/');
+      });
   }, [router]);
 
   useEffect(() => {
@@ -780,56 +800,107 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                 <div className={`${styles.dropMenu} ${styles.dropWide}`} role="menu">
                   <div className={styles.dropHead}>
                     <span>Уведомления ({notifications.length})</span>
-                    {unreadCount > 0 ? (
-                      <button
-                        type="button"
-                        className={styles.dropHeadBtn}
-                        onClick={async () => {
-                          await apiFetch('/api/me/notifications/read-all', {
-                            method: 'PATCH',
-                          });
-                          await loadNotifications();
-                        }}
-                      >
-                        Прочитать все
-                      </button>
-                    ) : null}
+                    <div className={styles.dropHeadActions}>
+                      {unreadCount > 0 ? (
+                        <button
+                          type="button"
+                          className={styles.dropHeadBtn}
+                          onClick={async () => {
+                            await apiFetch('/api/me/notifications/read-all', {
+                              method: 'PATCH',
+                            });
+                            await loadNotifications();
+                          }}
+                        >
+                          Прочитать все
+                        </button>
+                      ) : null}
+                      {notifications.length > 0 ? (
+                        <button
+                          type="button"
+                          className={styles.dropHeadBtnDanger}
+                          onClick={async () => {
+                            await apiFetch('/api/me/notifications', {
+                              method: 'DELETE',
+                            });
+                            setNotifications([]);
+                            setUnreadCount(0);
+                          }}
+                        >
+                          Очистить
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   {notifications.length === 0 ? (
-                    <div className={styles.dropEmpty}>Нет новых уведомлений</div>
+                    <div className={styles.dropEmpty}>Нет уведомлений</div>
                   ) : (
                     <div className={styles.notifyList}>
                       {notifications.slice(0, 20).map((n) => (
-                        <Link
+                        <div
                           key={n.id}
-                          href={n.href || '#'}
                           className={
-                            n.readAt ? styles.notifyItem : styles.notifyItemUnread
+                            n.readAt ? styles.notifyRow : styles.notifyRowUnread
                           }
-                          onClick={async () => {
-                            setNotifyOpen(false);
-                            if (!n.readAt) {
+                        >
+                          <Link
+                            href={n.href || '#'}
+                            className={
+                              n.readAt
+                                ? styles.notifyItem
+                                : styles.notifyItemUnread
+                            }
+                            onClick={async () => {
+                              setNotifyOpen(false);
+                              if (!n.readAt) {
+                                try {
+                                  await apiFetch(
+                                    `/api/me/notifications/${n.id}/read`,
+                                    { method: 'PATCH' },
+                                  );
+                                } catch {
+                                  /* ignore */
+                                }
+                              }
+                            }}
+                          >
+                            <strong>{n.title}</strong>
+                            {n.body ? <span>{n.body}</span> : null}
+                            <small>
+                              {new Date(n.createdAt).toLocaleString('ru-RU', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </small>
+                          </Link>
+                          <button
+                            type="button"
+                            className={styles.notifyDismiss}
+                            title="Удалить"
+                            aria-label="Удалить уведомление"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               try {
-                                await apiFetch(`/api/me/notifications/${n.id}/read`, {
-                                  method: 'PATCH',
+                                await apiFetch(`/api/me/notifications/${n.id}`, {
+                                  method: 'DELETE',
                                 });
+                                setNotifications((prev) =>
+                                  prev.filter((x) => x.id !== n.id),
+                                );
+                                if (!n.readAt) {
+                                  setUnreadCount((c) => Math.max(0, c - 1));
+                                }
                               } catch {
                                 /* ignore */
                               }
-                            }
-                          }}
-                        >
-                          <strong>{n.title}</strong>
-                          {n.body ? <span>{n.body}</span> : null}
-                          <small>
-                            {new Date(n.createdAt).toLocaleString('ru-RU', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </small>
-                        </Link>
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
