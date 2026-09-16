@@ -257,8 +257,15 @@ export function FilterPanel({
   );
 
   const activeCount = useMemo(
-    () => keys.filter((k) => (sourceValues[k] ?? '').trim()).length,
-    [keys, sourceValues],
+    () =>
+      keys.filter((k) => {
+        if (!(sourceValues[k] ?? '').trim()) return false;
+        // Search chip already shows «q» — don't double-count on ФИЛЬТР badge.
+        const field = fieldById.get(k);
+        if (field?.type === 'search' || k === 'q') return false;
+        return true;
+      }).length,
+    [keys, sourceValues, fieldById],
   );
 
   const setField = useCallback(

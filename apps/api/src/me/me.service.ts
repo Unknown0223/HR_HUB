@@ -24,6 +24,11 @@ import {
   MeReviewAbsenceDto,
   MeReviewRequestDto,
 } from './dto';
+import {
+  employeeNameSearchWhere,
+  personNameSearchWhere,
+  searchTokens,
+} from '../common/name-search';
 
 const MAX_GPS_ACCURACY_M = 100;
 
@@ -463,18 +468,14 @@ export class MeService {
       return { q: query, employees: [], persons: [], divisions: [] };
     }
     const tenantId = user.tenantId;
-    const contains = { contains: query, mode: 'insensitive' as const };
+    const empWhere = employeeNameSearchWhere(query);
+    const personWhere = personNameSearchWhere(query);
+    const divTokens = searchTokens(query);
     const [employees, persons, divisions] = await Promise.all([
       this.prisma.employee.findMany({
         where: {
           tenantId,
-          OR: [
-            { tabNumber: contains },
-            { firstName: contains },
-            { lastName: contains },
-            { middleName: contains },
-            { email: contains },
-          ],
+          ...(empWhere ?? {}),
         },
         select: {
           id: true,
@@ -489,12 +490,7 @@ export class MeService {
       this.prisma.person.findMany({
         where: {
           tenantId,
-          OR: [
-            { firstName: contains },
-            { lastName: contains },
-            { pinfl: contains },
-            { passport: contains },
-          ],
+          ...(personWhere ?? {}),
         },
         select: {
           id: true,
@@ -509,7 +505,16 @@ export class MeService {
       this.prisma.division.findMany({
         where: {
           tenantId,
-          OR: [{ code: contains }, { name: contains }],
+          ...(divTokens.length
+            ? {
+                AND: divTokens.map((token) => ({
+                  OR: [
+                    { code: { contains: token, mode: 'insensitive' as const } },
+                    { name: { contains: token, mode: 'insensitive' as const } },
+                  ],
+                })),
+              }
+            : {}),
         },
         select: { id: true, code: true, name: true },
         take: 8,

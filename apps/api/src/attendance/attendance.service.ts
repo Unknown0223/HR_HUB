@@ -37,6 +37,7 @@ import {
   parseHikvisionEventBody,
   type HikPushHostConfig,
 } from './hikvision-event.parser';
+import { employeeNameSearchWhere } from '../common/name-search';
 import {
   CreateDeviceDto,
   CreateLocationDto,
@@ -5325,15 +5326,15 @@ export class AttendanceService {
       where.device = { locationId: opts.locationId };
     }
     if (opts.q?.trim()) {
-      const q = opts.q.trim();
+      const nameWhere = employeeNameSearchWhere(opts.q);
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
         {
           OR: [
-            { employee: { lastName: { contains: q, mode: 'insensitive' } } },
-            { employee: { firstName: { contains: q, mode: 'insensitive' } } },
-            { employee: { tabNumber: { contains: q, mode: 'insensitive' } } },
-            { device: { name: { contains: q, mode: 'insensitive' } } },
+            ...(nameWhere
+              ? [{ employee: nameWhere }]
+              : []),
+            { device: { name: { contains: opts.q.trim(), mode: 'insensitive' } } },
           ],
         },
       ];
@@ -5969,14 +5970,7 @@ export class AttendanceService {
         tenantId,
         status: 'active',
         ...(opts.q?.trim()
-          ? {
-              OR: [
-                { lastName: { contains: opts.q.trim(), mode: 'insensitive' } },
-                { firstName: { contains: opts.q.trim(), mode: 'insensitive' } },
-                { tabNumber: { contains: opts.q.trim(), mode: 'insensitive' } },
-                { phone: { contains: opts.q.trim(), mode: 'insensitive' } },
-              ],
-            }
+          ? employeeNameSearchWhere(opts.q.trim()) ?? {}
           : {}),
       },
       select: {

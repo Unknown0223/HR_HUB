@@ -15,6 +15,7 @@ import type { ImportResult } from '../common/import.dto';
 import { CreateEmployeeDto, UpdateEmployeeDto, UpdateEmployeeContactsDto, UpdateEmployeePersonalDto, CreateEmployeeBankAccountDto, UpdateEmployeeBankAccountDto, CreateEmployeeBankCardDto, UpdateEmployeeBankCardDto, CreateEmployeePersonDocDto, UpdateEmployeePersonDocDto, CreateEmployeeRelativeDto, UpdateEmployeeRelativeDto, UpdateEmployeeMaritalStatusDto, CreateEmployeeCertificateDto, UpdateEmployeeCertificateDto, CreateEmployeeTenureDto, UpdateEmployeeTenureDto, CreateEmployeeWorkplaceDto, UpdateEmployeeWorkplaceDto, CreateEmployeeAwardDto, UpdateEmployeeAwardDto, UpdateEmployeeFileDto, CreateEmployeeInventoryDto, UpdateEmployeeInventoryDto, CreateEmployeeCarDto, UpdateEmployeeCarDto, UpdateEmployeeIdentificationDto, UpdateEmployeeExtraInfoDto, UpdateEmployeeUserSettingsDto, CreateEmployeeMarkBlockDto, UpdateEmployeeMarkBlockDto } from './dto';
 import type { EmployeeFormIngestDto } from './employee-form.dto';
 import { pageResult, parsePagination, PageResult } from '../common/pagination';
+import { employeeNameSearchWhere } from '../common/name-search';
 import {
   defaultReportSettings,
   normalizeReportKind,
@@ -162,11 +163,17 @@ export class EmployeesService {
     if (filters.divisionId) where.divisionId = filters.divisionId;
     if (filters.positionId) where.positionId = filters.positionId;
     if (filters.q) {
-      where.OR = [
-        { firstName: { contains: filters.q, mode: 'insensitive' } },
-        { lastName: { contains: filters.q, mode: 'insensitive' } },
-        { tabNumber: { contains: filters.q, mode: 'insensitive' } },
-      ];
+      const nameWhere = employeeNameSearchWhere(filters.q);
+      if (nameWhere) {
+        where.AND = [
+          ...(Array.isArray(where.AND)
+            ? where.AND
+            : where.AND
+              ? [where.AND]
+              : []),
+          nameWhere,
+        ];
+      }
     }
     return where;
   }
