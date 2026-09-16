@@ -78,6 +78,8 @@ data/verifix-dump/
 /tools/*
 !/tools/office-link/
 !/tools/office-link/**
+!/tools/google-form-employee/
+!/tools/google-form-employee/**
 /tools/office-link/runtime/
 /tools/office-link/data/
 /tools/office-link/gw/
