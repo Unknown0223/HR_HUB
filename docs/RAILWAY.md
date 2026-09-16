@@ -41,6 +41,7 @@ CLI on this Windows machine may be blocked by App Control — use the dashboard:
 | `NODE_ENV` | `production` |
 | `CORS_ORIGIN` | `https://<your-web>.up.railway.app` |
 | `PUNCH_INGEST_API_KEY` | strong random string |
+| `EMPLOYEE_FORM_INGEST_KEY` | Google Form → employee ingest (`X-Employee-Form-Key`) |
 | `PUNCH_INGEST_RATE_LIMIT_PER_MIN` | `120` |
 | `PORT` | `3001` (or leave Railway default and rely on `PORT`) |
 

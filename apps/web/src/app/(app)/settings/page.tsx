@@ -145,6 +145,8 @@ function sysLabel(s: string) {
       return 'Mehnat.gov';
     case 'telegram':
       return 'Telegram Bot';
+    case 'google_form':
+      return 'Google Form (xodimlar)';
     default:
       return s;
   }
@@ -270,6 +272,11 @@ export default function SettingsPage() {
     }
     if (tab === 'integrations' && sysCode === 'telegram') {
       router.replace('/settings/telegram');
+      return;
+    }
+    if (tab === 'integrations' && (sysCode === 'google_form' || sysCode === 'google-form')) {
+      router.replace('/settings/google-form');
+      return;
     }
     if (tab === 'admin' && panel === 'orgs') {
       router.replace('/settings/organizations');

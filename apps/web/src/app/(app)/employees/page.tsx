@@ -685,6 +685,16 @@ function EmployeesPageInner() {
                 >
                   Telegram
                 </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    router.push('/settings/google-form');
+                  }}
+                >
+                  Google Form
+                </button>
               </div>
             ) : null}
           </div>

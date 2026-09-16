@@ -12,6 +12,8 @@ const SECRET_KEYS = new Set([
   'apikey',
   'api_key',
   'punch_ingest_api_key',
+  'employee_form_ingest_key',
+  'x-employee-form-key',
   'authorization',
   'x-punch-key',
   'secretaccesskey',
@@ -46,4 +48,35 @@ export function safeJsonForLog(value: unknown): string {
   } catch {
     return '[unserializable]';
   }
+}
+
+/**
+ * Cloudflare / proxy HTML (502 etc.) must never land in UI progress banners.
+ * Keep short, human-readable GW errors.
+ */
+export function sanitizeGwErrorText(
+  raw: string,
+  opts?: { status?: number; fallback?: string },
+): string {
+  const status = opts?.status;
+  const fallback =
+    opts?.fallback ||
+    (status === 502 || status === 504
+      ? 'Ofis tunnel vaqtincha uzildi (502). Tunnelni saqlang va «Синхронизировать» ni qayta bosing.'
+      : 'Device gateway xatosi');
+  const text = (raw || '').trim();
+  if (!text) return fallback;
+  const lower = text.toLowerCase();
+  if (
+    lower.includes('<!doctype') ||
+    lower.includes('<html') ||
+    lower.includes('cloudflare') ||
+    lower.includes('bad gateway') ||
+    lower.includes('error code 502') ||
+    (lower.includes('<title>') && lower.includes('<'))
+  ) {
+    return fallback;
+  }
+  const oneLine = text.replace(/\s+/g, ' ').trim();
+  return oneLine.length > 240 ? `${oneLine.slice(0, 240)}…` : oneLine;
 }

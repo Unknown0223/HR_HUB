@@ -13,6 +13,7 @@ import { FaceService } from './face.service';
 import { buildCsvBuffer, buildExcelBuffer } from '../common/excel';
 import type { ImportResult } from '../common/import.dto';
 import { CreateEmployeeDto, UpdateEmployeeDto, UpdateEmployeeContactsDto, UpdateEmployeePersonalDto, CreateEmployeeBankAccountDto, UpdateEmployeeBankAccountDto, CreateEmployeeBankCardDto, UpdateEmployeeBankCardDto, CreateEmployeePersonDocDto, UpdateEmployeePersonDocDto, CreateEmployeeRelativeDto, UpdateEmployeeRelativeDto, UpdateEmployeeMaritalStatusDto, CreateEmployeeCertificateDto, UpdateEmployeeCertificateDto, CreateEmployeeTenureDto, UpdateEmployeeTenureDto, CreateEmployeeWorkplaceDto, UpdateEmployeeWorkplaceDto, CreateEmployeeAwardDto, UpdateEmployeeAwardDto, UpdateEmployeeFileDto, CreateEmployeeInventoryDto, UpdateEmployeeInventoryDto, CreateEmployeeCarDto, UpdateEmployeeCarDto, UpdateEmployeeIdentificationDto, UpdateEmployeeExtraInfoDto, UpdateEmployeeUserSettingsDto, CreateEmployeeMarkBlockDto, UpdateEmployeeMarkBlockDto } from './dto';
+import type { EmployeeFormIngestDto } from './employee-form.dto';
 import { pageResult, parsePagination, PageResult } from '../common/pagination';
 import {
   defaultReportSettings,
@@ -2192,6 +2193,442 @@ export class EmployeesService {
     }
 
     return emp;
+  }
+
+  /** Stable field catalog for Google Form + Apps Script. */
+  googleFormSchema() {
+    return {
+      endpoint: 'POST /api/employee-form/ingest',
+      authHeader: 'X-Employee-Form-Key',
+      authEnv: 'EMPLOYEE_FORM_INGEST_KEY',
+      required: ['tenantCode', 'lastName', 'firstName'],
+      fields: [
+        {
+          key: 'lastName',
+          titleUz: 'Familiya',
+          titleRu: 'Фамилия',
+          type: 'text',
+          required: true,
+        },
+        {
+          key: 'firstName',
+          titleUz: 'Ism',
+          titleRu: 'Имя',
+          type: 'text',
+          required: true,
+        },
+        {
+          key: 'middleName',
+          titleUz: 'Otasi ismi (otchestvo)',
+          titleRu: 'Отчество',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'phone',
+          titleUz: 'Telefon',
+          titleRu: 'Телефон',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'email',
+          titleUz: 'Email',
+          titleRu: 'Email',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'telegramUsername',
+          titleUz: 'Telegram (@username)',
+          titleRu: 'Telegram (@username)',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'pinfl',
+          titleUz: 'JSHSHIR (PINFL)',
+          titleRu: 'ПИНФЛ',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'birthDate',
+          titleUz: "Tug'ilgan sana",
+          titleRu: 'Дата рождения',
+          type: 'date',
+          required: false,
+        },
+        {
+          key: 'gender',
+          titleUz: 'Jins',
+          titleRu: 'Пол',
+          type: 'choice',
+          choices: ['Erkak', 'Ayol'],
+          required: false,
+        },
+        {
+          key: 'nationality',
+          titleUz: 'Fuqarolik / millat',
+          titleRu: 'Гражданство / национальность',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'passportDocType',
+          titleUz: 'Hujjat turi',
+          titleRu: 'Тип документа',
+          type: 'choice',
+          choices: ['Pasport', 'ID karta'],
+          required: false,
+        },
+        {
+          key: 'passportSeries',
+          titleUz: 'Pasport seriyasi',
+          titleRu: 'Серия паспорта',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'passportNumber',
+          titleUz: 'Pasport raqami',
+          titleRu: 'Номер паспорта',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'passportIssuer',
+          titleUz: 'Kim bergan',
+          titleRu: 'Кем выдан',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'passportIssuedAt',
+          titleUz: 'Berilgan sana',
+          titleRu: 'Дата выдачи',
+          type: 'date',
+          required: false,
+        },
+        {
+          key: 'passportExpiresAt',
+          titleUz: 'Amal qilish muddati',
+          titleRu: 'Срок действия',
+          type: 'date',
+          required: false,
+        },
+        {
+          key: 'divisionCode',
+          titleUz: "Bo'lim kodi yoki nomi",
+          titleRu: 'Подразделение (код или название)',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'positionCode',
+          titleUz: 'Lavozim kodi yoki nomi',
+          titleRu: 'Должность (код или название)',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'employmentType',
+          titleUz: 'Ish turi',
+          titleRu: 'Тип занятости',
+          type: 'choice',
+          choices: ['Shtat', 'GPH'],
+          required: false,
+        },
+        {
+          key: 'hiredAt',
+          titleUz: 'Qabul qilingan sana',
+          titleRu: 'Дата приёма',
+          type: 'date',
+          required: false,
+        },
+        {
+          key: 'tabNumber',
+          titleUz: 'Tabel raqami (bo‘sh qoldirilsa avto)',
+          titleRu: 'Табельный номер (пусто = авто)',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'externalId',
+          titleUz: 'Face ID / terminal PIN',
+          titleRu: 'Face ID / PIN терминала',
+          type: 'text',
+          required: false,
+        },
+        {
+          key: 'address',
+          titleUz: 'Yashash manzili',
+          titleRu: 'Адрес проживания',
+          type: 'paragraph',
+          required: false,
+        },
+        {
+          key: 'note',
+          titleUz: 'Izoh',
+          titleRu: 'Примечание',
+          type: 'paragraph',
+          required: false,
+        },
+      ],
+    };
+  }
+
+  private normalizeGender(raw?: string | null): string | undefined {
+    const g = String(raw || '')
+      .trim()
+      .toLowerCase();
+    if (!g) return undefined;
+    if (['m', 'male', 'erkak', 'муж', 'мужчина', 'м'].includes(g)) return 'male';
+    if (['f', 'female', 'ayol', 'жен', 'женщина', 'ж'].includes(g)) return 'female';
+    return g;
+  }
+
+  private normalizeEmploymentType(raw?: string | null): EmploymentType {
+    const t = String(raw || '')
+      .trim()
+      .toLowerCase();
+    if (t === 'gph' || t === 'гпх' || t.includes('gph')) return EmploymentType.gph;
+    return EmploymentType.staff;
+  }
+
+  private normalizePassportDocType(raw?: string | null): string | undefined {
+    const t = String(raw || '')
+      .trim()
+      .toLowerCase();
+    if (!t) return undefined;
+    if (t.includes('id') || t.includes('карта') || t.includes('karta')) {
+      return 'ID_CARD';
+    }
+    return 'PASSPORT';
+  }
+
+  private async resolveDivisionId(
+    tenantId: string,
+    code?: string,
+    name?: string,
+  ): Promise<string | undefined> {
+    const q = String(code || name || '').trim();
+    if (!q) return undefined;
+    const byCode = await this.prisma.division.findFirst({
+      where: { tenantId, code: { equals: q, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (byCode) return byCode.id;
+    const byName = await this.prisma.division.findFirst({
+      where: { tenantId, name: { equals: q, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return byName?.id;
+  }
+
+  private async resolvePositionId(
+    tenantId: string,
+    code?: string,
+    name?: string,
+  ): Promise<string | undefined> {
+    const q = String(code || name || '').trim();
+    if (!q) return undefined;
+    const byCode = await this.prisma.position.findFirst({
+      where: { tenantId, code: { equals: q, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (byCode) return byCode.id;
+    const byName = await this.prisma.position.findFirst({
+      where: { tenantId, name: { equals: q, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return byName?.id;
+  }
+
+  async allocateTabNumber(tenantId: string): Promise<string> {
+    const rows = await this.prisma.employee.findMany({
+      where: { tenantId },
+      select: { tabNumber: true },
+      take: 5000,
+    });
+    let max = 0;
+    for (const r of rows) {
+      const digits = String(r.tabNumber || '').replace(/\D/g, '');
+      if (!digits) continue;
+      const n = Number(digits);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+    const next = max + 1;
+    return String(next).padStart(Math.max(4, String(next).length), '0');
+  }
+
+  async ingestFromGoogleForm(dto: EmployeeFormIngestDto) {
+    const tenantCode = String(dto.tenantCode || '')
+      .trim()
+      .toLowerCase();
+    if (!tenantCode) {
+      throw new BadRequestException('tenantCode required');
+    }
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { code: { equals: tenantCode, mode: 'insensitive' } },
+      select: { id: true, code: true, name: true },
+    });
+    if (!tenant) {
+      throw new BadRequestException(`Unknown tenantCode: ${tenantCode}`);
+    }
+
+    const lastName = String(dto.lastName || '').trim();
+    const firstName = String(dto.firstName || '').trim();
+    if (!lastName || !firstName) {
+      throw new BadRequestException('lastName and firstName are required');
+    }
+
+    let tabNumber = String(dto.tabNumber || '').trim();
+    if (!tabNumber) {
+      tabNumber = await this.allocateTabNumber(tenant.id);
+    } else {
+      const exists = await this.prisma.employee.findFirst({
+        where: { tenantId: tenant.id, tabNumber },
+        select: { id: true },
+      });
+      if (exists) {
+        throw new ConflictException({
+          message: `Employee with tabNumber ${tabNumber} already exists`,
+          code: 'TAB_NUMBER_EXISTS',
+          employeeId: exists.id,
+        });
+      }
+    }
+
+    const divisionId = await this.resolveDivisionId(
+      tenant.id,
+      dto.divisionCode,
+      dto.divisionName || dto.divisionCode,
+    );
+    const positionId = await this.resolvePositionId(
+      tenant.id,
+      dto.positionCode,
+      dto.positionName || dto.positionCode,
+    );
+
+    const createDto: CreateEmployeeDto = {
+      tabNumber,
+      firstName,
+      lastName,
+      middleName: String(dto.middleName || '').trim() || undefined,
+      email: String(dto.email || '').trim() || undefined,
+      phone: String(dto.phone || '').trim() || undefined,
+      divisionId,
+      positionId,
+      employmentType: this.normalizeEmploymentType(dto.employmentType),
+      hiredAt: dto.hiredAt ? String(dto.hiredAt).slice(0, 10) : undefined,
+      externalId: String(dto.externalId || '').trim() || undefined,
+      pinfl: String(dto.pinfl || '').trim() || undefined,
+      birthDate: dto.birthDate ? String(dto.birthDate).slice(0, 10) : undefined,
+      gender: this.normalizeGender(dto.gender),
+      nationality: String(dto.nationality || '').trim() || undefined,
+      passportSeries: String(dto.passportSeries || '').trim() || undefined,
+      passportNumber: String(dto.passportNumber || '').trim() || undefined,
+      passportDocType: this.normalizePassportDocType(dto.passportDocType),
+      passportIssuer: String(dto.passportIssuer || '').trim() || undefined,
+      passportIssuedAt: dto.passportIssuedAt
+        ? String(dto.passportIssuedAt).slice(0, 10)
+        : undefined,
+      passportExpiresAt: dto.passportExpiresAt
+        ? String(dto.passportExpiresAt).slice(0, 10)
+        : undefined,
+    };
+
+    // Always create Person so address / contacts land even without passport.
+    if (!createDto.pinfl && !createDto.passportNumber && !createDto.birthDate) {
+      createDto.birthDate = undefined;
+      // Force person path via a soft flag: pinfl empty but we still want Person —
+      // call create then patch person, or create person first.
+    }
+
+    let emp;
+    try {
+      // Ensure Person exists for address/telegram even without passport bits.
+      if (
+        !createDto.pinfl &&
+        !createDto.passportNumber &&
+        !createDto.birthDate &&
+        !createDto.gender &&
+        !createDto.nationality
+      ) {
+        const person = await this.prisma.person.create({
+          data: {
+            tenantId: tenant.id,
+            firstName,
+            lastName,
+            middleName: createDto.middleName || null,
+            phone: createDto.phone || null,
+            email: createDto.email || null,
+            addressResidence: String(dto.address || '').trim() || null,
+          },
+        });
+        createDto.personId = person.id;
+      }
+
+      emp = await this.create(tenant.id, createDto);
+    } catch (e) {
+      if (e instanceof ConflictException) throw e;
+      throw e;
+    }
+
+    const tg = String(dto.telegramUsername || '')
+      .trim()
+      .replace(/^@/, '');
+    const address = String(dto.address || '').trim();
+    const note = String(dto.note || '').trim();
+
+    if (tg) {
+      await this.prisma.employee.update({
+        where: { id: emp.id },
+        data: { telegramUsername: tg },
+      });
+    }
+
+    const personId =
+      emp.personId ||
+      (
+        await this.prisma.employee.findUnique({
+          where: { id: emp.id },
+          select: { personId: true },
+        })
+      )?.personId;
+    if (personId && address) {
+      await this.prisma.person.update({
+        where: { id: personId },
+        data: { addressResidence: address },
+      });
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        action: 'employee.form_ingest',
+        entity: 'Employee',
+        entityId: emp.id,
+        meta: {
+          source: dto.source || 'google_form',
+          googleResponseId: dto.googleResponseId || null,
+          note: note || null,
+          tabNumber,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return {
+      ok: true,
+      employeeId: emp.id,
+      tabNumber: emp.tabNumber,
+      tenantCode: tenant.code,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      divisionId: emp.divisionId,
+      positionId: emp.positionId,
+    };
   }
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {
