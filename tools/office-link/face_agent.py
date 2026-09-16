@@ -66,6 +66,86 @@ def _employee_no(raw: str) -> str:
     return str(int(digits))
 
 
+def _shrink_jpeg(jpeg: bytes, side: int, quality: int) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image  # type: ignore
+
+    img = Image.open(BytesIO(jpeg)).convert("RGB")
+    img.thumbnail((side, side))
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=quality, optimize=True)
+    return buf.getvalue()
+
+
+def _prepare_face_jpeg(raw: bytes) -> bytes:
+    """Keep recognition quality; only shrink huge phone photos that disconnect DS-K1T."""
+    if len(raw) <= 100_000:
+        return raw
+    try:
+        out = _shrink_jpeg(raw, 480, 85)
+        if len(out) > 200_000:
+            out = _shrink_jpeg(out, 400, 80)
+        return out
+    except Exception:
+        return raw
+
+
+def _face_already_exists(text: str) -> bool:
+    t = (text or "").lower()
+    return "deviceuseralreadyexistface" in t or "facealreadyexist" in t
+
+
+def _delete_face(
+    *,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    employee_no: str,
+) -> None:
+    """Remove FDLib face so a fresh FaceDataRecord can replace a weak/stale template."""
+    no = _employee_no(employee_no)
+    if not no:
+        return
+    payload = {
+        "FaceDataRecord": {
+            "faceLibType": "blackFD",
+            "FDID": "1",
+            "FPID": no,
+            "employeeNo": no,
+        }
+    }
+    try:
+        _digest_request(
+            host,
+            port,
+            "PUT",
+            "/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json",
+            username,
+            password,
+            json_body=payload,
+            timeout=20.0,
+            retries=2,
+        )
+    except Exception:
+        pass
+    try:
+        _digest_request(
+            host,
+            port,
+            "POST",
+            "/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json",
+            username,
+            password,
+            json_body=payload,
+            timeout=20.0,
+            retries=2,
+        )
+    except Exception:
+        pass
+
+
 def enroll_face(
     *,
     host: str,
@@ -77,7 +157,6 @@ def enroll_face(
     face_b64: str,
 ) -> tuple[bool, str]:
     import base64
-    from io import BytesIO
 
     no = _employee_no(employee_no)
     name = (employee_name or no).strip()[:32] or no
@@ -90,26 +169,9 @@ def enroll_face(
         raw = base64.b64decode(b64, validate=False)
     except Exception as exc:
         return False, f"bad base64: {exc}"
-    # DS-K1T: large JPEGs + faceURL data-URIs cause disconnect / badJsonContent.
-    def _shrink(jpeg: bytes, side: int, quality: int) -> bytes:
-        from PIL import Image  # type: ignore
-
-        img = Image.open(BytesIO(jpeg)).convert("RGB")
-        img.thumbnail((side, side))
-        buf = BytesIO()
-        img.save(buf, format="JPEG", quality=quality, optimize=True)
-        return buf.getvalue()
-
-    try:
-        # Always normalize — terminals choke on phone-camera megabyte photos.
-        raw = _shrink(raw, 360, 75)
-        if len(raw) > 35_000:
-            raw = _shrink(raw, 280, 68)
-        if len(raw) > 28_000:
-            raw = _shrink(raw, 240, 62)
-        b64 = base64.b64encode(raw).decode("ascii")
-    except Exception:
-        pass
+    # Preserve quality for live match; shrink only oversized uploads (disconnect risk).
+    raw = _prepare_face_jpeg(raw)
+    b64 = base64.b64encode(raw).decode("ascii")
 
     begin, end = "2017-08-01T00:00:00", "2037-12-31T23:59:59"
     user = {
@@ -138,6 +200,13 @@ def enroll_face(
         )
     if code >= 400 and "employeeNoAlreadyExist" not in body:
         return False, f"UserInfo HTTP {code}: {body[:160]}"
+
+    # Stale/weak faces were previously marked OK via deviceUserAlreadyExistFace.
+    # Always clear FDLib entry first so multipart posts a usable template.
+    _delete_face(
+        host=host, port=port, username=username, password=password, employee_no=no,
+    )
+    time.sleep(0.35)
 
     record = {
         "faceLibType": "blackFD",
@@ -168,8 +237,10 @@ def enroll_face(
                 timeout=(8.0, 90.0),
                 retries=4,
             )
-            if code_m < 400 or "deviceUserAlreadyExistFace" in text_m:
+            if code_m < 400:
                 return True, "ok"
+            if _face_already_exists(text_m):
+                return False, f"Face still exists after delete: {text_m[:120]}"
             return False, f"Face multipart HTTP {code_m}: {text_m[:160]}"
         except Exception as exc:
             return False, f"Face multipart error: {exc}"[:180]
@@ -179,22 +250,33 @@ def enroll_face(
     if ok_mp:
         return True, "ok"
 
-    # 2) Retry multipart with tinier JPEG after disconnect / WinError 10053.
+    # 2) On already-exist: delete again and retry once with same quality.
+    if "still exists" in last.lower() or _face_already_exists(last):
+        _delete_face(
+            host=host, port=port, username=username, password=password, employee_no=no,
+        )
+        time.sleep(0.5)
+        ok_mp, last = _multipart_ok(raw)
+        if ok_mp:
+            return True, "ok"
+
+    # 3) Retry multipart slightly smaller only after disconnect / WinError 10053.
     if any(
         t in last.lower()
         for t in ("disconnect", "10053", "timeout", "aborted", "reset", "parse multipart")
     ):
         time.sleep(1.2)
         try:
-            tiny = _shrink(raw, 200, 55)
+            mid = _shrink_jpeg(raw, 360, 78)
         except Exception:
-            tiny = raw
-        ok_mp, last2 = _multipart_ok(tiny)
+            mid = raw
+        ok_mp, last2 = _multipart_ok(mid)
         if ok_mp:
             return True, "ok"
         last = last2
+        b64 = base64.b64encode(mid).decode("ascii")
 
-    # 3) JSON faceData only — never faceURL (firmware returns badJsonContent/faceURL).
+    # 4) JSON faceData only — never faceURL (firmware returns badJsonContent/faceURL).
     attempts: list[dict] = [
         {**record, "faceData": b64},
         {"FaceDataRecord": {**record, "faceData": b64}},
@@ -218,8 +300,18 @@ def enroll_face(
                 time.sleep(1.0)
             continue
         last = f"Face HTTP {code}: {body[:160]}"
-        if code < 400 or "deviceUserAlreadyExistFace" in body:
+        if code < 400:
             return True, "ok"
+        if _face_already_exists(body):
+            _delete_face(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                employee_no=no,
+            )
+            time.sleep(0.4)
+            continue
         # Skip useless retries on permanent JSON reject.
         if "badjsoncontent" in body.lower() or "faceurl" in body.lower():
             break
@@ -237,6 +329,9 @@ def delete_user(
     no = _employee_no(employee_no)
     if not no:
         return False, "empty employeeNo"
+    _delete_face(
+        host=host, port=port, username=username, password=password, employee_no=no,
+    )
     payload = {"UserInfoDelCond": {"EmployeeNoList": [{"employeeNo": no}]}}
     code, body = _digest_request(
         host, port, "PUT", "/ISAPI/AccessControl/UserInfo/Delete?format=json",

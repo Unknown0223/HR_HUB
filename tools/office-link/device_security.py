@@ -97,19 +97,40 @@ def ensure_live_detection(
             "livingBodyDetect": cfg.get("livingBodyDetect"),
             "liveDetLevelSet": cfg.get("liveDetLevelSet"),
             "enableLiveDetAntiAttack": cfg.get("enableLiveDetAntiAttack"),
+            "enable": cfg.get("enable"),
+            "faceMatchThresholdN": cfg.get("faceMatchThresholdN"),
         }
+        thr_hi = False
+        try:
+            thr_hi = before["faceMatchThresholdN"] is not None and float(
+                before["faceMatchThresholdN"]
+            ) > 85
+        except (TypeError, ValueError):
+            thr_hi = False
         need = (
             before["livingBodyDetect"] is not True
             or str(before["liveDetLevelSet"] or "").lower() != want.lower()
             or before["enableLiveDetAntiAttack"] is not True
+            or before["enable"] is False
+            or thr_hi
         )
         if not need:
             return {"ok": True, "changed": False, **before, "level": want}
 
         body = copy.deepcopy(data)
+        # Recognition off (punch-lock leftovers) → faces sync but never match.
+        if "enable" in body["CardReaderCfg"]:
+            body["CardReaderCfg"]["enable"] = True
         body["CardReaderCfg"]["livingBodyDetect"] = True
         body["CardReaderCfg"]["liveDetLevelSet"] = want
         body["CardReaderCfg"]["enableLiveDetAntiAttack"] = True
+        # Over-strict match threshold rejects good enrolls at the door.
+        thr = body["CardReaderCfg"].get("faceMatchThresholdN")
+        try:
+            if thr is not None and float(thr) > 85:
+                body["CardReaderCfg"]["faceMatchThresholdN"] = 80
+        except (TypeError, ValueError):
+            pass
         put_code, put_text = digest_httpx(
             host,
             port,

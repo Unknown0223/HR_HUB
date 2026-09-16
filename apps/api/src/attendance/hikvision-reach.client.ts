@@ -94,12 +94,14 @@ function isRetryableHttp(status: number, text: string): boolean {
   );
 }
 
-function isFaceAlreadyOk(text: string): boolean {
+function isUserAlreadyOk(text: string): boolean {
+  return (text || '').includes('employeeNoAlreadyExist');
+}
+
+function isFaceAlreadyExists(text: string): boolean {
   const t = text || '';
   return (
-    t.includes('deviceUserAlreadyExistFace') ||
-    t.includes('faceAlreadyExist') ||
-    t.includes('employeeNoAlreadyExist')
+    t.includes('deviceUserAlreadyExistFace') || t.includes('faceAlreadyExist')
   );
 }
 
@@ -299,7 +301,7 @@ export class HikvisionReachClient {
         contentType: 'application/json',
         timeoutMs: 30_000,
       });
-      if (r.status < 400 || isFaceAlreadyOk(r.text)) {
+      if (r.status < 400 || isUserAlreadyOk(r.text)) {
         return { ok: true };
       }
       last = snipError(r.status, r.text, 'UserInfo');
@@ -311,9 +313,8 @@ export class HikvisionReachClient {
   }
 
   /**
-   * Shrink oversized JPEG by re-sampling via canvas-less crude approach:
-   * drop quality isn't available without sharp — for large blobs prefer multipart
-   * and return a clear size hint on failure.
+   * Soft size hint only — office-link shrinks for recognition quality.
+   * Never treat already-exist face as enroll success (stale/weak templates).
    */
   private prepareFaceBytes(faceBase64: string): {
     b64: string;
@@ -325,8 +326,37 @@ export class HikvisionReachClient {
       b64 = b64.slice(b64.indexOf(',') + 1).trim();
     }
     const raw = Buffer.from(b64, 'base64');
-    // Soft size hint — multipart preferred above ~28KB (DS-K1T).
-    return { b64, raw, tooLarge: raw.length > 28_000 };
+    return { b64, raw, tooLarge: raw.length > 100_000 };
+  }
+
+  private async deleteFace(
+    baseUrl: string,
+    username: string,
+    password: string,
+    empNo: string,
+  ): Promise<void> {
+    const payload = JSON.stringify({
+      FaceDataRecord: {
+        faceLibType: 'blackFD',
+        FDID: '1',
+        FPID: empNo,
+        employeeNo: empNo,
+      },
+    });
+    for (const method of ['PUT', 'POST'] as const) {
+      await this.digestRequest(
+        baseUrl,
+        '/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json',
+        {
+          method,
+          username,
+          password,
+          body: payload,
+          contentType: 'application/json',
+          timeoutMs: 20_000,
+        },
+      );
+    }
   }
 
   private buildMultipart(
@@ -381,6 +411,9 @@ export class HikvisionReachClient {
     };
     const path = '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json';
 
+    // Clear stale/weak FDLib face before upload (synced≠recognizable otherwise).
+    await this.deleteFace(baseUrl, username, password, empNo);
+
     // DS-K1T: multipart first; never send faceURL data-URI (badJsonContent/faceURL).
     const mp = this.buildMultipart(JSON.stringify(record), prepared.raw);
     const attempts: Array<{
@@ -409,6 +442,7 @@ export class HikvisionReachClient {
 
     let last = 'Face enroll failed';
     let retryable = false;
+    let deletedAgain = false;
     for (const attempt of attempts) {
       const r = await this.digestRequest(baseUrl, path, {
         method: 'POST',
@@ -418,10 +452,27 @@ export class HikvisionReachClient {
         contentType: attempt.contentType,
         timeoutMs: 90_000,
       });
-      if ((r.status > 0 && r.status < 400) || isFaceAlreadyOk(r.text)) {
+      if (r.status > 0 && r.status < 400) {
         return { ok: true };
       }
-      last = snipError(r.status, r.text, `Face(${attempt.label})`);
+      if (isFaceAlreadyExists(r.text) && !deletedAgain) {
+        deletedAgain = true;
+        await this.deleteFace(baseUrl, username, password, empNo);
+        const again = await this.digestRequest(baseUrl, path, {
+          method: 'POST',
+          username,
+          password,
+          body: attempt.body,
+          contentType: attempt.contentType,
+          timeoutMs: 90_000,
+        });
+        if (again.status > 0 && again.status < 400) {
+          return { ok: true };
+        }
+        last = snipError(again.status, again.text, `Face(${attempt.label})`);
+      } else {
+        last = snipError(r.status, r.text, `Face(${attempt.label})`);
+      }
       const low = (r.text || '').toLowerCase();
       if (
         isRetryableHttp(r.status, r.text) ||
@@ -456,6 +507,7 @@ export class HikvisionReachClient {
     employeeId: string,
   ): Promise<boolean> {
     const empNo = hikvisionEmployeeNo(employeeId);
+    await this.deleteFace(baseUrl, username, password, empNo);
     const payload = {
       UserInfoDelCond: { EmployeeNoList: [{ employeeNo: empNo }] },
     };

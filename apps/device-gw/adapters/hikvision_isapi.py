@@ -586,15 +586,35 @@ class HikvisionIsapiAdapter(DeviceAdapter):
                     "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
                     files=files,
                 )
-                if resp.status_code < 400 or "deviceUserAlreadyExistFace" in (
-                    resp.text or ""
-                ):
+                if resp.status_code < 400:
                     logger.info(
                         "Face enroll multipart employeeNo=%s via %s",
                         emp_no,
                         resp.status_code,
                     )
                     return True
+                if "deviceUserAlreadyExistFace" in (resp.text or ""):
+                    # Stale face — delete then retry once (synced≠recognizable otherwise).
+                    try:
+                        await client.put(
+                            "/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json",
+                            json={
+                                "FaceDataRecord": {
+                                    "faceLibType": "blackFD",
+                                    "FDID": "1",
+                                    "FPID": emp_no,
+                                    "employeeNo": emp_no,
+                                }
+                            },
+                        )
+                        resp2 = await client.post(
+                            "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+                            files=files,
+                        )
+                        if resp2.status_code < 400:
+                            return True
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Face replace after exist failed: %s", exc)
                 logger.warning(
                     "Face enroll multipart -> %s %s",
                     resp.status_code,
