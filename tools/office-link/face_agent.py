@@ -90,7 +90,7 @@ def enroll_face(
         raw = base64.b64decode(b64, validate=False)
     except Exception as exc:
         return False, f"bad base64: {exc}"
-    # Oversized JPEGs disconnect some terminals mid-upload (esp. DS-K1T).
+    # DS-K1T: large JPEGs + faceURL data-URIs cause disconnect / badJsonContent.
     def _shrink(jpeg: bytes, side: int, quality: int) -> bytes:
         from PIL import Image  # type: ignore
 
@@ -101,10 +101,12 @@ def enroll_face(
         return buf.getvalue()
 
     try:
-        if len(raw) > 80_000:
-            raw = _shrink(raw, 400, 78)
-        if len(raw) > 55_000:
-            raw = _shrink(raw, 320, 70)
+        # Always normalize — terminals choke on phone-camera megabyte photos.
+        raw = _shrink(raw, 360, 75)
+        if len(raw) > 35_000:
+            raw = _shrink(raw, 280, 68)
+        if len(raw) > 28_000:
+            raw = _shrink(raw, 240, 62)
         b64 = base64.b64encode(raw).decode("ascii")
     except Exception:
         pass
@@ -143,13 +145,60 @@ def enroll_face(
         "FPID": no,
         "employeeNo": no,
     }
+    from isapi_http import digest_httpx, is_transient_error
+
+    def _multipart_ok(jpeg: bytes) -> tuple[bool, str]:
+        files = {
+            "FaceDataRecord": (
+                None,
+                __import__("json").dumps(record),
+                "application/json",
+            ),
+            "FaceImage": ("face.jpg", jpeg, "image/jpeg"),
+        }
+        try:
+            code_m, text_m = digest_httpx(
+                host,
+                port,
+                "POST",
+                "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
+                username,
+                password,
+                files=files,
+                timeout=(8.0, 90.0),
+                retries=4,
+            )
+            if code_m < 400 or "deviceUserAlreadyExistFace" in text_m:
+                return True, "ok"
+            return False, f"Face multipart HTTP {code_m}: {text_m[:160]}"
+        except Exception as exc:
+            return False, f"Face multipart error: {exc}"[:180]
+
+    # 1) Multipart first — DS-K1T343 prefers binary FaceImage over JSON faceURL.
+    ok_mp, last = _multipart_ok(raw)
+    if ok_mp:
+        return True, "ok"
+
+    # 2) Retry multipart with tinier JPEG after disconnect / WinError 10053.
+    if any(
+        t in last.lower()
+        for t in ("disconnect", "10053", "timeout", "aborted", "reset", "parse multipart")
+    ):
+        time.sleep(1.2)
+        try:
+            tiny = _shrink(raw, 200, 55)
+        except Exception:
+            tiny = raw
+        ok_mp, last2 = _multipart_ok(tiny)
+        if ok_mp:
+            return True, "ok"
+        last = last2
+
+    # 3) JSON faceData only — never faceURL (firmware returns badJsonContent/faceURL).
     attempts: list[dict] = [
         {**record, "faceData": b64},
         {"FaceDataRecord": {**record, "faceData": b64}},
-        {**record, "faceURL": f"data:image/jpeg;base64,{b64}"},
-        {"FaceDataRecord": {**record, "faceURL": f"data:image/jpeg;base64,{b64}"}},
     ]
-    last = ""
     for payload in attempts:
         try:
             code, body = _digest_request(
@@ -165,40 +214,15 @@ def enroll_face(
             )
         except Exception as exc:
             last = f"Face disconnect: {exc}"[:180]
-            time.sleep(0.8)
+            if is_transient_error(exc):
+                time.sleep(1.0)
             continue
         last = f"Face HTTP {code}: {body[:160]}"
         if code < 400 or "deviceUserAlreadyExistFace" in body:
             return True, "ok"
-
-    # Multipart fallback (DS-K1T / some firmware)
-    from isapi_http import digest_httpx
-
-    files = {
-        "FaceDataRecord": (
-            None,
-            __import__("json").dumps(record),
-            "application/json",
-        ),
-        "FaceImage": ("face.jpg", raw, "image/jpeg"),
-    }
-    try:
-        code, text = digest_httpx(
-            host,
-            port,
-            "POST",
-            "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json",
-            username,
-            password,
-            files=files,
-            timeout=(6.0, 75.0),
-            retries=4,
-        )
-        if code < 400 or "deviceUserAlreadyExistFace" in text:
-            return True, "ok"
-        last = f"Face multipart HTTP {code}: {text[:160]}"
-    except Exception as exc:
-        last = f"Face multipart error: {exc}"[:180]
+        # Skip useless retries on permanent JSON reject.
+        if "badjsoncontent" in body.lower() or "faceurl" in body.lower():
+            break
     return False, last
 
 
@@ -503,7 +527,7 @@ def tick_once(root=None) -> dict[str, Any]:
                     continue
                 break
         # Give weak DS-K1T firmware breathing room between faces.
-        time.sleep(0.35)
+        time.sleep(0.85)
         if ok:
             result["upsertOk"] += 1
         else:

@@ -325,7 +325,8 @@ export class HikvisionReachClient {
       b64 = b64.slice(b64.indexOf(',') + 1).trim();
     }
     const raw = Buffer.from(b64, 'base64');
-    return { b64, raw, tooLarge: raw.length > 100_000 };
+    // Soft size hint — multipart preferred above ~28KB (DS-K1T).
+    return { b64, raw, tooLarge: raw.length > 28_000 };
   }
 
   private buildMultipart(
@@ -379,46 +380,32 @@ export class HikvisionReachClient {
       employeeNo: empNo,
     };
     const path = '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json';
+
+    // DS-K1T: multipart first; never send faceURL data-URI (badJsonContent/faceURL).
+    const mp = this.buildMultipart(JSON.stringify(record), prepared.raw);
     const attempts: Array<{
       label: string;
       body: string | Uint8Array;
       contentType: string;
     }> = [
-        {
-          label: 'json-faceData',
-          body: JSON.stringify({ ...record, faceData: prepared.b64 }),
-          contentType: 'application/json',
-        },
-        {
-          label: 'json-FaceDataRecord',
-          body: JSON.stringify({
-            FaceDataRecord: { ...record, faceData: prepared.b64 },
-          }),
-          contentType: 'application/json',
-        },
-        {
-          label: 'json-faceURL',
-          body: JSON.stringify({
-            ...record,
-            faceURL: `data:image/jpeg;base64,${prepared.b64}`,
-          }),
-          contentType: 'application/json',
-        },
-      ];
-
-    // Multipart often works on DS-K1T when JSON faceData is rejected / oversized.
-    const mp = this.buildMultipart(JSON.stringify(record), prepared.raw);
-    attempts.push({
-      label: 'multipart',
-      body: new Uint8Array(mp.body),
-      contentType: mp.contentType,
-    });
-
-    // Prefer multipart first for large photos (JSON through Cloudflare often drops).
-    if (prepared.tooLarge) {
-      const multi = attempts.pop()!;
-      attempts.unshift(multi);
-    }
+      {
+        label: 'multipart',
+        body: new Uint8Array(mp.body),
+        contentType: mp.contentType,
+      },
+      {
+        label: 'json-faceData',
+        body: JSON.stringify({ ...record, faceData: prepared.b64 }),
+        contentType: 'application/json',
+      },
+      {
+        label: 'json-FaceDataRecord',
+        body: JSON.stringify({
+          FaceDataRecord: { ...record, faceData: prepared.b64 },
+        }),
+        contentType: 'application/json',
+      },
+    ];
 
     let last = 'Face enroll failed';
     let retryable = false;
@@ -435,15 +422,29 @@ export class HikvisionReachClient {
         return { ok: true };
       }
       last = snipError(r.status, r.text, `Face(${attempt.label})`);
-      if (isRetryableHttp(r.status, r.text) || r.status === 0) {
+      const low = (r.text || '').toLowerCase();
+      if (
+        isRetryableHttp(r.status, r.text) ||
+        r.status === 0 ||
+        low.includes('disconnect') ||
+        low.includes('10053') ||
+        low.includes('timeout')
+      ) {
         retryable = true;
+      }
+      // Permanent reject of faceURL/JSON — do not keep hammering same style.
+      if (low.includes('badjsoncontent') || low.includes('"facemsg":"faceurl"') || low.includes('facemsg')) {
+        if (low.includes('faceurl')) {
+          retryable = false;
+          continue;
+        }
       }
       this.logger.warn(
         `reach enroll emp=${empNo} via ${attempt.label}: ${r.status} ${(r.text || '').slice(0, 120)}`,
       );
     }
     if (prepared.tooLarge && !retryable) {
-      last = `${last} (photo ${prepared.raw.length}B >100KB — terminal may reject)`;
+      last = `${last} (photo ${prepared.raw.length}B — shrink on office agent preferred)`;
     }
     return { ok: false, error: last.slice(0, 400), retryable };
   }
