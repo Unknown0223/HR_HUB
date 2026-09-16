@@ -203,7 +203,7 @@ def install_portable_python(root: Path | None = None, cb: StatusFn | None = None
     get_pip = rt / "get-pip.py"
     _status(cb, "pip o‘rnatilmoqda...")
     _download(GET_PIP_URL, get_pip, cb)
-    r = _run_hidden([str(py), str(get_pip), "--no-warn-script-location"], cwd=py_dir)
+    r = _run_hidden([str(py), str(get_pip), "--no-warn-script-location"], cwd=py_dir, env=_clean_child_env(), timeout=180)
     get_pip.unlink(missing_ok=True)
     if r.returncode != 0:
         raise RuntimeError("pip o‘rnatilmadi (internet kerak).")
@@ -224,20 +224,64 @@ def install_cloudflared(root: Path | None = None, cb: StatusFn | None = None) ->
     return exe
 
 
+def _gw_deps_ready(py: Path) -> bool:
+    """True if device-gw imports already work (skip slow pip)."""
+    try:
+        r = _run_hidden(
+            [
+                str(py),
+                "-c",
+                "import fastapi,uvicorn,httpx,pydantic_settings,nats,multipart",
+            ],
+            env=_clean_child_env(),
+            timeout=20,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
 def install_gw_deps(root: Path | None = None, cb: StatusFn | None = None) -> None:
     root = root or find_root()
     py = portable_python(root)
     req = gw_dir(root) / "requirements.txt"
     if not req.is_file():
         raise FileNotFoundError("Gateway requirements.txt yo‘q.")
-    _status(cb, "Kerakli kutubxonalar o‘rnatilmoqda...")
-    r = _run_hidden(
-        [str(py), "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", str(req)],
-        cwd=gw_dir(root),
-        timeout=300,
-    )
+    if _gw_deps_ready(py):
+        _status(cb, "Kutubxonalar tayyor — o‘tkazib yuborildi")
+        return
+    _status(cb, "Kerakli kutubxonalar o‘rnatilmoqda… (1–2 daqiqa)")
+    try:
+        r = _run_hidden(
+            [
+                str(py),
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-input",
+                "-q",
+                "-r",
+                str(req),
+            ],
+            cwd=gw_dir(root),
+            env=_clean_child_env(),
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Kutubxona o‘rnatish vaqti tugadi (internet/PyPI). "
+            "Keyinroq qayta urining yoki BOSHLASH.bat."
+        ) from exc
     if r.returncode != 0:
-        raise RuntimeError("Kutubxona o‘rnatilmadi (internet kerak).")
+        err = ((r.stderr or "") + "\n" + (r.stdout or "")).strip()[:220]
+        raise RuntimeError(
+            "Kutubxona o‘rnatilmadi (internet kerak)."
+            + (f" {err}" if err else "")
+        )
+    if not _gw_deps_ready(py):
+        raise RuntimeError("Kutubxona o‘rnatildi, lekin import tekshiruvi yiqildi.")
+
 
 
 def ensure_runtime(root: Path | None = None, cb: StatusFn | None = None) -> None:

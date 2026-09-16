@@ -103,9 +103,15 @@ function Install-Cloudflared {
 }
 
 function Install-GwDeps {
-  Write-Info "Kerakli kutubxonalar o‘rnatilmoqda..."
-  & $pyEmbed -m pip install --disable-pip-version-check -q -r (Join-Path $gwDir "requirements.txt")
-  if ($LASTEXITCODE -ne 0) { throw "Kutubxona o‘rnatilmadi (internet kerak)." }
+  Write-Info "Kutubxonalar tekshirilmoqda..."
+  & $pyEmbed -c "import fastapi,uvicorn,httpx,pydantic_settings" 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Info "Kutubxonalar tayyor — o'tkazib yuborildi"
+    return
+  }
+  Write-Info "Kerakli kutubxonalar o'rnatilmoqda..."
+  & $pyEmbed -m pip install --disable-pip-version-check --no-input -q -r (Join-Path $gwDir "requirements.txt")
+  if ($LASTEXITCODE -ne 0) { throw "Kutubxona o'rnatilmadi (internet kerak)." }
 }
 
 function Start-Gateway([string]$apiUrl, [string]$punchKey) {
