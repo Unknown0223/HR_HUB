@@ -6,7 +6,6 @@ authenticated request per call; the caller owns retry/lock policy.
 from __future__ import annotations
 
 import hashlib
-import http.client
 import os
 import re
 import socket
@@ -155,23 +154,22 @@ def _http_request(
     body: bytes | None = None,
     headers: dict[str, str] | None = None,
     timeout: float = 4.0,
+    retries: int = 2,
 ) -> tuple[int, dict[str, str], bytes]:
-    conn = http.client.HTTPConnection(host, port, timeout=timeout)
-    try:
-        hdrs = {"Accept": "*/*"}
-        if headers:
-            hdrs.update(headers)
-        if body is not None and "Content-Type" not in {k.title(): v for k, v in hdrs.items()}:
-            # preserve caller Content-Type; default XML for activation
-            if "content-type" not in {k.lower() for k in hdrs}:
-                hdrs["Content-Type"] = "application/xml"
-        conn.request(method.upper(), path, body=body, headers=hdrs)
-        resp = conn.getresponse()
-        resp_body = resp.read(256_000)
-        resp_hdrs = {k.lower(): v for k, v in resp.getheaders()}
-        return resp.status, resp_hdrs, resp_body
-    finally:
-        conn.close()
+    """LAN HTTP with Connection: close + short retries (see isapi_http)."""
+    from isapi_http import http_raw
+
+    return http_raw(
+        host,
+        port,
+        method,
+        path,
+        body=body,
+        headers=headers,
+        timeout=timeout,
+        retries=retries,
+        max_body=256_000,
+    )
 
 
 def classify_probe(status: int, headers: dict[str, str], body: bytes) -> dict[str, Any]:

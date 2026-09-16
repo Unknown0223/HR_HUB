@@ -35,6 +35,8 @@ a = Analysis(
         "credential_store",
         "device_email",
         "device_security",
+        "device_push",
+        "isapi_http",
         "face_agent",
         "service_worker",
     ],

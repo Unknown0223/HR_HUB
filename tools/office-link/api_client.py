@@ -4,6 +4,7 @@ from __future__ import annotations
 import http.client
 import json
 import ssl
+import time
 from typing import Any
 from urllib.parse import urlencode
 
@@ -15,6 +16,18 @@ def is_success(code: int) -> bool:
     return 200 <= int(code or 0) < 300
 
 
+def _api_transient(code: int, data: Any) -> bool:
+    if int(code or 0) in {0, 408, 425, 429, 502, 503, 504}:
+        return True
+    if isinstance(data, dict):
+        err = str(data.get("error") or data.get("message") or "").lower()
+        return any(
+            t in err
+            for t in ("timeout", "temporar", "disconnect", "reset", "unavailable")
+        )
+    return False
+
+
 def api_req(
     api: str,
     method: str,
@@ -24,6 +37,7 @@ def api_req(
     timeout: float = 45.0,
     *,
     pairing_token: str | None = None,
+    retries: int = 3,
 ) -> tuple[int, Any]:
     host, port, base, tls = split_host(api)
     full = (base + path) if path.startswith("/") else (base + "/" + path)
@@ -31,7 +45,8 @@ def api_req(
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "HRHUB-OfficeLink/1.0",
+        "User-Agent": "HRHUB-OfficeLink/1.1",
+        "Connection": "close",
     }
     token = (pairing_token or "").strip()
     link = (key or "").strip()
@@ -39,28 +54,41 @@ def api_req(
         headers["X-Pairing-Token"] = token
     if link:
         headers["X-Device-Link-Key"] = link
-    try:
-        if tls:
-            ctx = ssl.create_default_context()
-            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
-                host, port, timeout=timeout, context=ctx
-            )
-        else:
-            conn = http.client.HTTPConnection(host, port, timeout=timeout)
+
+    attempts = max(1, int(retries or 1))
+    last_code = 0
+    last_data: Any = {"error": "no attempt"}
+    for attempt in range(attempts):
         try:
-            conn.request(method.upper(), full, body=payload, headers=headers)
-            resp = conn.getresponse()
-            # Face payloads (base64) can be multi-MB; never truncate JSON.
-            raw = resp.read()
+            if tls:
+                ctx = ssl.create_default_context()
+                conn: http.client.HTTPConnection = http.client.HTTPSConnection(
+                    host, port, timeout=timeout, context=ctx
+                )
+            else:
+                conn = http.client.HTTPConnection(host, port, timeout=timeout)
             try:
-                data = json.loads(raw.decode("utf-8", errors="replace") or "null")
-            except Exception:
-                data = {"raw": raw[:800].decode("utf-8", errors="replace")}
-            return resp.status, data
-        finally:
-            conn.close()
-    except Exception as exc:
-        return 0, {"error": str(exc)}
+                conn.request(method.upper(), full, body=payload, headers=headers)
+                resp = conn.getresponse()
+                # Face payloads (base64) can be multi-MB; never truncate JSON.
+                raw = resp.read()
+                try:
+                    data = json.loads(raw.decode("utf-8", errors="replace") or "null")
+                except Exception:
+                    data = {"raw": raw[:800].decode("utf-8", errors="replace")}
+                last_code, last_data = resp.status, data
+                if attempt + 1 < attempts and _api_transient(resp.status, data):
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                return resp.status, data
+            finally:
+                conn.close()
+        except Exception as exc:
+            last_code, last_data = 0, {"error": str(exc)}
+            if attempt + 1 >= attempts:
+                return last_code, last_data
+            time.sleep(0.5 * (attempt + 1))
+    return last_code, last_data
 
 
 def ping(

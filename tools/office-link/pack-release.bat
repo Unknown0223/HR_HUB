@@ -44,7 +44,7 @@ if exist "%CD%\device_push.py" copy /Y "%CD%\device_push.py" "%REL%\" >nul
 if exist "%CD%\START-GW.bat" copy /Y "%CD%\START-GW.bat" "%REL%\" >nul
 if exist "%CD%\REPAIR-INSTALL.bat" copy /Y "%CD%\REPAIR-INSTALL.bat" "%REL%\" >nul
 REM Service/CLI helpers only (GUI is frozen inside ilova\HRHUB-Qurilma.exe)
-for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provision.py session.py runtime_setup.py tunnel_watch.py credential_store.py device_email.py device_security.py device_push.py face_agent.py) do (
+for %%F in (api_client.py auth_lock.py discovery.py passwords.py paths.py provision.py session.py runtime_setup.py tunnel_watch.py credential_store.py device_email.py device_security.py device_push.py face_agent.py isapi_http.py) do (
   if exist "%CD%\%%F" copy /Y "%CD%\%%F" "%REL%\" >nul
 )
 if exist "%CD%\ui" xcopy /E /I /Y "%CD%\ui" "%REL%\ilova\ui\" >nul

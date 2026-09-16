@@ -3,10 +3,8 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
-from discovery import build_digest_header, parse_www_authenticate
+from isapi_http import digest_raw
 
 
 def _put(
@@ -19,36 +17,22 @@ def _put(
     content_type: str,
     timeout: float = 15.0,
 ) -> tuple[int, str]:
-    url = f"http://{host}:{int(port)}{path}"
-    req = Request(url, data=body, method="PUT")
-    req.add_header("Content-Type", content_type)
-    req.add_header("Accept", "*/*")
     try:
-        with urlopen(req, timeout=timeout) as resp:
-            return int(resp.status), resp.read().decode("utf-8", errors="replace")
-    except HTTPError as e:
-        www = e.headers.get("WWW-Authenticate") or ""
-        if e.code == 401 and "digest" in www.lower():
-            challenge = parse_www_authenticate(www)
-            auth = build_digest_header(
-                challenge, username, password, "PUT", path
-            )
-            req2 = Request(url, data=body, method="PUT")
-            req2.add_header("Content-Type", content_type)
-            req2.add_header("Authorization", auth)
-            req2.add_header("Accept", "*/*")
-            try:
-                with urlopen(req2, timeout=timeout) as resp:
-                    return int(resp.status), resp.read().decode(
-                        "utf-8", errors="replace"
-                    )
-            except HTTPError as e2:
-                return int(e2.code), (e2.read() or b"").decode(
-                    "utf-8", errors="replace"
-                )
-        return int(e.code), (e.read() or b"").decode("utf-8", errors="replace")
-    except URLError as e:
-        return 0, str(e.reason if hasattr(e, "reason") else e)
+        code, _hdrs, raw = digest_raw(
+            host,
+            port,
+            "PUT",
+            path,
+            username,
+            password,
+            body=body,
+            content_type=content_type,
+            timeout=timeout,
+            retries=4,
+        )
+        return int(code), raw.decode("utf-8", errors="replace")
+    except Exception as exc:
+        return 0, str(exc)
 
 
 def configure_http_host_notification(

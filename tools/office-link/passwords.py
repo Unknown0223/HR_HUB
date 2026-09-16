@@ -13,9 +13,6 @@ from discovery import (
     TIMEOUT,
     ERROR,
     OFFLINE,
-    _http_request,
-    build_digest_header,
-    parse_www_authenticate,
     verify_password,
 )
 
@@ -88,30 +85,22 @@ def digest_request(
     *,
     content_type: str = "application/xml",
     timeout: float = 15.0,
+    retries: int = 4,
 ) -> tuple[int, dict[str, str], bytes]:
-    """HTTP with Digest auth (401 challenge → retry)."""
-    headers: dict[str, str] = {"Accept": "*/*"}
-    if body is not None:
-        headers["Content-Type"] = content_type
-    try:
-        status, resp_headers, resp_body = _http_request(
-            host, port, method, path, body=body, headers=headers, timeout=timeout
-        )
-    except TimeoutError:
-        raise
-    except OSError:
-        raise
+    """HTTP with Digest auth + transient LAN retries."""
+    from isapi_http import digest_raw
 
-    www = resp_headers.get("www-authenticate") or ""
-    if status != 401 or "digest" not in www.lower():
-        return status, resp_headers, resp_body
-
-    challenge = parse_www_authenticate(www)
-    auth = build_digest_header(challenge, username, password, method.upper(), path)
-    headers2 = dict(headers)
-    headers2["Authorization"] = auth
-    return _http_request(
-        host, port, method, path, body=body, headers=headers2, timeout=timeout
+    return digest_raw(
+        host,
+        port,
+        method,
+        path,
+        username,
+        password,
+        body=body,
+        content_type=content_type,
+        timeout=timeout,
+        retries=retries,
     )
 
 

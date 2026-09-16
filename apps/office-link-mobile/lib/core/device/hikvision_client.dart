@@ -191,46 +191,65 @@ class HikvisionClient {
     List<int>? body,
     String? contentType,
     Duration timeout = const Duration(seconds: 10),
+    int retries = 3,
   }) async {
-    final client = HttpClient();
-    client.connectionTimeout = timeout;
-    client.idleTimeout = timeout;
-    try {
-      final req = await client.openUrl(
-        method.toUpperCase(),
-        Uri.parse('http://$host:$port$path'),
+    Object? lastError;
+    for (var attempt = 0; attempt < retries; attempt++) {
+      final client = HttpClient();
+      // Fresh socket each try — keep-alive reuse causes mid-request drops on DS-K1T.
+      client.autoUncompress = true;
+      client.connectionTimeout = Duration(
+        milliseconds: timeout.inMilliseconds.clamp(800, 8000),
       );
-      req.headers.set(HttpHeaders.acceptHeader, '*/*');
-      req.followRedirects = false;
-      if (headers != null) {
-        headers.forEach((k, v) => req.headers.set(k, v));
-      }
-      if (body != null) {
-        req.headers.set(
-          HttpHeaders.contentTypeHeader,
-          contentType ?? 'application/xml',
+      client.idleTimeout = const Duration(seconds: 1);
+      try {
+        final req = await client.openUrl(
+          method.toUpperCase(),
+          Uri.parse('http://$host:$port$path'),
         );
-        req.contentLength = body.length;
-        req.add(body);
+        req.headers.set(HttpHeaders.acceptHeader, '*/*');
+        req.headers.set(HttpHeaders.connectionHeader, 'close');
+        req.followRedirects = false;
+        if (headers != null) {
+          headers.forEach((k, v) => req.headers.set(k, v));
+        }
+        if (body != null) {
+          req.headers.set(
+            HttpHeaders.contentTypeHeader,
+            contentType ?? 'application/xml',
+          );
+          req.contentLength = body.length;
+          req.add(body);
+        }
+        final res = await req.close().timeout(timeout);
+        final bytes = await _readHttpBytes(res).timeout(timeout);
+        final h = <String, String>{};
+        res.headers.forEach((name, values) {
+          if (values.isNotEmpty) h[name.toLowerCase()] = values.join(', ');
+        });
+        return (
+          status: res.statusCode,
+          headers: h,
+          body: Uint8List.fromList(bytes),
+        );
+      } on TimeoutException catch (e) {
+        lastError = e;
+        if (attempt + 1 >= retries) throw TimeoutException('timeout');
+      } on SocketException catch (e) {
+        lastError = e;
+        if (attempt + 1 >= retries) throw OfflineException(e.message);
+      } on HttpException catch (e) {
+        lastError = e;
+        if (attempt + 1 >= retries) throw OfflineException(e.message);
+      } on IOException catch (e) {
+        lastError = e;
+        if (attempt + 1 >= retries) throw OfflineException('$e');
+      } finally {
+        client.close(force: true);
       }
-      final res = await req.close().timeout(timeout);
-      final bytes = await _readHttpBytes(res).timeout(timeout);
-      final h = <String, String>{};
-      res.headers.forEach((name, values) {
-        if (values.isNotEmpty) h[name.toLowerCase()] = values.join(', ');
-      });
-      return (status: res.statusCode, headers: h, body: Uint8List.fromList(bytes));
-    } on TimeoutException {
-      throw TimeoutException('timeout');
-    } on SocketException catch (e) {
-      throw OfflineException(e.message);
-    } on HttpException catch (e) {
-      throw OfflineException(e.message);
-    } on IOException catch (e) {
-      throw OfflineException('$e');
-    } finally {
-      client.close(force: true);
+      await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
     }
+    throw OfflineException('$lastError');
   }
 
   Future<({int status, Map<String, String> headers, Uint8List body})> digestRequest({

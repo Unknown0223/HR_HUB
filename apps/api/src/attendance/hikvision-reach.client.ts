@@ -9,6 +9,13 @@ type DigestParts = {
   algorithm?: string;
 };
 
+export type ReachResult = {
+  ok: boolean;
+  error?: string;
+  /** Transient tunnel/device blip — keep queue retryable. */
+  retryable?: boolean;
+};
+
 function md5(s: string) {
   return createHash('md5').update(s).digest('hex');
 }
@@ -70,18 +77,75 @@ export function hikvisionEmployeeNo(raw: string): string {
   return String(BigInt(digits));
 }
 
+function isRetryableHttp(status: number, text: string): boolean {
+  if ([408, 425, 429, 502, 503, 504, 520, 521, 522, 523, 524, 530].includes(status)) {
+    return true;
+  }
+  const low = (text || '').toLowerCase();
+  return (
+    low.includes('timeout') ||
+    low.includes('temporar') ||
+    low.includes('busy') ||
+    low.includes('try again') ||
+    low.includes('devicebusy') ||
+    low.includes('service unavailable') ||
+    low.includes('bad gateway') ||
+    low.includes('cloudflare')
+  );
+}
+
+function isFaceAlreadyOk(text: string): boolean {
+  const t = text || '';
+  return (
+    t.includes('deviceUserAlreadyExistFace') ||
+    t.includes('faceAlreadyExist') ||
+    t.includes('employeeNoAlreadyExist')
+  );
+}
+
+function snipError(status: number, text: string, prefix: string): string {
+  const body = (text || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+  return body
+    ? `${prefix} HTTP ${status}: ${body}`
+    : `${prefix} HTTP ${status}`;
+}
+
+function isRetryableNetwork(msg: string): boolean {
+  const low = (msg || '').toLowerCase();
+  return (
+    low.includes('abort') ||
+    low.includes('timeout') ||
+    low.includes('fetch failed') ||
+    low.includes('econnreset') ||
+    low.includes('econnrefused') ||
+    low.includes('econnaborted') ||
+    low.includes('epipe') ||
+    low.includes('socket') ||
+    low.includes('disconnected') ||
+    low.includes('network') ||
+    low.includes('other side closed') ||
+    low.includes('und_err') ||
+    low.includes('headers timeout') ||
+    low.includes('body timeout')
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 @Injectable()
 export class HikvisionReachClient {
   private readonly logger = new Logger(HikvisionReachClient.name);
 
-  private async digestRequest(
+  private async digestRequestOnce(
     baseUrl: string,
     path: string,
     opts: {
       method?: string;
       username: string;
       password: string;
-      body?: string;
+      body?: string | Uint8Array;
       contentType?: string;
       timeoutMs?: number;
     },
@@ -92,19 +156,27 @@ export class HikvisionReachClient {
     const method = (opts.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {
       Accept: '*/*',
-      'User-Agent': 'HRHUB-API-Reach/1.0',
+      Connection: 'close',
+      'User-Agent': 'HRHUB-API-Reach/1.1',
     };
     if (opts.body != null && opts.contentType) {
       headers['Content-Type'] = opts.contentType;
     }
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), opts.timeoutMs ?? 45_000);
+    const bodyInit: BodyInit | undefined =
+      opts.body == null
+        ? undefined
+        : typeof opts.body === 'string'
+          ? opts.body
+          : new Uint8Array(opts.body);
     try {
       let res = await fetch(url, {
         method,
         headers,
-        body: opts.body,
+        body: bodyInit,
         signal: ac.signal,
+        keepalive: false,
       });
       if (res.status === 401) {
         const www = res.headers.get('www-authenticate') || '';
@@ -112,7 +184,6 @@ export class HikvisionReachClient {
         if (!parts) {
           return { status: res.status, text: await res.text().catch(() => '') };
         }
-        // URI in digest must be path + query only.
         const uriPath = pathOnly;
         headers.Authorization = buildDigestAuth(
           parts,
@@ -124,15 +195,50 @@ export class HikvisionReachClient {
         res = await fetch(url, {
           method,
           headers,
-          body: opts.body,
+          body: bodyInit,
           signal: ac.signal,
+          keepalive: false,
         });
       }
       const text = await res.text().catch(() => '');
       return { status: res.status, text };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (isRetryableNetwork(msg)) {
+        return { status: 0, text: `network: ${msg}` };
+      }
+      throw e;
     } finally {
       clearTimeout(t);
     }
+  }
+
+  private async digestRequest(
+    baseUrl: string,
+    path: string,
+    opts: {
+      method?: string;
+      username: string;
+      password: string;
+      body?: string | Uint8Array;
+      contentType?: string;
+      timeoutMs?: number;
+      retries?: number;
+    },
+  ): Promise<{ status: number; text: string }> {
+    const retries = Math.max(1, opts.retries ?? 4);
+    let last = { status: 0, text: 'no attempt' };
+    for (let attempt = 0; attempt < retries; attempt += 1) {
+      last = await this.digestRequestOnce(baseUrl, path, opts);
+      if (last.status === 401 || last.status === 403) return last;
+      if (last.status > 0 && last.status < 500 && !isRetryableHttp(last.status, last.text)) {
+        return last;
+      }
+      if (attempt + 1 >= retries) break;
+      const delay = Math.min(4000, 400 * Math.pow(1.7, attempt));
+      await sleep(delay);
+    }
+    return last;
   }
 
   async probe(
@@ -159,7 +265,7 @@ export class HikvisionReachClient {
     password: string,
     employeeId: string,
     name: string,
-  ): Promise<boolean> {
+  ): Promise<ReachResult> {
     const empNo = hikvisionEmployeeNo(employeeId);
     const safeName = (name || empNo).slice(0, 32);
     const payload = {
@@ -178,6 +284,7 @@ export class HikvisionReachClient {
       },
     };
     const body = JSON.stringify(payload);
+    let last = 'UserInfo failed';
     for (const path of [
       '/ISAPI/AccessControl/UserInfo/SetUp?format=json',
       '/ISAPI/AccessControl/UserInfo/Modify?format=json',
@@ -190,10 +297,61 @@ export class HikvisionReachClient {
         password,
         body,
         contentType: 'application/json',
+        timeoutMs: 30_000,
       });
-      if (r.status < 400 || r.text.includes('employeeNoAlreadyExist')) return true;
+      if (r.status < 400 || isFaceAlreadyOk(r.text)) {
+        return { ok: true };
+      }
+      last = snipError(r.status, r.text, 'UserInfo');
+      if (isRetryableHttp(r.status, r.text)) {
+        return { ok: false, error: last, retryable: true };
+      }
     }
-    return false;
+    return { ok: false, error: last, retryable: false };
+  }
+
+  /**
+   * Shrink oversized JPEG by re-sampling via canvas-less crude approach:
+   * drop quality isn't available without sharp — for large blobs prefer multipart
+   * and return a clear size hint on failure.
+   */
+  private prepareFaceBytes(faceBase64: string): {
+    b64: string;
+    raw: Buffer;
+    tooLarge: boolean;
+  } {
+    let b64 = faceBase64.trim();
+    if (b64.toLowerCase().startsWith('data:') && b64.includes(',')) {
+      b64 = b64.slice(b64.indexOf(',') + 1).trim();
+    }
+    const raw = Buffer.from(b64, 'base64');
+    return { b64, raw, tooLarge: raw.length > 100_000 };
+  }
+
+  private buildMultipart(
+    recordJson: string,
+    jpeg: Buffer,
+  ): { body: Buffer; contentType: string } {
+    const boundary = `----HRHUB${randomBytes(12).toString('hex')}`;
+    const chunks: Buffer[] = [];
+    const push = (s: string | Buffer) => {
+      chunks.push(typeof s === 'string' ? Buffer.from(s, 'utf8') : s);
+    };
+    push(`--${boundary}\r\n`);
+    push(
+      'Content-Disposition: form-data; name="FaceDataRecord"\r\nContent-Type: application/json\r\n\r\n',
+    );
+    push(recordJson);
+    push(`\r\n--${boundary}\r\n`);
+    push(
+      'Content-Disposition: form-data; name="FaceImage"; filename="face.jpg"\r\nContent-Type: image/jpeg\r\n\r\n',
+    );
+    push(jpeg);
+    push(`\r\n--${boundary}--\r\n`);
+    return {
+      body: Buffer.concat(chunks),
+      contentType: `multipart/form-data; boundary=${boundary}`,
+    };
   }
 
   async enrollFace(
@@ -202,35 +360,92 @@ export class HikvisionReachClient {
     password: string,
     employeeId: string,
     faceBase64: string,
-  ): Promise<boolean> {
+  ): Promise<ReachResult> {
     const empNo = hikvisionEmployeeNo(employeeId);
-    let b64 = faceBase64.trim();
-    if (b64.toLowerCase().startsWith('data:') && b64.includes(',')) {
-      b64 = b64.slice(b64.indexOf(',') + 1).trim();
+    let prepared: { b64: string; raw: Buffer; tooLarge: boolean };
+    try {
+      prepared = this.prepareFaceBytes(faceBase64);
+    } catch {
+      return { ok: false, error: 'Bad face image base64', retryable: false };
     }
-    if (!b64) return false;
-    const payload = {
+    if (!prepared.b64 || prepared.raw.length < 32) {
+      return { ok: false, error: 'Empty face image', retryable: false };
+    }
+
+    const record = {
       faceLibType: 'blackFD',
       FDID: '1',
       FPID: empNo,
       employeeNo: empNo,
-      faceData: b64,
     };
-    const r = await this.digestRequest(
-      baseUrl,
-      '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json',
-      {
+    const path = '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json';
+    const attempts: Array<{
+      label: string;
+      body: string | Uint8Array;
+      contentType: string;
+    }> = [
+        {
+          label: 'json-faceData',
+          body: JSON.stringify({ ...record, faceData: prepared.b64 }),
+          contentType: 'application/json',
+        },
+        {
+          label: 'json-FaceDataRecord',
+          body: JSON.stringify({
+            FaceDataRecord: { ...record, faceData: prepared.b64 },
+          }),
+          contentType: 'application/json',
+        },
+        {
+          label: 'json-faceURL',
+          body: JSON.stringify({
+            ...record,
+            faceURL: `data:image/jpeg;base64,${prepared.b64}`,
+          }),
+          contentType: 'application/json',
+        },
+      ];
+
+    // Multipart often works on DS-K1T when JSON faceData is rejected / oversized.
+    const mp = this.buildMultipart(JSON.stringify(record), prepared.raw);
+    attempts.push({
+      label: 'multipart',
+      body: new Uint8Array(mp.body),
+      contentType: mp.contentType,
+    });
+
+    // Prefer multipart first for large photos (JSON through Cloudflare often drops).
+    if (prepared.tooLarge) {
+      const multi = attempts.pop()!;
+      attempts.unshift(multi);
+    }
+
+    let last = 'Face enroll failed';
+    let retryable = false;
+    for (const attempt of attempts) {
+      const r = await this.digestRequest(baseUrl, path, {
         method: 'POST',
         username,
         password,
-        body: JSON.stringify(payload),
-        contentType: 'application/json',
-        timeoutMs: 60_000,
-      },
-    );
-    return (
-      r.status < 400 || r.text.includes('deviceUserAlreadyExistFace')
-    );
+        body: attempt.body,
+        contentType: attempt.contentType,
+        timeoutMs: 90_000,
+      });
+      if ((r.status > 0 && r.status < 400) || isFaceAlreadyOk(r.text)) {
+        return { ok: true };
+      }
+      last = snipError(r.status, r.text, `Face(${attempt.label})`);
+      if (isRetryableHttp(r.status, r.text) || r.status === 0) {
+        retryable = true;
+      }
+      this.logger.warn(
+        `reach enroll emp=${empNo} via ${attempt.label}: ${r.status} ${(r.text || '').slice(0, 120)}`,
+      );
+    }
+    if (prepared.tooLarge && !retryable) {
+      last = `${last} (photo ${prepared.raw.length}B >100KB — terminal may reject)`;
+    }
+    return { ok: false, error: last.slice(0, 400), retryable };
   }
 
   async deleteUser(
@@ -363,15 +578,48 @@ export class HikvisionReachClient {
     employeeId: string,
     name: string,
     faceBase64: string,
-  ): Promise<boolean> {
-    const userOk = await this.upsertUser(
-      baseUrl,
-      username,
-      password,
-      employeeId,
-      name,
-    );
-    if (!userOk) return false;
-    return this.enrollFace(baseUrl, username, password, employeeId, faceBase64);
+  ): Promise<ReachResult> {
+    // Extra outer retries for flaky Cloudflare → terminal path.
+    let last: ReachResult = { ok: false, error: 'Reach sync failed' };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const user = await this.upsertUser(
+        baseUrl,
+        username,
+        password,
+        employeeId,
+        name,
+      );
+      if (!user.ok) {
+        last = {
+          ok: false,
+          error: user.error || 'UserInfo failed',
+          retryable: user.retryable,
+        };
+        if (user.retryable && attempt < 2) {
+          await sleep(700 + attempt * 500);
+          continue;
+        }
+        return last;
+      }
+      const face = await this.enrollFace(
+        baseUrl,
+        username,
+        password,
+        employeeId,
+        faceBase64,
+      );
+      if (face.ok) return { ok: true };
+      last = {
+        ok: false,
+        error: face.error || 'Face enroll failed',
+        retryable: face.retryable,
+      };
+      if (face.retryable && attempt < 2) {
+        await sleep(1000 + attempt * 600);
+        continue;
+      }
+      return last;
+    }
+    return last;
   }
 }
