@@ -822,8 +822,9 @@ export class AttendanceService {
     if (dto.authFailed) {
       const streak = Number(prevAuth.authFailStreak || 0) + 1;
       // Transient Digest / alertStream blips must not flip the device into
-      // passwordOutOfSync — require a short streak of confirmed failures.
-      if (streak >= 3) {
+      // passwordOutOfSync — require a longer streak of confirmed failures.
+      // (Shared-client races used to trip this in <10s while password was fine.)
+      if (streak >= 15) {
         meta.auth = {
           ...prevAuth,
           authFailStreak: streak,
@@ -849,7 +850,7 @@ export class AttendanceService {
       meta.auth = { ...prevAuth, authFailStreak: 0 };
     }
     const authHardFail =
-      dto.authFailed === true && Number((meta.auth as Record<string, unknown>).authFailStreak || 0) >= 3;
+      dto.authFailed === true && Number((meta.auth as Record<string, unknown>).authFailStreak || 0) >= 15;
     const nextStatus = authHardFail
       ? 'auth_failed'
       : punchLock.active

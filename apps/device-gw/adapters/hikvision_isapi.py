@@ -287,28 +287,28 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         )
 
     async def heartbeat(self) -> bool:
-        if not self._client:
-            return False
+        """Probe deviceInfo with a fresh Digest client (shared client races AcsEvent)."""
         if self.auth_locked():
             return False
         try:
-            resp = await self._client.get("/ISAPI/System/deviceInfo")
-            if resp.status_code == 401:
-                self._note_auth_response(resp)
-                return False
-            if resp.status_code < 400:
-                self.auth_failed = False
-                self.auth_lock_until = None
-                return True
-            resp2 = await self._client.get("/ISAPI/System/deviceInfo?format=json")
-            if resp2.status_code == 401:
-                self._note_auth_response(resp2)
-                return False
-            ok = resp2.status_code < 400
-            if ok:
-                self.auth_failed = False
-                self.auth_lock_until = None
-            return ok
+            async with await self._command_client() as client:
+                resp = await client.get("/ISAPI/System/deviceInfo")
+                if resp.status_code == 401:
+                    self._note_auth_response(resp)
+                    return False
+                if resp.status_code < 400:
+                    self.auth_failed = False
+                    self.auth_lock_until = None
+                    return True
+                resp2 = await client.get("/ISAPI/System/deviceInfo?format=json")
+                if resp2.status_code == 401:
+                    self._note_auth_response(resp2)
+                    return False
+                ok = resp2.status_code < 400
+                if ok:
+                    self.auth_failed = False
+                    self.auth_lock_until = None
+                return ok
         except Exception as exc:  # noqa: BLE001
             logger.warning("heartbeat failed: %s", exc)
             return False
