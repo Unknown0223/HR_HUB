@@ -32,26 +32,24 @@ def main() -> None:
         sys.path.insert(0, str(here))
     _attach_stdio()
 
-    # Legacy Tk UI only when explicitly requested.
-    if os.environ.get("OFFICE_LINK_UI", "").strip().lower() in ("tk", "tkinter", "classic"):
-        from office_link_gui import run_app
-
-        run_app()
-        return
-
-    try:
-        from desktop_app import run_desktop
-
-        run_desktop()
-    except Exception as exc:
-        # Fallback so ofis still has a working window if WebView2 missing.
+    # Product default: native Windows (Tkinter) setup tool — like an installed .exe app.
+    # WebView2 only when explicitly requested (OFFICE_LINK_UI=webview|html|edge).
+    ui = os.environ.get("OFFICE_LINK_UI", "").strip().lower()
+    if ui in ("webview", "html", "edge", "web"):
         try:
-            sys.stderr.write(f"desktop_app failed: {exc}\n")
-        except Exception:
-            pass
-        from office_link_gui import run_app
+            from desktop_app import run_desktop
 
-        run_app()
+            run_desktop()
+            return
+        except Exception as exc:
+            try:
+                sys.stderr.write(f"desktop_app failed: {exc}\n")
+            except Exception:
+                pass
+
+    from office_link_gui import run_app
+
+    run_app()
 
 
 if __name__ == "__main__":

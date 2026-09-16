@@ -48,7 +48,10 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   String _detectLine = '';
   String _alert = '';
   String _note =
-      'Faqat sozlash: pairing token + Ulash / tarmoqni tiklash. Yuz sync — faqat Web; bu ilova qatnashmaydi.';
+      'Sozlash asbobi: 1) Ulash  2) Tarmoqni tiklash. '
+      'Yuz/otmetka — qurilma↔server; Link ochiq turishi shart emas.';
+
+  int _tab = 0;
 
   List<Map<String, dynamic>> _locations = [];
   String? _locationId;
@@ -498,6 +501,17 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
               ),
             ],
           ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _tab,
+            onDestinationSelected: (i) => setState(() => _tab = i),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.link), label: '1. Ulash'),
+              NavigationDestination(
+                icon: Icon(Icons.wifi_protected_setup),
+                label: '2. Tiklash',
+              ),
+            ],
+          ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
@@ -539,11 +553,17 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
                       'Tenant: ${cfg.tenantCode} · API: ${cfg.apiUrl.replaceFirst('https://', '')}',
                       style: const TextStyle(fontSize: 11, color: LinkColors.muted),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _note,
+                      style: const TextStyle(fontSize: 12, color: LinkColors.muted),
+                    ),
                   ],
                 ),
               ),
+              if (_tab == 0)
               _card(
-                title: 'Ulanish sozlamalari',
+                title: '1. Qurilmani serverga ulash',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -674,26 +694,39 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
                         child: Text(_alert),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    Text(
-                      _note,
-                      style: const TextStyle(fontSize: 12, color: LinkColors.muted),
-                    ),
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: _busy ? null : _reconnect,
-                    child: const Text('Tarmoqni qayta ulash'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _busy ? null : _ulash,
-                    child: Text(_busy ? 'Kuting…' : 'Ulash'),
-                  ),
-                ],
+              if (_tab == 0)
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: _busy ? null : _ulash,
+                  child: Text(_busy ? 'Kuting…' : 'Ulash'),
+                ),
+              ),
+              if (_tab == 1)
+              _card(
+                title: '2. Tarmoq / aloqani tiklash',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Wi‑Fi yoki IP o‘zgarganda qurilmani serverga qayta bog‘laydi. '
+                      'Parol aylantirilmaydi. Tunnel — ofis PC (Windows Link).',
+                      style: TextStyle(fontSize: 13, color: LinkColors.muted),
+                    ),
+                    if (_alert.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(_alert),
+                    ],
+                    const SizedBox(height: 14),
+                    FilledButton(
+                      onPressed: _busy ? null : _reconnect,
+                      child: const Text('Tarmoqni qayta ulash'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

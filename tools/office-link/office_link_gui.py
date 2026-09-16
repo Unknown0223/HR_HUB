@@ -469,6 +469,35 @@ class OfficeLinkApp:
         )
         self.rescan_btn.pack(side=tk.LEFT, padx=(8, 0))
 
+        # Multi-device picker: show all LAN Hikvision IPs; password probe marks ✓/✗.
+        ttk.Label(
+            conn,
+            text="Найденные терминалы (выберите нужный)",
+            style="Muted.TLabel",
+        ).pack(anchor="w", pady=(4, 2))
+        list_wrap = ttk.Frame(conn, style="Card.TFrame")
+        list_wrap.pack(fill=tk.X, pady=(0, 6))
+        self.device_list = tk.Listbox(
+            list_wrap,
+            height=4,
+            activestyle="dotbox",
+            font=("Segoe UI", 9),
+            bg=C["surface"],
+            fg=C["text"],
+            selectbackground=C["accent"],
+            selectforeground="#ffffff",
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=C.get("border", "#d4d4d8"),
+            exportselection=False,
+        )
+        self.device_list.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        scroll = ttk.Scrollbar(list_wrap, orient=tk.VERTICAL, command=self.device_list.yview)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.device_list.configure(yscrollcommand=scroll.set)
+        self.device_list.bind("<<ListboxSelect>>", self._on_device_list_select)
+        self._device_list_rows: list[dict] = []
+
         row = self._field_row(conn, "Локация")
         self.location_var = tk.StringVar(value="")
         self.location_combo = ttk.Combobox(
@@ -501,6 +530,13 @@ class OfficeLinkApp:
             width=10,
         )
         self.pwd_toggle_btn.pack(side=tk.LEFT, padx=(8, 0))
+        self.pwd_probe_btn = ttk.Button(
+            row,
+            text="Проверить на всех",
+            style="Secondary.TButton",
+            command=self._on_probe_passwords,
+        )
+        self.pwd_probe_btn.pack(side=tk.LEFT, padx=(8, 0))
 
         self.btn_row = ttk.Frame(conn, style="Card.TFrame")
         self.btn_row.pack(anchor="e", pady=(4, 0))
@@ -532,10 +568,10 @@ class OfficeLinkApp:
             hint,
             text=(
                 "Это установочный инструмент (как «мастер»): только привязка и восстановление. "
-                "1) Web → «Связь с офисом» → pairing-токен → «Подключить». "
-                "2) После подтверждения в Web — закройте это окно. "
-                "Лица и отметки идут устройство↔сервер без этой программы. "
-                "Если Wi‑Fi/IP или туннель упали — вкладка «2. Восстановление»."
+                "1) Web → «Связь с офисом» → pairing-токен. "
+                "2) «Найти» — agar bir nechta terminal bo‘lsa, ro‘yxatdan tanlang "
+                "yoki parolni «Проверить на всех» bilan mosini belgilang → «Подключить». "
+                "3) Wi‑Fi/IP o‘zgarsa — вкладка «2. Восстановление»."
             ),
             style="Hint.TLabel",
             wraplength=520,
@@ -1210,7 +1246,9 @@ class OfficeLinkApp:
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
         state = "disabled" if busy else "normal"
-        for w in (self.rescan_btn, self.token_btn, self.token_paste_btn, self.loc_refresh_btn):
+        for w in (self.rescan_btn, self.token_btn, self.token_paste_btn, self.loc_refresh_btn, getattr(self, "pwd_probe_btn", None)):
+            if w is None:
+                continue
             try:
                 w.state(["disabled"] if busy else ["!disabled"])
             except (tk.TclError, AttributeError):
@@ -1223,6 +1261,10 @@ class OfficeLinkApp:
                 w.configure(state="disabled" if busy else "normal")
             except tk.TclError:
                 pass
+        try:
+            self.device_list.configure(state="disabled" if busy else "normal")
+        except (tk.TclError, AttributeError):
+            pass
         try:
             self.location_combo.configure(state="disabled" if busy else "readonly")
         except tk.TclError:
@@ -1321,6 +1363,7 @@ class OfficeLinkApp:
             hint = self.ip_var.get().strip()
             self.status_var.set("Устройство не найдено")
             self._set_badge("OFFLINE", "danger")
+            self._populate_device_list([])
             if hint:
                 self.device_var.set(f"Устройство: {hint} не отвечает")
                 self._show_alert(
@@ -1337,15 +1380,216 @@ class OfficeLinkApp:
                 )
             self.state_var.set("Состояние: —")
             return
-        self._show_device()
-        if devices[0].online:
+        self._populate_device_list(devices)
+        if len(devices) == 1:
+            self.session.select_scanned_host(devices[0].host, devices[0].port)
+            self._show_device()
             self.status_var.set("В сети")
             self._set_badge("ONLINE", "ok")
             self._show_alert("Устройство найдено и доступно в сети.", kind="ok")
+            return
+        self.status_var.set(f"Найдено: {len(devices)}")
+        self._set_badge("ВЫБОР", "warn")
+        self.device_var.set(f"Устройства: {len(devices)} в LAN — выберите нужный")
+        self.state_var.set("Состояние: выберите IP или проверьте пароль на всех")
+        self._show_alert(
+            f"LAN da {len(devices)} ta terminal. Ro‘yxatdan tanlang yoki parolni "
+            "yozib «Проверить на всех» — mos kelganini belgilaymiz.",
+            kind="warn",
+        )
+
+    def _populate_device_list(
+        self,
+        devices: list | None = None,
+        *,
+        probes: list | None = None,
+    ) -> None:
+        """Fill listbox from scan results and/or password probe results."""
+        if not hasattr(self, "device_list"):
+            return
+        self.device_list.delete(0, tk.END)
+        self._device_list_rows = []
+        probe_by_host = {}
+        if probes:
+            for p in probes:
+                host = getattr(p, "host", None) or (p.get("host") if isinstance(p, dict) else "")
+                if host:
+                    probe_by_host[str(host)] = p
+        source = devices if devices is not None else list(self.session.devices or [])
+        if not source and probe_by_host:
+            # Synthetic rows from probe-only results.
+            for host, p in probe_by_host.items():
+                port = int(getattr(p, "port", 80) or 80)
+                ok = bool(getattr(p, "ok", False))
+                label = (
+                    p.label()
+                    if hasattr(p, "label")
+                    else f"{'✓' if ok else '✗'}  {host}"
+                )
+                self._device_list_rows.append(
+                    {"host": host, "port": port, "ok": ok, "label": label}
+                )
+                self.device_list.insert(tk.END, label)
+            return
+        for d in source:
+            host = d.host
+            port = int(d.port or 80)
+            probe = probe_by_host.get(host)
+            if probe is not None:
+                ok = bool(getattr(probe, "ok", False))
+                label = (
+                    probe.label()
+                    if hasattr(probe, "label")
+                    else f"{'✓' if ok else '✗'}  {host}"
+                )
+            else:
+                name = d.hint_name or "Hikvision"
+                label = f"•  {host}  ·  {name}"
+                ok = None
+            self._device_list_rows.append(
+                {"host": host, "port": port, "ok": ok, "label": label}
+            )
+            self.device_list.insert(tk.END, label)
+        # Pre-select chosen / single match
+        chosen = self.session.chosen
+        if chosen:
+            for i, row in enumerate(self._device_list_rows):
+                if row["host"] == chosen.host:
+                    self.device_list.selection_set(i)
+                    self.device_list.see(i)
+                    break
         else:
-            self.status_var.set("Устройство не найдено")
-            self._set_badge("OFFLINE", "danger")
-            self._show_alert("Устройство обнаружено, но не в сети.", kind="danger")
+            matched_idx = [
+                i for i, row in enumerate(self._device_list_rows) if row.get("ok") is True
+            ]
+            if len(matched_idx) == 1:
+                self.device_list.selection_set(matched_idx[0])
+                self.device_list.see(matched_idx[0])
+
+    def _on_device_list_select(self, _event=None) -> None:
+        if self.busy:
+            return
+        sel = self.device_list.curselection()
+        if not sel:
+            return
+        idx = int(sel[0])
+        if idx < 0 or idx >= len(self._device_list_rows):
+            return
+        row = self._device_list_rows[idx]
+        self.session.select_scanned_host(row["host"], row["port"])
+        self.ip_var.set(row["host"])
+        self._show_device()
+        self.status_var.set("Выбрано")
+        self._set_badge("ONLINE", "ok")
+
+    def _on_probe_passwords(self) -> None:
+        if self.busy or self.session.auth.is_locked():
+            return
+        password = self.pwd_var.get().strip()
+        if not password:
+            self._show_alert("Avval admin parolini yozing.", kind="warn")
+            return
+        if not self.session.devices:
+            # Scan first if list empty
+            self._start_scan()
+            self.root.after(800, self._on_probe_passwords)
+            return
+        self._set_busy(True)
+        self.status_var.set("Проверка пароля на всех IP…")
+        self._set_badge("ПАРОЛЬ", "accent")
+
+        def work() -> None:
+            results, match, reason = self.session.pick_password_match(
+                password,
+                host_hint=self.ip_var.get().strip() or None,
+            )
+            self.root.after(
+                0, lambda: self._probe_passwords_done(results, match, reason)
+            )
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _probe_passwords_done(self, results, match, reason: str) -> None:
+        self._set_busy(False)
+        self._populate_device_list(self.session.devices, probes=results)
+        ok_n = sum(1 for r in results if getattr(r, "ok", False))
+        if reason == "ok" and match is not None:
+            self.ip_var.set(match.host)
+            self._show_device()
+            self.status_var.set("Пароль совпал")
+            self._set_badge("ПАРОЛЬ OK", "ok")
+            self._show_alert(
+                f"Parol mos: {match.host}"
+                + (f" · {match.name}" if match.name else "")
+                + ". «Подключить» / «Восстановить сеть» bilan davom eting.",
+                kind="ok",
+            )
+            return
+        if reason == "need_pick":
+            self.status_var.set("Выберите устройство")
+            self._set_badge("ВЫБОР", "warn")
+            self._show_alert(
+                f"Parol {ok_n} ta IP da mos keldi. Ro‘yxatdan keraklisini tanlang.",
+                kind="warn",
+            )
+            return
+        if reason == "none":
+            self.status_var.set("Пароль не подошёл")
+            self._set_badge("ПАРОЛЬ", "danger")
+            self._show_alert(
+                "Parol hech qaysi topilgan terminalga mos kelmadi. "
+                "Boshqa parol yoki IP ni tekshiring.",
+                kind="danger",
+            )
+            return
+        if reason == "empty":
+            self._show_alert("Введите пароль администратора.", kind="warn")
+            return
+        self._show_alert("Avval «Найти» bilan terminallarni qidiring.", kind="warn")
+
+    def _ask_pick_matched_host(self, matches: list[dict]) -> str | None:
+        """Modal picker when several password-matched IPs remain."""
+        if not matches:
+            return None
+        if len(matches) == 1:
+            return str(matches[0].get("host") or "")
+        win = tk.Toplevel(self.root)
+        win.title("Выбор терминала")
+        win.transient(self.root)
+        win.grab_set()
+        ttk.Label(
+            win,
+            text="Parol bir nechta qurilmaga mos. Davom etish uchun bittasini tanlang:",
+            wraplength=420,
+        ).pack(anchor="w", padx=14, pady=(12, 8))
+        lb = tk.Listbox(win, height=min(8, max(3, len(matches))), font=("Segoe UI", 9))
+        lb.pack(fill=tk.BOTH, expand=True, padx=14, pady=4)
+        for m in matches:
+            host = str(m.get("host") or "")
+            name = str(m.get("name") or "")
+            sn = str(m.get("serialNumber") or "")
+            lb.insert(tk.END, f"{host}  ·  {name}" + (f"  ·  S/N {sn}" if sn else ""))
+        lb.selection_set(0)
+        picked: dict[str, str | None] = {"host": None}
+
+        def ok() -> None:
+            sel = lb.curselection()
+            if not sel:
+                return
+            picked["host"] = str(matches[int(sel[0])].get("host") or "")
+            win.destroy()
+
+        def cancel() -> None:
+            picked["host"] = None
+            win.destroy()
+
+        btns = ttk.Frame(win)
+        btns.pack(fill=tk.X, padx=14, pady=12)
+        ttk.Button(btns, text="Отмена", command=cancel).pack(side=tk.RIGHT)
+        ttk.Button(btns, text="Выбрать", command=ok).pack(side=tk.RIGHT, padx=(0, 8))
+        win.protocol("WM_DELETE_WINDOW", cancel)
+        self.root.wait_window(win)
+        return picked["host"]
 
     def _reset_reconnect_steps(self) -> None:
         self.reconnect_detail_var.set("")
@@ -1506,6 +1750,38 @@ class OfficeLinkApp:
                 "Теперь Web → Синхронизировать должен работать (DEVICE_GW tunnel).",
             )
             return
+        if kind == "need_pick":
+            matches = list((result.device or {}).get("matches") or [])
+            self.device_list.delete(0, tk.END)
+            self._device_list_rows = []
+            for m in matches:
+                host = str(m.get("host") or "")
+                port = int(m.get("port") or 80)
+                name = str(m.get("name") or "Hikvision")
+                sn = str(m.get("serialNumber") or "")
+                label = f"✓  {host}  ·  {name}" + (f" · S/N {sn}" if sn else "")
+                self._device_list_rows.append(
+                    {"host": host, "port": port, "ok": True, "label": label}
+                )
+                self.device_list.insert(tk.END, label)
+            host = self._ask_pick_matched_host(matches)
+            if not host:
+                self.status_var.set("Выбор отменён")
+                self._set_badge("ВЫБОР", "warn")
+                self._show_alert(result.message or "Qurilmani tanlang.", kind="warn")
+                return
+            self.ip_var.set(host)
+            self.session.select_scanned_host(host)
+            # Retry reconnect with explicit IP
+            self._set_busy(True)
+            self.status_var.set("Повтор с выбранным IP…")
+            password = self.pwd_var.get().strip()
+            threading.Thread(
+                target=self._reconnect_auto_worker,
+                args=(password, host),
+                daemon=True,
+            ).start()
+            return
         if kind == UNAUTHORIZED or kind == "empty":
             self.status_var.set(result.message or "Пароль не найден")
             self._set_badge("ПАРОЛЬ", "danger")
@@ -1566,7 +1842,81 @@ class OfficeLinkApp:
                 kind="warn",
             )
             return
+        password = self.pwd_var.get()
+        if not password.strip():
+            self.status_var.set("Нужен пароль")
+            self._set_badge("ПАРОЛЬ", "warn")
+            self._show_alert("Введите текущий пароль администратора.", kind="warn")
+            return
+
         ip = self.ip_var.get().strip()
+        # Multi-device: if list has several and no firm chosen IP, probe password.
+        need_resolve = (
+            (not ip and not self.session.chosen)
+            or (not ip and len(self.session.devices or []) > 1 and self.session.chosen is None)
+            or (len(self.session.devices or []) > 1 and not ip)
+        )
+        if need_resolve or (len(self.session.devices or []) > 1 and not self.session.chosen):
+            if not self.session.devices:
+                self.status_var.set("Устройство не найдено")
+                self._show_alert(
+                    "Avval «Найти» — LAN dagi terminallarni qidiring.",
+                    kind="warn",
+                )
+                return
+            self._set_busy(True)
+            self.status_var.set("Подбор устройства по паролю…")
+
+            def resolve() -> None:
+                results, match, reason = self.session.pick_password_match(
+                    password.strip(),
+                    host_hint=ip or None,
+                )
+
+                def after() -> None:
+                    self._set_busy(False)
+                    self._populate_device_list(self.session.devices, probes=results)
+                    if reason == "ok" and match is not None:
+                        self.ip_var.set(match.host)
+                        self._show_device()
+                        self._confirm_and_start_ulash(password)
+                        return
+                    if reason == "need_pick":
+                        matched = [
+                            {
+                                "host": r.host,
+                                "port": r.port,
+                                "name": r.name,
+                                "serialNumber": r.serialNumber,
+                            }
+                            for r in results
+                            if r.ok
+                        ]
+                        host = self._ask_pick_matched_host(matched)
+                        if not host:
+                            self._show_alert("Tanlov bekor qilindi.", kind="warn")
+                            return
+                        self.session.select_scanned_host(host)
+                        self.ip_var.set(host)
+                        self._show_device()
+                        self._confirm_and_start_ulash(password)
+                        return
+                    if reason == "none":
+                        self._show_alert(
+                            "Parol hech qaysi topilgan terminalga mos kelmadi.",
+                            kind="danger",
+                        )
+                        return
+                    self._show_alert(
+                        "Qurilmani tanlab bo‘lmadi. IP yoki parolni tekshiring.",
+                        kind="warn",
+                    )
+
+                self.root.after(0, after)
+
+            threading.Thread(target=resolve, daemon=True).start()
+            return
+
         if ip:
             chosen = self.session.choose_ip(ip)
             if chosen is None:
@@ -1585,12 +1935,9 @@ class OfficeLinkApp:
             self.status_var.set("Устройство не найдено")
             self._show_alert("Устройство не найдено. Сначала выполните поиск.", kind="warn")
             return
-        password = self.pwd_var.get()
-        if not password.strip():
-            self.status_var.set("Нужен пароль")
-            self._set_badge("ПАРОЛЬ", "warn")
-            self._show_alert("Введите текущий пароль администратора.", kind="warn")
-            return
+        self._confirm_and_start_ulash(password)
+
+    def _confirm_and_start_ulash(self, password: str) -> None:
         # Operator confirms what they typed before rotate+send to server.
         try:
             from device_email import normalize_recovery_email

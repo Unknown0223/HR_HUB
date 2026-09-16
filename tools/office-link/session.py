@@ -12,6 +12,7 @@ from discovery import (
     TIMEOUT,
     UNAUTHORIZED,
     OnlineInfo,
+    VerifyResult,
     find_devices,
     probe_online,
     valid_ip,
@@ -57,6 +58,26 @@ class ReconnectMatch:
     serial: str
     password_source: str
     host_changed: bool
+
+
+@dataclass
+class PasswordProbeResult:
+    """One LAN host checked with an admin password."""
+
+    host: str
+    port: int = 80
+    ok: bool = False
+    kind: str = UNAUTHORIZED
+    serialNumber: str = ""
+    name: str = ""
+    model: str = ""
+    detail: str = ""
+
+    def label(self) -> str:
+        mark = "✓" if self.ok else "✗"
+        title = self.name or self.model or "Hikvision"
+        sn = f" · S/N {self.serialNumber}" if self.serialNumber else ""
+        return f"{mark}  {self.host}  ·  {title}{sn}"
 
 
 class OfficeLinkSession:
@@ -132,13 +153,22 @@ class OfficeLinkSession:
             self.detected_state = None
             return self.devices
         self.devices = find_devices(prefixes)
-        self.chosen = self.devices[0] if self.devices else None
+        # Multiple terminals: do not silently lock onto the first IP —
+        # operator (or password probe) must choose.
+        if len(self.devices) == 1:
+            self.chosen = self.devices[0]
+        else:
+            self.chosen = None
         self._refresh_detected_state()
         return self.devices
 
     def choose(self, host: str, port: int = 80) -> OnlineInfo:
         info = probe_online(host, port)
         self.chosen = info
+        # Keep in devices list if missing.
+        if info.online and info.likely_hikvision:
+            if not any(d.host == info.host and int(d.port or 80) == int(info.port or 80) for d in self.devices):
+                self.devices = list(self.devices) + [info]
         self._refresh_detected_state()
         return info
 
@@ -147,6 +177,110 @@ class OfficeLinkSession:
         if not valid_ip(ip):
             return None
         return self.choose(ip, port)
+
+    def select_scanned_host(self, host: str, port: int = 80) -> OnlineInfo | None:
+        """Pick an already-scanned LAN device without re-probing when possible."""
+        host_n = (host or "").strip()
+        port_n = int(port or 80)
+        for d in self.devices:
+            if d.host == host_n and int(d.port or 80) == port_n:
+                self.chosen = d
+                self._refresh_detected_state()
+                return d
+        if host_n and valid_ip(host_n):
+            return self.choose(host_n, port_n)
+        return None
+
+    def match_password_on_lan(
+        self,
+        password: str,
+        *,
+        devices: list[OnlineInfo] | None = None,
+        username: str | None = None,
+        on_status: StatusFn | None = None,
+    ) -> list[PasswordProbeResult]:
+        """Try the same admin password against every found Hikvision IP."""
+        pwd = (password or "").strip()
+        user = (username or self.username or "admin").strip() or "admin"
+        targets = list(devices if devices is not None else self.devices)
+        if not targets and self.chosen:
+            targets = [self.chosen]
+        out: list[PasswordProbeResult] = []
+        if not pwd:
+            for d in targets:
+                out.append(
+                    PasswordProbeResult(
+                        host=d.host,
+                        port=int(d.port or 80),
+                        ok=False,
+                        kind="empty",
+                        detail="no password",
+                        name=d.hint_name or "",
+                    )
+                )
+            return out
+        for d in targets:
+            if on_status:
+                on_status(f"Parol tekshiruvi: {d.host}…")
+            result = verify_password(d.host, int(d.port or 80), user, pwd)
+            out.append(
+                PasswordProbeResult(
+                    host=d.host,
+                    port=int(d.port or 80),
+                    ok=result.kind == OK,
+                    kind=result.kind,
+                    serialNumber=str(result.serialNumber or ""),
+                    name=str(result.name or d.hint_name or ""),
+                    model=str(result.model or ""),
+                    detail=str(result.detail or ""),
+                )
+            )
+        return out
+
+    def pick_password_match(
+        self,
+        password: str,
+        *,
+        host_hint: str | None = None,
+        devices: list[OnlineInfo] | None = None,
+        on_status: StatusFn | None = None,
+    ) -> tuple[list[PasswordProbeResult], PasswordProbeResult | None, str]:
+        """Probe all LAN devices; auto-pick when exactly one password matches.
+
+        Returns (all_results, chosen_match_or_None, reason_code):
+          ok | need_pick | none | empty | no_devices
+        """
+        hint = (host_hint or "").strip()
+        targets = list(devices if devices is not None else self.devices)
+        if hint and valid_ip(hint):
+            # Prefer explicit IP: probe that host first / only if not in list.
+            if not any(d.host == hint for d in targets):
+                info = probe_online(hint, 80)
+                if info.online:
+                    targets = [info] + targets
+                else:
+                    targets = targets  # keep scan results
+            # Narrow to hint when present in list
+            narrowed = [d for d in targets if d.host == hint]
+            if narrowed:
+                targets = narrowed
+        if not targets:
+            return [], None, "no_devices"
+        if not (password or "").strip():
+            return [], None, "empty"
+        results = self.match_password_on_lan(
+            password, devices=targets, on_status=on_status
+        )
+        matched = [r for r in results if r.ok]
+        if not matched:
+            return results, None, "none"
+        if len(matched) == 1:
+            m = matched[0]
+            self.select_scanned_host(m.host, m.port)
+            self.password = (password or "").strip()
+            return results, m, "ok"
+        # Multiple matches — caller must show picker.
+        return results, None, "need_pick"
 
     def bind_pairing_session(self) -> tuple[bool, str]:
         """Bind office client to platform provision session; may receive link.key."""
@@ -767,12 +901,30 @@ class OfficeLinkSession:
         top = score(best)
         rivals = [m for m in matches if score(m) == top and m.web.get("id") != best.web.get("id")]
         if rivals:
+            options = [best] + rivals
             return SubmitResult(
-                kind="api",
+                kind="need_pick",
                 message=(
-                    f"Найдено несколько подходящих устройств ({1 + len(rivals)}). "
-                    "Укажите точный адрес в поле IP."
+                    f"Mos keladigan {len(options)} ta qurilma topildi. "
+                    "Ro‘yxatdan keraklisini tanlang."
                 ),
+                device={
+                    "matches": [
+                        {
+                            "host": m.lan.host,
+                            "port": int(m.lan.port or 80),
+                            "name": str(
+                                m.web.get("name")
+                                or m.lan.hint_name
+                                or m.lan.host
+                            ),
+                            "serialNumber": m.serial,
+                            "webId": str(m.web.get("id") or ""),
+                            "passwordOk": True,
+                        }
+                        for m in options
+                    ]
+                },
             )
         return best
 

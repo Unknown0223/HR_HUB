@@ -2,10 +2,11 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const titles = {
-    connect: ["Подключение", "Привязка Face ID терминала к HR HUB"],
-    reconnect: ["Сеть", "Восстановление связи после смены IP"],
-    tunnel: ["Туннель", "Доступ сервера к терминалу"],
-    device: ["Устройство", "Текущее состояние привязки"],
+    connect: ["1. Подключение", "Привязка терминала к HR HUB — затем закройте окно"],
+    restore: ["2. Восстановление", "Сеть / IP и туннель после сбоя"],
+    reconnect: ["2. Восстановление", "Сеть / IP и туннель после сбоя"],
+    tunnel: ["2. Восстановление", "Сеть / IP и туннель после сбоя"],
+    device: ["2. Восстановление", "Сеть / IP и туннель после сбоя"],
   };
 
   let busy = false;
@@ -104,6 +105,50 @@
     if (dev.apiUrl) $("devApi").textContent = dev.apiUrl;
   }
 
+  function fillDeviceList(devices, selectedHost) {
+    const field = $("deviceListField");
+    const sel = $("deviceList");
+    if (!field || !sel) return;
+    const rows = Array.isArray(devices) ? devices : [];
+    sel.innerHTML = "";
+    if (!rows.length) {
+      field.hidden = true;
+      return;
+    }
+    field.hidden = false;
+    rows.forEach((d) => {
+      const opt = document.createElement("option");
+      const host = d.host || "";
+      const port = d.port || 80;
+      const name = d.name || "Hikvision";
+      const ok = d.ok;
+      let mark = "•";
+      let cls = "";
+      if (ok === true) {
+        mark = "✓";
+        cls = "ok";
+      } else if (ok === false) {
+        mark = "✗";
+        cls = "fail";
+      } else if (d.needPick) {
+        mark = "✓";
+        cls = "pick";
+      }
+      opt.value = host + ":" + port;
+      opt.dataset.host = host;
+      opt.dataset.port = String(port);
+      opt.className = cls;
+      opt.textContent =
+        mark + "  " + host + "  ·  " + name + (d.serialNumber ? "  ·  S/N " + d.serialNumber : "");
+      if (selectedHost && host === selectedHost) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!sel.value && sel.options.length) {
+      const firstOk = Array.from(sel.options).find((o) => o.classList.contains("ok") || o.classList.contains("pick"));
+      (firstOk || sel.options[0]).selected = true;
+    }
+  }
+
   function fillTunnel(t) {
     $("tunnelState").textContent = t.state || "—";
     $("tunnelUrl").textContent = t.url || "—";
@@ -146,6 +191,7 @@
     fillBootstrap,
     fillLocations,
     fillDevice,
+    fillDeviceList,
     fillTunnel,
     onConnectProgress(result) {
       if (result && result.status) setStatus(result.status);
@@ -156,13 +202,24 @@
       if (result.ok === false) {
         setAlert(result.message || "Поиск не удался", "danger");
         setStatus({ title: "Ошибка поиска", sub: result.message || "", kind: "danger", badge: "ОШИБКА" });
+        fillDeviceList([]);
         return;
       }
-      if (result.ip) $("ip").value = result.ip;
+      if (result.ip && !result.needPick) $("ip").value = result.ip;
+      fillDeviceList(result.devices || [], result.ip || "");
       setStatus(result.status || { title: "Найдено", kind: "ok", badge: "ОНЛАЙН", sub: result.sub || "" });
       if (result.device) fillDevice(result.device);
       if (result.alert) setAlert(result.alert.text, result.alert.kind);
       else setAlert("");
+    },
+    onProbeDone(result) {
+      setBusy(false);
+      if (!result) return;
+      if (result.ip && result.reason === "ok") $("ip").value = result.ip;
+      fillDeviceList(result.devices || [], result.ip || "");
+      if (result.status) setStatus(result.status);
+      if (result.alert) setAlert(result.alert.text, result.alert.kind);
+      if (result.device) fillDevice(result.device);
     },
     onConnectDone(result) {
       setBusy(false);
@@ -173,6 +230,14 @@
       else setAlert("");
       if (result.device) fillDevice(result.device);
       if (result.tunnel) fillTunnel(result.tunnel);
+      if (result.devices) fillDeviceList(result.devices, result.ip || $("ip").value);
+      if (result.needPick && result.ip) $("ip").value = result.ip;
+      if (result.needPick && Array.isArray(result.matches)) {
+        fillDeviceList(
+          result.matches.map((m) => ({ ...m, ok: true, needPick: true })),
+          result.ip || ""
+        );
+      }
       $("btnUnlock").hidden = !result.locked;
     },
     onReconnectProgress(steps) {
@@ -193,6 +258,13 @@
       if (result.device) fillDevice(result.device);
       if (result.tunnel) fillTunnel(result.tunnel);
       if (result.steps) window.__hrhub.onReconnectProgress(result.steps);
+      if (result.needPick && Array.isArray(result.matches)) {
+        fillDeviceList(
+          result.matches.map((m) => ({ ...m, ok: true, needPick: true })),
+          ""
+        );
+        switchTab("connect");
+      }
     },
     onTunnelDone(result) {
       setBusy(false);
@@ -248,6 +320,17 @@
     setBusy(true, "Поиск терминала…");
     await call("scan", $("ip").value);
   });
+  $("deviceList").addEventListener("change", async () => {
+    const opt = $("deviceList").selectedOptions[0];
+    if (!opt) return;
+    const host = opt.dataset.host || "";
+    const port = Number(opt.dataset.port || 80);
+    if (!host) return;
+    $("ip").value = host;
+    const res = await call("choose_device", host, port);
+    if (res?.device) fillDevice(res.device);
+    if (res?.status) setStatus(res.status);
+  });
   $("btnLocRefresh").addEventListener("click", async () => {
     setBusy(true, "Локации…");
     await call("refresh_locations", $("token").value);
@@ -256,6 +339,15 @@
     pwdVisible = !pwdVisible;
     $("password").type = pwdVisible ? "text" : "password";
     $("btnTogglePwd").textContent = pwdVisible ? "Скрыть" : "Показать";
+  });
+  $("btnProbePwd").addEventListener("click", async () => {
+    const password = $("password").value;
+    if (!password.trim()) {
+      setAlert("Введите текущий пароль администратора.", "warn");
+      return;
+    }
+    setBusy(true, "Проверка пароля на всех IP…");
+    await call("probe_passwords", password, $("ip").value);
   });
   $("btnConnect").addEventListener("click", async () => {
     const password = $("password").value;
@@ -286,7 +378,10 @@
   });
   $("btnReconnect").addEventListener("click", async () => {
     setBusy(true, "Восстановление сети…");
-    await call("reconnect");
+    await call("reconnect", {
+      password: $("password").value,
+      ip: $("ip").value,
+    });
   });
   $("btnTunnelRefresh").addEventListener("click", async () => {
     setBusy(true, "Проверка туннеля…");

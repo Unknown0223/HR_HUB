@@ -200,6 +200,28 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.section-title {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.device-list {
+  width: 100%;
+  min-height: 88px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  font: inherit;
+  font-size: 13px;
+  background: #fff;
+  color: var(--text);
+}
+.device-list option.ok { color: var(--ok); font-weight: 600; }
+.device-list option.fail { color: var(--danger); }
+.device-list option.pick { color: var(--warn); font-weight: 600; }
+
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }
   .rail { flex-direction: row; align-items: center; gap: 12px; padding: 12px; }

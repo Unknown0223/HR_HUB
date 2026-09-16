@@ -325,32 +325,197 @@ class LinkApi:
                     {"ok": False, "message": "Терминал в LAN не найден."},
                 )
                 return
-            pick = devices[0]
-            self.session.choose(pick.host, pick.port)
-            state = self.session.detected_state_label()
+            if len(devices) == 1:
+                pick = devices[0]
+                self.session.choose(pick.host, pick.port)
+            else:
+                pick = self.session.chosen or devices[0]
+            state = self.session.detected_state_label() if self.session.chosen else "—"
             self._emit(
                 "onScanDone",
                 {
                     "ok": True,
-                    "ip": pick.host,
-                    "sub": f"Устройство: {pick.host}",
+                    "ip": (pick.host if pick else ""),
+                    "needPick": len(devices) > 1 and self.session.chosen is None,
+                    "devices": [
+                        {
+                            "host": d.host,
+                            "port": int(d.port or 80),
+                            "name": d.hint_name or "Hikvision",
+                        }
+                        for d in devices
+                    ],
+                    "sub": (
+                        f"Устройство: {pick.host}"
+                        if len(devices) == 1
+                        else f"Найдено: {len(devices)} — выберите IP"
+                    ),
                     "status": {
-                        "title": "Терминал найден",
-                        "sub": f"Устройство: {pick.host}",
-                        "kind": "ok",
-                        "badge": "ОНЛАЙН",
+                        "title": (
+                            "Терминал найден"
+                            if len(devices) == 1
+                            else f"Найдено: {len(devices)}"
+                        ),
+                        "sub": (
+                            f"Устройство: {pick.host}"
+                            if len(devices) == 1
+                            else "Выберите терминал или проверьте пароль"
+                        ),
+                        "kind": "ok" if len(devices) == 1 else "warn",
+                        "badge": "ОНЛАЙН" if len(devices) == 1 else "ВЫБОР",
                     },
                     "device": {
-                        "name": getattr(pick, "name", "") or "Hikvision",
-                        "host": pick.host,
+                        "name": getattr(pick, "hint_name", "") or "Hikvision",
+                        "host": pick.host if pick else "",
                         "state": state,
                         "location": self._location_label(),
                         "apiUrl": self.session.api_url,
+                    },
+                    "alert": {
+                        "text": (
+                            "Устройство найдено."
+                            if len(devices) == 1
+                            else f"LAN da {len(devices)} ta terminal — tanlang yoki parolni tekshiring."
+                        ),
+                        "kind": "ok" if len(devices) == 1 else "warn",
                     },
                 },
             )
         except Exception as exc:
             self._emit("onScanDone", {"ok": False, "message": str(exc)})
+
+    def choose_device(self, host: str, port: int = 80) -> dict[str, Any]:
+        info = self.session.select_scanned_host(str(host or "").strip(), int(port or 80))
+        if info is None:
+            return {
+                "ok": False,
+                "alert": {"text": "Некорректный IP.", "kind": "warn"},
+            }
+        return {
+            "ok": True,
+            "ip": info.host,
+            "status": {
+                "title": "Выбрано",
+                "sub": f"Устройство: {info.host}",
+                "kind": "ok",
+                "badge": "ONLINE",
+            },
+            "device": {
+                "name": info.hint_name or "Hikvision",
+                "host": info.host,
+                "state": self.session.detected_state_label(),
+                "location": self._location_label(),
+                "apiUrl": self.session.api_url,
+            },
+        }
+
+    def probe_passwords(self, password: str, ip_hint: str = "") -> bool:
+        threading.Thread(
+            target=self._probe_passwords_worker,
+            args=(str(password or ""), str(ip_hint or "").strip()),
+            daemon=True,
+        ).start()
+        return True
+
+    def _probe_passwords_worker(self, password: str, ip_hint: str) -> None:
+        try:
+            if not self.session.devices:
+                self.session.scan(ip_hint=ip_hint or None)
+            results, match, reason = self.session.pick_password_match(
+                password, host_hint=ip_hint or None
+            )
+            devices = [
+                {
+                    "host": r.host,
+                    "port": int(r.port or 80),
+                    "name": r.name or "Hikvision",
+                    "serialNumber": r.serialNumber or "",
+                    "ok": bool(r.ok),
+                }
+                for r in results
+            ]
+            if reason == "ok" and match is not None:
+                self._emit(
+                    "onProbeDone",
+                    {
+                        "reason": "ok",
+                        "ip": match.host,
+                        "devices": devices,
+                        "status": {
+                            "title": "Пароль совпал",
+                            "sub": f"Устройство: {match.host}",
+                            "kind": "ok",
+                            "badge": "ПАРОЛЬ OK",
+                        },
+                        "alert": {
+                            "text": f"Parol mos: {match.host}. «Подключить» bilan davom eting.",
+                            "kind": "ok",
+                        },
+                        "device": {
+                            "name": match.name or "Hikvision",
+                            "host": match.host,
+                            "state": self.session.detected_state_label(),
+                            "location": self._location_label(),
+                            "apiUrl": self.session.api_url,
+                        },
+                    },
+                )
+                return
+            if reason == "need_pick":
+                self._emit(
+                    "onProbeDone",
+                    {
+                        "reason": "need_pick",
+                        "needPick": True,
+                        "devices": devices,
+                        "status": {
+                            "title": "Выберите устройство",
+                            "sub": "Parol bir nechta IP da mos",
+                            "kind": "warn",
+                            "badge": "ВЫБОР",
+                        },
+                        "alert": {
+                            "text": "Parol bir nechta terminalga mos. Ro‘yxatdan keraklisini tanlang.",
+                            "kind": "warn",
+                        },
+                    },
+                )
+                return
+            if reason == "none":
+                self._emit(
+                    "onProbeDone",
+                    {
+                        "reason": "none",
+                        "devices": devices,
+                        "status": {
+                            "title": "Пароль не подошёл",
+                            "kind": "danger",
+                            "badge": "ПАРОЛЬ",
+                            "sub": "Нет совпадений",
+                        },
+                        "alert": {
+                            "text": "Parol hech qaysi topilgan terminalga mos kelmadi.",
+                            "kind": "danger",
+                        },
+                    },
+                )
+                return
+            self._emit(
+                "onProbeDone",
+                {
+                    "reason": reason,
+                    "devices": devices,
+                    "alert": {
+                        "text": "Avval «Найти» bilan terminallarni qidiring yoki parolni yozing.",
+                        "kind": "warn",
+                    },
+                },
+            )
+        except Exception as exc:
+            self._emit(
+                "onProbeDone",
+                {"reason": "error", "alert": {"text": str(exc), "kind": "danger"}},
+            )
 
     def confirm_connect(self, ip: str, location_label: str, password: str) -> bool:
         try:
@@ -463,23 +628,80 @@ class LinkApi:
                 )
                 return
         elif not self.session.chosen:
-            self._emit(
-                "onConnectDone",
+            # Multi-device / no IP: resolve by password across scanned LAN.
+            if not self.session.devices:
+                self._emit(
+                    "onConnectDone",
+                    {
+                        "clearPassword": False,
+                        "status": {
+                            "title": "Устройство не найдено",
+                            "kind": "warn",
+                            "badge": "ПОИСК",
+                            "sub": "Сначала нажмите «Найти»",
+                        },
+                        "alert": {
+                            "text": "Сначала найдите терминал в LAN.",
+                            "kind": "warn",
+                        },
+                    },
+                )
+                return
+            results, match, reason = self.session.pick_password_match(password)
+            devices = [
                 {
-                    "clearPassword": False,
-                    "status": {
-                        "title": "Устройство не найдено",
-                        "kind": "warn",
-                        "badge": "ПОИСК",
-                        "sub": "Сначала нажмите «Найти»",
+                    "host": r.host,
+                    "port": int(r.port or 80),
+                    "name": r.name or "Hikvision",
+                    "serialNumber": r.serialNumber or "",
+                    "ok": bool(r.ok),
+                }
+                for r in results
+            ]
+            if reason == "need_pick":
+                matched = [d for d in devices if d.get("ok")]
+                self._emit(
+                    "onConnectDone",
+                    {
+                        "clearPassword": False,
+                        "needPick": True,
+                        "matches": matched,
+                        "devices": devices,
+                        "status": {
+                            "title": "Выберите устройство",
+                            "kind": "warn",
+                            "badge": "ВЫБОР",
+                            "sub": f"Parol {len(matched)} ta IP da mos",
+                        },
+                        "alert": {
+                            "text": "Parol bir nechta terminalga mos. Ro‘yxatdan tanlang, keyin yana «Подключить».",
+                            "kind": "warn",
+                        },
                     },
-                    "alert": {
-                        "text": "Сначала найдите терминал в LAN.",
-                        "kind": "warn",
+                )
+                return
+            if reason != "ok" or match is None:
+                self._emit(
+                    "onConnectDone",
+                    {
+                        "clearPassword": False,
+                        "devices": devices,
+                        "status": {
+                            "title": "Пароль не подошёл",
+                            "kind": "danger",
+                            "badge": "ПАРОЛЬ",
+                            "sub": "Нет совпадений",
+                        },
+                        "alert": {
+                            "text": "Parol hech qaysi topilgan terminalga mos kelmadi.",
+                            "kind": "danger",
+                        },
                     },
-                },
-            )
-            return
+                )
+                return
+        elif len(self.session.devices or []) > 1 and not ip:
+            # Chosen set but operator didn't confirm IP field — keep chosen.
+            pass
 
         def progress(msg: str) -> None:
             self._emit(
@@ -563,6 +785,53 @@ class LinkApi:
                 },
                 "alert": {"text": result.message or "Ошибка подключения", "kind": "warn"},
             }
+        if kind == "reconnected":
+            host = (result.device or {}).get("host") or host
+            self._last_device = dict(result.device or {})
+            try:
+                self.session.write_service_handoff()
+            except Exception:
+                pass
+            return {
+                "clearPassword": False,
+                "status": {
+                    "title": "Сеть обновлена",
+                    "kind": "ok",
+                    "badge": "ОБНОВЛЕНО",
+                    "sub": f"Устройство: {host or '—'}",
+                },
+                "alert": {
+                    "text": result.message or "Сеть успешно обновлена.",
+                    "kind": "ok",
+                },
+                "device": {
+                    "name": (result.device or {}).get("name") or "Hikvision",
+                    "host": host,
+                    "state": "reconnected",
+                    "location": self._location_label(),
+                    "apiUrl": self.session.api_url,
+                },
+                "tunnel": self._tunnel_payload(),
+            }
+        if kind == "need_pick":
+            matches = list((result.device or {}).get("matches") or [])
+            return {
+                "clearPassword": False,
+                "needPick": True,
+                "matches": matches,
+                "devices": matches,
+                "status": {
+                    "title": "Выберите устройство",
+                    "kind": "warn",
+                    "badge": "ВЫБОР",
+                    "sub": f"Mos: {len(matches)}",
+                },
+                "alert": {
+                    "text": result.message
+                    or "Bir nechta qurilma mos keldi — ro‘yxatdan tanlang.",
+                    "kind": "warn",
+                },
+            }
         if kind == "linked" or linked:
             sealed = bool((result.device or {}).get("sealed"))
             needs_confirm = bool((result.device or {}).get("needsAdminConfirm"))
@@ -616,12 +885,22 @@ class LinkApi:
             "alert": {"text": result.message or "Ошибка", "kind": "danger"},
         }
 
-    def reconnect(self) -> bool:
+    def reconnect(self, payload: dict[str, Any] | None = None) -> bool:
+        data = payload if isinstance(payload, dict) else {}
         self._reconnect_steps = []
-        threading.Thread(target=self._reconnect_worker, daemon=True).start()
+        threading.Thread(
+            target=self._reconnect_worker,
+            args=(
+                str(data.get("password") or ""),
+                str(data.get("ip") or "").strip() or None,
+            ),
+            daemon=True,
+        ).start()
         return True
 
-    def _reconnect_worker(self) -> None:
+    def _reconnect_worker(
+        self, password: str = "", ip_hint: str | None = None
+    ) -> None:
         labels = {
             "web": "Веб",
             "scan": "Сканер",
@@ -651,7 +930,11 @@ class LinkApi:
             self._emit("onReconnectProgress", self._reconnect_steps)
 
         try:
-            result = self.session.auto_reconnect_network(on_step=on_step)
+            result = self.session.auto_reconnect_network(
+                password,
+                on_step=on_step,
+                ip_hint=ip_hint,
+            )
         except Exception as exc:
             self._emit(
                 "onReconnectDone",
@@ -667,7 +950,11 @@ class LinkApi:
                 },
             )
             return
-        payload = self._connect_result(result, clear_pwd=False, linked=result.kind == "linked")
+        payload = self._connect_result(
+            result,
+            clear_pwd=False,
+            linked=result.kind in ("linked", "reconnected"),
+        )
         payload["steps"] = self._reconnect_steps
         self._emit("onReconnectDone", payload)
 

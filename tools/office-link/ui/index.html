@@ -13,14 +13,12 @@
         <div class="brand-mark" aria-hidden="true"></div>
         <div>
           <div class="brand-name">HR HUB Link</div>
-          <div class="brand-sub" id="tenantLabel">Офисный клиент</div>
+          <div class="brand-sub" id="tenantLabel">Мастер настройки</div>
         </div>
       </div>
       <nav class="nav">
-        <button class="nav-btn active" data-tab="connect" type="button">Подключение</button>
-        <button class="nav-btn" data-tab="reconnect" type="button">Сеть</button>
-        <button class="nav-btn" data-tab="tunnel" type="button">Туннель</button>
-        <button class="nav-btn" data-tab="device" type="button">Устройство</button>
+        <button class="nav-btn active" data-tab="connect" type="button">1. Подключение</button>
+        <button class="nav-btn" data-tab="restore" type="button">2. Восстановление</button>
       </nav>
       <div class="rail-foot">
         <div class="pill" id="statusPill">Ожидание</div>
@@ -32,7 +30,7 @@
       <header class="top">
         <div>
           <h1 id="pageTitle">Подключение</h1>
-          <p class="lede" id="pageLede">Привязка Face ID терминала к HR HUB</p>
+          <p class="lede" id="pageLede">Привязка Face ID терминала к HR HUB (затем окно закрывают)</p>
         </div>
         <div class="status-block">
           <span class="dot" id="statusDot"></span>
@@ -62,6 +60,10 @@
               <button type="button" class="ghost" id="btnScan">Найти</button>
             </div>
           </label>
+          <label class="field" id="deviceListField" hidden>
+            <span>Найденные терминалы</span>
+            <select id="deviceList" size="4" class="device-list"></select>
+          </label>
           <label class="field">
             <span>Локация</span>
             <div class="row">
@@ -74,6 +76,7 @@
             <div class="row">
               <input id="password" type="password" autocomplete="off" />
               <button type="button" class="ghost" id="btnTogglePwd">Показать</button>
+              <button type="button" class="ghost" id="btnProbePwd">Проверить на всех</button>
             </div>
           </label>
           <div class="actions">
@@ -81,24 +84,22 @@
             <button type="button" class="primary" id="btnConnect">Подключить</button>
           </div>
           <p class="hint" id="connectHint">
-            После успешной привязки и подтверждения в Web приложение можно закрыть.
-            Лица синхронизируются только с Web.
+            Несколько терминалов в LAN: «Найти» → список → нужный IP, или пароль + «Проверить на всех»
+            (совпавшие отмечаются) → «Подключить». То же при восстановлении сети.
           </p>
         </div>
       </section>
 
-      <section class="panel" id="tab-reconnect">
+      <section class="panel" id="tab-restore">
         <div class="stack">
-          <p class="hint">Если терминал сменил IP в LAN — восстановите связь без полной переустановки.</p>
+          <h2 class="section-title">A) Сеть / IP</h2>
+          <p class="hint">Терминал сменил Wi‑Fi или IP — восстановите связь без смены пароля.</p>
           <div class="actions">
             <button type="button" class="primary" id="btnReconnect">Восстановить сеть</button>
           </div>
           <ol class="steps" id="reconnectSteps"></ol>
-        </div>
-      </section>
 
-      <section class="panel" id="tab-tunnel">
-        <div class="stack">
+          <h2 class="section-title">B) Туннель</h2>
           <div class="kv">
             <div><span>Состояние</span><strong id="tunnelState">—</strong></div>
             <div><span>URL</span><strong id="tunnelUrl" class="mono">—</strong></div>
@@ -107,17 +108,16 @@
             <button type="button" class="ghost" id="btnTunnelRefresh">Обновить</button>
             <button type="button" class="primary" id="btnTunnelRestore">Восстановить туннель</button>
           </div>
-          <p class="hint">Туннель нужен, чтобы сервер мог достучаться до терминала для синхронизации лиц.</p>
-        </div>
-      </section>
+          <p class="hint">Нужен только если сервер снова не видит терминал. После первой привязки GUI не обязан быть открыт.</p>
 
-      <section class="panel" id="tab-device">
-        <div class="stack kv" id="deviceInfo">
-          <div><span>Имя</span><strong id="devName">—</strong></div>
-          <div><span>IP</span><strong id="devHost">—</strong></div>
-          <div><span>Состояние</span><strong id="devState">—</strong></div>
-          <div><span>Локация</span><strong id="devLocation">—</strong></div>
-          <div><span>API</span><strong id="devApi" class="mono">—</strong></div>
+          <h2 class="section-title">Устройство</h2>
+          <div class="kv" id="deviceInfo">
+            <div><span>Имя</span><strong id="devName">—</strong></div>
+            <div><span>IP</span><strong id="devHost">—</strong></div>
+            <div><span>Состояние</span><strong id="devState">—</strong></div>
+            <div><span>Локация</span><strong id="devLocation">—</strong></div>
+            <div><span>API</span><strong id="devApi" class="mono">—</strong></div>
+          </div>
         </div>
       </section>
     </main>
