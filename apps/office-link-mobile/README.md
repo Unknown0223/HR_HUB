@@ -37,12 +37,14 @@ Natija: `build/app/outputs/flutter-apk/app-release.apk`
 1. Web → pairing token yaratish
 2. Ilovada token → **Saqlash**
 3. Lokatsiya tanlash
-4. **Qidirish** — IP bo‘sh bo‘lsa Wi‑Fi `/24` avto-skan; IP yozilsa shu host tekshiriladi
-5. Joriy admin paroli → **Ulash**
-6. Webda «Подтвердить привязку»
-7. Ilova **TASDIQ → ULANDI** ni kuzatadi
+4. **Qidirish** — IP bo‘sh bo‘lsa Wi‑Fi `/24` avto-skan; bir nechta bo‘lsa ro‘yxatdan tanlang
+5. (ixtiyoriy) **Hammada tekshir** — bir xil parolni barcha LAN terminallarda sinab ko‘radi
+6. Joriy admin paroli → **Ulash**
+7. Webda «Подтвердить привязку»
+8. Ilova **TASDIQ → ULANDI** ni kuzatadi
 
-**Tarmoqni qayta ulash** — Wi‑Fi/IP o‘zgaganda (parolni aylantirmaydi).
+**2. Tiklash → Tarmoqni qayta ulash** — Wi‑Fi/IP o‘zgaganda (avto skan + Web moslash, parol aylantirilmaydi).  
+**Tunnel** — faqat ofis PC Windows Link.
 
 ## Config
 

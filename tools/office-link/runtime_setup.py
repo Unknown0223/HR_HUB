@@ -135,33 +135,56 @@ def _copy_gw_tree(src: Path, dest: Path, cb: StatusFn | None = None) -> None:
             shutil.copy2(py, dest / "adapters" / py.name)
 
 
+def _gw_seed_candidates(root: Path) -> list[Path]:
+    """Locations that may ship device-gw with the Link install / repo checkout."""
+    meipass = getattr(sys, "_MEIPASS", None)
+    cands: list[Path | None] = [
+        root / "gw",
+        root.parent / "gw",  # BOSHLASH.bat root when exe lives in ilova\
+        Path(meipass) / "gw" if meipass else None,
+        root.parent.parent / "apps" / "device-gw",
+        root.parent / "apps" / "device-gw",
+        Path(__file__).resolve().parent.parent.parent / "apps" / "device-gw",
+        Path(__file__).resolve().parent / "gw",
+    ]
+    out: list[Path] = []
+    seen: set[str] = set()
+    for cand in cands:
+        if cand is None:
+            continue
+        try:
+            key = str(cand.resolve())
+        except OSError:
+            key = str(cand)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cand)
+    return out
+
+
 def copy_gw_sources(root: Path | None = None, cb: StatusFn | None = None) -> Path:
     """Copy device-gw into a writable gw_dir (never leave Program Files half-updated)."""
     root = root or find_root()
     dest = gw_dir(root)
-    install_gw = root / "gw"
+
+    # Already present in the writable tree — nothing to do.
+    if (dest / "main.py").is_file():
+        return dest
+
     src = None
-    for cand in (
-        root.parent.parent / "apps" / "device-gw",
-        root.parent / "apps" / "device-gw",
-        Path(r"D:\hr-hub\apps\device-gw"),
-        # Seed writable user gw from a read-only Program Files install.
-        install_gw if install_gw.resolve() != dest.resolve() else None,
-    ):
-        if cand is not None and (cand / "main.py").is_file():
+    for cand in _gw_seed_candidates(root):
+        if (cand / "main.py").is_file():
             src = cand
             break
 
-    if (dest / "main.py").is_file() and src is None:
-        return dest
-
     if src is None:
         raise FileNotFoundError(
-            "Gateway kodlari yo‘q. Avval ADMIN-PAROL.bat ni HR HUB kompyuterida ishga tushiring."
+            "Gateway kodlari yo‘q (gw/main.py). "
+            "Link paketiga gw qo‘shilgan bo‘lishi kerak — pack-release.bat ni qayta ishga tushiring."
         )
 
     try:
-        # Skip overwrite when source and dest are the same tree.
         if src.resolve() != dest.resolve():
             _copy_gw_tree(src, dest, cb)
     except OSError as exc:
@@ -175,7 +198,7 @@ def copy_gw_sources(root: Path | None = None, cb: StatusFn | None = None) -> Pat
 
     if not (dest / "main.py").is_file():
         raise FileNotFoundError(
-            "Gateway kodlari yo‘q. Avval ADMIN-PAROL.bat ni HR HUB kompyuterida ishga tushiring."
+            "Gateway kodlari yo‘q. Link o‘rnatilishida gw papkasi bo‘lishi shart."
         )
     return dest
 
@@ -215,13 +238,28 @@ def install_cloudflared(root: Path | None = None, cb: StatusFn | None = None) ->
     exe = cloudflared_exe(root)
     if exe.is_file():
         return exe
-    nearby = root.parent.parent / "tools" / "cloudflared.exe"
-    if nearby.is_file():
-        shutil.copy2(nearby, exe)
-        return exe
+    meipass = getattr(sys, "_MEIPASS", None)
+    nearby_candidates = (
+        root / "runtime" / "cloudflared.exe",
+        root.parent / "runtime" / "cloudflared.exe",
+        root / "cloudflared.exe",
+        Path(meipass) / "cloudflared.exe" if meipass else None,
+        root.parent.parent / "tools" / "cloudflared.exe",
+        Path(__file__).resolve().parent.parent / "cloudflared.exe",
+    )
+    for nearby in nearby_candidates:
+        if nearby is not None and nearby.is_file():
+            exe.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(nearby, exe)
+            return exe
     _status(cb, "Tunnel dasturi yuklanmoqda...")
     _download(CLOUDFLARED_URL, exe, cb)
     return exe
+
+
+def ensure_tunnel_tools(root: Path | None = None, cb: StatusFn | None = None) -> Path:
+    """Ensure cloudflared is available (device-direct tunnel — no local :8800 GW)."""
+    return install_cloudflared(root, cb)
 
 
 def _gw_deps_ready(py: Path) -> bool:
@@ -285,6 +323,7 @@ def install_gw_deps(root: Path | None = None, cb: StatusFn | None = None) -> Non
 
 
 def ensure_runtime(root: Path | None = None, cb: StatusFn | None = None) -> None:
+    """Full stack: device-gw sources + portable Python + deps + cloudflared."""
     copy_gw_sources(root, cb)
     install_portable_python(root, cb)
     install_cloudflared(root, cb)

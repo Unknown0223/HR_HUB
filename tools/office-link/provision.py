@@ -957,34 +957,27 @@ class ProvisionEngine:
         port = int(session.chosen.port or 80)
         serial = str((session.verified or {}).get("serialNumber") or "")
 
-        runtime_setup.ensure_runtime(session.root, on_status)
+        runtime_setup.ensure_tunnel_tools(session.root, on_status)
         bundle = runtime_setup.ServiceBundle()
         bundle.root = session.root
         try:
-            gw_key = key or pairing
-            _progress(
-                session,
-                status="configuring",
-                step="gateway",
-                percent=40,
-                message="Gateway",
-                device_id=device_id,
-            )
-            _emit(on_status, "1/3 Открытие gateway + tunnel...")
-            bundle.gw = runtime_setup.start_gateway(
-                session.api_url, gw_key, session.root, on_status
-            )
             _progress(
                 session,
                 status="configuring",
                 step="tunnel",
-                percent=55,
+                percent=40,
                 message="Tunnel",
                 device_id=device_id,
             )
-            proc, url = runtime_setup.start_tunnel(session.root, on_status)
+            # Prefer direct tunnel → terminal (no local :8800). Faces use this path.
+            target = f"http://{host}:{port}"
+            _emit(on_status, f"1/3 Туннель → терминал {host}:{port}…")
+            proc, url = runtime_setup.start_tunnel(
+                session.root, on_status, target_url=target
+            )
             bundle.tunnel = proc
             bundle.tunnel_url = url
+            bundle.gw = None
             if not (url or "").strip():
                 bundle.stop()
                 return SubmitResult(
@@ -994,7 +987,40 @@ class ProvisionEngine:
                     ),
                 )
 
+            from paths import (
+                load_config,
+                resolve_tunnel_token,
+                write_service_config,
+                write_tunnel_url,
+            )
+
+            write_tunnel_url(url, session.root)
+            cfg = getattr(session, "cfg", None) or load_config(session.root)
+            write_service_config(
+                api_url=session.api_url,
+                tenant=session.tenant,
+                tunnel_mode="named" if resolve_tunnel_token(cfg, session.root) else "quick",
+                root=session.root,
+                extra={
+                    "tunnelUrl": url,
+                    "autoHeal": True,
+                    "faceAgent": True,
+                    "deviceId": device_id,
+                    "host": host,
+                    "port": port,
+                    "reachMode": "device",
+                },
+            )
+
             _emit(on_status, "2/3 Запись туннеля на платформу...")
+            _progress(
+                session,
+                status="configuring",
+                step="announce",
+                percent=55,
+                message="Announce",
+                device_id=device_id,
+            )
             code, _ping = api_client.ping(
                 session.api_url, key, session.tenant, pairing_token=pairing or None
             )
@@ -1011,6 +1037,7 @@ class ProvisionEngine:
                 session.tenant,
                 url,
                 pairing_token=pairing or None,
+                device_id=device_id,
             )
             if not api_client.is_success(code):
                 bundle.stop()
@@ -1049,6 +1076,42 @@ class ProvisionEngine:
                         f"Сеть не обновлена (HTTP {code}). {tip}".strip()
                     ),
                 )
+
+            # Critical: rewrite HttpHost on terminal so punches hit Railway
+            # (Windows reconnect previously skipped this — marks never arrived).
+            try:
+                from device_push import apply_hik_push_from_api_response
+
+                hik_push = (
+                    linked.get("hikPush") if isinstance(linked, dict) else None
+                )
+                if isinstance(hik_push, dict) and hik_push.get("urlPath"):
+                    _emit(on_status, "3b/3 HttpHost (otmetkalar → web)…")
+                    push_res = apply_hik_push_from_api_response(
+                        host,
+                        port,
+                        username,
+                        password,
+                        hik_push,
+                    )
+                    if push_res.get("ok"):
+                        _emit(
+                            on_status,
+                            "HttpHost OK — otmetkalar terminal → web",
+                        )
+                    else:
+                        _emit(
+                            on_status,
+                            f"HttpHost: {push_res.get('message') or push_res.get('status')} — "
+                            "tekshiring (terminal internet/HTTPS)",
+                        )
+                else:
+                    _emit(
+                        on_status,
+                        "HttpHost config yo‘q (API hikPush) — Web ensure-push kerak",
+                    )
+            except Exception as exc:
+                _emit(on_status, f"HttpHost: {exc}")
 
             try:
                 from credential_store import save_device_credential
@@ -1096,6 +1159,7 @@ class ProvisionEngine:
                     "tunnel": url,
                     "id": device_id,
                     "reconnected": True,
+                    "hikPush": linked.get("hikPush") if isinstance(linked, dict) else None,
                     "gwVerified": bool(
                         isinstance(linked, dict) and linked.get("gwVerified")
                     ),

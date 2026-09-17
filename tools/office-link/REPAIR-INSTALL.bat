@@ -35,6 +35,25 @@ for %%F in (
 
 if exist "%CD%\START-GW.bat" copy /Y "%CD%\START-GW.bat" "%DST%\START-GW.bat" >nul
 
+REM Seed device-gw into the install (needed for GW fallback / repair).
+set "GW_SRC=%CD%\..\..\apps\device-gw"
+if not exist "%GW_SRC%\main.py" set "GW_SRC=%CD%\gw"
+if exist "%GW_SRC%\main.py" (
+  mkdir "%DST%\gw" 2>nul
+  mkdir "%DST%\gw\adapters" 2>nul
+  copy /Y "%GW_SRC%\main.py" "%DST%\gw\" >nul
+  if exist "%GW_SRC%\nats_client.py" copy /Y "%GW_SRC%\nats_client.py" "%DST%\gw\" >nul
+  if exist "%GW_SRC%\requirements.txt" copy /Y "%GW_SRC%\requirements.txt" "%DST%\gw\" >nul
+  if exist "%GW_SRC%\adapters" xcopy /E /I /Y "%GW_SRC%\adapters\*.py" "%DST%\gw\adapters\" >nul
+  echo OK gw\
+)
+
+if exist "%CD%\runtime\cloudflared.exe" (
+  mkdir "%DST%\runtime" 2>nul
+  copy /Y "%CD%\runtime\cloudflared.exe" "%DST%\runtime\" >nul
+  echo OK runtime\cloudflared.exe
+)
+
 echo.
 echo [OK] Asosiy skriptlar tiklandi.
 echo Keyin: START-GW.bat yoki install-service.bat (ADMIN).

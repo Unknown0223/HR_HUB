@@ -76,6 +76,28 @@ def read_device_credential(root: Path | None = None) -> dict[str, Any] | None:
     return data
 
 
+def peek_device_host(root: Path | None = None) -> dict[str, Any]:
+    """Host/port/deviceId even when password is missing (tunnel restore hint)."""
+    path = credential_file(root)
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    host = str(data.get("host") or "").strip()
+    if not host:
+        return {}
+    return {
+        "host": host,
+        "port": int(data.get("port") or 80),
+        "deviceId": str(data.get("deviceId") or "").strip(),
+        "username": str(data.get("username") or "admin").strip() or "admin",
+    }
+
+
 def format_credential_for_display(data: dict[str, Any] | None) -> str:
     path = credential_file(find_root())
     if not data:

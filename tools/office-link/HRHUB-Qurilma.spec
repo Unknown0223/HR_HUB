@@ -5,17 +5,41 @@ from pathlib import Path
 
 spec_dir = Path(SPECPATH)
 ui_dir = spec_dir / "ui"
+gw_dir = (spec_dir / ".." / ".." / "apps" / "device-gw").resolve()
+if not (gw_dir / "main.py").is_file():
+    gw_dir = (spec_dir / "gw").resolve()
+
+datas = [
+    (str(spec_dir / "config.json"), "."),
+    (str(spec_dir / "hrhub-link.ico"), "."),
+    (str(spec_dir / "hrhub-link-256.png"), "."),
+    (str(ui_dir), "ui"),
+]
+# Bundle device-gw so office PCs do not need the monorepo checkout.
+if (gw_dir / "main.py").is_file():
+    datas.append((str(gw_dir / "main.py"), "gw"))
+    if (gw_dir / "nats_client.py").is_file():
+        datas.append((str(gw_dir / "nats_client.py"), "gw"))
+    if (gw_dir / "requirements.txt").is_file():
+        datas.append((str(gw_dir / "requirements.txt"), "gw"))
+    adapters = gw_dir / "adapters"
+    if adapters.is_dir():
+        datas.append((str(adapters), "gw/adapters"))
+
+cf_candidates = [
+    spec_dir / "runtime" / "cloudflared.exe",
+    (spec_dir / ".." / "cloudflared.exe").resolve(),
+]
+for cf in cf_candidates:
+    if cf.is_file():
+        datas.append((str(cf), "."))
+        break
 
 a = Analysis(
     [str(spec_dir / "office_link_app.py")],
     pathex=[str(spec_dir)],
     binaries=[],
-    datas=[
-        (str(spec_dir / "config.json"), "."),
-        (str(spec_dir / "hrhub-link.ico"), "."),
-        (str(spec_dir / "hrhub-link-256.png"), "."),
-        (str(ui_dir), "ui"),
-    ],
+    datas=datas,
     hiddenimports=[
         "webview",
         "webview.platforms.edgechromium",

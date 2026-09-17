@@ -49,15 +49,32 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   String _alert = '';
   String _note =
       'Sozlash asbobi: 1) Ulash  2) Tarmoqni tiklash. '
-      'Yuz/otmetka — qurilma↔server; Link ochiq turishi shart emas.';
+      'Tunnel / yuz sync — ofis PC (Windows Link). Link ochiq turishi shart emas.';
 
   int _tab = 0;
 
   List<Map<String, dynamic>> _locations = [];
   String? _locationId;
 
+  List<DeviceState> _devices = [];
+  String? _selectedHost;
+  List<PasswordProbeResult> _probeResults = [];
+
+  final Map<String, String> _reconnectSteps = {
+    for (final s in reconnectSteps) s: 'pending',
+  };
+  final Map<String, String> _reconnectDetails = {};
+
   Timer? _confirmPoll;
   bool _confirmNotified = false;
+
+  static const _stepTitles = {
+    'web': 'Web',
+    'scan': 'Skaner',
+    'match': 'Moslash',
+    'auth': 'Parol',
+    'link': 'Ulash',
+  };
 
   @override
   void dispose() {
@@ -75,6 +92,10 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
     await _session!.loadPersisted();
     _tokenCtrl.text = _session!.pairingToken ?? '';
     _locationId = _session!.locationId;
+    if (_session!.host.isNotEmpty) {
+      _ipCtrl.text = _session!.host;
+      _selectedHost = _session!.host;
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -104,6 +125,32 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         _badgeBg = LinkColors.accentSoft;
     }
     _badge = text;
+  }
+
+  void _applyDeviceSelection(DeviceState state) {
+    _selectedHost = state.host;
+    _ipCtrl.text = state.host;
+    _deviceLine =
+        'Qurilma: ${state.name.isEmpty ? '—' : state.name}  ${state.host}';
+    _detectLine = 'Aniqlangan holat: ${state.label}';
+  }
+
+  Future<void> _onPickDevice(String? host) async {
+    if (host == null || _session == null) return;
+    final picked = await _session!.selectScannedHost(host);
+    if (!mounted) return;
+    setState(() {
+      _selectedHost = host;
+      _ipCtrl.text = host;
+      if (picked != null) {
+        _applyDeviceSelection(picked);
+        _alert = picked.state == 'configured'
+            ? 'Admin bor — joriy admin parolini kiriting'
+            : (picked.state == 'new'
+                ? 'Yangi qurilma — avval terminalda admin yarating'
+                : 'Qurilma tanlandi');
+      }
+    });
   }
 
   Future<void> _saveToken() async {
@@ -150,6 +197,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       _busy = true;
       _status = 'Qidirilmoqda…';
       _setBadge('QIDIRILMOQDA', tone: 'warn');
+      _probeResults = [];
       _alert = ip.isEmpty
           ? 'Wi‑Fi tarmog‘ida terminal qidirilmoqda…'
           : 'Tekshirilmoqda: $ip';
@@ -158,10 +206,13 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       final list = await _session!.scanLan(
         ipHint: ip.isEmpty ? null : ip,
         onProgress: (m) {
-          if (mounted) setState(() => _status = m.length > 120 ? m.substring(0, 120) : m);
+          if (mounted) {
+            setState(() => _status = m.length > 120 ? m.substring(0, 120) : m);
+          }
         },
       );
       if (!mounted) return;
+      setState(() => _devices = list);
       if (list.isEmpty) {
         final phoneIp = await _session!.discovery.wifiIp();
         final subnetHint = (phoneIp != null &&
@@ -169,8 +220,11 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
                 validIp(ip) &&
                 !sameSubnet(phoneIp, ip))
             ? '\nTelefon Wi‑Fi: $phoneIp — qurilma boshqa tarmoqda.'
-            : (phoneIp != null ? '\nTelefon Wi‑Fi: $phoneIp' : '\nTelefon Wi‑Fi IP o‘qilmadi.');
+            : (phoneIp != null
+                ? '\nTelefon Wi‑Fi: $phoneIp'
+                : '\nTelefon Wi‑Fi IP o‘qilmadi.');
         setState(() {
+          _selectedHost = null;
           _detectLine = 'Aniqlangan holat: —';
           _deviceLine = ip.isEmpty
               ? 'Qurilma: topilmadi — ofis Wi‑Fi ga ulang'
@@ -182,21 +236,103 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         });
         return;
       }
-      final state = list.first;
-      _ipCtrl.text = state.host;
+      if (list.length == 1) {
+        _applyDeviceSelection(list.first);
+        setState(() {
+          _status = 'Qurilma topildi';
+          _setBadge('ONLINE', tone: 'ok');
+          _alert = list.first.state == 'configured'
+              ? 'Admin bor — joriy admin parolini kiriting'
+              : (list.first.state == 'new'
+                  ? 'Yangi qurilma — avval terminalda admin yarating, keyin qayta qidiring'
+                  : 'Qurilma topildi');
+        });
+      } else {
+        setState(() {
+          _selectedHost = null;
+          _detectLine = 'Topildi: ${list.length} ta terminal — ro‘yxatdan tanlang';
+          _deviceLine = 'Qurilma: tanlanmagan';
+          _status = 'Bir nechta qurilma';
+          _setBadge('TANLANG', tone: 'warn');
+          _alert =
+              '${list.length} ta terminal topildi. Ro‘yxatdan keraklisini tanlang '
+              'yoki parol + «Hammada tekshir».';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _probePasswordOnLan() async {
+    await _ensureSession();
+    final pwd = _pwdCtrl.text.trim();
+    if (pwd.isEmpty) {
       setState(() {
-        _detectLine =
-            'Aniqlangan holat: ${state.label}${list.length > 1 ? ' (+${list.length - 1} ta)' : ''}';
-        _deviceLine =
-            'Qurilma: ${state.name.isEmpty ? '—' : state.name}  ${state.host}';
-        _status = 'Qurilma topildi';
-        _setBadge('ONLINE', tone: 'ok');
-        _alert = state.state == 'configured'
-            ? 'Admin bor — joriy admin parolini kiriting'
-            : (state.state == 'new'
-                ? 'Yangi qurilma — avval terminalda admin yarating, keyin qayta qidiring'
-                : 'Qurilma topildi');
+        _alert = 'Avval admin parolini kiriting';
+        _setBadge('PAROL', tone: 'warn');
       });
+      return;
+    }
+    if (_session!.scannedDevices.isEmpty && _devices.isEmpty) {
+      setState(() => _alert = 'Avval Qidirishni bosing');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = 'Parol tekshirilmoqda…';
+      _setBadge('TEKSHIRUV', tone: 'warn');
+    });
+    try {
+      final picked = await _session!.pickPasswordMatch(
+        pwd,
+        hostHint: _ipCtrl.text.trim().isEmpty ? null : _ipCtrl.text.trim(),
+        devices: _devices.isNotEmpty ? _devices : null,
+        onStatus: (m) {
+          if (mounted) setState(() => _status = m);
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _probeResults = picked.results;
+        _devices = _session!.scannedDevices.isNotEmpty
+            ? _session!.scannedDevices
+            : _devices;
+      });
+      switch (picked.reason) {
+        case 'ok':
+          final m = picked.match!;
+          setState(() {
+            _selectedHost = m.host;
+            _ipCtrl.text = m.host;
+            _deviceLine =
+                'Qurilma: ${m.name.isEmpty ? '—' : m.name}  ${m.host}';
+            _status = 'Parol mos keldi';
+            _setBadge('ONLINE', tone: 'ok');
+            _alert = 'Bitta terminalda parol OK — tanlandi: ${m.host}';
+          });
+        case 'need_pick':
+          setState(() {
+            _selectedHost = null;
+            _status = 'Bir nechta mos keldi';
+            _setBadge('TANLANG', tone: 'warn');
+            _alert =
+                'Parol ${picked.results.where((r) => r.ok).length} ta terminalda OK. '
+                'Ro‘yxatdan keraklisini tanlang.';
+          });
+        case 'none':
+          setState(() {
+            _status = 'Parol mos kelmadi';
+            _setBadge('PAROL', tone: 'danger');
+            _alert = 'Hech bir topilgan terminalda parol noto‘g‘ri.';
+          });
+        case 'empty':
+          setState(() => _alert = 'Parol bo‘sh');
+        case 'no_devices':
+          setState(() => _alert = 'Avval Qidirishni bosing');
+        default:
+          setState(() => _alert = 'Tekshiruv yakunlanmadi');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -214,7 +350,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       return;
     }
     if (_session!.host.isEmpty) {
-      setState(() => _alert = 'Avval IP qidiring');
+      setState(() => _alert = 'Avval IP qidiring yoki ro‘yxatdan tanlang');
       return;
     }
     final pwd = _pwdCtrl.text.trim();
@@ -236,7 +372,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           'Lokatsiya: ${_locationLabel()}\n'
           'Tiklanish: ${_session!.config.recoveryEmail}\n\n'
           'Parol terminalda almashtiriladi va Webga yuboriladi.\n'
-          'Yuz sinxroni uchun ofisda PC HR HUB Link ochiq tursin.',
+          'Yuz sinxroni uchun ofisda PC HR HUB Link (tunnel) ishlashi kerak.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor')),
@@ -257,7 +393,9 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       final result = await _session!.ulash(
         currentPassword: pwd,
         onStatus: (m) {
-          if (mounted) setState(() => _status = m.length > 120 ? m.substring(0, 120) : m);
+          if (mounted) {
+            setState(() => _status = m.length > 120 ? m.substring(0, 120) : m);
+          }
         },
       );
       if (!mounted) return;
@@ -291,7 +429,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
     }
     if (result.kind == AuthLock.locked) {
       setState(() {
-        _status = 'Qulflangan ${result.remaining > 0 ? '' : _session!.auth.formatRemaining()}';
+        _status = 'Qulflangan';
         _setBadge('QULFLANGAN', tone: 'danger');
         _alert = '2 marta xato — ${_session!.auth.formatRemaining()} kutilsin';
       });
@@ -304,12 +442,13 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         _status = needs ? 'Web tasdiq kutilmoqda' : 'Ulandi';
         _setBadge(needs ? 'TASDIQ' : 'ULANDI', tone: needs ? 'warn' : 'ok');
         _deviceLine =
-            'Qurilma: ${result.device['name'] ?? ''}  ${result.device['host'] ?? ''}'.trim();
+            'Qurilma: ${result.device['name'] ?? ''}  ${result.device['host'] ?? ''}'
+                .trim();
         _alert = needs
-            ? 'Parol terminalga o‘rnatildi va serverga yuborildi. Web → bildirishnoma / Устройства → «Подтвердить привязку».'
+            ? 'Parol terminalga o‘rnatildi va serverga yuborildi. Web → «Подтвердить привязку».'
             : 'Ulanish mustahkamlandi.';
         _note = needs
-            ? 'Keyingi qadam: Webda «Подтвердить привязку». Keyin yuzlar: Web sync + PC GW+tunnel.'
+            ? 'Keyingi qadam: Webda «Подтвердить привязку». Yuzlar: Web sync + PC tunnel.'
             : 'Ulandi. Yangi parolni Web → Устройства sahifasida ko‘ring.';
       });
       if (needs) {
@@ -320,8 +459,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
             title: const Text('Tasdiq kutilmoqda'),
             content: const Text(
               'Parol qurilmaga o‘rnatildi va Webga yuborildi.\n\n'
-              'Tenant admin Webda «Подтвердить привязку» ni bosishi kerak.\n'
-              'Tasdiqdan keyin shu ekranda «Ulandi» chiqadi.',
+              'Tenant admin Webda «Подтвердить привязку» ni bosishi kerak.',
             ),
             actions: [
               FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
@@ -359,26 +497,9 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         _status = 'Ulanish mustahkamlandi';
         _setBadge('ULANDI', tone: 'ok');
         _alert =
-            'Web tasdiqlandi. Otmetkalar → web. Yuzlar faqat Web «Синхронизировать» (bu ilova kerak emas)${info['deviceName'] != null ? ' (${info['deviceName']})' : ''}.';
-        _note =
-            'Sozlash tugadi. Ilovani yopishingiz mumkin. Yuz sync — Webda.';
+            'Web tasdiqlandi. Otmetkalar → web. Yuzlar — Web «Синхронизировать» + ofis PC tunnel.';
+        _note = 'Sozlash tugadi. Ilovani yopishingiz mumkin.';
       });
-      if (mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Tasdiqlandi'),
-            content: const Text(
-              'Web admin ulanishni tasdiqladi.\n\n'
-              'Otmetkalar terminaldan webga. Yuzlar — faqat Web «Синхронизировать». '
-              'Bu sozlash ilovasini yopishingiz mumkin.',
-            ),
-            actions: [
-              FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-            ],
-          ),
-        );
-      }
       return;
     }
     _confirmPoll = Timer(const Duration(seconds: 3), _pollConfirmOnce);
@@ -408,6 +529,17 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
     }
   }
 
+  void _onReconnectStep(String id, String state, [String detail = '']) {
+    if (!mounted) return;
+    setState(() {
+      _reconnectSteps[id] = state;
+      if (detail.isNotEmpty) _reconnectDetails[id] = detail;
+      if (detail.isNotEmpty) {
+        _status = detail.length > 120 ? detail.substring(0, 120) : detail;
+      }
+    });
+  }
+
   Future<void> _reconnect() async {
     await _ensureSession();
     if (_busy) return;
@@ -415,22 +547,61 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       _busy = true;
       _status = 'Tarmoq qayta ulanmoqda…';
       _setBadge('ULANMOQDA', tone: 'warn');
+      for (final s in reconnectSteps) {
+        _reconnectSteps[s] = 'pending';
+        _reconnectDetails.remove(s);
+      }
     });
     try {
       final result = await _session!.reconnectNetwork(
         password: _pwdCtrl.text,
+        ipHint: _ipCtrl.text.trim().isEmpty ? null : _ipCtrl.text.trim(),
         onStatus: (m) {
           if (mounted) setState(() => _status = m);
         },
+        onStep: _onReconnectStep,
       );
       if (!mounted) return;
-      if (result.kind == 'linked') {
+      if (result.kind == 'need_pick') {
+        final matches = (result.device['matches'] as List?) ?? [];
+        final asDevices = <DeviceState>[];
+        for (final raw in matches) {
+          if (raw is! Map) continue;
+          final m = Map<String, dynamic>.from(raw);
+          asDevices.add(
+            DeviceState(
+              state: 'configured',
+              label: 'Admin bor',
+              host: '${m['host'] ?? ''}',
+              port: int.tryParse('${m['port'] ?? 80}') ?? 80,
+              name: '${m['name'] ?? ''}',
+              serialNumber: '${m['serialNumber'] ?? ''}',
+            ),
+          );
+        }
         setState(() {
+          _devices = asDevices;
+          _selectedHost = null;
+          _status = 'Tanlash kerak';
+          _setBadge('TANLANG', tone: 'warn');
+          _alert = result.message;
+          _tab = 1;
+        });
+        return;
+      }
+      if (result.kind == 'linked') {
+        final host = '${result.device['host'] ?? _session!.host}';
+        setState(() {
+          if (host.isNotEmpty) {
+            _ipCtrl.text = host;
+            _selectedHost = host;
+            _deviceLine = 'Qurilma: ${result.device['name'] ?? ''}  $host'.trim();
+          }
           _status = 'Tarmoq yangilandi';
           _setBadge('YANGILANDI', tone: 'ok');
-          _alert = 'Host yangilandi; otmetkalar → web.';
-          _note =
-              'Sozlash OK. Yuz sync faqat Webda — bu ilova kerak emas.';
+          _alert =
+              'Host yangilandi; otmetkalar → web. Tunnel/yuz sync — ofis PC Windows Link.';
+          _note = 'Sozlash OK. Yuz sync faqat Web + ofis PC.';
         });
       } else {
         setState(() {
@@ -458,6 +629,150 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
         ],
       ),
+    );
+  }
+
+  Widget _devicePicker() {
+    if (_devices.length < 2) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        const Text('Topilgan terminallar', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          key: ValueKey('dev-${_devices.length}-$_selectedHost'),
+          initialValue: _devices.any((d) => d.host == _selectedHost) ? _selectedHost : null,
+          items: _devices
+              .map(
+                (d) => DropdownMenuItem(
+                  value: d.host,
+                  child: Text(
+                    '${d.name.isEmpty ? d.host : d.name} · ${d.host}'
+                    '${d.serialNumber.isNotEmpty ? ' · ${d.serialNumber}' : ''}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: _busy ? null : _onPickDevice,
+          decoration: const InputDecoration(hintText: 'Tanlang…'),
+        ),
+        if (_probeResults.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ..._probeResults.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                r.label(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: r.ok ? LinkColors.ok : LinkColors.danger,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _reconnectStepStrip() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: reconnectSteps.map((id) {
+        final state = _reconnectSteps[id] ?? 'pending';
+        Color bg;
+        Color fg;
+        switch (state) {
+          case 'done':
+            bg = LinkColors.okBg;
+            fg = LinkColors.ok;
+          case 'active':
+            bg = LinkColors.accentSoft;
+            fg = LinkColors.accent;
+          case 'fail':
+            bg = LinkColors.dangerBg;
+            fg = LinkColors.danger;
+          default:
+            bg = const Color(0xFFF3F4F6);
+            fg = LinkColors.muted;
+        }
+        final detail = _reconnectDetails[id] ?? '';
+        return Tooltip(
+          message: detail.isEmpty ? _stepTitles[id]! : detail,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              _stepTitles[id]!,
+              style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _ipPasswordBlock({required bool showProbe}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('IP manzil (ixtiyoriy)', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _ipCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  hintText: 'Bo‘sh — avto qidiruv',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: _busy ? null : _scan,
+              child: const Text('Qidirish'),
+            ),
+          ],
+        ),
+        _devicePicker(),
+        const SizedBox(height: 14),
+        const Text(
+          'Admin paroli',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _pwdCtrl,
+                obscureText: _obscurePwd,
+                decoration: const InputDecoration(hintText: '8–16 belgi'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: () => setState(() => _obscurePwd = !_obscurePwd),
+              child: Text(_obscurePwd ? 'Ko‘rsat' : 'Yashir'),
+            ),
+          ],
+        ),
+        if (showProbe) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _busy ? null : _probePasswordOnLan,
+            child: const Text('Hammada tekshir'),
+          ),
+        ],
+      ],
     );
   }
 
@@ -561,177 +876,168 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
                   ],
                 ),
               ),
-              if (_tab == 0)
-              _card(
-                title: '1. Qurilmani serverga ulash',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Pairing token', style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _tokenCtrl,
-                            obscureText: true,
-                            decoration: const InputDecoration(hintText: 'Webdan token'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: _busy
-                              ? null
-                              : () async {
-                                  final data = await Clipboard.getData('text/plain');
-                                  if (data?.text != null) {
-                                    _tokenCtrl.text = data!.text!.trim();
-                                    setState(() {});
-                                  }
-                                },
-                          child: const Text('Joylashtir'),
-                        ),
-                        const SizedBox(width: 6),
-                        FilledButton(
-                          onPressed: _busy ? null : _saveToken,
-                          child: const Text('Saqlash'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('IP manzil (ixtiyoriy)', style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _ipCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: 'Bo‘sh qoldiring — avto qidiruv',
+              if (_tab == 0) ...[
+                _card(
+                  title: '1. Qurilmani serverga ulash',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Pairing token', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _tokenCtrl,
+                              obscureText: true,
+                              decoration: const InputDecoration(hintText: 'Webdan token'),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _busy ? null : _scan,
-                          child: const Text('Qidirish'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Lokatsiya', style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            key: ValueKey('loc-${_locations.length}-$_locationId'),
-                            initialValue: _locations.any((l) => '${l['id']}' == _locationId)
-                                ? _locationId
-                                : null,
-                            items: _locations
-                                .map(
-                                  (l) => DropdownMenuItem(
-                                    value: '${l['id']}',
-                                    child: Text(
-                                      '${l['name'] ?? l['id']}',
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: _busy
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: _busy
                                 ? null
-                                : (v) async {
-                                    setState(() => _locationId = v);
-                                    await _session?.setLocationId(v);
+                                : () async {
+                                    final data = await Clipboard.getData('text/plain');
+                                    if (data?.text != null) {
+                                      _tokenCtrl.text = data!.text!.trim();
+                                      setState(() {});
+                                    }
                                   },
-                            decoration: const InputDecoration(),
+                            child: const Text('Joylashtir'),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: _busy
-                              ? null
-                              : () => _bindAndLoadLocations(showAlert: true),
-                          child: const Text('Yangilash'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Hozirgi admin paroli (bir marta)',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _pwdCtrl,
-                            obscureText: _obscurePwd,
-                            decoration: const InputDecoration(hintText: '8–16 belgi'),
+                          const SizedBox(width: 6),
+                          FilledButton(
+                            onPressed: _busy ? null : _saveToken,
+                            child: const Text('Saqlash'),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () => setState(() => _obscurePwd = !_obscurePwd),
-                          child: Text(_obscurePwd ? 'Ko‘rsat' : 'Yashir'),
-                        ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _ipPasswordBlock(showProbe: true),
+                      const SizedBox(height: 14),
+                      const Text('Lokatsiya', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              key: ValueKey('loc-${_locations.length}-$_locationId'),
+                              initialValue: _locations.any((l) => '${l['id']}' == _locationId)
+                                  ? _locationId
+                                  : null,
+                              items: _locations
+                                  .map(
+                                    (l) => DropdownMenuItem(
+                                      value: '${l['id']}',
+                                      child: Text(
+                                        '${l['name'] ?? l['id']}',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _busy
+                                  ? null
+                                  : (v) async {
+                                      setState(() => _locationId = v);
+                                      await _session?.setLocationId(v);
+                                    },
+                              decoration: const InputDecoration(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: _busy
+                                ? null
+                                : () => _bindAndLoadLocations(showAlert: true),
+                            child: const Text('Yangilash'),
+                          ),
+                        ],
+                      ),
+                      if (_alert.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _alertBox(_alert),
                       ],
-                    ),
-                    if (_alert.isNotEmpty) ...[
+                    ],
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _ulash,
+                    child: Text(_busy ? 'Kuting…' : 'Ulash'),
+                  ),
+                ),
+              ],
+              if (_tab == 1) ...[
+                _card(
+                  title: 'A) Tarmoq / IP',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Wi‑Fi yoki IP o‘zgarganda qurilmani serverga qayta bog‘laydi. '
+                        'Parol aylantirilmaydi.',
+                        style: TextStyle(fontSize: 13, color: LinkColors.muted),
+                      ),
                       const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: LinkColors.warnBg,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE8D48B)),
-                        ),
-                        child: Text(_alert),
+                      _ipPasswordBlock(showProbe: true),
+                      const SizedBox(height: 12),
+                      _reconnectStepStrip(),
+                      if (_alert.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _alertBox(_alert),
+                      ],
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: _busy ? null : _reconnect,
+                        child: Text(_busy ? 'Kuting…' : 'Tarmoqni qayta ulash'),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              if (_tab == 0)
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: _busy ? null : _ulash,
-                  child: Text(_busy ? 'Kuting…' : 'Ulash'),
-                ),
-              ),
-              if (_tab == 1)
-              _card(
-                title: '2. Tarmoq / aloqani tiklash',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Wi‑Fi yoki IP o‘zgarganda qurilmani serverga qayta bog‘laydi. '
-                      'Parol aylantirilmaydi. Tunnel — ofis PC (Windows Link).',
-                      style: TextStyle(fontSize: 13, color: LinkColors.muted),
-                    ),
-                    if (_alert.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(_alert),
+                _card(
+                  title: 'B) Tunnel',
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Android telefon lokal shlyuz (:8800) va Cloudflare tunnel ochmaydi.',
+                        style: TextStyle(fontSize: 13, color: LinkColors.muted),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Tunnel tiklash — ofis PCdagi Windows HR HUB Link → '
+                        '«2. Восстановление» → «Восстановить туннель».',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Yuz sync: Web «Синхронизировать» → ofis PC tunnel → terminal.',
+                        style: TextStyle(fontSize: 12, color: LinkColors.muted),
+                      ),
                     ],
-                    const SizedBox(height: 14),
-                    FilledButton(
-                      onPressed: _busy ? null : _reconnect,
-                      child: const Text('Tarmoqni qayta ulash'),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _alertBox(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: LinkColors.warnBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8D48B)),
+      ),
+      child: Text(text),
     );
   }
 

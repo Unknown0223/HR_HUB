@@ -33,6 +33,7 @@ from runtime_setup import (
     GW_PORT,
     ServiceBundle,
     ensure_runtime,
+    ensure_tunnel_tools,
     start_gateway,
     start_tunnel,
 )
@@ -50,6 +51,20 @@ class TunnelHealth:
     mode: str
     ok: bool
     message: str
+    reach_mode: str = "gw"  # "device" = direct tunnel to terminal (no local :8800)
+
+
+def _resolve_device_host(root: Path, svc: dict) -> tuple[str, int]:
+    """Host/port for direct terminal tunnel (preferred over local GW)."""
+    try:
+        from credential_store import peek_device_host, read_device_credential
+
+        cred = read_device_credential(root) or peek_device_host(root) or {}
+    except Exception:
+        cred = {}
+    host = str(cred.get("host") or svc.get("host") or "").strip()
+    port = int(cred.get("port") or svc.get("port") or 80)
+    return host, port
 
 
 def probe_local_gw(timeout: float = 2.0) -> bool:
@@ -99,8 +114,12 @@ def snapshot_health(
     svc = load_service_config(root)
     mode = "named" if resolve_tunnel_token(cfg, root) else "quick"
     reach_mode = str(svc.get("reachMode") or "").strip().lower()
+    host, _port = _resolve_device_host(root, svc)
     # Direct tunnel to the terminal does not use local :8800 gateway.
-    device_reach = reach_mode == "device"
+    # Infer device mode when credentials already know the terminal IP.
+    device_reach = reach_mode == "device" or (not reach_mode and bool(host))
+    if device_reach:
+        reach_mode = "device"
     url = ""
     if bundle is not None:
         url = str(getattr(bundle, "tunnel_url", "") or "").strip()
@@ -115,7 +134,7 @@ def snapshot_health(
     if not tun_proc:
         tun_proc = _pidfile_alive(runtime_dir(root) / "tunnel.pid")
 
-    gw_http = probe_local_gw()
+    gw_http = False if device_reach else probe_local_gw()
     # /health is device-gw only; direct terminal tunnels won't match that body.
     tun_http = None
     if url and not device_reach:
@@ -134,10 +153,10 @@ def snapshot_health(
             message = "cloudflared есть, URL туннеля пуст"
         elif url and tun_http is not False:
             ok = False
-            message = "Процесс cloudflared отсутствует — откройте туннель снова"
+            message = "Процесс cloudflared отсутствует — нажмите «Восстановить туннель»"
         else:
             ok = False
-            message = "Туннель к терминалу не активен"
+            message = "Туннель к терминалу не активен — нажмите «Восстановить туннель»"
     elif gw_http and (tun_http is True or (tun_http is None and tun_proc)):
         ok = True
         message = "Шлюз и туннель работают"
@@ -163,6 +182,7 @@ def snapshot_health(
         mode=mode,
         ok=ok,
         message=message,
+        reach_mode=reach_mode or "gw",
     )
 
 
@@ -247,19 +267,21 @@ def restore_tunnel(
     if not key and not pairing:
         raise RuntimeError("Нет data/link.key / pairing.token — сначала подключение / pairing")
 
-    from credential_store import read_device_credential
+    from credential_store import peek_device_host, read_device_credential
 
     cred = read_device_credential(root) or {}
-    host = str(cred.get("host") or svc.get("host") or "").strip()
-    port = int(cred.get("port") or svc.get("port") or 80)
-    device_id = str(cred.get("deviceId") or svc.get("deviceId") or "").strip()
+    peek = peek_device_host(root) if not cred else {}
+    host = str(
+        cred.get("host") or peek.get("host") or svc.get("host") or ""
+    ).strip()
+    port = int(cred.get("port") or peek.get("port") or svc.get("port") or 80)
+    device_id = str(
+        cred.get("deviceId") or peek.get("deviceId") or svc.get("deviceId") or ""
+    ).strip()
 
     def emit(msg: str) -> None:
         if on_status:
             on_status(msg)
-
-    emit("Проверка runtime…")
-    ensure_runtime(root, on_status)
 
     left = tunnel_cooldown_remaining(root)
     if left > 0:
@@ -281,12 +303,17 @@ def restore_tunnel(
     target = f"http://{host}:{port}" if host else ""
     try:
         if target:
+            # Device path only needs cloudflared — skip portable Python / gw pip.
+            emit("Проверка tunnel dasturi…")
+            ensure_tunnel_tools(root, on_status)
             emit(f"Туннель -> терминал {host}:{port}...")
             proc, url = start_tunnel(root, on_status, target_url=target)
             bundle.tunnel = proc
             bundle.tunnel_url = url
             bundle.gw = None
         else:
+            emit("Проверка runtime…")
+            ensure_runtime(root, on_status)
             emit("Запуск gateway…")
             bundle.gw = start_gateway(api_url, key, root, on_status)
             emit("Открытие туннеля…")

@@ -324,9 +324,18 @@ class OfficeLinkSession:
             tunnel = named_url
         if tunnel:
             write_tunnel_url(tunnel, self.root)
-        from credential_store import read_device_credential
+        from credential_store import peek_device_host, read_device_credential
 
-        local = read_device_credential(self.root) or {}
+        local = read_device_credential(self.root) or peek_device_host(self.root) or {}
+        host = str(local.get("host") or "")
+        port = int(local.get("port") or 80)
+        device_id = str(local.get("deviceId") or "")
+        if self.chosen is not None:
+            host = host or str(getattr(self.chosen, "host", "") or "")
+            port = int(getattr(self.chosen, "port", None) or port or 80)
+            serial = str(getattr(self.chosen, "serial", "") or "")
+            if serial and not device_id:
+                device_id = serial
         write_service_config(
             api_url=self.api_url,
             tenant=self.tenant,
@@ -338,10 +347,11 @@ class OfficeLinkSession:
                 "namedTunnelUrl": named_url,
                 "autoHeal": True,
                 "faceAgent": True,
-                "deviceId": str(local.get("deviceId") or ""),
-                "host": str(local.get("host") or ""),
-                "port": int(local.get("port") or 80),
+                "deviceId": device_id,
+                "host": host,
+                "port": port,
                 "username": str(local.get("username") or "admin"),
+                "reachMode": "device" if host else "gw",
             },
         )
 
@@ -354,6 +364,11 @@ class OfficeLinkSession:
         """Restart GW + Cloudflare tunnel and re-announce (no device password)."""
         from tunnel_watch import restore_tunnel, spawn_detached_worker
 
+        # Remember LAN host so restore prefers device-direct tunnel (no :8800).
+        try:
+            self.write_service_handoff()
+        except Exception:
+            pass
         try:
             bundle, url = restore_tunnel(
                 root=self.root,

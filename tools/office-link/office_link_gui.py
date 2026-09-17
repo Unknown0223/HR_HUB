@@ -2324,17 +2324,26 @@ class OfficeLinkApp:
         ok = bool(getattr(health, "ok", False))
         msg = getattr(health, "message", "") or ""
         url = getattr(health, "tunnel_url", "") or ""
+        reach = str(getattr(health, "reach_mode", "") or "").lower()
+        device_reach = reach == "device"
         if url:
             self._last_tunnel_url = url
-        self._set_tun_ind("gw_http", "Шлюз :8800", bool(getattr(health, "gw_http", False)))
+        # Device-direct tunnel does not use local :8800 — show N/A, not red failure.
+        if device_reach:
+            self._set_tun_ind("gw_http", "Шлюз :8800", None)
+            self._set_tun_ind("gw_proc", "Процесс GW", None)
+        else:
+            self._set_tun_ind(
+                "gw_http", "Шлюз :8800", bool(getattr(health, "gw_http", False))
+            )
+            self._set_tun_ind(
+                "gw_proc", "Процесс GW", bool(getattr(health, "gw_process", False))
+            )
         tun_http = getattr(health, "tunnel_http", None)
         self._set_tun_ind(
             "tun_http",
             "Туннель URL",
             True if tun_http is True else (False if tun_http is False else None),
-        )
-        self._set_tun_ind(
-            "gw_proc", "Процесс GW", bool(getattr(health, "gw_process", False))
         )
         self._set_tun_ind(
             "tun_proc",
@@ -2358,7 +2367,12 @@ class OfficeLinkApp:
             if "ОТКЛЮЧЁН" in (self.status_var.get() or "") or "туннел" in (
                 self.lock_var.get() or ""
             ).lower():
-                self._show_alert("Туннель и шлюз работают.", kind="ok")
+                self._show_alert(
+                    "Туннель к терминалу работает."
+                    if device_reach
+                    else "Туннель и шлюз работают.",
+                    kind="ok",
+                )
         elif cool_left > 0:
             mins = max(1, (cool_left + 59) // 60)
             self.tunnel_status_var.set(

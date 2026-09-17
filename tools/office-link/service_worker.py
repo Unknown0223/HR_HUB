@@ -101,7 +101,18 @@ def run_forever(poll_sec: float = 8.0) -> int:
 
     write_status(root, {"ok": False, "state": "starting", "message": "Подготовка runtime"})
     try:
-        ensure_runtime(root)
+        # Device-direct tunnel only needs cloudflared; full GW stack is fallback.
+        from credential_store import read_device_credential
+        from runtime_setup import ensure_tunnel_tools
+
+        svc0 = load_service_config(root)
+        cred0 = read_device_credential(root) or {}
+        host0 = str(cred0.get("host") or svc0.get("host") or "").strip()
+        reach0 = str(svc0.get("reachMode") or "").strip().lower()
+        if reach0 == "device" or (not reach0 and host0):
+            ensure_tunnel_tools(root)
+        else:
+            ensure_runtime(root)
     except Exception as exc:
         write_status(root, {"ok": False, "state": "error", "message": f"runtime: {exc}"[:240]})
         return 1
