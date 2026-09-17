@@ -120,8 +120,12 @@ function typeClass(t: string) {
 }
 
 function markPhotoSrc(m: Mark): string | null {
-  // Only the punch capture snapshot — never the employee profile face photo.
-  return mediaSrc(m.photoUrl);
+  // Prefer punch capture snapshot; fall back to employee face for display/reports.
+  return (
+    mediaSrc(m.photoUrl) ||
+    mediaSrc(m.employee?.faceProfile?.photoUrl) ||
+    null
+  );
 }
 
 function markDay(iso: string) {

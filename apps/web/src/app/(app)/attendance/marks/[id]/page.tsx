@@ -89,7 +89,7 @@ function MarkDetailInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const photo = mediaSrc(mark?.photoUrl) || null;
+  const photo = mediaSrc(mark?.photoUrl) || mediaSrc(mark?.employee?.faceProfile?.photoUrl) || null;
   const face = mediaSrc(mark?.employee?.faceProfile?.photoUrl) || null;
   const name = mark ? empName(mark) : '';
   const slides = [

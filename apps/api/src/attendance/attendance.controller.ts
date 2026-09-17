@@ -377,14 +377,17 @@ export class AttendanceController {
   ) {
     const ct = String(req.headers['content-type'] || '');
     let payload: string | Buffer | Record<string, unknown> | null = null;
-    if (body && typeof body === 'object' && !Buffer.isBuffer(body)) {
+    // Prefer raw bytes (multipart JPEG + JSON) from express.raw middleware.
+    if (Buffer.isBuffer(body)) {
+      payload = body;
+    } else if (Buffer.isBuffer((req as { body?: unknown }).body)) {
+      payload = (req as { body: Buffer }).body;
+    } else if (typeof (req as { rawBody?: Buffer }).rawBody !== 'undefined') {
+      payload = (req as { rawBody?: Buffer }).rawBody || null;
+    } else if (body && typeof body === 'object') {
       payload = body as Record<string, unknown>;
     } else if (typeof body === 'string') {
       payload = body;
-    } else if (Buffer.isBuffer(body)) {
-      payload = body;
-    } else if (typeof (req as { rawBody?: Buffer }).rawBody !== 'undefined') {
-      payload = (req as { rawBody?: Buffer }).rawBody || null;
     }
     return this.attendance.ingestHikvisionHttpHostEvent(pushToken, payload, ct);
   }

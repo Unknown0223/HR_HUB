@@ -1,6 +1,7 @@
 /**
  * Parse Hikvision HttpHostNotification / alert payloads into punch fields.
- * Supports JSON (EventNotificationAlert / AccessControllerEvent) and simple XML.
+ * Supports JSON (EventNotificationAlert / AccessControllerEvent), XML,
+ * and multipart/form-data (JSON part + binary JPEG capture).
  */
 
 const AUTH_OK_MINORS = new Set([1, 38, 39, 75, 76]);
@@ -10,6 +11,7 @@ export type ParsedHikPunch = {
   direction: 'IN' | 'OUT' | 'AUTO';
   occurredAt: string;
   serialNo?: string;
+  photoBase64?: string;
   raw: Record<string, unknown>;
 };
 
@@ -142,6 +144,101 @@ function parseXmlPayload(text: string): ParsedHikPunch[] {
   ];
 }
 
+function boundaryFromContentType(contentType?: string): string | null {
+  const m = String(contentType || '').match(/boundary=("?)([^";\s]+)\1/i);
+  return m?.[2] || null;
+}
+
+function extractJpegFromBuffer(buf: Buffer): Buffer | null {
+  const start = buf.indexOf(Buffer.from([0xff, 0xd8]));
+  if (start < 0) return null;
+  const end = buf.lastIndexOf(Buffer.from([0xff, 0xd9]));
+  if (end > start) return buf.subarray(start, end + 2);
+  if (buf.length - start >= 2500) return buf.subarray(start);
+  return null;
+}
+
+/**
+ * Split multipart body into punches + optional capture JPEG (base64).
+ * Hikvision typically sends JSON AccessControllerEvent + image/jpeg parts.
+ */
+export function parseMultipartHikvisionBody(
+  body: Buffer,
+  contentType?: string,
+): ParsedHikPunch[] {
+  const boundary = boundaryFromContentType(contentType);
+  let parts: Buffer[] = [];
+  if (boundary) {
+    const sep = Buffer.from(`--${boundary}`);
+    const chunks: Buffer[] = [];
+    let start = body.indexOf(sep);
+    while (start >= 0) {
+      const next = body.indexOf(sep, start + sep.length);
+      const chunk =
+        next >= 0 ? body.subarray(start + sep.length, next) : body.subarray(start + sep.length);
+      // strip leading CRLF and trailing CRLF
+      let p = chunk;
+      if (p.length >= 2 && p[0] === 0x0d && p[1] === 0x0a) p = p.subarray(2);
+      if (p.length >= 2 && p[p.length - 2] === 0x0d && p[p.length - 1] === 0x0a) {
+        p = p.subarray(0, p.length - 2);
+      }
+      if (p.length >= 2 && p[0] === 0x2d && p[1] === 0x2d) {
+        // closing boundary
+        break;
+      }
+      if (p.length) chunks.push(p);
+      start = next;
+    }
+    parts = chunks;
+  } else {
+    parts = [body];
+  }
+
+  const punches: ParsedHikPunch[] = [];
+  let jpegB64: string | undefined;
+
+  for (const part of parts) {
+    const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+    const headerBuf = headerEnd >= 0 ? part.subarray(0, headerEnd) : Buffer.alloc(0);
+    const content = headerEnd >= 0 ? part.subarray(headerEnd + 4) : part;
+    const headers = headerBuf.toString('utf8').toLowerCase();
+
+    const jpeg = extractJpegFromBuffer(content);
+    if (jpeg && jpeg.length > 500) {
+      if (
+        headers.includes('image/jpeg') ||
+        headers.includes('content-type: image') ||
+        jpeg.length >= 2500
+      ) {
+        jpegB64 = jpeg.toString('base64');
+        continue;
+      }
+    }
+
+    const text = content.toString('utf8');
+    if (text.includes('{') || text.includes('<')) {
+      const found = text.trimStart().startsWith('<')
+        ? parseXmlPayload(text)
+        : parseJsonPayload(text);
+      punches.push(...found);
+    }
+  }
+
+  if (jpegB64 && punches.length) {
+    for (const p of punches) {
+      if (!p.photoBase64) p.photoBase64 = jpegB64;
+    }
+  } else if (!punches.length && jpegB64) {
+    return [];
+  }
+
+  if (!punches.length) {
+    const text = body.toString('utf8');
+    if (text.includes('{')) return parseJsonPayload(text);
+  }
+  return punches;
+}
+
 export function parseHikvisionEventBody(
   body: string | Buffer | Record<string, unknown> | null | undefined,
   contentType?: string,
@@ -150,16 +247,29 @@ export function parseHikvisionEventBody(
   if (typeof body === 'object' && !Buffer.isBuffer(body)) {
     return parseJsonPayload(JSON.stringify(body));
   }
+  const ct = (contentType || '').toLowerCase();
+  if (Buffer.isBuffer(body) && (ct.includes('multipart') || body.includes(Buffer.from('--')))) {
+    return parseMultipartHikvisionBody(body, contentType);
+  }
   const text =
     typeof body === 'string'
       ? body
       : Buffer.isBuffer(body)
         ? body.toString('utf8')
         : String(body);
-  const ct = (contentType || '').toLowerCase();
   if (ct.includes('xml') || text.trimStart().startsWith('<?xml') || text.includes('<Event')) {
     const xml = parseXmlPayload(text);
     if (xml.length) return xml;
+  }
+  // Binary JPEG may sit after JSON in a non-multipart body.
+  if (Buffer.isBuffer(body)) {
+    const jpeg = extractJpegFromBuffer(body);
+    const punches = parseJsonPayload(text);
+    if (jpeg && jpeg.length > 500 && punches.length) {
+      const b64 = jpeg.toString('base64');
+      for (const p of punches) if (!p.photoBase64) p.photoBase64 = b64;
+    }
+    if (punches.length) return punches;
   }
   return parseJsonPayload(text);
 }

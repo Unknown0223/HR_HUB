@@ -809,23 +809,32 @@ class ProvisionEngine:
                 pass
 
             # Device → cloud punch push (HttpHostNotification). Soft-fail.
+            # Prefer LAN punch-proxy on this PC (terminal often has no outbound HTTPS).
             try:
-                from device_push import apply_hik_push_from_api_response
+                from device_push import apply_hik_push_prefer_lan
 
                 hik_push = (
                     linked.get("hikPush") if isinstance(linked, dict) else None
                 )
                 if isinstance(hik_push, dict) and hik_push.get("urlPath"):
                     _emit(on_status, "3b/4 HttpHost (otmetkalar → web)…")
-                    push_res = apply_hik_push_from_api_response(
+                    push_res = apply_hik_push_prefer_lan(
                         session.chosen.host if session.chosen else "",
                         int(session.chosen.port or 80) if session.chosen else 80,
                         username,
                         session.password or "",
                         hik_push,
+                        api_base=str(session.api_url or ""),
                     )
                     if push_res.get("ok"):
-                        _emit(on_status, "HttpHost OK — otmetkalar to‘g‘ridan webga")
+                        if push_res.get("mode") == "lan_proxy":
+                            _emit(
+                                on_status,
+                                "HttpHost OK — otmetkalar PC orqali webga "
+                                f"({push_res.get('lanIp')}:{push_res.get('proxyPort')})",
+                            )
+                        else:
+                            _emit(on_status, "HttpHost OK — otmetkalar to‘g‘ridan webga")
                     else:
                         _emit(
                             on_status,
@@ -1077,33 +1086,58 @@ class ProvisionEngine:
                     ),
                 )
 
-            # Critical: rewrite HttpHost on terminal so punches hit Railway
-            # (Windows reconnect previously skipped this — marks never arrived).
+            # Critical: rewrite HttpHost — prefer LAN punch-proxy on this PC
+            # (terminal often cannot open outbound HTTPS to Railway).
             try:
-                from device_push import apply_hik_push_from_api_response
+                from device_push import apply_hik_push_prefer_lan
 
                 hik_push = (
                     linked.get("hikPush") if isinstance(linked, dict) else None
                 )
                 if isinstance(hik_push, dict) and hik_push.get("urlPath"):
                     _emit(on_status, "3b/3 HttpHost (otmetkalar → web)…")
-                    push_res = apply_hik_push_from_api_response(
+                    api_base = ""
+                    try:
+                        api_base = str(
+                            (session.api_url if session else None)
+                            or ""
+                        )
+                    except Exception:
+                        api_base = ""
+                    if not api_base:
+                        try:
+                            from paths import load_config, find_root
+
+                            api_base = str(
+                                load_config(find_root()).get("apiUrl") or ""
+                            )
+                        except Exception:
+                            api_base = ""
+                    push_res = apply_hik_push_prefer_lan(
                         host,
                         port,
                         username,
                         password,
                         hik_push,
+                        api_base=api_base,
                     )
                     if push_res.get("ok"):
-                        _emit(
-                            on_status,
-                            "HttpHost OK — otmetkalar terminal → web",
-                        )
+                        if push_res.get("mode") == "lan_proxy":
+                            _emit(
+                                on_status,
+                                "HttpHost OK — otmetkalar PC orqali → web "
+                                f"({push_res.get('lanIp')}:{push_res.get('proxyPort')})",
+                            )
+                        else:
+                            _emit(
+                                on_status,
+                                "HttpHost OK — otmetkalar terminal → web",
+                            )
                     else:
                         _emit(
                             on_status,
                             f"HttpHost: {push_res.get('message') or push_res.get('status')} — "
-                            "tekshiring (terminal internet/HTTPS)",
+                            "tekshiring (Link ishlashi / terminal LAN)",
                         )
                 else:
                     _emit(

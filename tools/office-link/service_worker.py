@@ -36,6 +36,19 @@ from tunnel_watch import (  # noqa: E402
 )
 
 
+def _start_punch_proxy(root: Path, api_url: str) -> dict:
+    """Terminal → PC HTTP → Railway (works when device has no outbound HTTPS)."""
+    try:
+        from punch_proxy import DEFAULT_PORT, ensure_punch_proxy, punch_proxy_status
+
+        ensure_punch_proxy(api_url, DEFAULT_PORT)
+        st = punch_proxy_status()
+        st["ok"] = bool(st.get("running"))
+        return st
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "message": f"punch_proxy: {exc}"[:200]}
+
+
 def _alive(proc) -> bool:
     return proc is not None and proc.poll() is None
 
@@ -189,6 +202,29 @@ def run_forever(poll_sec: float = 8.0) -> int:
     last_health = time.monotonic()
     last_face = 0.0
 
+    punch_st = _start_punch_proxy(root, api_url)
+    write_status(
+        root,
+        {
+            "ok": True,
+            "state": "face_agent" if not tunnel_ok else "running",
+            "tunnelMode": mode if tunnel_ok else "off",
+            "tunnelUrl": url if tunnel_ok else "",
+            "apiUrl": api_url,
+            "tenantCode": tenant,
+            "faceAgent": True,
+            "punchProxy": punch_st,
+            "message": (
+                "Punch proxy :"
+                + str(punch_st.get("port") or 8787)
+                + " + face agent"
+                if punch_st.get("ok")
+                else (punch_st.get("message") or "face agent")
+            ),
+            "autoHeal": False,
+        },
+    )
+
     while True:
         time.sleep(poll_sec)
         now = time.monotonic()
@@ -196,6 +232,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
         if now - last_face >= face_every:
             last_face = now
             fr = _face_tick(root)
+            punch_st = _start_punch_proxy(root, api_url)
             write_status(
                 root,
                 {
@@ -207,6 +244,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     "tenantCode": tenant,
                     "faceAgent": True,
                     "faceLast": fr,
+                    "punchProxy": punch_st,
                     "message": fr.get("message") or "face agent tick",
                     "autoHeal": False,
                 },

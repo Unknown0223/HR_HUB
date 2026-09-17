@@ -3440,6 +3440,7 @@ export class AttendanceService {
         direction: dir,
         occurredAt,
         source: 'hikvision_http_host',
+        photoBase64: p.photoBase64,
         raw: p.raw,
       });
       results.push(res as { ok: boolean; reason?: string });

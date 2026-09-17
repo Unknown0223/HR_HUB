@@ -13,6 +13,13 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   // Original-resolution mobile selfies are base64 encoded (~33% larger).
   const bodyLimit = process.env.API_BODY_LIMIT ?? '30mb';
+  // Hikvision HttpHost sends multipart JSON + JPEG — must keep raw bytes.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const express = require('express') as typeof import('express');
+  app.use(
+    '/api/attendance/hikvision/events',
+    express.raw({ type: () => true, limit: bodyLimit }),
+  );
   app.useBodyParser('json', { limit: bodyLimit });
   app.useBodyParser('urlencoded', { limit: bodyLimit, extended: true });
 
