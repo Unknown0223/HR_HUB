@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HR HUB — Yangi xodim</title>
+    <style>
+      :root {
+        --bg: #f4f6fb;
+        --card: #fff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --accent: #2563eb;
+        --ok: #059669;
+        --danger: #dc2626;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: linear-gradient(180deg, #e8eef9 0%, var(--bg) 40%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+      h1 { font-size: 1.35rem; margin: 0 0 6px; }
+      .lede { color: var(--muted); font-size: 0.95rem; margin: 0 0 20px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+      }
+      .card h2 { font-size: 1rem; margin: 0 0 12px; }
+      label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px; }
+      label .req { color: var(--danger); }
+      input, select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: inherit;
+        background: #fff;
+      }
+      input[type="file"] {
+        padding: 8px;
+        background: #f8fafc;
+      }
+      .hint { font-size: 0.8rem; color: var(--muted); margin: 4px 0 0; font-weight: 400; }
+      .samples { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 8px 0 12px; }
+      .samples figure {
+        margin: 0;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        padding: 8px;
+        background: #f8fafc;
+        text-align: center;
+      }
+      .samples img { max-width: 100%; max-height: 220px; height: auto; border-radius: 8px; }
+      .samples figcaption { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+      .photo-card { border-left: 4px solid var(--accent); }
+      .photo-card + .photo-card { border-left-color: #0ea5e9; }
+      .file-label input[type="file"] { margin-top: 6px; }
+      .req { color: var(--danger); }
+      .actions { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+      button {
+        border: 0;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        padding: 12px 18px;
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.6; cursor: wait; }
+      #msg { font-size: 0.9rem; color: var(--muted); }
+      #msg.ok { color: var(--ok); }
+      #msg.err { color: var(--danger); }
+      .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      @media (max-width: 520px) {
+        .samples, .row2 { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>HR HUB — Yangi xodim arizasi</h1>
+      <p class="lede">
+        Kerakli maydonlarni to‘ldiring. Yuz va pasport rasmini shu yerdan yuklang (JPG/PNG).
+      </p>
+
+      <form id="appForm">
+        <div class="card">
+          <h2>1. Shaxsiy ma’lumot</h2>
+          <label>Familiya / Фамилия <span class="req">*</span>
+            <input name="lastName" required autocomplete="family-name" />
+          </label>
+          <label>Ism / Имя <span class="req">*</span>
+            <input name="firstName" required autocomplete="given-name" />
+          </label>
+          <label>Otasi ismi / Отчество
+            <input name="middleName" autocomplete="additional-name" />
+          </label>
+          <label>Telefon <span class="req">*</span>
+            <input name="phone" required placeholder="+99890..." autocomplete="tel" />
+          </label>
+          <div class="row2">
+            <label>JSHSHIR (PINFL)
+              <input name="pinfl" inputmode="numeric" />
+            </label>
+            <label>Tug‘ilgan sana
+              <input name="birthDate" type="date" />
+            </label>
+          </div>
+          <label>Jins
+            <select name="gender">
+              <option value="">—</option>
+              <option value="Erkak">Erkak</option>
+              <option value="Ayol">Ayol</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>2. Hujjat</h2>
+          <label>Hujjat turi
+            <select name="passportDocType">
+              <option value="">—</option>
+              <option value="Pasport">Pasport</option>
+              <option value="ID karta">ID karta</option>
+            </select>
+          </label>
+          <div class="row2">
+            <label>Pasport seriyasi
+              <input name="passportSeries" placeholder="AA" />
+            </label>
+            <label>Pasport raqami
+              <input name="passportNumber" />
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>3. Ish</h2>
+          <label>Bo‘lim
+            <input name="divisionCode" />
+          </label>
+          <label>Lavozim
+            <input name="positionCode" />
+          </label>
+          <div class="row2">
+            <label>Ish turi
+              <select name="employmentType">
+                <option value="">—</option>
+                <option value="Shtat">Shtat</option>
+                <option value="GPH">GPH</option>
+              </select>
+            </label>
+            <label>Qabul sanasi
+              <input name="hiredAt" type="date" />
+            </label>
+          </div>
+        </div>
+
+        <div class="card photo-card">
+          <h2>4a. Yuz rasmi — Face ID terminal <span class="req">*</span></h2>
+          <p class="hint">
+            Alohida fayl. Terminal xodimni shu rasm bilan tanidi.
+            JPG/PNG · oldindan · yuz markazda · yorug‘ · oddiy fon · bitta odam ·
+            ko‘zoynak/shapka bo‘lmasa yaxshi.
+          </p>
+          <div class="samples" id="sampleFace"></div>
+          <label class="file-label">
+            Faylni tanlang (faqat yuz)
+            <input
+              name="facePhoto"
+              type="file"
+              accept="image/jpeg,image/png,image/jpg,image/*"
+              required
+            />
+          </label>
+        </div>
+
+        <div class="card photo-card">
+          <h2>4b. Pasport / ID rasmi <span class="req">*</span></h2>
+          <p class="hint">
+            Alohida fayl (yuz rasmidan boshqa). Hujjat tahlili uchun.
+            JPG/PNG · butun sahifa/karta kadrda · matn aniq · aks/blur yo‘q.
+          </p>
+          <div class="samples" id="samplePass"></div>
+          <label class="file-label">
+            Faylni tanlang (faqat pasport/ID)
+            <input
+              name="passportPhoto"
+              type="file"
+              accept="image/jpeg,image/png,image/jpg,image/*"
+              required
+            />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="btn">Yuborish</button>
+          <span id="msg"></span>
+        </div>
+      </form>
+    </div>
+
+    <script>
+      (function () {
+        if (window.SAMPLE_FACE) {
+          document.getElementById('sampleFace').innerHTML =
+            '<figure><img alt="yuz namuna" src="' +
+            window.SAMPLE_FACE +
+            '"/><figcaption>Namuna — yuz (terminal)</figcaption></figure>';
+        }
+        if (window.SAMPLE_PASSPORT) {
+          document.getElementById('samplePass').innerHTML =
+            '<figure><img alt="pasport namuna" src="' +
+            window.SAMPLE_PASSPORT +
+            '"/><figcaption>Namuna — pasport</figcaption></figure>';
+        }
+
+        var form = document.getElementById('appForm');
+        var btn = document.getElementById('btn');
+        var msg = document.getElementById('msg');
+
+        form.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var face = form.facePhoto.files && form.facePhoto.files[0];
+          var pass = form.passportPhoto.files && form.passportPhoto.files[0];
+          if (!face) {
+            msg.className = 'err';
+            msg.textContent = 'Yuz rasmini alohida yuklang.';
+            return;
+          }
+          if (!pass) {
+            msg.className = 'err';
+            msg.textContent = 'Pasport rasmini alohida yuklang.';
+            return;
+          }
+          if (face === pass || (face.name === pass.name && face.size === pass.size)) {
+            /* same file often OK to warn */
+          }
+          msg.className = '';
+          msg.textContent = 'Yuborilmoqda…';
+          btn.disabled = true;
+
+          google.script.run
+            .withSuccessHandler(function (res) {
+              btn.disabled = false;
+              if (res && res.ok) {
+                msg.className = 'ok';
+                msg.textContent =
+                  'Qabul qilindi' +
+                  (res.tabNumber ? ' · tabel: ' + res.tabNumber : '') +
+                  '.';
+                form.reset();
+              } else {
+                msg.className = 'err';
+                msg.textContent = (res && res.error) || 'Xato';
+              }
+            })
+            .withFailureHandler(function (err) {
+              btn.disabled = false;
+              msg.className = 'err';
+              msg.textContent = String(err && err.message ? err.message : err);
+            })
+            .submitHrHubApplication(form);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -26,14 +26,8 @@ if (gw_dir / "main.py").is_file():
     if adapters.is_dir():
         datas.append((str(adapters), "gw/adapters"))
 
-cf_candidates = [
-    spec_dir / "runtime" / "cloudflared.exe",
-    (spec_dir / ".." / "cloudflared.exe").resolve(),
-]
-for cf in cf_candidates:
-    if cf.is_file():
-        datas.append((str(cf), "."))
-        break
+# Do not bundle cloudflared into onedir — pack-release puts a single copy under
+# runtime/cloudflared.exe (GitHub 100MB limit; install_cloudflared also downloads).
 
 a = Analysis(
     [str(spec_dir / "office_link_app.py")],

@@ -54,9 +54,12 @@ if exist "%GW_SRC%\main.py" (
   echo [OGOHLANTIRISH] device-gw topilmadi — tunnel GW yo'li ishlamasligi mumkin.
 )
 
-echo cloudflared paketga...
+echo cloudflared paketga (bitta nusxa — GitHub 100MB limuti)...
 mkdir "%REL%\runtime" 2>nul
-mkdir "%REL%\ilova\runtime" 2>nul
+REM Drop copies baked into onedir / accidental duplicates.
+if exist "%REL%\ilova\_internal\cloudflared.exe" del /F /Q "%REL%\ilova\_internal\cloudflared.exe" >nul 2>nul
+if exist "%REL%\ilova\runtime\cloudflared.exe" del /F /Q "%REL%\ilova\runtime\cloudflared.exe" >nul 2>nul
+if exist "%REL%\ilova\cloudflared.exe" del /F /Q "%REL%\ilova\cloudflared.exe" >nul 2>nul
 set "CF_SRC="
 if exist "%CD%\runtime\cloudflared.exe" set "CF_SRC=%CD%\runtime\cloudflared.exe"
 if not defined CF_SRC if exist "%CD%\..\cloudflared.exe" set "CF_SRC=%CD%\..\cloudflared.exe"
@@ -68,16 +71,16 @@ if not defined CF_SRC (
 )
 if defined CF_SRC if exist "%CF_SRC%" (
   copy /Y "%CF_SRC%" "%REL%\runtime\cloudflared.exe" >nul
-  copy /Y "%CF_SRC%" "%REL%\ilova\runtime\cloudflared.exe" >nul
   echo [OK] runtime\cloudflared.exe
 ) else (
   echo [OGOHLANTIRISH] cloudflared yuklanmadi — birinchi restore internet bilan yuklaydi.
 )
 
-if exist "%CD%\runtime\python\python.exe" (
-  echo Portable Python paketga...
-  xcopy /E /I /Y "%CD%\runtime\python" "%REL%\runtime\python\" >nul
-  echo [OK] runtime\python\
+REM Portable Python intentionally NOT shipped in download ZIP/Setup (keeps packages
+REM under GitHub 100MB). BOSHLASH uses frozen EXE; restore can install runtime later.
+if exist "%REL%\runtime\python" (
+  echo Portable Python paketdan olib tashlanmoqda (hajm)...
+  rmdir /S /Q "%REL%\runtime\python" >nul 2>nul
 )
 
 echo Skriptlar...

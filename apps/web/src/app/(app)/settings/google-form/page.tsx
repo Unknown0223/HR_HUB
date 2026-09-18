@@ -99,8 +99,12 @@ export default function GoogleFormEmployeesPage() {
             <code>TENANT_CODE=&apos;{tenantHint}&apos;</code>
           </li>
           <li>
-            <code>createHrHubEmployeeForm</code> ni <b>Run</b> qiling — form URL
-            Logger da chiqadi
+            <code>createHrHubEmployeeForm</code> — birinchi marta; keyin{' '}
+            <code>updateHrHubEmployeeForm</code> (URL saqlanadi)
+          </li>
+          <li>
+            Formada yuz + pasport rasmi majburiy (JPG/PNG). Namuna:{' '}
+            <code>SampleBlobs.gs</code>
           </li>
           <li>Form linkini kandidatlarga yuboring</li>
         </ol>

@@ -248,24 +248,49 @@ def apply_hik_push_prefer_lan(
     *,
     api_base: str = "",
     proxy_port: int = 8787,
+    mode: str | None = None,
 ) -> dict[str, Any]:
-    """Prefer LAN punch-proxy (HTTP→PC); fall back to direct HTTPS Railway."""
+    """Configure HttpHost for punches.
+
+    Default: **direct HTTPS → Railway** (Link ochiq bo‘lishi shart emas).
+    LAN punch-proxy (:8787) faqat:
+      - mode/env ``lan`` bo‘lsa, yoki
+      - to‘g‘ridan sozlash muvaffaqiyatsiz bo‘lsa (fallback).
+
+    Env: ``OFFICE_LINK_PUNCH_MODE=direct|lan|auto`` (default ``direct``).
+    """
+    import os
+
     if not isinstance(hik_push, dict) or not hik_push.get("urlPath"):
         return {"ok": False, "message": "hikPush missing"}
-    url_path = str(hik_push.get("urlPath") or "")
-    lan_ip = ""
-    try:
-        from punch_proxy import (
-            DEFAULT_PORT,
-            ensure_punch_proxy,
-            lan_ipv4_for_device,
-        )
 
-        pport = int(proxy_port or DEFAULT_PORT)
-        if api_base:
-            ensure_punch_proxy(api_base, pport)
-        lan_ip = lan_ipv4_for_device(host)
-        if lan_ip:
+    raw_mode = (mode or os.environ.get("OFFICE_LINK_PUNCH_MODE") or "direct").strip().lower()
+    if raw_mode not in ("direct", "lan", "auto"):
+        raw_mode = "direct"
+
+    def _try_direct() -> dict[str, Any]:
+        direct = apply_hik_push_from_api_response(
+            host, port, username, password, hik_push
+        )
+        if direct.get("ok"):
+            return {**direct, "mode": "direct_https"}
+        return direct
+
+    def _try_lan() -> dict[str, Any]:
+        url_path = str(hik_push.get("urlPath") or "")
+        try:
+            from punch_proxy import (
+                DEFAULT_PORT,
+                ensure_punch_proxy,
+                lan_ipv4_for_device,
+            )
+
+            pport = int(proxy_port or DEFAULT_PORT)
+            if api_base:
+                ensure_punch_proxy(api_base, pport)
+            lan_ip = lan_ipv4_for_device(host)
+            if not lan_ip:
+                return {"ok": False, "message": "no LAN IP for punch proxy"}
             lan_cfg = {
                 "urlPath": url_path,
                 "protocolType": "HTTP",
@@ -278,23 +303,47 @@ def apply_hik_push_prefer_lan(
                 host, port, username, password, lan_cfg
             )
             if res.get("ok"):
-                res = {
+                return {
                     **res,
                     "mode": "lan_proxy",
                     "lanIp": lan_ip,
                     "proxyPort": pport,
                 }
-                return res
-    except Exception as exc:  # noqa: BLE001
-        # Fall through to direct cloud HttpHost.
-        lan_err = str(exc)[:120]
-    else:
-        lan_err = "lan configure failed"
+            return res
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "message": str(exc)[:160]}
 
-    direct = apply_hik_push_from_api_response(
-        host, port, username, password, hik_push
-    )
+    # Explicit LAN-only (rare: terminal has no WAN).
+    if raw_mode == "lan":
+        lan = _try_lan()
+        if lan.get("ok"):
+            return lan
+        direct = _try_direct()
+        if direct.get("ok"):
+            return {**direct, "lanNote": lan.get("message") or "lan failed"}
+        return lan
+
+    # Default / auto: direct first (linksiz), then LAN fallback.
+    direct = _try_direct()
     if direct.get("ok"):
-        direct = {**direct, "mode": "direct_https", "lanNote": lan_err}
+        return direct
+    if raw_mode == "direct":
+        # Still try LAN as last resort so Ulash doesn't leave punches dead.
+        lan = _try_lan()
+        if lan.get("ok"):
+            return {
+                **lan,
+                "directNote": direct.get("message") or "direct failed",
+            }
+        return direct
+
+    # auto: same as direct-first
+    lan = _try_lan()
+    if lan.get("ok"):
+        return {**lan, "directNote": direct.get("message") or "direct failed"}
     return direct
+
+
+# Clearer alias — callers may use either name.
+apply_hik_push = apply_hik_push_prefer_lan
 

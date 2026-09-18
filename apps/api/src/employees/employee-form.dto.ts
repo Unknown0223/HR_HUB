@@ -155,6 +155,28 @@ export class EmployeeFormIngestDto {
   @IsString()
   note?: string;
 
+  /** Face ID photo from Google Form file upload (raw base64, no data: prefix). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  facePhotoBase64?: string;
+
+  @ApiPropertyOptional({ example: 'image/jpeg' })
+  @IsOptional()
+  @IsString()
+  facePhotoContentType?: string;
+
+  /** Passport / ID card scan from Google Form file upload. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  passportPhotoBase64?: string;
+
+  @ApiPropertyOptional({ example: 'image/jpeg' })
+  @IsOptional()
+  @IsString()
+  passportPhotoContentType?: string;
+
   /** Idempotency / Google response id */
   @ApiPropertyOptional()
   @IsOptional()

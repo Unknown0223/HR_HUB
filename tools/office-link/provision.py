@@ -809,7 +809,7 @@ class ProvisionEngine:
                 pass
 
             # Device → cloud punch push (HttpHostNotification). Soft-fail.
-            # Prefer LAN punch-proxy on this PC (terminal often has no outbound HTTPS).
+            # Default: direct HTTPS to Railway (Link not required). LAN proxy = fallback.
             try:
                 from device_push import apply_hik_push_prefer_lan
 
@@ -827,14 +827,21 @@ class ProvisionEngine:
                         api_base=str(session.api_url or ""),
                     )
                     if push_res.get("ok"):
-                        if push_res.get("mode") == "lan_proxy":
+                        if push_res.get("mode") == "direct_https":
+                            _emit(
+                                on_status,
+                                "HttpHost OK — otmetkalar terminal → server "
+                                "(Link kerak emas)",
+                            )
+                        elif push_res.get("mode") == "lan_proxy":
                             _emit(
                                 on_status,
                                 "HttpHost OK — otmetkalar PC orqali webga "
-                                f"({push_res.get('lanIp')}:{push_res.get('proxyPort')})",
+                                f"({push_res.get('lanIp')}:{push_res.get('proxyPort')}) "
+                                "— Link/service ochiq bo‘lishi kerak",
                             )
                         else:
-                            _emit(on_status, "HttpHost OK — otmetkalar to‘g‘ridan webga")
+                            _emit(on_status, "HttpHost OK — otmetkalar → web")
                     else:
                         _emit(
                             on_status,
@@ -1122,11 +1129,18 @@ class ProvisionEngine:
                         api_base=api_base,
                     )
                     if push_res.get("ok"):
-                        if push_res.get("mode") == "lan_proxy":
+                        if push_res.get("mode") == "direct_https":
+                            _emit(
+                                on_status,
+                                "HttpHost OK — otmetkalar terminal → server "
+                                "(Link kerak emas)",
+                            )
+                        elif push_res.get("mode") == "lan_proxy":
                             _emit(
                                 on_status,
                                 "HttpHost OK — otmetkalar PC orqali → web "
-                                f"({push_res.get('lanIp')}:{push_res.get('proxyPort')})",
+                                f"({push_res.get('lanIp')}:{push_res.get('proxyPort')}) "
+                                "— Link/service kerak",
                             )
                         else:
                             _emit(
@@ -1137,7 +1151,7 @@ class ProvisionEngine:
                         _emit(
                             on_status,
                             f"HttpHost: {push_res.get('message') or push_res.get('status')} — "
-                            "tekshiring (Link ishlashi / terminal LAN)",
+                            "terminal internet/DNS/TLS ni tekshiring",
                         )
                 else:
                     _emit(

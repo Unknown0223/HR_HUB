@@ -2381,6 +2381,20 @@ export class EmployeesService {
           type: 'paragraph',
           required: false,
         },
+        {
+          key: 'facePhotoBase64',
+          titleUz: 'Yuz rasmi (Face ID)',
+          titleRu: 'Фото лица (Face ID)',
+          type: 'file',
+          required: true,
+        },
+        {
+          key: 'passportPhotoBase64',
+          titleUz: 'Pasport / ID rasmi',
+          titleRu: 'Фото паспорта / ID',
+          type: 'file',
+          required: true,
+        },
       ],
     };
   }
@@ -2611,6 +2625,95 @@ export class EmployeesService {
       });
     }
 
+    let facePhotoSaved = false;
+    let passportPhotoSaved = false;
+    const faceB64 = String(dto.facePhotoBase64 || '').trim();
+    if (faceB64) {
+      try {
+        const buf = Buffer.from(faceB64, 'base64');
+        if (buf.length > 0) {
+          const mime =
+            String(dto.facePhotoContentType || '').trim() || 'image/jpeg';
+          const ext = mime.includes('png') ? 'png' : 'jpg';
+          await this.face.uploadFace(tenant.id, emp.id, {
+            buffer: buf,
+            mimetype: mime,
+            originalname: `form-face.${ext}`,
+            size: buf.length,
+          } as Express.Multer.File);
+          facePhotoSaved = true;
+          this.scheduleEmployeeDeviceSync(tenant.id, emp.id);
+        }
+      } catch (e) {
+        this.logger.warn(
+          `form ingest face photo employee=${emp.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+
+    const passB64 = String(dto.passportPhotoBase64 || '').trim();
+    if (passB64) {
+      try {
+        const buf = Buffer.from(passB64, 'base64');
+        if (buf.length > 0) {
+          const mime =
+            String(dto.passportPhotoContentType || '').trim() || 'image/jpeg';
+          const ext = mime.includes('png') ? 'png' : 'jpg';
+          const key = `person-docs/${tenant.id}/${emp.id}/passport-${Date.now()}.${ext}`;
+          const { url, key: storedKey } = await this.storage.putObject(
+            key,
+            buf,
+            mime,
+          );
+          const personIdForDoc =
+            emp.personId ||
+            (
+              await this.prisma.employee.findUnique({
+                where: { id: emp.id },
+                select: { personId: true },
+              })
+            )?.personId;
+          if (personIdForDoc) {
+            await this.prisma.personDocument.create({
+              data: {
+                tenantId: tenant.id,
+                personId: personIdForDoc,
+                employeeId: emp.id,
+                docType: createDto.passportDocType || 'PASSPORT',
+                docNumber:
+                  [createDto.passportSeries, createDto.passportNumber]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim() || 'form-upload',
+                issuer: createDto.passportIssuer || null,
+                issuedAt: createDto.passportIssuedAt
+                  ? new Date(createDto.passportIssuedAt)
+                  : null,
+                expiresAt: createDto.passportExpiresAt
+                  ? new Date(createDto.passportExpiresAt)
+                  : null,
+                payload: {
+                  source: 'google_form',
+                  photoUrl: url,
+                  photoKey: storedKey,
+                  contentType: mime,
+                } as Prisma.InputJsonValue,
+              },
+            });
+            passportPhotoSaved = true;
+          }
+        }
+      } catch (e) {
+        this.logger.warn(
+          `form ingest passport photo employee=${emp.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+
     await this.prisma.auditLog.create({
       data: {
         tenantId: tenant.id,
@@ -2622,6 +2725,8 @@ export class EmployeesService {
           googleResponseId: dto.googleResponseId || null,
           note: note || null,
           tabNumber,
+          facePhotoSaved,
+          passportPhotoSaved,
         } as Prisma.InputJsonValue,
       },
     });
@@ -2635,6 +2740,8 @@ export class EmployeesService {
       lastName: emp.lastName,
       divisionId: emp.divisionId,
       positionId: emp.positionId,
+      facePhotoSaved,
+      passportPhotoSaved,
     };
   }
 
