@@ -338,14 +338,10 @@ function IncidentsInner() {
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`/api/catalog/incidents/${row.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: next,
-          ...(next === 'resolved'
-            ? { resolvedAt: new Date().toISOString().slice(0, 10) }
-            : {}),
-        }),
+      const action = next === 'resolved' ? 'resolve' : 'close';
+      await apiFetch(`/api/catalog/incidents/${row.id}/${action}`, {
+        method: 'POST',
+        body: JSON.stringify({}),
       });
       forget([row.id]);
       await load();
@@ -387,14 +383,9 @@ function IncidentsInner() {
           if (action === 'delete') {
             await apiFetch(`/api/catalog/incidents/${row.id}`, { method: 'DELETE' });
           } else {
-            await apiFetch(`/api/catalog/incidents/${row.id}`, {
-              method: 'PATCH',
-              body: JSON.stringify({
-                status: action === 'resolve' ? 'resolved' : 'closed',
-                ...(action === 'resolve'
-                  ? { resolvedAt: new Date().toISOString().slice(0, 10) }
-                  : {}),
-              }),
+            await apiFetch(`/api/catalog/incidents/${row.id}/${action}`, {
+              method: 'POST',
+              body: JSON.stringify({}),
             });
           }
         } catch {

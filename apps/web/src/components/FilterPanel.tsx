@@ -1,16 +1,17 @@
 'use client';
 
 import {
-  DragEvent,
   ReactNode,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import styles from './filter-panel.module.css';
+import { FilterSelectLookup } from './FilterSelectLookup';
 
 export type FilterSelectOption = { value: string; label: string };
 
@@ -35,8 +36,12 @@ export type FilterFieldDef = {
   label?: string;
   options?: FilterSelectOption[];
   placeholder?: string;
-  /** Operator shown in Verifix row (default =) */
+  /** Operator shown in HR HUB row (default =) — modal only */
   operator?: string;
+  /** Allow selecting several values (stored as comma-separated) */
+  multiple?: boolean;
+  /** Show search box inside the dropdown (default: auto when many options) */
+  searchable?: boolean;
 };
 
 const DEFAULT_KEYS: Record<FilterFieldDef['type'], string> = {
@@ -65,6 +70,8 @@ const DEFAULT_LABELS: Record<string, string> = {
   divisionId: 'Подразделение',
   positionId: 'Должность',
   employeeId: 'Сотрудники',
+  locationId: 'Локация',
+  markTypes: 'Тип отметки',
   status: 'Статус',
   isActive: 'Активность',
   posted: 'Проведен',
@@ -90,7 +97,7 @@ function fieldLabel(field: FilterFieldDef): string {
   return DEFAULT_LABELS[k] ?? k;
 }
 
-/** Stable id for a field definition (used for visible list / DnD). */
+/** Stable id for a field definition (used for visible list). */
 export function fieldId(field: FilterFieldDef): string {
   if (field.type === 'dateRange') {
     return `range:${field.fromKey || 'from'}:${field.toKey || 'to'}:${field.label || ''}`;
@@ -124,8 +131,10 @@ function keysForField(field: FilterFieldDef): string[] {
 }
 
 export type FilterPanelProps = {
-  open: boolean;
-  onToggle: () => void;
+  /** @deprecated Ignored in bar (default) layout */
+  open?: boolean;
+  /** @deprecated Ignored in bar (default) layout */
+  onToggle?: () => void;
   onApply?: () => void;
   onReset?: () => void;
   children?: ReactNode;
@@ -134,10 +143,14 @@ export type FilterPanelProps = {
   onChange?: (key: string, value: string) => void;
   urlSync?: boolean;
   resetKeys?: string[];
-  /** Modal title */
   title?: string;
-  /** Render toggle inline (same row as toolbar actions) */
+  /** @deprecated Always inline in bar mode */
   inline?: boolean;
+  /**
+   * `bar` — fields always on the page (default). No modal / no «Фильтр» button.
+   * `modal` — legacy popup.
+   */
+  variant?: 'bar' | 'modal';
 };
 
 /** Read current filter keys from the URL query string. */
@@ -150,40 +163,8 @@ export function useFilterFromUrl(keys: readonly string[]): Record<string, string
   }, [keys, searchParams]);
 }
 
-function layoutStorageKey(pathname: string, allIds: string[]) {
-  return `hrhub_filter_layout:${pathname}:${allIds.join('|')}`;
-}
-
-function loadVisibleIds(pathname: string, allIds: string[]): string[] {
-  if (typeof window === 'undefined') return allIds;
-  try {
-    const raw = localStorage.getItem(layoutStorageKey(pathname, allIds));
-    if (!raw) return allIds;
-    const parsed = JSON.parse(raw) as { order?: string[]; hidden?: string[] };
-    const order = Array.isArray(parsed.order) ? parsed.order : allIds;
-    const hidden = new Set(Array.isArray(parsed.hidden) ? parsed.hidden : []);
-    const known = new Set(allIds);
-    const next = order.filter((id) => known.has(id) && !hidden.has(id));
-    for (const id of allIds) {
-      if (!next.includes(id) && !hidden.has(id)) next.push(id);
-    }
-    return next;
-  } catch {
-    return allIds;
-  }
-}
-
-function saveVisibleIds(pathname: string, allIds: string[], visible: string[]) {
-  if (typeof window === 'undefined') return;
-  const hidden = allIds.filter((id) => !visible.includes(id));
-  localStorage.setItem(
-    layoutStorageKey(pathname, allIds),
-    JSON.stringify({ order: visible, hidden }),
-  );
-}
-
 export function FilterPanel({
-  open,
+  open = false,
   onToggle,
   onApply,
   onReset,
@@ -195,18 +176,14 @@ export function FilterPanel({
   resetKeys,
   title = 'Фильтр',
   inline = false,
+  variant = 'bar',
 }: FilterPanelProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const isBar = variant !== 'modal';
 
   const keys = useMemo(() => filterFieldKeys(fields), [fields]);
-  const allIds = useMemo(() => fields.map(fieldId), [fields]);
-  const fieldById = useMemo(() => {
-    const map = new Map<string, FilterFieldDef>();
-    fields.forEach((f) => map.set(fieldId(f), f));
-    return map;
-  }, [fields]);
 
   const syncUrl = urlSync ?? (controlledValues === undefined && fields.length > 0);
 
@@ -223,57 +200,29 @@ export function FilterPanel({
     return base;
   }, [controlledValues, urlValues, keys, searchParams]);
   const [draft, setDraft] = useState<Record<string, string>>(sourceValues);
-  const [visibleIds, setVisibleIds] = useState<string[]>(allIds);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setDraft(sourceValues);
   }, [sourceValues]);
 
   useEffect(() => {
-    if (!allIds.length) {
-      setVisibleIds([]);
-      return;
-    }
-    setVisibleIds(loadVisibleIds(pathname || '/', allIds));
-  }, [pathname, allIds.join('|')]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onToggle();
+    return () => {
+      if (liveTimer.current) clearTimeout(liveTimer.current);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onToggle]);
-
-  const persistVisible = useCallback(
-    (next: string[]) => {
-      setVisibleIds(next);
-      saveVisibleIds(pathname || '/', allIds, next);
-    },
-    [pathname, allIds],
-  );
+  }, []);
 
   const activeCount = useMemo(
     () =>
       keys.filter((k) => {
         if (!(sourceValues[k] ?? '').trim()) return false;
-        // Search chip already shows «q» — don't double-count on ФИЛЬТР badge.
-        const field = fieldById.get(k);
-        if (field?.type === 'search' || k === 'q') return false;
+        if (k === 'q') return false;
+        const field = fields.find((f) => keysForField(f).includes(k));
+        if (field && isPageSearchField(field)) return false;
         return true;
       }).length,
-    [keys, sourceValues, fieldById],
-  );
-
-  const setField = useCallback(
-    (key: string, value: string) => {
-      setDraft((prev) => ({ ...prev, [key]: value }));
-      if (!syncUrl && controlledValues !== undefined) onChange?.(key, value);
-    },
-    [controlledValues, onChange, syncUrl],
+    [keys, sourceValues, fields],
   );
 
   const pushToUrl = useCallback(
@@ -306,13 +255,41 @@ export function FilterPanel({
     [keys, pathname, router, searchParams],
   );
 
+  const commitValues = useCallback(
+    (next: Record<string, string>) => {
+      if (syncUrl) pushToUrl(next);
+      else if (controlledValues !== undefined) {
+        for (const k of keys) onChange?.(k, next[k] ?? '');
+      }
+      onApply?.();
+    },
+    [syncUrl, pushToUrl, controlledValues, keys, onChange, onApply],
+  );
+
+  const scheduleLiveApply = useCallback(
+    (next: Record<string, string>) => {
+      if (!isBar) return;
+      if (liveTimer.current) clearTimeout(liveTimer.current);
+      liveTimer.current = setTimeout(() => commitValues(next), 180);
+    },
+    [isBar, commitValues],
+  );
+
+  const setField = useCallback(
+    (key: string, value: string) => {
+      setDraft((prev) => {
+        const next = { ...prev, [key]: value };
+        if (isBar) scheduleLiveApply(next);
+        else if (!syncUrl && controlledValues !== undefined) onChange?.(key, value);
+        return next;
+      });
+    },
+    [isBar, scheduleLiveApply, syncUrl, controlledValues, onChange],
+  );
+
   function handleApply() {
-    if (syncUrl) pushToUrl(draft);
-    else if (controlledValues !== undefined) {
-      for (const k of keys) onChange?.(k, draft[k] ?? '');
-    }
-    onApply?.();
-    onToggle();
+    commitValues(draft);
+    if (!isBar) onToggle?.();
   }
 
   function handleReset() {
@@ -321,93 +298,17 @@ export function FilterPanel({
     for (const k of toClear) cleared[k] = '';
     const next = { ...draft, ...cleared };
     setDraft(next);
-    if (syncUrl) pushToUrl(next);
-    else if (controlledValues !== undefined) {
-      for (const k of toClear) onChange?.(k, '');
-    }
+    commitValues(next);
     onReset?.();
   }
 
-  function handleResetAll() {
-    handleReset();
-  }
-
-  function addParam(id: string) {
-    if (!id || visibleIds.includes(id)) return;
-    persistVisible([...visibleIds, id]);
-  }
-
-  function removeParam(id: string) {
-    const field = fieldById.get(id);
-    if (field) {
-      const clearKeys = keysForField(field);
-      setDraft((prev) => {
-        const next = { ...prev };
-        for (const k of clearKeys) next[k] = '';
-        return next;
-      });
-    }
-    persistVisible(visibleIds.filter((x) => x !== id));
-  }
-
-  function restoreDefaultsLayout() {
-    persistVisible(allIds);
-    handleReset();
-  }
-
-  function onDragStart(e: DragEvent, id: string) {
-    setDragId(id);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-  }
-
-  function onDragOver(e: DragEvent, id: string) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (overId !== id) setOverId(id);
-  }
-
-  function onDrop(e: DragEvent, targetId: string) {
-    e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain') || dragId;
-    setDragId(null);
-    setOverId(null);
-    if (!sourceId || sourceId === targetId) return;
-    const from = visibleIds.indexOf(sourceId);
-    const to = visibleIds.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    const next = [...visibleIds];
-    next.splice(from, 1);
-    next.splice(to, 0, sourceId);
-    persistVisible(next);
-  }
-
-  function onDragEnd() {
-    setDragId(null);
-    setOverId(null);
-  }
-
-  const availableToAdd = useMemo(
-    () =>
-      allIds.filter((id) => {
-        if (visibleIds.includes(id)) return false;
-        const f = fieldById.get(id);
-        return f ? !isPageSearchField(f) : true;
-      }),
-    [allIds, visibleIds, fieldById],
-  );
-
-  const visibleFields = useMemo(
-    () =>
-      visibleIds
-        .map((id) => fieldById.get(id))
-        .filter((f): f is FilterFieldDef => Boolean(f))
-        .filter((f) => !isPageSearchField(f)),
-    [visibleIds, fieldById],
-  );
-
   const pageSearchFields = useMemo(
     () => fields.filter(isPageSearchField),
+    [fields],
+  );
+
+  const barFields = useMemo(
+    () => fields.filter((f) => !isPageSearchField(f)),
     [fields],
   );
 
@@ -415,18 +316,40 @@ export function FilterPanel({
     (key: string, value: string) => {
       const next = { ...draft, [key]: value };
       setDraft(next);
-      if (syncUrl) pushToUrl(next);
-      else if (controlledValues !== undefined) onChange?.(key, value);
-      onApply?.();
+      commitValues(next);
     },
-    [controlledValues, draft, onApply, onChange, pushToUrl, syncUrl],
+    [draft, commitValues],
   );
+
+  function fieldAllowsMultiple(field: FilterFieldDef): boolean {
+    if (field.multiple === false) return false;
+    if (field.multiple === true) return true;
+    if (field.type === 'divisionId' || field.type === 'positionId') return true;
+    if (field.type === 'select') {
+      const k = fieldKey(field);
+      // Multi by default for common entity picks
+      if (
+        k === 'employeeId' ||
+        k === 'locationId' ||
+        k === 'markTypes' ||
+        k === 'divisionId' ||
+        k === 'positionId' ||
+        k.endsWith('Ids') ||
+        k.endsWith('Id')
+      ) {
+        // status-like single enums stay single unless options look like entities
+        if (k === 'status' || k === 'isActive' || k === 'posted') return false;
+        return true;
+      }
+    }
+    return false;
+  }
 
   function renderControl(field: FilterFieldDef) {
     const key = fieldKey(field);
     const value = draft[key] ?? '';
 
-    if (field.type === 'search' || field.type === 'text') {
+    if (field.type === 'search') {
       return (
         <div className={styles.controlGrow}>
           <span className={styles.searchIcon} aria-hidden>
@@ -438,8 +361,33 @@ export function FilterPanel({
             value={value}
             placeholder={field.placeholder ?? 'Поиск...'}
             onChange={(e) => setField(key, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                applySearchNow(key, (e.target as HTMLInputElement).value);
+              }
+            }}
           />
         </div>
+      );
+    }
+
+    if (field.type === 'text') {
+      return (
+        <input
+          className={styles.input}
+          type="text"
+          value={value}
+          placeholder={field.placeholder ?? fieldLabel(field)}
+          aria-label={fieldLabel(field)}
+          onChange={(e) => setField(key, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              applySearchNow(key, (e.target as HTMLInputElement).value);
+            }
+          }}
+        />
       );
     }
 
@@ -447,19 +395,35 @@ export function FilterPanel({
       const fromKey = field.fromKey || 'from';
       const toKey = field.toKey || 'to';
       return (
-        <div className={styles.datePair}>
-          <input
-            className={styles.input}
-            type="date"
-            value={draft[fromKey] ?? ''}
-            onChange={(e) => setField(fromKey, e.target.value)}
-          />
-          <input
-            className={styles.input}
-            type="date"
-            value={draft[toKey] ?? ''}
-            onChange={(e) => setField(toKey, e.target.value)}
-          />
+        <div className={styles.periodRange}>
+          <span className={styles.periodGlyph} aria-hidden>
+            <i className="fas fa-calendar-week" />
+          </span>
+          <div className={styles.periodFields}>
+            <label className={styles.periodSlot}>
+              <span className={styles.periodSlotLabel}>с</span>
+              <input
+                className={styles.periodInput}
+                type="date"
+                value={draft[fromKey] ?? ''}
+                onChange={(e) => setField(fromKey, e.target.value)}
+                aria-label={`${fieldLabel(field)} с`}
+              />
+            </label>
+            <span className={styles.periodDash} aria-hidden>
+              —
+            </span>
+            <label className={styles.periodSlot}>
+              <span className={styles.periodSlotLabel}>по</span>
+              <input
+                className={styles.periodInput}
+                type="date"
+                value={draft[toKey] ?? ''}
+                onChange={(e) => setField(toKey, e.target.value)}
+                aria-label={`${fieldLabel(field)} по`}
+              />
+            </label>
+          </div>
         </div>
       );
     }
@@ -471,6 +435,7 @@ export function FilterPanel({
           type="date"
           value={value}
           onChange={(e) => setField(key, e.target.value)}
+          aria-label={fieldLabel(field)}
         />
       );
     }
@@ -507,7 +472,6 @@ export function FilterPanel({
       );
     }
 
-    const options = field.options ?? [];
     const isSelect =
       field.type === 'select' ||
       field.type === 'divisionId' ||
@@ -516,81 +480,145 @@ export function FilterPanel({
       field.type === 'isActive';
 
     if (isSelect) {
-      const defaultIsActive: FilterSelectOption[] = [
-        { value: '', label: 'Все' },
-        { value: '1', label: 'Активные' },
-        { value: '0', label: 'Неактивные' },
-      ];
-      const opts =
-        field.type === 'isActive' && !field.options?.length
-          ? defaultIsActive
-          : [{ value: '', label: '—' }, ...options];
+      const opts = (field.options ?? []).filter((o) => o.value !== '');
+      const multiple = fieldAllowsMultiple(field);
+      const searchable =
+        field.searchable !== undefined
+          ? field.searchable
+          : opts.length >= 4 || multiple;
+
+      if (
+        !multiple &&
+        !searchable &&
+        (field.type === 'status' || field.type === 'isActive') &&
+        opts.length <= 8
+      ) {
+        const defaultIsActive: FilterSelectOption[] = [
+          { value: '', label: 'Все' },
+          { value: '1', label: 'Активные' },
+          { value: '0', label: 'Неактивные' },
+        ];
+        const nativeOpts =
+          field.type === 'isActive' && !field.options?.length
+            ? defaultIsActive
+            : [{ value: '', label: '—' }, ...opts];
+        return (
+          <select
+            className={styles.select}
+            value={value}
+            onChange={(e) => setField(key, e.target.value)}
+          >
+            {nativeOpts.map((o) => (
+              <option key={o.value || '__all'} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        );
+      }
 
       return (
-        <select
-          className={styles.select}
+        <FilterSelectLookup
           value={value}
-          onChange={(e) => setField(key, e.target.value)}
-        >
-          {opts.map((o) => (
-            <option key={o.value || '__all'} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          options={opts}
+          multiple={multiple}
+          searchable={searchable}
+          placeholder={field.placeholder ?? fieldLabel(field)}
+          searchPlaceholder="Поиск…"
+          onChange={(next) => setField(key, next)}
+        />
       );
     }
 
     return null;
   }
 
-  function renderRow(field: FilterFieldDef) {
-    const id = fieldId(field);
-    const dragging = dragId === id;
-    const over = overId === id && dragId !== id;
-
+  /* ─── Inline bar (default, all pages) ─── */
+  if (isBar) {
     return (
       <div
-        key={id}
+        ref={rootRef}
         className={[
-          styles.row,
-          dragging ? styles.rowDragging : '',
-          over ? styles.rowDropTarget : '',
+          styles.rootBar,
+          inline ? styles.rootBarInline : '',
         ]
           .filter(Boolean)
           .join(' ')}
-        draggable={false}
-        onDragOver={(e) => onDragOver(e, id)}
-        onDrop={(e) => onDrop(e, id)}
-        onDragEnd={onDragEnd}
       >
-        <span
-          className={styles.grip}
-          title="Перетащите для изменения порядка"
-          draggable
-          onDragStart={(e) => onDragStart(e, id)}
-          onDragEnd={onDragEnd}
-        >
-          ⋮⋮
-        </span>
-        <span className={styles.rowLabel}>{fieldLabel(field)}</span>
-        <span className={styles.operator}>{field.operator || '='}</span>
-        <div className={styles.rowControl}>{renderControl(field)}</div>
-        <button
-          type="button"
-          className={styles.removeBtn}
-          title="Удалить параметр"
-          aria-label={`Удалить ${fieldLabel(field)}`}
-          onClick={() => removeParam(id)}
-        >
-          ×
-        </button>
+        <div className={styles.barRow}>
+          {pageSearchFields.map((field) => {
+            const key = fieldKey(field);
+            const value = draft[key] ?? '';
+            return (
+              <label key={fieldId(field)} className={styles.pageSearch}>
+                <span className={styles.pageSearchIcon} aria-hidden>
+                  ⌕
+                </span>
+                <input
+                  className={styles.pageSearchInput}
+                  type="search"
+                  value={value}
+                  placeholder={field.placeholder ?? 'Поиск...'}
+                  aria-label={fieldLabel(field)}
+                  onChange={(e) => setField(key, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      applySearchNow(key, (e.target as HTMLInputElement).value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const next = e.target.value;
+                    if ((sourceValues[key] ?? '') !== next) {
+                      applySearchNow(key, next);
+                    }
+                  }}
+                />
+              </label>
+            );
+          })}
+
+          {children
+            ? children
+            : barFields.map((field) => (
+                <div
+                  key={fieldId(field)}
+                  className={[
+                    styles.barField,
+                    field.type === 'dateRange' || field.type === 'dateFrom'
+                      ? styles.barFieldWide
+                      : '',
+                    field.type === 'postedChecks' || field.type === 'isActive'
+                      ? styles.barFieldNarrow
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  <span className={styles.barLabel}>{fieldLabel(field)}</span>
+                  <div className={styles.barControl}>{renderControl(field)}</div>
+                </div>
+              ))}
+
+          {activeCount > 0 ? (
+            <button
+              type="button"
+              className={styles.barReset}
+              onClick={handleReset}
+              title="Сбросить все фильтры"
+            >
+              Сбросить
+              <span className={styles.activeCount}>{activeCount}</span>
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }
 
+  /* ─── Legacy modal ─── */
   return (
-    <div className={inline ? styles.rootInline : styles.root}>
+    <div ref={rootRef} className={inline ? styles.rootInline : styles.root}>
       <div className={styles.toggleBar}>
         {pageSearchFields.map((field) => {
           const key = fieldKey(field);
@@ -613,12 +641,6 @@ export function FilterPanel({
                     applySearchNow(key, (e.target as HTMLInputElement).value);
                   }
                 }}
-                onBlur={(e) => {
-                  const next = e.target.value;
-                  if ((sourceValues[key] ?? '') !== next) {
-                    applySearchNow(key, next);
-                  }
-                }}
               />
             </label>
           );
@@ -626,16 +648,14 @@ export function FilterPanel({
         <button
           type="button"
           className={open ? styles.toggleBtnOpen : styles.toggleBtn}
-          onClick={onToggle}
+          onClick={() => onToggle?.()}
           aria-expanded={open}
         >
           Фильтр
           <span className={styles.chev}>{open ? '▴' : '▾'}</span>
         </button>
         {activeCount > 0 ? (
-          <span className={styles.activeCount} title="Активные фильтры">
-            {activeCount}
-          </span>
+          <span className={styles.activeCount}>{activeCount}</span>
         ) : null}
       </div>
 
@@ -645,7 +665,7 @@ export function FilterPanel({
               className={styles.backdrop}
               role="presentation"
               onClick={(e) => {
-                if (e.target === e.currentTarget) onToggle();
+                if (e.target === e.currentTarget) onToggle?.();
               }}
             >
               <div
@@ -661,69 +681,28 @@ export function FilterPanel({
                     type="button"
                     className={styles.closeX}
                     aria-label="Закрыть"
-                    onClick={onToggle}
+                    onClick={() => onToggle?.()}
                   >
                     ×
                   </button>
                 </div>
-
-                <div className={styles.modalToolbar}>
-                  <label className={styles.templateField}>
-                    <span>Шаблон</span>
-                    <select className={styles.templateSelect} defaultValue="">
-                      <option value="">—</option>
-                      <option value="default">По умолчанию</option>
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    className={styles.btnToolbar}
-                    onClick={restoreDefaultsLayout}
-                  >
-                    По умолчанию
-                  </button>
-                  <label className={styles.addParamsField}>
-                    <span className={styles.srOnly}>Добавить параметры</span>
-                    <select
-                      className={styles.addParamsSelect}
-                      value=""
-                      disabled={!availableToAdd.length}
-                      onChange={(e) => {
-                        addParam(e.target.value);
-                        e.target.value = '';
-                      }}
-                      aria-label="Добавить параметры"
-                    >
-                      <option value="">
-                        {availableToAdd.length
-                          ? 'Добавить параметры'
-                          : 'Все параметры добавлены'}
-                      </option>
-                      {availableToAdd.map((id) => {
-                        const f = fieldById.get(id);
-                        if (!f) return null;
-                        return (
-                          <option key={id} value={id}>
-                            {fieldLabel(f)}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </label>
-                </div>
-
                 <div className={styles.modalBody}>
-                  {children ? (
-                    children
-                  ) : visibleFields.length ? (
-                    visibleFields.map(renderRow)
-                  ) : (
-                    <p className={styles.emptyHint}>
-                      Нет параметров — добавьте через «Добавить параметры»
-                    </p>
-                  )}
+                  {children
+                    ? children
+                    : barFields.map((field) => (
+                        <div key={fieldId(field)} className={styles.row}>
+                          <span className={styles.rowLabel}>
+                            {fieldLabel(field)}
+                          </span>
+                          <span className={styles.operator}>
+                            {field.operator || '='}
+                          </span>
+                          <div className={styles.rowControl}>
+                            {renderControl(field)}
+                          </div>
+                        </div>
+                      ))}
                 </div>
-
                 <div className={styles.modalFooter}>
                   <button
                     type="button"
@@ -735,14 +714,14 @@ export function FilterPanel({
                   <button
                     type="button"
                     className={styles.btnReset}
-                    onClick={handleResetAll}
+                    onClick={handleReset}
                   >
                     Сбросить все
                   </button>
                   <button
                     type="button"
                     className={styles.btnReset}
-                    onClick={onToggle}
+                    onClick={() => onToggle?.()}
                   >
                     Закрыть
                   </button>

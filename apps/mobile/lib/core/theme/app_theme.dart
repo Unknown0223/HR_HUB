@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Dark Verifix-style employee app tokens (from screenshots).
+/// Dark Arena-style employee app tokens (from screenshots).
 class AppColors {
   static const bg = Color(0xFF12141C);
   static const bgElevated = Color(0xFF1C202B);

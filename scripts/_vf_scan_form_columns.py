@@ -1,6 +1,6 @@
-"""One-off: login to Verifix with env credentials and dump list-form columns.
-Credentials via VERIFIX_LOGIN / VERIFIX_PASSWORD only — never hardcode.
-Output: data/verifix-dump/live/form_columns_scan.json (+ form HTML)
+"""One-off: login to HR HUB with env credentials and dump list-form columns.
+Credentials via HR_HUB_LOGIN / HR_HUB_PASSWORD only — never hardcode.
+Output: data/catalog-dump/live/form_columns_scan.json (+ form HTML)
 """
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ import urllib.request
 from http.cookiejar import CookieJar
 from pathlib import Path
 
-BASE = "https://app2.verifix.com"
-OUT = Path(__file__).resolve().parents[1] / "data" / "verifix-dump" / "live"
+BASE = "https://example.invalid"
+OUT = Path(__file__).resolve().parents[1] / "data" / "hrhub-dump" / "live"
 OUT.mkdir(parents=True, exist_ok=True)
 
-LOGIN = os.environ.get("VERIFIX_LOGIN", "")
-PASSWORD = os.environ.get("VERIFIX_PASSWORD", "")
+LOGIN = os.environ.get("HR_HUB_LOGIN", "")
+PASSWORD = os.environ.get("HR_HUB_PASSWORD", "")
 if not LOGIN or not PASSWORD:
-    raise SystemExit("Set VERIFIX_LOGIN and VERIFIX_PASSWORD")
+    raise SystemExit("Set HR_HUB_LOGIN and HR_HUB_PASSWORD")
 
 FORMS = [
     "/vhr/htt/request_list",

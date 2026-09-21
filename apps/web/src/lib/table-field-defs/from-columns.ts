@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@/lib/catalog-columns';
 import type { TableFieldDef, TablePrefsConfig, SortRule } from '@/components/table-prefs';
 
-/** Build TablePrefsConfig from catalog ColumnDef lists (Verifix-style). */
+/** Build TablePrefsConfig from catalog ColumnDef lists (Arena-style). */
 export function prefsConfigFromColumns(opts: {
   storageKey: string;
   title: string;

@@ -1,4 +1,4 @@
-/** Default Verifix-style employee report column/settings toggles. */
+/** Default Arena-style employee report column/settings toggles. */
 
 export type EmployeeReportSettings = {
   // Информация о сотруднике

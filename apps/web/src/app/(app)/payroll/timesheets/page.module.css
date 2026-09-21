@@ -106,6 +106,67 @@
   gap: 0.65rem;
 }
 
+.filterBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.filterBand > :first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.filterBand .monthFilter {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+.filterBand .monthPicker {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  min-width: 188px;
+}
+
+.monthPicker {
+  flex: 0 0 auto;
+}
+
+.divisionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 133, 226, 0.22);
+  background: #edf6fe;
+  color: #0770c2;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.divisionChip i {
+  font-size: 10px;
+  opacity: 0.85;
+  flex: 0 0 auto;
+}
+
+.divisionEmpty {
+  color: var(--ink-400);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
 .leftActions,
 .rightTools {
   display: flex;

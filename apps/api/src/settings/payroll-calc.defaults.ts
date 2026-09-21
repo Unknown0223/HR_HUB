@@ -1,4 +1,4 @@
-/** Verifix «Расчет зарплаты» — TenantSetting.extras.payrollCalc */
+/** HR HUB «Расчет зарплаты» — TenantSetting.extras.payrollCalc */
 
 export type TaxBlockSettings = {
   /** Облагается */

@@ -379,9 +379,16 @@ class OfficeLinkSession:
             self.services = bundle
             self.write_service_handoff()
             spawn_detached_worker(self.root)
+            is_lan = bool(url) and "trycloudflare" not in url.lower() and url.startswith(
+                "http://"
+            )
             return SubmitResult(
                 kind="tunnel_ok",
-                message=f"Туннель восстановлен: {url}",
+                message=(
+                    f"LAN ulanish: {url} (Cloudflare limithi o‘tkazib yuborildi)"
+                    if is_lan
+                    else f"Туннель восстановлен: {url}"
+                ),
                 device={"tunnelUrl": url},
             )
         except Exception as e:
@@ -389,26 +396,15 @@ class OfficeLinkSession:
 
     def ensure_tunnel_supervisor(self) -> bool:
         """Start background tunnel worker + login startup task (no GUI needed later)."""
+        from auto_resume import ensure_background_worker
         from paths import load_service_config
-        from tunnel_watch import (
-            install_startup_task,
-            snapshot_health,
-            spawn_detached_worker,
-        )
 
         self.write_service_handoff()
         svc = load_service_config(self.root)
         if not svc or svc.get("enabled") is False:
             return False
-        started = False
-        health = snapshot_health(self.services, self.root)
-        if not health.ok:
-            started = spawn_detached_worker(self.root)
-        try:
-            install_startup_task(self.root)
-        except Exception:
-            pass
-        return started
+        # Always ensure worker is alive (health.ok can be GUI-only tunnel).
+        return bool(ensure_background_worker(self.root))
 
     def submit_password(self, password: str) -> SubmitResult:
         password = (password or "").strip()
@@ -1069,6 +1065,21 @@ class OfficeLinkSession:
                 result.device["passwordSource"] = match.password_source
                 result.device["hostChanged"] = match.host_changed
                 result.device["serialNumber"] = match.serial
+            try:
+                self.ensure_tunnel_supervisor()
+            except Exception:
+                pass
+            try:
+                from auto_resume import reconcile_link
+
+                reconcile_link(
+                    self.root,
+                    self.api_url,
+                    self.tenant,
+                    force_httphost=True,
+                )
+            except Exception:
+                pass
         else:
             step("link", "fail", result.message or "Ошибка подключения")
         return result

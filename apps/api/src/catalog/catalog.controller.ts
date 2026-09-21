@@ -22,13 +22,17 @@ import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import { sendExcelAttachment } from '../common/excel';
 import { excelImportMulterOptions } from '../common/excel-import';
 import { CatalogService } from './catalog.service';
+import { IncidentsCatalogService } from './incidents-catalog.service';
 
 @ApiTags('catalog')
 @ApiBearerAuth()
 @ApiSecurity('tenant')
 @Controller('catalog')
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly catalog: CatalogService,
+    private readonly incidents: IncidentsCatalogService,
+  ) {}
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager, Role.employee)
   @Get('resources')
@@ -1730,6 +1734,38 @@ export class CatalogController {
     @Param('id') id: string,
   ) {
     return this.catalog.cancelClearanceSheet(this.catalog.requireTenant(t), id);
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
+  @Post('incidents/:id/investigate')
+  investigateIncident(
+    @CurrentTenant() t: string | null,
+    @Param('id') id: string,
+  ) {
+    return this.incidents.investigateIncident(this.catalog.requireTenant(t), id);
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
+  @Post('incidents/:id/resolve')
+  resolveIncident(
+    @CurrentTenant() t: string | null,
+    @Param('id') id: string,
+    @Body() body?: { resolution?: string | null },
+  ) {
+    return this.incidents.resolveIncident(
+      this.catalog.requireTenant(t),
+      id,
+      body,
+    );
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
+  @Post('incidents/:id/close')
+  closeIncident(
+    @CurrentTenant() t: string | null,
+    @Param('id') id: string,
+  ) {
+    return this.incidents.closeIncident(this.catalog.requireTenant(t), id);
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)

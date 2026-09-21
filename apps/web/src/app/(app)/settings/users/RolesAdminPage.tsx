@@ -35,8 +35,11 @@ const FILTER_KEYS = ['q', 'name', 'isActive'] as const;
 const ACCESS_ROWS: AccessRow[] = accessCatalog();
 
 const SIBLINGS = {
-  title: 'Роли',
-  siblings: [{ label: 'Пользователи', href: '/settings/users' }],
+  title: 'Пользователи и роли',
+  siblings: [
+    { label: 'Пользователи', href: '/settings/users' },
+    { label: 'Роли', href: '/settings/users/roles' },
+  ],
 };
 
 export type RolesSection = 'list' | 'products' | 'access';
@@ -69,7 +72,7 @@ function RolesInner({ section }: { section: RolesSection }) {
   const [name, setName] = useState('');
   const [seq, setSeq] = useState('');
   const [active, setActive] = useState(true);
-  const [productIds, setProductIds] = useState<string[]>(['verifix']);
+  const [productIds, setProductIds] = useState<string[]>(['hrhub']);
   const [history, setHistory] = useState<
     { id: string; action: string; createdAt: string; meta?: { userName?: string } | null }[]
   >([]);
@@ -139,7 +142,7 @@ function RolesInner({ section }: { section: RolesSection }) {
     setName(r?.name || '');
     setSeq(r?.sortOrder != null ? String(r.sortOrder) : '');
     setActive(r ? r.isActive !== false : true);
-    setProductIds(asRoleMeta(r?.meta).products?.length ? asRoleMeta(r?.meta).products! : ['verifix']);
+    setProductIds(asRoleMeta(r?.meta).products?.length ? asRoleMeta(r?.meta).products! : ['hrhub']);
   }
 
   function openCreate() {
@@ -307,7 +310,7 @@ function RolesInner({ section }: { section: RolesSection }) {
   if (section === 'products') {
     return (
       <div className={styles.wrap}>
-        <PageSubnav group={{ title: 'Роли (прикрепление продуктов)', siblings: [] }} />
+        <PageSubnav group={SIBLINGS} titleOverride="Роли (прикрепление продуктов)" />
         <div className={formStyles.actions} style={{ marginBottom: '0.5rem' }}>
           <button
             type="button"
@@ -346,7 +349,7 @@ function RolesInner({ section }: { section: RolesSection }) {
   if (section === 'access') {
     return (
       <div className={styles.wrap}>
-        <PageSubnav group={{ title: 'Прикрепление доступов (действия)', siblings: [] }} />
+        <PageSubnav group={SIBLINGS} titleOverride="Прикрепление доступов (действия)" />
         <div className={styles.toolbar}>
           <div className={styles.leftActions}>
             <button
@@ -441,7 +444,7 @@ function RolesInner({ section }: { section: RolesSection }) {
     if (viewRow) {
       return (
         <div className={styles.wrap}>
-          <PageSubnav group={{ title: 'Роль (просмотр)', siblings: [] }} />
+          <PageSubnav group={SIBLINGS} titleOverride="Роль (просмотр)" />
           <div className={formStyles.actions} style={{ marginBottom: '0.5rem' }}>
             <button type="button" className={styles.createBtn} onClick={() => openEdit(viewRow)}>
               Изменить

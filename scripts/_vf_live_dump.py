@@ -1,7 +1,7 @@
-"""Dump live Verifix (Biruni) tables for OOO World of Trade / lalaku.
+"""Dump live HR HUB (Biruni) tables for OOO World of Trade / lalaku.
 
-Auth: VERIFIX_LOGIN / VERIFIX_PASSWORD env, or the session defaults used for this dump.
-Do not commit credentials. Output is gitignored under data/verifix-dump/.
+Auth: HR_HUB_LOGIN / HR_HUB_PASSWORD env, or the session defaults used for this dump.
+Do not commit credentials. Output is gitignored under data/catalog-dump/.
 """
 from __future__ import annotations
 
@@ -20,19 +20,19 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-OUT = Path(__file__).resolve().parents[1] / "data" / "verifix-dump" / "live"
+OUT = Path(__file__).resolve().parents[1] / "data" / "hrhub-dump" / "live"
 OUT.mkdir(parents=True, exist_ok=True)
-BASE = "https://app2.verifix.com"
+BASE = "https://example.invalid"
 FILIAL = "88862"
-LOGIN = os.environ.get("VERIFIX_LOGIN", "")
-PASSWORD = os.environ.get("VERIFIX_PASSWORD", "")
+LOGIN = os.environ.get("HR_HUB_LOGIN", "")
+PASSWORD = os.environ.get("HR_HUB_PASSWORD", "")
 _cred = OUT / "credentials.json"
 if (not LOGIN or not PASSWORD) and _cred.exists():
     _c = json.loads(_cred.read_text(encoding="utf-8"))
     LOGIN = LOGIN or _c.get("login") or ""
     PASSWORD = PASSWORD or _c.get("password") or ""
 if not LOGIN or not PASSWORD:
-    raise SystemExit("Set VERIFIX_LOGIN/VERIFIX_PASSWORD or data/verifix-dump/live/credentials.json")
+    raise SystemExit("Set HR_HUB_LOGIN/HR_HUB_PASSWORD or data/catalog-dump/live/credentials.json")
 
 EMP_COLS = [
     "employee_id", "name", "staff_id", "employee_number", "last_name", "first_name", "middle_name",
@@ -285,7 +285,7 @@ class Client:
 
 
 def track_from_date() -> str:
-    env = os.environ.get("VERIFIX_TRACKS_FROM", "").strip()
+    env = os.environ.get("HR_HUB_TRACKS_FROM", "").strip()
     if env:
         return env
     today = date.today()

@@ -51,7 +51,7 @@ describe('excel import guards', () => {
 
   it('parses a template produced by the exporter (round-trip)', async () => {
     const { buildIndividualScheduleTemplateBuffer, parseIndividualScheduleWorkbook } =
-      await import('../catalog/verifix-schedule-xlsx');
+      await import('../catalog/schedule-xlsx');
     const buf = await buildIndividualScheduleTemplateBuffer({
       year: 2026,
       monthIndex: 0,

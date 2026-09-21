@@ -9,12 +9,12 @@ import urllib.request
 from http.cookiejar import CookieJar
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-OUT = Path(__file__).resolve().parents[1] / "data" / "verifix-dump" / "live"
-BASE = "https://app2.verifix.com"
-LOGIN = os.environ.get("VF_LOGIN") or os.environ.get("VERIFIX_LOGIN") or ""
-PASSWORD = os.environ.get("VF_PASSWORD") or os.environ.get("VERIFIX_PASSWORD") or ""
+OUT = Path(__file__).resolve().parents[1] / "data" / "hrhub-dump" / "live"
+BASE = "https://example.invalid"
+LOGIN = os.environ.get("VF_LOGIN") or os.environ.get("HR_HUB_LOGIN") or ""
+PASSWORD = os.environ.get("VF_PASSWORD") or os.environ.get("HR_HUB_PASSWORD") or ""
 if not LOGIN or not PASSWORD:
-    raise SystemExit("Set VF_LOGIN/VF_PASSWORD (or VERIFIX_LOGIN/VERIFIX_PASSWORD)")
+    raise SystemExit("Set VF_LOGIN/VF_PASSWORD (or HR_HUB_LOGIN/HR_HUB_PASSWORD)")
 AUTH = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0",
     "Referer": BASE + "/",

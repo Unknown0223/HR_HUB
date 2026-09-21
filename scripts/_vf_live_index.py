@@ -6,13 +6,13 @@ import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar
 
-OUT = Path(__file__).resolve().parents[1] / "data" / "verifix-dump" / "live"
+OUT = Path(__file__).resolve().parents[1] / "data" / "hrhub-dump" / "live"
 OUT.mkdir(parents=True, exist_ok=True)
-BASE = "https://app2.verifix.com"
-LOGIN = os.environ.get("VF_LOGIN") or os.environ.get("VERIFIX_LOGIN") or ""
-PASSWORD = os.environ.get("VF_PASSWORD") or os.environ.get("VERIFIX_PASSWORD") or ""
+BASE = "https://example.invalid"
+LOGIN = os.environ.get("VF_LOGIN") or os.environ.get("HR_HUB_LOGIN") or ""
+PASSWORD = os.environ.get("VF_PASSWORD") or os.environ.get("HR_HUB_PASSWORD") or ""
 if not LOGIN or not PASSWORD:
-    raise SystemExit("Set VF_LOGIN/VF_PASSWORD (or VERIFIX_LOGIN/VERIFIX_PASSWORD)")
+    raise SystemExit("Set VF_LOGIN/VF_PASSWORD (or HR_HUB_LOGIN/HR_HUB_PASSWORD)")
 
 
 class Client:

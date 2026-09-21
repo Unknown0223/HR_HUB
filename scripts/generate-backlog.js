@@ -1,5 +1,5 @@
 /**
- * Generate hr-hub/docs/backlog.csv from Verifix catalog JSON.
+ * Generate hr-hub/docs/backlog.csv from HR HUB catalog JSON.
  * Filters MENU::, pagination noise, and noisy СОЗДАТЬ duplicates
  * (keeps one optional create ticket per parent when useful).
  */

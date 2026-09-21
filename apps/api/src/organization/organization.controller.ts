@@ -89,7 +89,7 @@ export class OrganizationController {
   @ApiBody({
     type: ImportRowsDto,
     description:
-      'Rows keyed by Verifix headers or English keys: name, code, parent, group, schedule, manager, openedAt, closedAt, project',
+      'Rows keyed by HR HUB headers or English keys: name, code, parent, group, schedule, manager, openedAt, closedAt, project',
   })
   importDivisions(
     @CurrentTenant() tenantId: string | null,

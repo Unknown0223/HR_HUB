@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -186,8 +185,6 @@ function VedomostInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="vedomost" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-file-invoice-dollar" aria-hidden />
@@ -255,25 +252,6 @@ function VedomostInner() {
             <i className="fas fa-history" aria-hidden />
             История
           </Link>
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
-              { type: 'dateRange', label: 'Дата' },
-              {
-                type: 'select',
-                key: 'status',
-                label: 'Статус',
-                options: [
-                  { value: 'draft', label: 'Черновик' },
-                  { value: 'completed', label: 'Завершена' },
-                ],
-              },
-            ]}
-          />
         </div>
 
         <div className={styles.rightTools}>
@@ -333,6 +311,29 @@ function VedomostInner() {
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
+      </div>
+
+      <div className={styles.filterBand}>
+        <FilterPanel
+          inline
+          urlSync
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((v) => !v)}
+          fields={[
+            { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
+            { type: 'dateRange', label: 'Дата' },
+            {
+              type: 'select',
+              key: 'status',
+              label: 'Статус',
+              multiple: false,
+              options: [
+                { value: 'draft', label: 'Черновик' },
+                { value: 'completed', label: 'Завершена' },
+              ],
+            },
+          ]}
+        />
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}

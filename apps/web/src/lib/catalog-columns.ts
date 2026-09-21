@@ -1,5 +1,5 @@
 /**
- * Grid columns 1:1 with Verifix `:table` request `column` arrays,
+ * Grid columns 1:1 with HR HUB `:table` request `column` arrays,
  * mapped onto HR HUB Prisma field paths (flattenRow keys).
  * Order + Russian labels must match the captured screens.
  */
@@ -9,11 +9,11 @@ import { COLUMN_LABEL_OVERRIDES } from './employee-fields';
 export type ColumnDef = {
   /** flattenRow / API field path */
   key: string;
-  /** Russian header (Verifix UI) */
+  /** Russian header (HR HUB UI) */
   label: string;
 };
 
-/** Общие label map for common keys (Verifix employee fields merged in). */
+/** Общие label map for common keys (HR HUB employee fields merged in). */
 export const COLUMN_LABELS: Record<string, string> = {
   tabNumber: 'Табельный номер',
   employee_number: 'Табельный номер',
@@ -162,7 +162,7 @@ export function labelFor(key: string): string {
 }
 
 /**
- * Explicit column order per catalog resource (Verifix-aligned visible columns).
+ * Explicit column order per catalog resource (catalog-aligned visible columns).
  * Keys are flattenRow paths present in API responses.
  */
 export const RESOURCE_COLUMNS: Record<string, ColumnDef[]> = {

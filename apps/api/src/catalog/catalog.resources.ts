@@ -1,4 +1,4 @@
-/** Verifix catalog → Prisma delegate map (CRUD resources). */
+/** HR HUB catalog → Prisma delegate map (CRUD resources). */
 export type CatalogResource = {
   key: string;
   section: 'hr' | 'attendance' | 'payroll' | 'reports' | 'settings' | 'org';

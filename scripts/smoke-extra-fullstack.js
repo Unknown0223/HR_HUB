@@ -1,6 +1,6 @@
 /**
  * Full-stack check for extra catalogs + external integrations that we shipped
- * in this Verifix clone pass: API persist round-trip (existing smokes) +
+ * in this HR HUB clone pass: API persist round-trip (existing smokes) +
  * authenticated browser pages (Chrome/Edge CDP).
  *
  * Usage: node scripts/smoke-extra-fullstack.js

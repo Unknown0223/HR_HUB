@@ -11,7 +11,7 @@ export default function CatalogIndexPage() {
         <div>
           <h1 className={styles.h1}>To‘liq katalog</h1>
           <p className={styles.lead}>
-            Каталог модулей HR HUB (паритет экранов Verifix).
+            Каталог модулей HR HUB.
           </p>
         </div>
       </div>

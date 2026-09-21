@@ -34,17 +34,26 @@
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.65rem;
 }
 
-.leftActions,
+.leftActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem;
+  flex: 1 1 520px;
+  min-width: 0;
+}
+
 .rightTools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+  flex: 0 0 auto;
 }
 
 .createBtn {

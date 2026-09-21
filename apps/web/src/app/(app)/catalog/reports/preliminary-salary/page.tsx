@@ -86,7 +86,7 @@ function downloadBlob(filename: string, blob: Blob) {
   a.click();
   URL.revokeObjectURL(url);
 }
-/** 3-digit grouping; zero stays plain 0 (Verifix). */
+/** 3-digit grouping; zero stays plain 0 (каталог). */
 function money(n: number) {
   const v = Number(n) || 0;
   if (!v) return '0';

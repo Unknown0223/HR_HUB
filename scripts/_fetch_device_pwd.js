@@ -9,7 +9,7 @@ async function main() {
   const pwd = d?.passwordEnc || '';
   // Write password to local file for unlock script (not stdout)
   const fs = require('fs');
-  const out = '/mnt/d/hr-hub/data/verifix-dump/.device-pwd.tmp';
+  const out = '/mnt/d/hr-hub/data/catalog-dump/.device-pwd.tmp';
   fs.writeFileSync(out, pwd, { mode: 0o600 });
   console.log(
     JSON.stringify({

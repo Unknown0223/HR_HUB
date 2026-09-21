@@ -1,6 +1,7 @@
 """Native-feeling Windows desktop shell (WebView2) for HR HUB Link."""
 from __future__ import annotations
 
+import ctypes
 import json
 import sys
 import threading
@@ -14,6 +15,22 @@ from auth_lock import CONFIRM, LOCKED
 
 APP_TITLE = "HR HUB Link"
 APP_AUMID = "HRHUB.OfficeLink.Desktop"
+
+# Win32 helpers for frameless chrome (min/max/resize).
+_SW_MINIMIZE = 6
+_SW_MAXIMIZE = 3
+_SW_RESTORE = 9
+_WM_NCLBUTTONDOWN = 0x00A1
+_HT_BY_EDGE = {
+    "w": 10,   # HTLEFT
+    "e": 11,   # HTRIGHT
+    "n": 12,   # HTTOP
+    "nw": 13,  # HTTOPLEFT
+    "ne": 14,  # HTTOPRIGHT
+    "s": 15,   # HTBOTTOM
+    "sw": 16,  # HTBOTTOMLEFT
+    "se": 17,  # HTBOTTOMRIGHT
+}
 
 
 def _ui_dir() -> Path:
@@ -62,6 +79,40 @@ class LinkApi:
 
     def _window(self):
         return self._holder.get("window")
+
+    def _hwnd(self) -> int | None:
+        win = self._window()
+        if win is None:
+            return None
+        try:
+            native = getattr(win, "native", None)
+            if native is None:
+                return None
+            handle = getattr(native, "Handle", None)
+            if handle is None:
+                return None
+            if hasattr(handle, "ToInt32"):
+                return int(handle.ToInt32())
+            return int(handle)
+        except Exception:
+            return None
+
+    def _is_maximized(self) -> bool:
+        hwnd = self._hwnd()
+        if hwnd and sys.platform == "win32":
+            try:
+                return bool(ctypes.windll.user32.IsZoomed(hwnd))
+            except Exception:
+                pass
+        win = self._window()
+        if win is None:
+            return False
+        try:
+            native = getattr(win, "native", None)
+            state = getattr(native, "WindowState", None) if native is not None else None
+            return str(state).endswith("Maximized")
+        except Exception:
+            return False
 
     def _emit(self, fn: str, payload: Any) -> None:
         """Queue UI events — JS polls them (evaluate_js from worker threads is unreliable)."""
@@ -152,17 +203,26 @@ class LinkApi:
         }
 
     def save_token(self, token: str) -> dict[str, Any]:
-        self.session.set_pairing_token((token or "").strip())
+        saved = (token or "").strip()
+        self.session.set_pairing_token(saved)
         ok = self.session.has_credentials()
+        if saved:
+            threading.Thread(
+                target=self._load_locations_worker, args=(saved,), daemon=True
+            ).start()
         return {
             "status": {
                 "title": "Токен сохранён" if ok else "Токен пуст",
-                "sub": "Устройство: —",
+                "sub": "Локации обновляются…" if saved else "Устройство: —",
                 "kind": "ok" if ok else "warn",
                 "badge": "ТОКЕН",
             },
             "alert": {
-                "text": "Pairing-токен сохранён." if ok else "Вставьте токен из Web.",
+                "text": (
+                    "Pairing-токен сохранён — локации загружаются."
+                    if ok
+                    else "Вставьте токен из Web."
+                ),
                 "kind": "ok" if ok else "warn",
             },
         }
@@ -792,6 +852,59 @@ class LinkApi:
                 self.session.write_service_handoff()
             except Exception:
                 pass
+            try:
+                self.session.ensure_tunnel_supervisor()
+            except Exception:
+                pass
+            try:
+                from auto_resume import reconcile_link
+
+                reconcile_link(
+                    self.session.root,
+                    self.session.api_url,
+                    self.session.tenant,
+                    force_httphost=True,
+                )
+            except Exception:
+                pass
+            # Persist hikPush from reconnect response for later auto-resume.
+            try:
+                hik = (result.device or {}).get("hikPush")
+                if isinstance(hik, dict) and hik.get("urlPath"):
+                    from paths import load_service_config, write_service_config
+
+                    svc = load_service_config(self.session.root) or {}
+                    extra = {
+                        k: v
+                        for k, v in svc.items()
+                        if k
+                        not in (
+                            "enabled",
+                            "apiUrl",
+                            "tenantCode",
+                            "tunnelMode",
+                            "writtenAt",
+                        )
+                    }
+                    extra.update(
+                        {
+                            "hikPushUrlPath": str(hik.get("urlPath") or ""),
+                            "hikPushHost": str(hik.get("hostName") or ""),
+                            "hikPushPort": int(hik.get("portNo") or 443),
+                            "hikPushProtocol": str(
+                                hik.get("protocolType") or "HTTPS"
+                            ),
+                        }
+                    )
+                    write_service_config(
+                        api_url=self.session.api_url,
+                        tenant=self.session.tenant,
+                        tunnel_mode=str(svc.get("tunnelMode") or "quick"),
+                        root=self.session.root,
+                        extra=extra,
+                    )
+            except Exception:
+                pass
             return {
                 "clearPassword": False,
                 "status": {
@@ -995,7 +1108,7 @@ class LinkApi:
             state = message[:80]
         # Soften alarm when LAN face agent is already syncing.
         try:
-            from paths import service_status_file, tunnel_cooldown_remaining
+            from paths import load_service_config, service_status_file, tunnel_cooldown_remaining
             import json
 
             left = tunnel_cooldown_remaining(self.session.root)
@@ -1004,9 +1117,15 @@ class LinkApi:
             if st_path.is_file():
                 st = json.loads(st_path.read_text(encoding="utf-8"))
                 face_ok = bool(st.get("faceAgent")) and str(st.get("state") or "") == "face_agent"
-            if left > 0 and not ok:
+            lan_fb = bool(load_service_config(self.session.root).get("lanFallback"))
+            if lan_fb and url and "trycloudflare" not in url.lower():
+                state = "онлайн (LAN)"
+            elif left > 0 and not ok:
                 mins = max(1, (left + 59) // 60)
-                state = f"Cloudflare limithi — ~{mins} daqiqa kuting"
+                state = (
+                    f"LAN mumkin — Cloudflare ~{mins} daq "
+                    "(«Восстановить туннель» LAN ga o‘tadi)"
+                )
             elif face_ok and not ok:
                 state = "LAN sync OK (tunnel kutilyapti)"
         except Exception:
@@ -1072,6 +1191,74 @@ class LinkApi:
                 return row.get("label") or lid
         return lid or "—"
 
+    def window_minimize(self) -> bool:
+        hwnd = self._hwnd()
+        if hwnd and sys.platform == "win32":
+            try:
+                ctypes.windll.user32.ShowWindow(hwnd, _SW_MINIMIZE)
+                return True
+            except Exception:
+                pass
+        win = self._window()
+        if win is None:
+            return False
+        try:
+            win.minimize()
+            return True
+        except Exception:
+            return False
+
+    def window_toggle_maximize(self) -> bool:
+        hwnd = self._hwnd()
+        if hwnd and sys.platform == "win32":
+            try:
+                if self._is_maximized():
+                    ctypes.windll.user32.ShowWindow(hwnd, _SW_RESTORE)
+                else:
+                    ctypes.windll.user32.ShowWindow(hwnd, _SW_MAXIMIZE)
+                return True
+            except Exception:
+                pass
+        win = self._window()
+        if win is None:
+            return False
+        try:
+            if self._is_maximized():
+                win.restore()
+            else:
+                win.maximize()
+            return True
+        except Exception:
+            return False
+
+    def window_start_resize(self, edge: str = "se") -> bool:
+        """Begin OS window resize from a frameless edge/corner (mouse already down)."""
+        if sys.platform != "win32":
+            return False
+        hwnd = self._hwnd()
+        if not hwnd:
+            return False
+        ht = _HT_BY_EDGE.get(str(edge or "se").lower())
+        if ht is None:
+            return False
+        try:
+            user32 = ctypes.windll.user32
+            user32.ReleaseCapture()
+            user32.SendMessageW(hwnd, _WM_NCLBUTTONDOWN, ht, 0)
+            return True
+        except Exception:
+            return False
+
+    def window_close(self) -> bool:
+        win = self._window()
+        if win is None:
+            return False
+        try:
+            win.destroy()
+            return True
+        except Exception:
+            return False
+
 
 def run_desktop() -> None:
     _set_aumid()
@@ -1081,6 +1268,22 @@ def run_desktop() -> None:
         raise SystemExit(
             "pywebview kerak. pip install pywebview\n" + str(exc)
         ) from exc
+
+    # Resume after reboot / network drop: worker + HttpHost heal without re-Ulash.
+    try:
+        from auto_resume import ensure_background_worker, reconcile_link
+        from paths import find_root, load_config, load_service_config
+
+        root = find_root()
+        ensure_background_worker(root)
+        svc = load_service_config(root) or {}
+        cfg = load_config(root)
+        api_url = str(svc.get("apiUrl") or cfg.get("apiUrl") or "").rstrip("/")
+        tenant = str(svc.get("tenantCode") or cfg.get("tenantCode") or "demo")
+        if api_url and svc.get("enabled") is not False:
+            reconcile_link(root, api_url, tenant, force_httphost=False)
+    except Exception:
+        pass
 
     ui = _ui_dir()
     index = ui / "index.html"
@@ -1103,14 +1306,64 @@ def run_desktop() -> None:
         APP_TITLE,
         url=index.as_uri(),
         js_api=api,
-        width=980,
-        height=720,
-        min_size=(820, 600),
-        background_color="#0B1220",
+        width=600,
+        height=760,
+        min_size=(560, 680),
+        background_color="#F3F3F3",
         text_select=False,
+        frameless=True,
+        easy_drag=False,
+        resizable=True,
+        shadow=True,
     )
     holder["window"] = window
+
+    def _on_shown() -> None:
+        _enable_frameless_resize(window)
+
+    try:
+        window.events.shown += _on_shown
+    except Exception:
+        pass
     webview.start(gui="edgechromium", icon=icon)
+
+
+def _enable_frameless_resize(window) -> None:
+    """Keep custom chrome but allow OS edge/corner resize + min/max boxes."""
+    if sys.platform != "win32":
+        return
+    try:
+        native = getattr(window, "native", None)
+        if native is None:
+            return
+        hwnd = int(native.Handle.ToInt32())
+    except Exception:
+        return
+    try:
+        user32 = ctypes.windll.user32
+        GWL_STYLE = -16
+        WS_THICKFRAME = 0x00040000
+        WS_MINIMIZEBOX = 0x00020000
+        WS_MAXIMIZEBOX = 0x00010000
+        WS_SYSMENU = 0x00080000
+        SWP_NOSIZE = 0x0001
+        SWP_NOMOVE = 0x0002
+        SWP_NOZORDER = 0x0004
+        SWP_FRAMECHANGED = 0x0020
+        style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+        style |= WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU
+        user32.SetWindowLongW(hwnd, GWL_STYLE, style)
+        user32.SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        )
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ export function DismissalReasonFormModal({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
   }, [knownGroups, groupName]);
 
-  /** Keep values that came from Verifix imports but are not in our option list. */
+  /** Keep values that came from HR HUB imports but are not in our option list. */
   const basisOptions = useMemo(() => {
     const known = BASIS_OPTIONS.map((o) => o.value);
     if (basisType && !known.includes(basisType)) {

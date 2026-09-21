@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-/** Verifix «Отчет по кандидатам» sample rows (Excel 21.08.2026). */
+/** HR HUB «Отчет по кандидатам» sample rows (Excel 21.08.2026). */
 const ROWS = [
   ['04.08.2026', 'BEKMUXAMEDOVA NADEJDA SANJAROVNA', '06.08.2007', 'Женский', 'TP', '+998904605599'],
   ['12.08.2026', 'KASIMOVA MADINABONU FARHODBEK QIZI', '13.07.1997', 'Женский', 'TP', '+998938057877'],

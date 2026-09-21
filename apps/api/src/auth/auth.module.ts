@@ -9,6 +9,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { LoginRateLimitService } from './login-rate-limit.service';
+import { resolveJwtSecret } from './jwt-secret';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { LoginRateLimitService } from './login-rate-limit.service';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') ?? 'dev-secret',
+        secret: resolveJwtSecret(config),
         // jwt accepts string durations; Nest types are strict about StringValue
         signOptions: {
           expiresIn: 60 * 60 * 24 * 7,

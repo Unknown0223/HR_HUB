@@ -1,5 +1,5 @@
 /**
- * One-shot: replace leftover Uzbek UI strings with Russian (Verifix parity).
+ * One-shot: replace leftover Uzbek UI strings with Russian (HR HUB parity).
  * Uses word-boundary-ish matching for short tokens.
  * Run from hr-hub root: node scripts/ru-ify-ui.mjs
  */

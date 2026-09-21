@@ -276,13 +276,14 @@ export function parseHikvisionEventBody(
 
 export type HikPushHostConfig = {
   pushToken: string;
-  protocolType: 'HTTPS';
-  addressingFormatType: 'hostname';
+  protocolType: 'HTTPS' | 'HTTP';
+  addressingFormatType: 'hostname' | 'ipaddress';
   hostName: string;
   portNo: number;
   urlPath: string;
   httpAuthenticationMethod: 'none';
   fullNotifyUrl: string;
+  ipAddress?: string;
 };
 
 export function buildHikPushHostConfig(
@@ -292,22 +293,37 @@ export function buildHikPushHostConfig(
   const base = apiBaseUrl.replace(/\/$/, '');
   let hostName = 'localhost';
   let portNo = 443;
+  let isHttps = true;
   try {
     const u = new URL(base);
     hostName = u.hostname;
-    portNo = u.port ? Number(u.port) : u.protocol === 'https:' ? 443 : 80;
+    isHttps = u.protocol === 'https:';
+    portNo = u.port ? Number(u.port) : isHttps ? 443 : 80;
   } catch {
     hostName = base.replace(/^https?:\/\//, '').split('/')[0] || 'localhost';
+    isHttps = /^https:/i.test(base);
   }
   const urlPath = `/api/attendance/hikvision/events/${pushToken}`;
+  const loopback =
+    hostName === 'localhost' ||
+    hostName === '127.0.0.1' ||
+    hostName === '[::1]' ||
+    hostName === '::1';
   return {
     pushToken,
-    protocolType: 'HTTPS',
+    // Local/dev API is HTTP; Hikvision cannot use HTTPS+localhost from the terminal.
+    protocolType: isHttps && !loopback ? 'HTTPS' : 'HTTP',
     addressingFormatType: 'hostname',
     hostName,
     portNo,
     urlPath,
     httpAuthenticationMethod: 'none',
-    fullNotifyUrl: `${base}${urlPath}`,
+    fullNotifyUrl: `${isHttps && !loopback ? 'https' : 'http'}://${hostName}${
+      (isHttps && !loopback && portNo === 443) ||
+      (!isHttps && portNo === 80) ||
+      (loopback && !isHttps && portNo === 80)
+        ? ''
+        : `:${portNo}`
+    }${urlPath}`,
   };
 }

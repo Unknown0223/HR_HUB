@@ -144,8 +144,19 @@ def snapshot_health(
     elif url:
         tun_http = probe_tunnel_url(url)
 
+    lan_fallback = bool(svc.get("lanFallback"))
+    lan_url = bool(url) and (
+        "trycloudflare.com" not in url.lower()
+        and "cfargotunnel.com" not in url.lower()
+        and url.lower().startswith("http://")
+    )
+
     if device_reach:
-        if tun_proc and url:
+        if lan_fallback and lan_url:
+            ok = True
+            message = "LAN (Cloudflare siz) — API → терминал"
+            mode = "lan"
+        elif tun_proc and url:
             ok = True
             message = "Туннель -> терминал работает"
         elif tun_proc:
@@ -245,6 +256,80 @@ def announce_best_effort(
         return False
 
 
+def restore_lan_reach(
+    *,
+    root: Path,
+    host: str,
+    port: int,
+    api_url: str,
+    tenant: str,
+    device_id: str,
+    bundle: ServiceBundle | None,
+    on_status: StatusFn | None = None,
+) -> tuple[ServiceBundle, str]:
+    """Announce device LAN URL to API when Cloudflare quick-tunnel is blocked.
+
+    Local/dev API on the same LAN can reach the terminal without cloudflared.
+    """
+    def emit(msg: str) -> None:
+        if on_status:
+            on_status(msg)
+
+    if not host:
+        raise RuntimeError(
+            "LAN host noma’lum — avval «Восстановить сеть» yoki qurilmani tanlang"
+        )
+    url = f"http://{host}:{int(port or 80)}"
+    emit(f"LAN ulanish: {url} (Cloudflare siz)…")
+    if bundle is None:
+        bundle = ServiceBundle()
+        bundle.root = root
+    bundle.tunnel_url = url
+    write_tunnel_url(url, root)
+    ok = announce_best_effort(
+        root, api_url, tenant, url, device_id=device_id or None
+    )
+    if not ok:
+        raise RuntimeError(
+            "LAN announce API ga yetmadi. Pairing-token / link.key va "
+            f"apiUrl ({api_url}) ni tekshiring."
+        )
+    write_service_config(
+        api_url=api_url,
+        tenant=tenant,
+        tunnel_mode="quick",
+        root=root,
+        extra={
+            "tunnelUrl": url,
+            "autoHeal": True,
+            "faceAgent": True,
+            "deviceId": device_id,
+            "host": host,
+            "port": int(port or 80),
+            "reachMode": "device",
+            "lanFallback": True,
+        },
+    )
+    write_status(
+        root,
+        {
+            "ok": True,
+            "state": "running",
+            "tunnelMode": "lan",
+            "tunnelUrl": url,
+            "apiUrl": api_url,
+            "tenantCode": tenant,
+            "deviceId": device_id,
+            "reachTarget": f"{host}:{int(port or 80)}",
+            "announced": True,
+            "lanFallback": True,
+            "faceAgent": True,
+            "message": f"LAN announce OK: {url}",
+        },
+    )
+    emit(f"LAN announce OK: {url}")
+    return bundle, url
+
 def restore_tunnel(
     *,
     root: Path | None = None,
@@ -252,7 +337,11 @@ def restore_tunnel(
     on_status: StatusFn | None = None,
     keep_bundle: bool = True,
 ) -> tuple[ServiceBundle, str]:
-    """Open Cloudflare tunnel to the terminal (preferred) so Railway can reach it."""
+    """Open Cloudflare tunnel to the terminal (preferred) so Railway can reach it.
+
+    If Cloudflare quick-tunnel is rate-limited, fall back to LAN announce
+    (enough for local API on the same network as the terminal).
+    """
     root = root or find_root()
     cfg = load_config(root)
     svc = load_service_config(root)
@@ -286,10 +375,23 @@ def restore_tunnel(
     left = tunnel_cooldown_remaining(root)
     if left > 0:
         mins = max(1, (left + 59) // 60)
+        if host:
+            emit(f"Cloudflare limithi (~{mins} daq) — LAN orqali davom etamiz…")
+            return restore_lan_reach(
+                root=root,
+                host=host,
+                port=port,
+                api_url=api_url,
+                tenant=tenant,
+                device_id=device_id,
+                bundle=bundle,
+                on_status=on_status,
+            )
         raise RuntimeError(
             f"Cloudflare limithi hali kuchda. Yana ~{mins} daqiqa kutib, "
-            "keyin bir marta «Восстановить» bosing. "
-            "LAN face sync ishlashi mumkin — yuzlar lokal yuklanadi."
+            "keyin bir marta «Восстановить туннель» bosing. "
+            "Avval «Восстановить сеть» bilan qurilma IP ni toping — "
+            "keyin LAN orqali ishlaydi."
         )
 
     if bundle is None:
@@ -324,6 +426,18 @@ def restore_tunnel(
         msg = str(exc)
         if "429" in msg or "1015" in msg or "limithi" in msg.lower():
             set_tunnel_cooldown(900, reason="cloudflare_429", root=root)
+            if host:
+                emit("Cloudflare 429 — LAN announce ga o‘tamiz…")
+                return restore_lan_reach(
+                    root=root,
+                    host=host,
+                    port=port,
+                    api_url=api_url,
+                    tenant=tenant,
+                    device_id=device_id,
+                    bundle=bundle,
+                    on_status=on_status,
+                )
         raise
 
     if not url:
@@ -454,11 +568,9 @@ def spawn_detached_worker(root: Path | None = None) -> bool:
         worker = here / "service_worker.py"
     if not face_only.is_file():
         face_only = here / "face_worker.py"
-    if probe_local_gw():
-        # Avoid second GW on :8800 — still run LAN face puller.
-        target = face_only if face_only.is_file() else worker
-    else:
-        target = worker if worker.is_file() else face_only
+    # Prefer full service_worker (punch proxy + HttpHost reconcile + face).
+    # face_worker is fallback only when service_worker.py is missing.
+    target = worker if worker.is_file() else face_only
     if not target.is_file():
         return False
 

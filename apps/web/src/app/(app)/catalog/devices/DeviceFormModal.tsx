@@ -83,7 +83,7 @@ const emptyMeta = (): DeviceMeta => ({
   periodicReboot: false,
   useBasicSettings: true,
   hikCentral: {
-    gatewayHost: 'hikvision.verifix.com',
+    gatewayHost: 'hikvision.example.com',
     gatewayPort: 6362,
     deviceId: '',
     isupKey: '',

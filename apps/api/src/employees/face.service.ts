@@ -278,6 +278,128 @@ export class FaceService {
     return { profile, results };
   }
 
+  /**
+   * Remove this employee from terminals of the given locations only
+   * (incremental detach — does not touch other locations' devices).
+   */
+  async removeFromLocationDevices(
+    tenantId: string,
+    employeeId: string,
+    locationIds: string[],
+  ): Promise<{ removed: number; failed: number; skipped: number }> {
+    const locs = [...new Set(locationIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    if (!locs.length) return { removed: 0, failed: 0, skipped: 0 };
+
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, tenantId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        tabNumber: true,
+        externalId: true,
+        faceProfile: { select: { id: true } },
+      },
+    });
+    if (!emp) return { removed: 0, failed: 0, skipped: 0 };
+
+    const allDevices = await this.prisma.device.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        locationId: { in: locs },
+      },
+    });
+    const hasReal = allDevices.some((d) => (d.adapterType || 'mock') !== 'mock');
+    const devices = hasReal
+      ? allDevices.filter(
+          (d) => (d.adapterType || 'mock') !== 'mock' && Boolean(d.host?.trim()),
+        )
+      : allDevices;
+
+    if (!devices.length) return { removed: 0, failed: 0, skipped: locs.length };
+
+    const empNo = this.employeeNoForDevice(emp);
+    const name = `${emp.lastName} ${emp.firstName}`.trim() || empNo;
+    let removed = 0;
+    let failed = 0;
+
+    for (const device of devices) {
+      let gatewayRef = device.gatewayRef;
+      const ensureRegistered = async () => {
+        const reg = await this.gw.registerFromDevice(device);
+        if (reg?.id) {
+          gatewayRef = reg.id;
+          await this.prisma.device.update({
+            where: { id: device.id },
+            data: { gatewayRef, status: reg.status || 'online' },
+          });
+          return true;
+        }
+        return false;
+      };
+
+      if (!gatewayRef) {
+        const okReg = await ensureRegistered();
+        if (!okReg) {
+          failed += 1;
+          this.logger.warn(
+            `Face remove skipped (no GW) device=${device.id} emp=${employeeId}`,
+          );
+          continue;
+        }
+      }
+
+      try {
+        await this.gw.deleteUser(gatewayRef!, empNo);
+        if (emp.faceProfile?.id) {
+          await this.prisma.deviceFaceSync.deleteMany({
+            where: {
+              tenantId,
+              deviceId: device.id,
+              faceProfileId: emp.faceProfile.id,
+            },
+          });
+        } else {
+          await this.prisma.deviceFaceSync.deleteMany({
+            where: { tenantId, deviceId: device.id, employeeId },
+          });
+        }
+        removed += 1;
+        this.logger.log(
+          `Face removed device=${device.id} emp=${empNo} (${name}) location detach`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('404') || msg.includes('not found')) {
+          try {
+            const okReg = await ensureRegistered();
+            if (okReg && gatewayRef) {
+              await this.gw.deleteUser(gatewayRef, empNo);
+              await this.prisma.deviceFaceSync.deleteMany({
+                where: { tenantId, deviceId: device.id, employeeId },
+              });
+              removed += 1;
+              continue;
+            }
+          } catch (e2) {
+            failed += 1;
+            this.logger.warn(
+              `Face remove retry failed device=${device.id}: ${
+                e2 instanceof Error ? e2.message : e2
+              }`,
+            );
+            continue;
+          }
+        }
+        failed += 1;
+        this.logger.warn(`Face remove failed device=${device.id}: ${msg}`);
+      }
+    }
+
+    return { removed, failed, skipped: 0 };
+  }
+
   async getFaceStatus(tenantId: string, employeeId: string) {
     const emp = await this.prisma.employee.findFirst({
       where: { id: employeeId, tenantId },

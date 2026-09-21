@@ -22,7 +22,7 @@ const DEMO = [
     fullName: 'Каримова Малика Азизовна',
     gender: 'Женский',
     birth: '1992-05-01',
-    workplace: 'ООО Verifix',
+    workplace: 'ООО Demo',
     dependent: true,
   },
   {

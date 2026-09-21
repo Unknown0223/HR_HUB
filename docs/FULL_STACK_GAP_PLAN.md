@@ -2,7 +2,7 @@
 
 **Goal:** Every mega-nav link opens a dedicated working full-stack screen (or a clearly dedicated tab with its own API filters/data). No fake redirects to unrelated shared pages.
 
-**Demo:** `admin@demo.local` / `Demo1234!` · API `:3001` · Web `:3000`  
+**Demo:** `admin@demo.local` / `Demo1234!` · API `:3002` · Web `:3001`  
 **Builds:** `npm.cmd run build:api` / `npm.cmd run build:web`  
 **Dashboard:** Keep current two attendance tables (no donut) unless explicitly changed below.
 
@@ -154,9 +154,9 @@
 | Kubernetes / production HA | Infra not requested |
 | Mobile apps | Not in web scope |
 | Live 1C / bank payment rails | Integration stubs only (config + sync button) |
-| Pixel-perfect Verifix Excel UI | CSV + existing Excel for T-13/lateness/marks/hr/fot; no huge new deps |
+| Pixel-perfect HR HUB Excel UI | CSV + existing Excel for T-13/lateness/marks/hr/fot; no huge new deps |
 | Donut dashboard redesign | Keep two attendance tables |
-| Create/pagination Verifix noise screens | Already excluded from mega-nav |
+| Create/pagination HR HUB noise screens | Already excluded from mega-nav |
 | Git commit / config changes | User did not ask |
 
 ---

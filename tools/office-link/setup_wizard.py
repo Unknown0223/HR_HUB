@@ -65,6 +65,57 @@ def _find_exe(dest: Path) -> Path | None:
     return None
 
 
+def _write_boshlash(dest: Path, exe: Path | None) -> Path:
+    """
+    Start Menu / Desktop shortcut target.
+
+    Smart App Control blocks unsigned PyInstaller EXEs; prefer system/runtime
+    pythonw + office_link_app.py, fall back to EXE only if no Python.
+    """
+    path = dest / "BOSHLASH.bat"
+    exe_rel = ""
+    if exe is not None:
+        try:
+            exe_rel = str(exe.relative_to(dest)).replace("/", "\\")
+        except ValueError:
+            exe_rel = "ilova\\HRHUB-Qurilma.exe"
+    lines = [
+        "@echo off",
+        "REM HR HUB Link — SAC imzosiz EXE ni bloklaydi; avvalo pythonw.",
+        'cd /d "%~dp0"',
+        'if exist "%~dp0runtime\\python\\pythonw.exe" if exist "%~dp0office_link_app.py" (',
+        '  start "" /D "%~dp0" "%~dp0runtime\\python\\pythonw.exe" "%~dp0office_link_app.py"',
+        "  exit /b 0",
+        ")",
+        "where pythonw >nul 2>&1",
+        "if %ERRORLEVEL%==0 if exist \"%~dp0office_link_app.py\" (",
+        '  start "" /D "%~dp0" pythonw "%~dp0office_link_app.py"',
+        "  exit /b 0",
+        ")",
+    ]
+    if exe_rel:
+        work = str(Path(exe_rel).parent).replace("/", "\\")
+        if work in (".", ""):
+            work = "."
+        lines += [
+            f'if exist "%~dp0{exe_rel}" (',
+            f'  start "" /D "%~dp0{work}" "%~dp0{exe_rel}"',
+            "  exit /b 0",
+            ")",
+        ]
+    lines += [
+        "echo.",
+        "echo [XATO] pythonw yoki HRHUB-Qurilma.exe topilmadi.",
+        "echo Smart App Control EXE ni bloklasa: Python o'rnating yoki SAC ni o'chiring.",
+        "echo.",
+        "pause",
+        "exit /b 1",
+        "",
+    ]
+    path.write_text("\r\n".join(lines), encoding="utf-8")
+    return path
+
+
 def _write_uninstall_script(dest: Path, exe: Path) -> Path:
     script = dest / "Uninstall-HRHUB-Link.bat"
     # Delayed delete so the bat can exit before its own folder is removed.
@@ -176,9 +227,17 @@ def _shortcuts(dest: Path, target: Path, desktop: bool) -> None:
     except OSError:
         pass
     if desktop:
-        for desk in (Path.home() / "Desktop", Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop"):
-            if desk.is_dir():
-                write_lnk(desk / f"{APP_NAME}.lnk", target.parent)
+        # One desktop icon only (user Desktop) — Public\Desktop duplicates the icon.
+        desk = Path.home() / "Desktop"
+        if desk.is_dir():
+            write_lnk(desk / f"{APP_NAME}.lnk", target.parent)
+        # Clean leftover Public shortcut from older installers.
+        try:
+            pub = Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop" / f"{APP_NAME}.lnk"
+            if pub.is_file():
+                pub.unlink()
+        except OSError:
+            pass
 
 
 class SetupWizard(tk.Tk):
@@ -301,29 +360,23 @@ class SetupWizard(tk.Tk):
                         shutil.copy2(side, ilova / name)
 
             exe = _find_exe(dest)
-            if not (dest / "BOSHLASH.bat").is_file() and exe is not None:
-                (dest / "BOSHLASH.bat").write_text(
-                    "@echo off\r\n"
-                    f'cd /d "%~dp0"\r\n'
-                    f'start "" /D "%~dp0{exe.parent.relative_to(dest)}" '
-                    f'"%~dp0{exe.relative_to(dest)}"\r\n',
-                    encoding="utf-8",
-                )
-
             if exe is None:
                 raise FileNotFoundError("HRHUB-Qurilma.exe topilmadi")
 
+            boshlash = _write_boshlash(dest, exe)
             uninstall = _write_uninstall_script(dest, exe)
             _register_apps_list(dest, exe, uninstall)
-            _shortcuts(dest, exe, self.desktop.get())
+            # Shortcut → BOSHLASH.bat (Python first); never point .lnk at unsigned EXE.
+            _shortcuts(dest, boshlash, self.desktop.get())
             self.status.set("Tayyor.")
             messagebox.showinfo(
                 APP_NAME,
                 f"O‘rnatildi:\n{dest}\n\n"
-                "Ilova Start Menu va Windows «Ilovalar» ro‘yxatida ko‘rinadi.",
+                "Ilova Start Menu va Windows «Ilovalar» ro‘yxatida ko‘rinadi.\n"
+                "Smart App Control uchun ochish Python orqali (BOSHLASH.bat).",
             )
             if self.launch.get():
-                os.startfile(str(exe))  # noqa: S606
+                os.startfile(str(boshlash))  # noqa: S606
             self.destroy()
         except Exception as e:
             messagebox.showerror(APP_NAME, f"O‘rnatish xatosi:\n{e}")

@@ -92,15 +92,7 @@ export default function AccountSettingsPage() {
 
   return (
     <div className={styles.page}>
-      <PageSubnav
-        group={{
-          title: 'Настройки счетов',
-          siblings: [
-            { label: 'План счетов', href: '/catalog/coa' },
-            { label: 'План главных счетов', href: '/catalog/coa-main' },
-          ],
-        }}
-      />
+      <PageSubnav groupKey="settings-main" />
 
       <header className={shared.pageHeader}>
         <div

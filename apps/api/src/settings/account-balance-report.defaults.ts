@@ -1,4 +1,4 @@
-/** Verifix «Оборотно-сальдовая ведомость по счету» — report UI settings */
+/** HR HUB «Оборотно-сальдовая ведомость по счету» — report UI settings */
 
 export type AccountBalanceReportSettings = {
   /** Значение по умолчанию для пустых ячеек */

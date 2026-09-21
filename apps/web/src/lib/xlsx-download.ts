@@ -8,7 +8,7 @@ async function loadExcelJS(): Promise<ExcelJSNS> {
   return ns;
 }
 
-/** Verifix-like table palette (ARGB without #). */
+/** catalog-like table palette (ARGB without #). */
 export const XLSX_COLORS = {
   headerBg: 'FFF7F8FA',
   headerFg: 'FF3F4254',
@@ -306,7 +306,7 @@ export async function downloadAttendanceLikeXlsx(opts: {
   URL.revokeObjectURL(url);
 }
 
-/** Pivot matrix: date lines + rotated column headers (Verifix dismissal report). */
+/** Pivot matrix: date lines + rotated column headers (HR HUB dismissal report). */
 export async function downloadMatrixXlsx(opts: {
   filename: string;
   sheetName?: string;
@@ -405,7 +405,7 @@ export type XlsxSheetExport = {
   colWidths?: number[];
 };
 
-/** Verifix multi-sheet reports: empty row, merged date line, header, grouped first column. */
+/** HR HUB multi-sheet reports: empty row, merged date line, header, grouped first column. */
 export async function downloadMultiSheetXlsx(opts: {
   filename: string;
   dateLine?: string;
@@ -496,7 +496,7 @@ export async function downloadMultiSheetXlsx(opts: {
   URL.revokeObjectURL(url);
 }
 
-/** KPI + titled tables on one sheet (employee movement / similar Verifix reports). */
+/** KPI + titled tables on one sheet (employee movement / similar HR HUB reports). */
 export async function downloadSectionedXlsx(opts: {
   filename: string;
   sheetName?: string;

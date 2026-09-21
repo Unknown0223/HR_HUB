@@ -19,7 +19,7 @@ HOST = "192.168.0.116"
 EMAIL = "admin@demo.local"
 PASSWORD = "Demo1234!"
 DEVICE_PWDS = [p for p in os.environ.get("HIK_PASSWORD_HISTORY", "").split("|") if p]
-PHOTOS = Path(r"D:\hr-hub\data\verifix-dump\live\photos")
+PHOTOS = Path(r"D:\hr-hub\data\hrhub-dump\live\photos")
 
 
 def req(method, path, body=None, headers=None, base=API, timeout=90):
@@ -181,9 +181,9 @@ def main() -> int:
             fp = e.get("faceProfile") or {}
             url = fp.get("photoUrl") or ""
             b64 = None
-            # local by verifix id
+            # local by hrhub id
             ext = str(e.get("externalId") or "")
-            if ext.startswith("verifix:"):
+            if ext.startswith("hrhub:"):
                 local = PHOTOS / f"{ext.split(':',1)[1]}.jpg"
                 if local.exists():
                     b64 = base64.b64encode(local.read_bytes()).decode()

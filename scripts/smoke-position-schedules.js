@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke: Индивидуальные графики для позиций + Verifix Excel template.
+ * Smoke: Индивидуальные графики для позиций + HR HUB Excel template.
  * Usage: node scripts/smoke-position-schedules.js
  */
 const fs = require('fs');
@@ -116,7 +116,7 @@ async function main() {
     fail('template.xlsx', e);
   }
 
-  // parse user-provided Verifix template if present
+  // parse user-provided HR HUB template if present
   const userTplCandidates = [
     path.join(
       process.env.USERPROFILE || '',
@@ -145,9 +145,9 @@ async function main() {
         },
         body: fd,
       });
-      ok('import user Verifix xlsx', `imported=${imp.imported} shifts=${imp.shifts?.length || 0}`);
+      ok('import user HR HUB xlsx', `imported=${imp.imported} shifts=${imp.shifts?.length || 0}`);
     } catch (e) {
-      fail('import user Verifix xlsx', e);
+      fail('import user HR HUB xlsx', e);
     }
   } else {
     ok('user template skipped', 'file not in Downloads');

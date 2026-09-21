@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { fmtDt, money, type ManualOp } from '@/lib/manual-ops';
@@ -175,8 +174,6 @@ function ManualInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="manual-ops" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-pen-to-square" aria-hidden />
@@ -219,17 +216,6 @@ function ManualInner() {
             <i className="fas fa-history" aria-hidden />
             История
           </Link>
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
-              { type: 'dateRange', label: 'Дата' },
-              { type: 'postedChecks', key: 'posted', label: 'Проведен' },
-            ]}
-          />
         </div>
 
         <div className={styles.rightTools}>
@@ -289,6 +275,20 @@ function ManualInner() {
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
+      </div>
+
+      <div className={styles.filterBand}>
+        <FilterPanel
+          inline
+          urlSync
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((v) => !v)}
+          fields={[
+            { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
+            { type: 'dateRange', label: 'Дата' },
+            { type: 'postedChecks', key: 'posted', label: 'Проведен' },
+          ]}
+        />
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}

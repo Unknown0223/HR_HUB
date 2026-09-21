@@ -49,7 +49,7 @@ for meta in results.values():
     if title not in by_title or len(sibs) > len(by_title[title]):
         by_title[title] = sibs
 
-out = Path(r"d:\0223\hr-hub\scripts\_verifix_form_siblings.json")
+out = Path(r"d:\0223\hr-hub\scripts\_hrhub_form_siblings.json")
 out.write_text(
     json.dumps({"by_folder": results, "by_title": by_title}, ensure_ascii=False, indent=2),
     encoding="utf-8",

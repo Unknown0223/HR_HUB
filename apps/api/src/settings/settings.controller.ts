@@ -188,6 +188,22 @@ export class SettingsController {
     return this.settings.getRoleAccess(this.settings.requireTenant(tenantId));
   }
 
+  /** Effective grants for the current user (nav / page gating). */
+  @Roles(
+    Role.platform_admin,
+    Role.tenant_admin,
+    Role.hr,
+    Role.manager,
+    Role.employee,
+  )
+  @Get('my-access')
+  getMyAccess(
+    @CurrentTenant() tenantId: string | null,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.settings.getMyAccess(this.settings.requireTenant(tenantId), user);
+  }
+
   @Roles(Role.platform_admin, Role.tenant_admin)
   @Patch('role-access')
   updateRoleAccess(

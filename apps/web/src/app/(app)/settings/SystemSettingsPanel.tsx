@@ -1,12 +1,83 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch, getSession } from '@/lib/api';
 import styles from './system-settings.module.css';
 
 type SystemSettings = Record<string, unknown>;
 
-type Panel = 'general' | 'hr_staff' | 'timepad' | 'required' | 'recruitment';
+type Panel =
+  | 'general'
+  | 'hr_staff'
+  | 'timepad'
+  | 'required'
+  | 'recruitment'
+  | 'mark_photos';
+
+type MarkPhotoRetentionUnit = 'day' | 'month' | 'year';
+type MarkPhotoKind = 'in' | 'out' | 'mark' | 'estimated_out';
+type MarkPhotoPolicy = {
+  enabled?: boolean;
+  retentionValue?: number;
+  retentionUnit?: MarkPhotoRetentionUnit;
+};
+type MarkPhotoCompress = {
+  enabled?: boolean;
+  maxEdge?: number;
+  quality?: number;
+};
+type MarkPhotosSettings = Partial<Record<MarkPhotoKind, MarkPhotoPolicy>> & {
+  compress?: MarkPhotoCompress;
+};
+
+type DocNotifRule = {
+  id: string;
+  documentTypeCode: string;
+  daysBefore: number;
+  enabled: boolean;
+};
+
+type DocNotifSettings = {
+  enabled?: boolean;
+  rules?: DocNotifRule[];
+};
+
+type DictItem = { id: string; code: string; name: string; isActive?: boolean };
+type Dict = { id: string; code: string; name: string; items: DictItem[] };
+
+const MARK_PHOTO_KINDS: Array<{
+  key: MarkPhotoKind;
+  title: string;
+  hint: string;
+}> = [
+  {
+    key: 'in',
+    title: 'Приход',
+    hint: 'Фото при отметке прихода (prixod)',
+  },
+  {
+    key: 'out',
+    title: 'Уход',
+    hint: 'Фото при отметке ухода (uxod)',
+  },
+  {
+    key: 'estimated_out',
+    title: 'Примерный уход',
+    hint:
+      'Промежуточные уходы в течение дня. Выключить — фото сразу удаляются; в общем списке «Отметки» строки скрываются (остаются в карточке сотрудника и в деталях отметки, без фото).',
+  },
+  {
+    key: 'mark',
+    title: 'Отметка',
+    hint: 'Обычная отметка без явного приход/уход',
+  },
+];
+
+const RETENTION_UNITS: Array<{ value: MarkPhotoRetentionUnit; label: string }> = [
+  { value: 'day', label: 'день' },
+  { value: 'month', label: 'месяц' },
+  { value: 'year', label: 'год' },
+];
 
 const OVERTIME_TYPES = [
   { value: 'overtime_pay', label: 'Сверхурочная оплата труда' },
@@ -43,7 +114,7 @@ function Check({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span>{label}</span>
+      <span className={styles.checkLabel}>{label}</span>
     </label>
   );
 }
@@ -78,12 +149,27 @@ export function SystemSettingsPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [docTypes, setDocTypes] = useState<DictItem[]>([]);
+  const [docNotifOpen, setDocNotifOpen] = useState(false);
+  const canSave = useMemo(() => {
+    const role = getSession()?.user?.role;
+    return role === 'platform_admin' || role === 'tenant_admin';
+  }, []);
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const data = await apiFetch<{ system: SystemSettings }>('/api/settings/system');
+      const [data, dicts] = await Promise.all([
+        apiFetch<{ system: SystemSettings }>('/api/settings/system'),
+        apiFetch<Dict[]>('/api/settings/dictionaries?kind=core').catch(() => [] as Dict[]),
+      ]);
       setS(data.system || {});
+      const dt = (dicts || []).find((d) => d.code === 'doc_types');
+      setDocTypes((dt?.items || []).filter((i) => i.isActive !== false));
+      const rules = (
+        data.system?.documentTypeNotifications as DocNotifSettings | undefined
+      )?.rules;
+      if (Array.isArray(rules) && rules.length > 0) setDocNotifOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
       setS({});
@@ -98,8 +184,53 @@ export function SystemSettingsPanel() {
     setS((prev) => ({ ...(prev || {}), [key]: value }));
   }
 
+  function docNotif(): DocNotifSettings {
+    const raw = s?.documentTypeNotifications;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return raw as DocNotifSettings;
+    }
+    return { enabled: asBool(s?.hrNotifyDocumentDates), rules: [] };
+  }
+
+  function setDocNotif(next: DocNotifSettings) {
+    setS((prev) => ({
+      ...(prev || {}),
+      documentTypeNotifications: next,
+      hrNotifyDocumentDates: Boolean(next.enabled),
+    }));
+  }
+
+  function addDocNotifRule() {
+    const cur = docNotif();
+    const rules = [...(cur.rules || [])];
+    rules.push({
+      id: `doc-notif-${Date.now()}`,
+      documentTypeCode: docTypes[0]?.code || '',
+      daysBefore: 30,
+      enabled: true,
+    });
+    setDocNotif({ ...cur, enabled: true, rules });
+    setDocNotifOpen(true);
+  }
+
+  function updateDocNotifRule(id: string, patch: Partial<DocNotifRule>) {
+    const cur = docNotif();
+    setDocNotif({
+      ...cur,
+      rules: (cur.rules || []).map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    });
+  }
+
+  function removeDocNotifRule(id: string) {
+    const cur = docNotif();
+    setDocNotif({
+      ...cur,
+      rules: (cur.rules || []).filter((r) => r.id !== id),
+    });
+  }
+
   async function save() {
-    if (!s) return;
+    if (!s || !canSave) return;
     setBusy(true);
     setError('');
     setInfo('');
@@ -127,10 +258,11 @@ export function SystemSettingsPanel() {
         {(
           [
             ['general', 'Основные настройки'],
-            ['hr_staff', 'Настройки для Verifix HR Staff'],
+            ['hr_staff', 'Настройки для HR Staff'],
             ['timepad', 'Настройки для Timepad'],
             ['required', 'Настройки обязательных полей'],
             ['recruitment', 'Настройки рекрутинга'],
+            ['mark_photos', 'Фото отметок (приход/уход)'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -159,13 +291,17 @@ export function SystemSettingsPanel() {
         <div className={styles.toolbar}>
           {info ? <p className={styles.msg}>{info}</p> : null}
           {error ? <p className={styles.err}>{error}</p> : null}
+          {!canSave ? (
+            <p className={styles.msg}>Только администратор может сохранять настройки</p>
+          ) : null}
           <button
             type="button"
             className={styles.saveBtn}
-            disabled={busy}
+            disabled={busy || !canSave}
             onClick={() => void save()}
           >
-            {busy ? '…' : 'Сохранить'}
+            <i className="fas fa-save" aria-hidden />
+            {busy ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
       </div>
@@ -324,12 +460,138 @@ export function SystemSettingsPanel() {
                 type="text"
                 value={asStr(s.medicalExamIntervalMonths)}
                 onChange={(e) => set('medicalExamIntervalMonths', e.target.value)}
+                placeholder="например 12"
               />
             </label>
 
-            <button type="button" className={styles.linkish}>
-              + Добавить настройки уведомлений для типов документов
-            </button>
+            {!docNotifOpen && !(docNotif().rules || []).length ? (
+              <button
+                type="button"
+                className={styles.linkish}
+                onClick={() => {
+                  setDocNotifOpen(true);
+                  if (!(docNotif().rules || []).length) addDocNotifRule();
+                }}
+              >
+                + Добавить настройки уведомлений для типов документов
+              </button>
+            ) : (
+              <div className={styles.payBlock}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <p className={styles.payBlockTitle} style={{ margin: 0 }}>
+                    Уведомления по типам документов
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.linkish}
+                    onClick={() => setDocNotifOpen(false)}
+                  >
+                    Свернуть
+                  </button>
+                </div>
+                <p className={styles.hint} style={{ marginBottom: 8 }}>
+                  HR получит напоминание за N дней до истечения срока документа
+                  (ежедневно). Включите также «Уведомление для HR о приближающейся
+                  дате документа» или оставьте правила включёнными.
+                </p>
+                <div className={styles.payTableWrap}>
+                  <table className={styles.payTable}>
+                    <thead>
+                      <tr>
+                        <th>Тип документа</th>
+                        <th style={{ width: 110 }}>Дней до</th>
+                        <th style={{ width: 90 }}>Вкл.</th>
+                        <th className={styles.payActions}> </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(docNotif().rules || []).map((rule) => (
+                        <tr key={rule.id}>
+                          <td>
+                            <select
+                              className={styles.payInput}
+                              value={rule.documentTypeCode}
+                              onChange={(e) =>
+                                updateDocNotifRule(rule.id, {
+                                  documentTypeCode: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="">— выберите —</option>
+                              {docTypes.map((d) => (
+                                <option key={d.id} value={d.code}>
+                                  {d.name} ({d.code})
+                                </option>
+                              ))}
+                              {rule.documentTypeCode &&
+                              !docTypes.some((d) => d.code === rule.documentTypeCode) ? (
+                                <option value={rule.documentTypeCode}>
+                                  {rule.documentTypeCode}
+                                </option>
+                              ) : null}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              max={3650}
+                              className={styles.payInput}
+                              value={rule.daysBefore}
+                              onChange={(e) =>
+                                updateDocNotifRule(rule.id, {
+                                  daysBefore: Math.max(
+                                    0,
+                                    Math.floor(Number(e.target.value) || 0),
+                                  ),
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={rule.enabled !== false}
+                              onChange={(e) =>
+                                updateDocNotifRule(rule.id, {
+                                  enabled: e.target.checked,
+                                })
+                              }
+                            />
+                          </td>
+                          <td className={styles.payActions}>
+                            <button
+                              type="button"
+                              className={styles.payDelete}
+                              title="Удалить"
+                              aria-label="Удалить"
+                              onClick={() => removeDocNotifRule(rule.id)}
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button
+                    type="button"
+                    className={styles.payAdd}
+                    onClick={() => addDocNotifRule()}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
 
             <Toggle
               label="Ограничение изменения смен за прошлый период"
@@ -499,7 +761,7 @@ export function SystemSettingsPanel() {
 
             <Toggle
               label="Корпоративная лента новостей"
-              checked={asBool(s.corporateNewsFeed)}
+              checked={asBool(s.corporateNewsFeed, true)}
               onChange={(v) => set('corporateNewsFeed', v)}
             />
 
@@ -510,8 +772,11 @@ export function SystemSettingsPanel() {
             />
             <Check
               label="Уведомление для HR о приближающейся дате документа"
-              checked={asBool(s.hrNotifyDocumentDates)}
-              onChange={(v) => set('hrNotifyDocumentDates', v)}
+              checked={asBool(s.hrNotifyDocumentDates) || asBool(docNotif().enabled)}
+              onChange={(v) => {
+                const cur = docNotif();
+                setDocNotif({ ...cur, enabled: v });
+              }}
             />
             <Check
               label="Заблокировать интервалы с официальным отсутствием"
@@ -634,6 +899,15 @@ export function SystemSettingsPanel() {
             (s.recruitment && typeof s.recruitment === 'object' ? s.recruitment : {}) as SystemSettings
           }
           onChange={(recruitment) => set('recruitment', recruitment)}
+        />
+      ) : panel === 'mark_photos' ? (
+        <MarkPhotosSettingsForm
+          value={
+            (s.markPhotos && typeof s.markPhotos === 'object'
+              ? s.markPhotos
+              : {}) as MarkPhotosSettings
+          }
+          onChange={(markPhotos) => set('markPhotos', markPhotos)}
         />
       ) : (
         <div className={styles.stub}>Нет данных</div>
@@ -854,7 +1128,7 @@ function HrStaffSettingsForm({
             value={asNum(h.authValidityDays, 7)}
             onChange={(e) => setH('authValidityDays', Number(e.target.value))}
           />
-          <span className={styles.hint}>По умолчанию: 1 день (Verifix demo: 7)</span>
+          <span className={styles.hint}>По умолчанию: 1 день (демо: 7)</span>
         </label>
 
         <Check
@@ -887,7 +1161,7 @@ function HrStaffSettingsForm({
   );
 }
 
-/* ─── Timepad (matches Verifix «Настройки для Timepad») ──────────────────── */
+/* ─── Timepad (matches HR HUB «Настройки для Timepad») ──────────────────── */
 
 function TimepadSettingsForm({
   value,
@@ -984,7 +1258,7 @@ function TimepadSettingsForm({
   );
 }
 
-/* ─── Required fields (Verifix «Настройки обязательных полей») ───────────── */
+/* ─── Required fields (HR HUB «Настройки обязательных полей») ───────────── */
 
 type Section = Record<string, unknown>;
 
@@ -1100,7 +1374,7 @@ function RequiredFieldsSettingsForm({
   );
 }
 
-/* ─── Recruitment (Verifix «Настройки рекрутинга») ───────────────────────── */
+/* ─── Recruitment (HR HUB «Настройки рекрутинга») ───────────────────────── */
 
 type PayLine = { id: string; name: string; indicators: string };
 
@@ -1298,6 +1572,178 @@ function RecruitmentSettingsForm({
         {payTable('internshipAccruals', 'Начисления (стажировка)', 'Начисление')}
         {payTable('internshipDeductions', 'Удержания (стажировка)', 'Удержание')}
       </div>
+    </div>
+  );
+}
+
+function MarkPhotosSettingsForm({
+  value,
+  onChange,
+}: {
+  value: MarkPhotosSettings;
+  onChange: (next: MarkPhotosSettings) => void;
+}) {
+  const patchKind = (kind: MarkPhotoKind, patch: Partial<MarkPhotoPolicy>) => {
+    const prev = (value[kind] && typeof value[kind] === 'object' ? value[kind] : {}) as MarkPhotoPolicy;
+    onChange({
+      ...value,
+      [kind]: {
+        enabled: asBool(prev.enabled, true),
+        retentionValue: asNum(prev.retentionValue, 90),
+        retentionUnit: (['day', 'month', 'year'].includes(String(prev.retentionUnit))
+          ? prev.retentionUnit
+          : 'day') as MarkPhotoRetentionUnit,
+        ...patch,
+      },
+    });
+  };
+
+  const compress =
+    value.compress && typeof value.compress === 'object' ? value.compress : {};
+  const compressEnabled = asBool(compress.enabled, true);
+  const maxEdge = Math.min(1920, Math.max(240, asNum(compress.maxEdge, 720)));
+  const quality = Math.min(95, Math.max(30, asNum(compress.quality, 62)));
+
+  const patchCompress = (patch: Partial<MarkPhotoCompress>) => {
+    onChange({
+      ...value,
+      compress: {
+        enabled: compressEnabled,
+        maxEdge,
+        quality,
+        ...patch,
+      },
+    });
+  };
+
+  return (
+    <div className={styles.grid2}>
+      <div className={styles.col} style={{ gridColumn: '1 / -1' }}>
+        <p className={styles.sectionTitle}>Фото отметок (приход / уход / примерный уход)</p>
+        <p className={styles.hint}>
+          Управление сохранением фото с терминала при отметках. Это не «Загрузка фото»
+          сотрудников — только кадры прихода/ухода/примерного ухода. Если выключить —
+          новые фото не сохраняются; для «Примерный уход» уже сохранённые кадры
+          удаляются сразу (и строки скрываются из общего списка «Отметки»). Срок
+          хранения: по истечении фото удаляются с сервера (0 = без срока).
+        </p>
+      </div>
+
+      <div className={styles.policyCard} style={{ gridColumn: '1 / -1' }}>
+        <p className={styles.policyCardTitle}>Сжатие при сохранении</p>
+        <p className={styles.hint}>
+          Кадры с терминала уменьшаются и перекодируются перед записью на сервер —
+          экономия диска и быстрее приём. Уже сохранённые файлы не меняются.
+        </p>
+        <Toggle
+          label="Сжимать фото с терминала"
+          checked={compressEnabled}
+          onChange={(v) => patchCompress({ enabled: v })}
+        />
+        <label className={styles.field}>
+          Макс. размер (длинная сторона, px)
+          <input
+            type="number"
+            min={240}
+            max={1920}
+            step={10}
+            disabled={!compressEnabled}
+            value={maxEdge}
+            onChange={(e) =>
+              patchCompress({
+                maxEdge: Math.min(1920, Math.max(240, Math.floor(Number(e.target.value) || 720))),
+              })
+            }
+            style={{ maxWidth: 140 }}
+          />
+          <span className={styles.hint}>Рекомендуется 640–800</span>
+        </label>
+        <label className={styles.field}>
+          Качество JPEG (30–95)
+          <input
+            type="number"
+            min={30}
+            max={95}
+            step={1}
+            disabled={!compressEnabled}
+            value={quality}
+            onChange={(e) =>
+              patchCompress({
+                quality: Math.min(95, Math.max(30, Math.floor(Number(e.target.value) || 62))),
+              })
+            }
+            style={{ maxWidth: 140 }}
+          />
+          <span className={styles.hint}>Рекомендуется 55–70 — меньше = меньше файл</span>
+        </label>
+      </div>
+
+      {MARK_PHOTO_KINDS.map(({ key, title, hint }) => {
+        const row = (value[key] && typeof value[key] === 'object' ? value[key] : {}) as MarkPhotoPolicy;
+        const enabled = asBool(row.enabled, true);
+        const retentionValue = asNum(row.retentionValue, 90);
+        const retentionUnit = (
+          ['day', 'month', 'year'].includes(String(row.retentionUnit))
+            ? row.retentionUnit
+            : 'day'
+        ) as MarkPhotoRetentionUnit;
+        return (
+          <div key={key} className={styles.policyCard}>
+            <p className={styles.policyCardTitle}>{title}</p>
+            <p className={styles.hint}>{hint}</p>
+            <Toggle
+              label="Сохранять фото"
+              checked={enabled}
+              onChange={(v) => patchKind(key, { enabled: v })}
+            />
+            <label className={styles.field}>
+              Срок хранения
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  disabled={!enabled}
+                  value={retentionValue}
+                  onChange={(e) =>
+                    patchKind(key, {
+                      retentionValue: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                    })
+                  }
+                  style={{ maxWidth: 100 }}
+                />
+                <select
+                  disabled={!enabled}
+                  value={retentionUnit}
+                  onChange={(e) =>
+                    patchKind(key, {
+                      retentionUnit: e.target.value as MarkPhotoRetentionUnit,
+                    })
+                  }
+                  style={{ maxWidth: 120 }}
+                >
+                  {RETENTION_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className={styles.hint}>
+                {retentionValue <= 0
+                  ? 'Без автоудаления'
+                  : `Хранить ${retentionValue} ${
+                      retentionUnit === 'day'
+                        ? 'дн.'
+                        : retentionUnit === 'month'
+                          ? 'мес.'
+                          : 'лет'
+                    }`}
+              </span>
+            </label>
+          </div>
+        );
+      })}
     </div>
   );
 }

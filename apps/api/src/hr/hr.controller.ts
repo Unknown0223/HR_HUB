@@ -581,7 +581,7 @@ export class HrController {
     );
   }
 
-  // —— Personnel change requests (Verifix) ——
+  // —— Personnel change requests (каталог) ——
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
   @Get('change-requests')

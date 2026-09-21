@@ -1,4 +1,4 @@
-/** Verifix «Настройки системы» — defaults for TenantSetting.extras.system */
+/** HR HUB «Настройки системы» — defaults for TenantSetting.extras.system */
 
 export type SystemSettings = {
   // Autogeneration / core
@@ -30,6 +30,8 @@ export type SystemSettings = {
   rotationExpenseAccrual: string;
   hideScheduleInEmployeeCalendar: boolean;
   showExtraTimeTypesInCalendar: boolean;
+  /** HR reminders before PersonDocument.expiresAt by doc type */
+  documentTypeNotifications: DocumentTypeNotificationsSettings;
 
   // Verification / attendance
   employeeVerification: boolean;
@@ -65,14 +67,77 @@ export type SystemSettings = {
   checkAdultAge18: boolean;
   hideInitialBalance: boolean;
 
-  // Nested Verifix sub-panels
+  // Nested HR HUB sub-panels
   hrStaff: HrStaffSettings;
   timepad: TimepadSettings;
   requiredFields: RequiredFieldsSettings;
   recruitment: RecruitmentSettings;
+  /** Punch capture photos (приход / уход / отметка / примерный уход) */
+  markPhotos: MarkPhotosSettings;
 };
 
-/** Verifix «Настройки рекрутинга» — line in accrual/deduction tables */
+/** Per document-type expiry reminder (PersonDocument.docType / catalog doc_types.code) */
+export type DocumentTypeNotificationRule = {
+  id: string;
+  documentTypeCode: string;
+  /** Notify this many days before expiresAt */
+  daysBefore: number;
+  enabled: boolean;
+};
+
+export type DocumentTypeNotificationsSettings = {
+  enabled: boolean;
+  rules: DocumentTypeNotificationRule[];
+};
+
+export const DEFAULT_DOCUMENT_TYPE_NOTIFICATIONS: DocumentTypeNotificationsSettings =
+  {
+    enabled: false,
+    rules: [],
+  };
+
+export function mergeDocumentTypeNotifications(
+  raw: unknown,
+): DocumentTypeNotificationsSettings {
+  const p =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const rulesRaw = Array.isArray(p.rules) ? p.rules : [];
+  const rules: DocumentTypeNotificationRule[] = [];
+  for (const item of rulesRaw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const o = item as Record<string, unknown>;
+    const documentTypeCode = String(o.documentTypeCode || o.docType || '')
+      .trim()
+      .toUpperCase();
+    if (!documentTypeCode) continue;
+    const daysBefore = Math.max(
+      0,
+      Math.min(
+        3650,
+        Math.floor(
+          Number.isFinite(Number(o.daysBefore)) ? Number(o.daysBefore) : 30,
+        ),
+      ),
+    );
+    rules.push({
+      id: String(o.id || '').trim() || `doc-notif-${rules.length + 1}`,
+      documentTypeCode,
+      daysBefore,
+      enabled: typeof o.enabled === 'boolean' ? o.enabled : true,
+    });
+  }
+  return {
+    enabled:
+      typeof p.enabled === 'boolean'
+        ? p.enabled
+        : DEFAULT_DOCUMENT_TYPE_NOTIFICATIONS.enabled,
+    rules,
+  };
+}
+
+/** HR HUB «Настройки рекрутинга» — line in accrual/deduction tables */
 export type RecruitmentPayLine = {
   id: string;
   /** Наименование начисления / удержания */
@@ -115,7 +180,178 @@ export const DEFAULT_RECRUITMENT_SETTINGS: RecruitmentSettings = {
   internshipDeductions: emptyPayLines(2),
 };
 
-/** Verifix «Настройки обязательных полей» */
+/** Retention unit for mark punch photos in system settings. */
+export type MarkPhotoRetentionUnit = 'day' | 'month' | 'year';
+
+export type MarkPhotoKind = 'in' | 'out' | 'mark' | 'estimated_out';
+
+export type MarkPhotoPolicy = {
+  /** When false, new punch photos for this direction are discarded. */
+  enabled: boolean;
+  /** How long to keep stored photos (0 = forever). */
+  retentionValue: number;
+  retentionUnit: MarkPhotoRetentionUnit;
+};
+
+export type MarkPhotosSettings = {
+  in: MarkPhotoPolicy;
+  out: MarkPhotoPolicy;
+  mark: MarkPhotoPolicy;
+  /** Mid-day / «Примерный уход» punches */
+  estimated_out: MarkPhotoPolicy;
+  /**
+   * Compress snapshots from terminals before MinIO (saves disk + speeds ingest).
+   * Applied to all enabled directions.
+   */
+  compress: {
+    enabled: boolean;
+    /** Longest side px (240–1920). */
+    maxEdge: number;
+    /** JPEG quality 30–95. */
+    quality: number;
+  };
+};
+
+export const DEFAULT_MARK_PHOTO_POLICY: MarkPhotoPolicy = {
+  enabled: true,
+  retentionValue: 90,
+  retentionUnit: 'day',
+};
+
+export const DEFAULT_MARK_PHOTO_COMPRESS = {
+  enabled: true,
+  maxEdge: 720,
+  quality: 62,
+} as const;
+
+export const DEFAULT_MARK_PHOTOS_SETTINGS: MarkPhotosSettings = {
+  in: { ...DEFAULT_MARK_PHOTO_POLICY },
+  out: { ...DEFAULT_MARK_PHOTO_POLICY },
+  mark: { ...DEFAULT_MARK_PHOTO_POLICY },
+  estimated_out: { ...DEFAULT_MARK_PHOTO_POLICY },
+  compress: { ...DEFAULT_MARK_PHOTO_COMPRESS },
+};
+
+/** Convert UI retention (day/month/year) to whole days for purge cutoff. */
+export function retentionToDays(
+  value: unknown,
+  unit: unknown,
+): number {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const u = String(unit || 'day').toLowerCase();
+  if (u === 'year') return n * 365;
+  if (u === 'month') return n * 30;
+  return n;
+}
+
+function normalizeMarkPhotoPolicy(raw: unknown): MarkPhotoPolicy {
+  const d = DEFAULT_MARK_PHOTO_POLICY;
+  const o =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const unitRaw = String(o.retentionUnit || d.retentionUnit).toLowerCase();
+  const retentionUnit: MarkPhotoRetentionUnit =
+    unitRaw === 'month' || unitRaw === 'year' || unitRaw === 'day'
+      ? unitRaw
+      : 'day';
+  const retentionValue = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(Number(o.retentionValue))
+        ? Number(o.retentionValue)
+        : d.retentionValue,
+    ),
+  );
+  return {
+    enabled: typeof o.enabled === 'boolean' ? o.enabled : d.enabled,
+    retentionValue,
+    retentionUnit,
+  };
+}
+
+export function mergeMarkPhotosSettings(raw: unknown): MarkPhotosSettings {
+  const p =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const cRaw =
+    p.compress && typeof p.compress === 'object' && !Array.isArray(p.compress)
+      ? (p.compress as Record<string, unknown>)
+      : {};
+  const maxEdge = Math.min(
+    1920,
+    Math.max(
+      240,
+      Math.floor(
+        Number.isFinite(Number(cRaw.maxEdge))
+          ? Number(cRaw.maxEdge)
+          : DEFAULT_MARK_PHOTO_COMPRESS.maxEdge,
+      ),
+    ),
+  );
+  const quality = Math.min(
+    95,
+    Math.max(
+      30,
+      Math.floor(
+        Number.isFinite(Number(cRaw.quality))
+          ? Number(cRaw.quality)
+          : DEFAULT_MARK_PHOTO_COMPRESS.quality,
+      ),
+    ),
+  );
+  return {
+    in: normalizeMarkPhotoPolicy(p.in),
+    out: normalizeMarkPhotoPolicy(p.out),
+    mark: normalizeMarkPhotoPolicy(p.mark),
+    estimated_out: normalizeMarkPhotoPolicy(p.estimated_out),
+    compress: {
+      enabled:
+        typeof cRaw.enabled === 'boolean'
+          ? cRaw.enabled
+          : DEFAULT_MARK_PHOTO_COMPRESS.enabled,
+      maxEdge,
+      quality,
+    },
+  };
+}
+
+/** Map punch direction enum / mark type to markPhotos policy key. */
+export function markPhotoKindFromDirection(
+  direction: string | null | undefined,
+): MarkPhotoKind {
+  const d = String(direction || '').toUpperCase();
+  if (d === 'IN') return 'in';
+  if (d === 'OUT') return 'out';
+  return 'mark';
+}
+
+/** Prefer markType (incl. Примерный уход) when classifying photo policy. */
+export function markPhotoKindFromMarkType(
+  markType: string | null | undefined,
+  direction?: string | null,
+): MarkPhotoKind {
+  const t = String(markType || '')
+    .trim()
+    .toLowerCase();
+  if (
+    t === 'estimated_out' ||
+    t === 'примерный уход' ||
+    t === 'такминий уход' ||
+    t === 'taxminiy' ||
+    t === 'промежуточный уход'
+  ) {
+    return 'estimated_out';
+  }
+  if (t === 'in' || t === 'приход') return 'in';
+  if (t === 'out' || t === 'уход') return 'out';
+  if (t === 'mark' || t === 'отметка') return 'mark';
+  return markPhotoKindFromDirection(direction);
+}
+
+/** HR HUB «Настройки обязательных полей» */
 export type RequiredFieldsSettings = {
   employee: {
     lastName: boolean;
@@ -369,6 +605,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   rotationExpenseAccrual: '',
   hideScheduleInEmployeeCalendar: false,
   showExtraTimeTypesInCalendar: false,
+  documentTypeNotifications: structuredClone(DEFAULT_DOCUMENT_TYPE_NOTIFICATIONS),
 
   employeeVerification: true,
   verificationDataType: 'fio',
@@ -381,7 +618,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   useClearanceSheet: false,
   showInternship: false,
   autoOutAsTripEnd: false,
-  corporateNewsFeed: false,
+  corporateNewsFeed: true,
   optionalGphEndDate: false,
   hrNotifyDocumentDates: false,
   blockOfficialAbsenceIntervals: true,
@@ -407,6 +644,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   timepad: { ...DEFAULT_TIMEPAD_SETTINGS },
   requiredFields: structuredClone(DEFAULT_REQUIRED_FIELDS_SETTINGS),
   recruitment: structuredClone(DEFAULT_RECRUITMENT_SETTINGS),
+  markPhotos: structuredClone(DEFAULT_MARK_PHOTOS_SETTINGS),
 };
 
 function mergeObj<T extends Record<string, unknown>>(base: T, patch: unknown): T {
@@ -517,5 +755,25 @@ export function mergeSystemSettings(raw: unknown): SystemSettings {
   ) as unknown as TimepadSettings;
   merged.requiredFields = mergeRequiredFields(partial.requiredFields);
   merged.recruitment = mergeRecruitment(partial.recruitment);
+  merged.markPhotos = mergeMarkPhotosSettings(partial.markPhotos);
+  merged.documentTypeNotifications = mergeDocumentTypeNotifications(
+    partial.documentTypeNotifications,
+  );
+  // Alias: nested.enabled is source of truth; legacy checkbox follows it unless only legacy was patched
+  if (
+    partial.documentTypeNotifications &&
+    typeof (partial.documentTypeNotifications as { enabled?: unknown })
+      .enabled === 'boolean'
+  ) {
+    merged.hrNotifyDocumentDates = merged.documentTypeNotifications.enabled;
+  } else if (typeof partial.hrNotifyDocumentDates === 'boolean') {
+    merged.documentTypeNotifications = {
+      ...merged.documentTypeNotifications,
+      enabled: partial.hrNotifyDocumentDates,
+    };
+    merged.hrNotifyDocumentDates = partial.hrNotifyDocumentDates;
+  } else {
+    merged.hrNotifyDocumentDates = merged.documentTypeNotifications.enabled;
+  }
   return merged;
 }

@@ -1,4 +1,4 @@
-/** Mega-nav `?dict=` / admin `?panel=` codes → Dictionary seed (Verifix Справочники). */
+/** Mega-nav `?dict=` / admin `?panel=` codes → Dictionary seed (HR HUB Справочники). */
 export type KnownDictItem = {
   code: string;
   name: string;

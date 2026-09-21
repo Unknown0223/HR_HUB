@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { formatMonthRu } from '@/lib/fine-policies';
@@ -85,7 +85,7 @@ function TimesheetsInner() {
   async function load() {
     setError('');
     setLoading(true);
-    try {
+    const attempt = async () => {
       const lookups = await apiFetch<{ divisions?: Opt[] }>('/api/catalog/lookups');
       setDivisions(lookups.divisions || []);
       if (tab === 'corrections') {
@@ -93,8 +93,18 @@ function TimesheetsInner() {
       } else {
         setSheets(await apiFetch<TimesheetSheetRow[]>('/api/payroll/timesheets'));
       }
+    };
+    try {
+      await attempt();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      try {
+        await new Promise((r) => setTimeout(r, 400));
+        await attempt();
+      } catch (e2) {
+        setError(e2 instanceof Error ? e2.message : 'Ошибка загрузки');
+        if (tab === 'corrections') setCorrections([]);
+        else setSheets([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -323,8 +333,6 @@ function TimesheetsInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="timesheet" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-calendar-check" aria-hidden />
@@ -407,23 +415,6 @@ function TimesheetsInner() {
               Создать
             </button>
           )}
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={[
-              { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
-              { type: 'dateRange', label: 'Дата' },
-              {
-                type: 'select',
-                key: 'divisionId',
-                label: 'Подразделение',
-                options: divisions.map((d) => ({ value: d.id, label: d.label })),
-              },
-              { type: 'postedChecks', key: 'posted', label: 'Проведен' },
-            ]}
-          />
           {tab === 'timesheets' ? (
             <button
               type="button"
@@ -437,16 +428,6 @@ function TimesheetsInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <label className={styles.monthFilter}>
-            месяц
-            <input
-              type="month"
-              value={monthFilter ? monthFilter.slice(0, 7) : ''}
-              onChange={(e) =>
-                patchUrl({ month: e.target.value ? `${e.target.value}-01` : null })
-              }
-            />
-          </label>
           <span className={styles.countBadge}>
             {filteredRows.length} /{' '}
             {tab === 'corrections' ? corrections.length : sheets.length}
@@ -504,6 +485,33 @@ function TimesheetsInner() {
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
+      </div>
+
+      <div className={styles.filterBand}>
+        <FilterPanel
+          inline
+          urlSync
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((v) => !v)}
+          fields={[
+            { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
+            { type: 'dateRange', label: 'Период' },
+            {
+              type: 'divisionId',
+              key: 'divisionId',
+              label: 'Подразделение',
+              searchable: true,
+              options: divisions.map((d) => ({ value: d.id, label: d.label })),
+            },
+            { type: 'postedChecks', key: 'posted', label: 'Проведен' },
+          ]}
+        />
+        <MonthPeriodPicker
+          className={styles.monthPicker}
+          label="Месяц"
+          value={monthFilter}
+          onChange={(next) => patchUrl({ month: next })}
+        />
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -642,7 +650,16 @@ function TimesheetsInner() {
                           <td className={styles.dateCell}>{fmtDate(row.docDate)}</td>
                           <td className={styles.docNumber}>{padNumber(row.number) || '—'}</td>
                           <td className={styles.nameCell}>{formatMonthRu(row.month)}</td>
-                          <td className={styles.noteCell}>{row.division?.name || '—'}</td>
+                          <td className={styles.noteCell}>
+                            {row.division?.name ? (
+                              <span className={styles.divisionChip} title={row.division.name}>
+                                <i className="fas fa-sitemap" aria-hidden />
+                                {row.division.name}
+                              </span>
+                            ) : (
+                              <span className={styles.divisionEmpty}>Не указано</span>
+                            )}
+                          </td>
                           <td>
                             {row.status === 'posted' ? (
                               <span className={styles.statusPosted}>Проведен</span>
@@ -730,7 +747,16 @@ function TimesheetsInner() {
                           </td>
                           <td className={styles.docNumber}>{row.number || '—'}</td>
                           <td className={styles.nameCell}>{employeesLabel(row)}</td>
-                          <td className={styles.noteCell}>{row.division?.name || '—'}</td>
+                          <td className={styles.noteCell}>
+                            {row.division?.name ? (
+                              <span className={styles.divisionChip} title={row.division.name}>
+                                <i className="fas fa-sitemap" aria-hidden />
+                                {row.division.name}
+                              </span>
+                            ) : (
+                              <span className={styles.divisionEmpty}>Не указано</span>
+                            )}
+                          </td>
                           <td className={styles.dateCell}>{fmtDate(row.periodFrom)}</td>
                           <td>
                             {row.status === 'posted' ? (

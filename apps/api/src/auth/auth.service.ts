@@ -67,7 +67,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verifix: «Закрыть доступ к системе» — linked employee cannot sign in
+    // HR HUB: «Закрыть доступ к системе» — linked employee cannot sign in
     if (user.tenantId && user.role === Role.employee) {
       const emp = await this.prisma.employee.findFirst({
         where: {
@@ -104,12 +104,20 @@ export class AuthService {
       include: { tenant: true },
     });
     if (!user) throw new UnauthorizedException();
+    const meta =
+      user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
+        ? (user.meta as Record<string, unknown>)
+        : {};
+    const catalogRoleIds = Array.isArray(meta.catalogRoleIds)
+      ? meta.catalogRoleIds.filter((x): x is string => typeof x === 'string')
+      : [];
     return {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
       role: user.role,
       tenantId: user.tenantId,
+      catalogRoleIds,
       tenant: user.tenant
         ? { id: user.tenant.id, code: user.tenant.code, name: user.tenant.name }
         : null,
@@ -117,9 +125,23 @@ export class AuthService {
   }
 
   private tokenResponse(
-    user: { id: string; email: string; role: Role; tenantId: string | null; fullName: string },
+    user: {
+      id: string;
+      email: string;
+      role: Role;
+      tenantId: string | null;
+      fullName: string;
+      meta?: unknown;
+    },
     tenant: { id: string; code: string; name: string } | null,
   ) {
+    const meta =
+      user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
+        ? (user.meta as Record<string, unknown>)
+        : {};
+    const catalogRoleIds = Array.isArray(meta.catalogRoleIds)
+      ? meta.catalogRoleIds.filter((x): x is string => typeof x === 'string')
+      : [];
     const payload = {
       sub: user.id,
       email: user.email,
@@ -134,6 +156,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role,
         tenantId: user.tenantId,
+        catalogRoleIds,
       },
       tenant: tenant
         ? { id: tenant.id, code: tenant.code, name: tenant.name }

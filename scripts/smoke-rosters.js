@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke: Verifix «Расписание» (WorkRoster).
+ * Smoke: HR HUB «Расписание» (WorkRoster).
  * Usage: node scripts/smoke-rosters.js
  */
 const API = process.env.API_URL || 'http://localhost:3001';

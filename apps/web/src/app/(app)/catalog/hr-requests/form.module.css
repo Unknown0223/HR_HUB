@@ -16,7 +16,7 @@
   }
 }
 
-/* Title row matches Verifix: title + actions below, left-aligned */
+/* Title row matches HR HUB: title + actions below, left-aligned */
 .docHead {
   display: flex;
   flex-direction: column;

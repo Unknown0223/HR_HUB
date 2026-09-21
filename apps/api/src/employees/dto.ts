@@ -492,7 +492,7 @@ export class UpdateEmployeeExtraInfoDto {
 }
 
 export class UpdateEmployeeUserSettingsDto {
-  @ApiPropertyOptional({ description: 'Verifix-style user settings payload' })
+  @ApiPropertyOptional({ description: 'Arena-style user settings payload' })
   @IsOptional()
   @IsObject()
   settings?: Record<string, unknown>;

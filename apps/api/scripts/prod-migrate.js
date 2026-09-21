@@ -86,6 +86,17 @@ async function main() {
     await prisma.$disconnect();
   }
 
+  // F12: migrate plaintext password_enc → vault before DROP column migration.
+  const backfill = path.join(__dirname, 'backfill-device-vault.js');
+  if (fs.existsSync(backfill)) {
+    console.log('[prod-migrate] Backfilling device passwords into vault…');
+    execSync(`node "${backfill}"`, {
+      cwd: apiRoot,
+      stdio: 'inherit',
+      env: process.env,
+    });
+  }
+
   runPrisma('migrate deploy');
   console.log('[prod-migrate] Done.');
 }

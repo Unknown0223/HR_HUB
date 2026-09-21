@@ -21,6 +21,10 @@ import { ImportPanel } from '@/components/ImportPanel';
 import { PrintArea } from '@/components/PrintArea';
 import { PrintButton } from '@/components/PrintButton';
 import { StatusBadge } from '@/components/StatusBadge';
+import {
+  PAYROLL_TYPE_OPTIONS,
+  payrollTypeLabel,
+} from '@/lib/payroll-type-labels';
 import styles from '../../../page-shared.module.css';
 
 const LEGACY_ROUTES: Record<string, { list: string; create: string }> = {
@@ -54,16 +58,6 @@ const STATUS_RESOURCES = new Set([
   'payment-orders',
   'payroll-lines',
 ]);
-
-const PAYROLL_TYPE_OPTIONS = [
-  { value: 'base', label: 'base' },
-  { value: 'bonus', label: 'bonus' },
-  { value: 'penalty', label: 'penalty' },
-  { value: 'deduction', label: 'deduction / удержание' },
-  { value: 'overtime', label: 'overtime' },
-  { value: 'other', label: 'other / разовые' },
-  { value: 'advance', label: 'advance' },
-];
 
 type Lookups = Record<string, { id: string; label: string }[]>;
 
@@ -484,6 +478,9 @@ function renderCellValue(
 ) {
   if (col === 'status' && row.status != null && row.status !== '') {
     return <StatusBadge status={String(row.status)} />;
+  }
+  if (col === 'type' && row.type != null && row.type !== '') {
+    return payrollTypeLabel(String(row.type));
   }
   if (col === 'isActive' && row.isActive != null) {
     return <StatusBadge status={rowIsActive(row) ? 'active' : 'closed'} />;

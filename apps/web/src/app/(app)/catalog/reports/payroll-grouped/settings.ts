@@ -4,7 +4,7 @@ export type NamedGroup = {
   itemIds: string[];
 };
 
-/** Verifix «группа итогов»: сложение / вычитание — items, groups, flags */
+/** HR HUB «группа итогов»: сложение / вычитание — items, groups, flags */
 export type TotalSide = {
   itemIds: string[];
   groupIds: string[];
@@ -25,7 +25,7 @@ export type GroupedSettings = {
   divisionGroup: boolean;
   divisionCode: boolean;
   division: boolean;
-  /** Verifix «Отдел» */
+  /** HR HUB «Отдел» */
   orgUnit: boolean;
   position: boolean;
   positionType: boolean;

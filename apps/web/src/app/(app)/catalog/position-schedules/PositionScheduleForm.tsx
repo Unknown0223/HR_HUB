@@ -692,7 +692,7 @@ export function PositionScheduleForm({
                     if (f) void onUpload(f);
                   }}
                 />
-                <span className={styles.muted}>Excel: data + metadata (Verifix)</span>
+                <span className={styles.muted}>Excel: data + metadata (каталог)</span>
               </div>
             ) : null}
 

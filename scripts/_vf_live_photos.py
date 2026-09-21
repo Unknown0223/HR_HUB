@@ -1,6 +1,6 @@
-"""Download Verifix employee face photos (photo_sha) without rewriting rows.
+"""Download HR HUB employee face photos (photo_sha) without rewriting rows.
 
-Saves JPEGs to data/verifix-dump/live/photos/{employee_id}.jpg
+Saves JPEGs to data/catalog-dump/live/photos/{employee_id}.jpg
 Default: working staff (status=W). Pass --all for dismissed too.
 """
 from __future__ import annotations

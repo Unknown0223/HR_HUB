@@ -23,6 +23,7 @@ export type Session = {
     fullName: string;
     role: string;
     tenantId: string | null;
+    catalogRoleIds?: string[];
   };
   tenant: { id: string; code: string; name: string } | null;
 };
@@ -66,10 +67,13 @@ const MEDIA_TOKEN_KEY = 'hrhub_media_at';
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return (
-      sessionStorage.getItem(MEDIA_TOKEN_KEY) ||
-      localStorage.getItem(MEDIA_TOKEN_KEY)
-    );
+    // sessionStorage only — never read JWT from localStorage (XSS surface).
+    try {
+      localStorage.removeItem(MEDIA_TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    return sessionStorage.getItem(MEDIA_TOKEN_KEY);
   } catch {
     return null;
   }
@@ -78,12 +82,12 @@ export function getAccessToken(): string | null {
 export function setMediaAccessToken(token: string | null) {
   if (typeof window === 'undefined') return;
   try {
+    // sessionStorage only. Clear any legacy localStorage copy.
+    localStorage.removeItem(MEDIA_TOKEN_KEY);
     if (!token) {
       sessionStorage.removeItem(MEDIA_TOKEN_KEY);
-      localStorage.removeItem(MEDIA_TOKEN_KEY);
     } else {
       sessionStorage.setItem(MEDIA_TOKEN_KEY, token);
-      localStorage.setItem(MEDIA_TOKEN_KEY, token);
     }
   } catch {
     /* ignore */

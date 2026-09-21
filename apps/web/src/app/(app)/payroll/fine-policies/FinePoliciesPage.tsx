@@ -4,7 +4,6 @@ import { confirm } from '@/lib/dialogs';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -276,8 +275,6 @@ function FinePoliciesInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="policies" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeIncident}`}>
           <i className="fas fa-gavel" aria-hidden />
@@ -328,13 +325,6 @@ function FinePoliciesInner() {
             <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={filterFields}
-          />
         </div>
 
         <div className={styles.rightTools}>
@@ -371,6 +361,16 @@ function FinePoliciesInner() {
             <i className="fas fa-sync-alt" aria-hidden />
           </button>
         </div>
+      </div>
+
+      <div className={styles.filterBand}>
+        <FilterPanel
+          inline
+          urlSync
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((v) => !v)}
+          fields={filterFields}
+        />
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}

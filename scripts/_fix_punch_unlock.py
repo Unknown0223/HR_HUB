@@ -24,13 +24,13 @@ PASS = "Demo1234!"
 # Key people to re-enroll (empNo on device = digits from tab / external)
 KEY_FACES = [
     # (label, employee_id_on_api_or_external, photo_candidates)
-    ("FACE_ANVAR", "1", [Path(r"D:\hr-hub\data\verifix-dump\live\photos\1.jpg")]),
+    ("FACE_ANVAR", "1", [Path(r"D:\hr-hub\data\hrhub-dump\live\photos\1.jpg")]),
     (
         "XAMIDOV",
         "124248",
         [
-            Path(r"D:\hr-hub\data\verifix-dump\live\photos\94110.jpg"),
-            Path(r"D:\hr-hub\data\verifix-dump\live\photos\124248.jpg"),
+            Path(r"D:\hr-hub\data\hrhub-dump\live\photos\94110.jpg"),
+            Path(r"D:\hr-hub\data\hrhub-dump\live\photos\124248.jpg"),
         ],
     ),
 ]

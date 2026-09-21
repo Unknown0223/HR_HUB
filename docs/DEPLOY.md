@@ -77,10 +77,10 @@ cd apps/api && NODE_ENV=production npm run start:prod
 cd apps/web && npm run build && npm run start
 
 # Device gateway
-cd apps/device-gw && uvicorn main:app --host 127.0.0.1 --port 8000
+cd apps/device-gw && uvicorn main:app --host 127.0.0.1 --port 8800
 ```
 
-Put nginx/Caddy on `:443` → web `:3000`, API `:3001` (or path `/api`). Keep NATS / MinIO / Postgres off the public internet.
+Put nginx/Caddy on `:443` → web `:3001`, API `:3002` (or path `/api`). Keep NATS / MinIO / Postgres off the public internet.
 
 ## 5. Punch ingest (prod note)
 
@@ -106,9 +106,45 @@ Soft-purge: delete MinIO object, clear `FaceProfile` photo fields, write `audit_
 1. Login via TLS origin  
 2. Punch without key → 401; with `X-Punch-Key` → 2xx  
 3. Settings → Audit shows admin actions  
-4. `docs/SECURITY_CHECKLIST.md` §8  
+4. Role access: `npm run smoke:role-access` (against API) — grant/revoke matrix  
+5. `docs/SECURITY_CHECKLIST.md` §8  
 
-## 8. Out of scope here
+## 8. Office Link ilovalari (Windows + Android)
+
+Cloud API/Web bilan birga **Link** paketlari API image ichida ship qilinadi:
+
+| Fayl | Qayerda |
+|------|---------|
+| `HRHUB-Link-portable.zip` | `apps/api/assets/office-link/` |
+| `HRHUB-Link-Setup.exe` | same |
+| `HRHUB-Link-Android.apk` | same |
+
+Download (auth + tenant):
+- `GET /api/attendance/office-link/download-bound` — Windows zip (tenant-bound)
+- `GET /api/attendance/office-link/download-android` — Android APK
+
+**Prod env (API):** `DEVICE_LINK_KEY` / `DEVICE_CREDENTIAL_VAULT_KEY` — Link bind + vault.  
+**Local LAN:** `device-gw` ofis PC da qoladi; qarang [RAILWAY.md](./RAILWAY.md) §2–3.
+
+Qayta build (Windows):
+
+```bat
+tools\office-link\BUILD-EXE.bat
+set NOPAUSE=1 && tools\office-link\pack-release.bat
+copy tools\office-link\release\HRHUB-Link-portable.zip apps\api\assets\office-link\
+```
+
+Qayta build (Android):
+
+```bat
+cd apps\office-link-mobile
+flutter build apk --release --no-tree-shake-icons
+copy build\app\outputs\flutter-apk\app-release.apk ..\..\apps\api\assets\office-link\HRHUB-Link-Android.apk
+```
+
+Batafsil: `apps/api/assets/office-link/README.md`
+
+## 9. Out of scope here
 
 - Formal third-party pentest engagement (use checklist + hire separately)  
 - Kubernetes / Helm  

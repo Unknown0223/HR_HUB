@@ -120,12 +120,12 @@ function typeClass(t: string) {
 }
 
 function markPhotoSrc(m: Mark): string | null {
-  // Prefer punch capture snapshot; fall back to employee face for display/reports.
-  return (
-    mediaSrc(m.photoUrl) ||
-    mediaSrc(m.employee?.faceProfile?.photoUrl) ||
-    null
-  );
+  // Punch capture only. For «Примерный уход» never fall back to employee face —
+  // if snapshot was not saved, list stays text-only.
+  const punch = mediaSrc(m.photoUrl);
+  if (punch) return punch;
+  if (m.markType === 'estimated_out') return null;
+  return mediaSrc(m.employee?.faceProfile?.photoUrl) || null;
 }
 
 function markDay(iso: string) {
@@ -165,6 +165,12 @@ function markCell(m: Mark, key: string): string {
   }
 }
 
+/** Values used only for table sort (ISO time, not DD.MM.YYYY display). */
+function markSortValue(m: Mark, key: string): string {
+  if (key === 'time') return m.occurredAt || '';
+  return markCell(m, key);
+}
+
 function MarksInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -182,9 +188,6 @@ function MarksInner() {
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(
-    () => Boolean(filters.employeeId || filters.dateFrom || filters.dateTo),
-  );
   const [confirm, setConfirm] = useState<{
     title: string;
     action: string;
@@ -199,7 +202,7 @@ function MarksInner() {
   const photos = usePhotoLightbox();
 
   const displayRows = useMemo(
-    () => prefs.applySortToRows(rows, markCell),
+    () => prefs.applySortToRows(rows, markSortValue),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- prefs methods read prefs.state
     [rows, prefs.state.sort],
   );
@@ -210,11 +213,22 @@ function MarksInner() {
   const colCount = 1 + visibleCols.length;
 
   const scopeLabel = useMemo(() => {
-    const employeeId = (searchParams?.get('employeeId') || filters.employeeId || '').trim();
+    const employeeRaw = (
+      searchParams?.get('employeeId') ||
+      filters.employeeId ||
+      ''
+    ).trim();
+    const employeeIds = employeeRaw.split(',').map((x) => x.trim()).filter(Boolean);
     const dateFrom = (searchParams?.get('dateFrom') || filters.dateFrom || '').trim();
     const dateTo = (searchParams?.get('dateTo') || filters.dateTo || '').trim();
-    if (!employeeId && !dateFrom && !dateTo) return '';
-    const emp = employees.find((e) => e.id === employeeId)?.name || '';
+    if (!employeeIds.length && !dateFrom && !dateTo) return '';
+    const empNames = employeeIds
+      .map((id) => employees.find((e) => e.id === id)?.name || '')
+      .filter(Boolean);
+    const emp =
+      empNames.length <= 2
+        ? empNames.join(', ')
+        : `${empNames.slice(0, 2).join(', ')} +${empNames.length - 2}`;
     const fmt = (iso: string) => {
       if (!iso) return '';
       const [y, m, d] = iso.split('-');
@@ -224,7 +238,7 @@ function MarksInner() {
       dateFrom && dateTo && dateFrom !== dateTo
         ? `${fmt(dateFrom)} – ${fmt(dateTo)}`
         : fmt(dateFrom || dateTo);
-    return [emp, date].filter(Boolean).join(' В· ');
+    return [emp, date].filter(Boolean).join(' · ');
   }, [employees, filters.dateFrom, filters.dateTo, filters.employeeId, searchParams]);
 
   const checkedIds = useMemo(
@@ -268,8 +282,17 @@ function MarksInner() {
         `/api/attendance/marks?${qs.toString()}`,
       );
       const raw = Array.isArray(data) ? data : data.items || [];
+      const employeeIds = employeeId
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
       const scoped = raw.filter((m) => {
-        if (employeeId && m.employee?.id !== employeeId) return false;
+        if (
+          employeeIds.length &&
+          !employeeIds.includes(String(m.employee?.id || ''))
+        ) {
+          return false;
+        }
         const day = markDay(m.occurredAt);
         if (dateFrom && day && day < dateFrom) return false;
         if (dateTo && day && day > dateTo) return false;
@@ -279,7 +302,7 @@ function MarksInner() {
       setTotal(
         Array.isArray(data)
           ? scoped.length
-          : employeeId || dateFrom || dateTo
+          : employeeIds.length || dateFrom || dateTo
             ? scoped.length
             : data.total || scoped.length,
       );
@@ -497,8 +520,6 @@ function MarksInner() {
           <FilterPanel
             inline
             urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
             fields={[
               { type: 'dateFrom', key: 'dateFrom', label: 'Дата с' },
               { type: 'dateTo', key: 'dateTo', label: 'Дата по' },
@@ -506,27 +527,38 @@ function MarksInner() {
                 type: 'select',
                 key: 'divisionId',
                 label: 'Подразделение',
+                multiple: true,
+                searchable: true,
                 options: divisions.map((d) => ({ value: d.id, label: d.name })),
               },
               {
                 type: 'select',
                 key: 'locationId',
                 label: 'Локация',
+                multiple: true,
+                searchable: true,
                 options: locations.map((l) => ({ value: l.id, label: l.name })),
               },
               {
                 type: 'select',
                 key: 'employeeId',
                 label: 'Физическое лицо',
+                multiple: true,
+                searchable: true,
                 options: employees.map((e) => ({ value: e.id, label: e.name })),
               },
               {
                 type: 'select',
                 key: 'markTypes',
                 label: 'Тип отметки',
-                options: MARK_TYPE_OPTS.map((t) => ({ value: t.key, label: t.label })),
+                multiple: true,
+                searchable: true,
+                options: MARK_TYPE_OPTS.map((t) => ({
+                  value: t.key,
+                  label: t.label,
+                })),
               },
-                          ]}
+            ]}
           />
         </div>
         <div className={styles.rightTools}>
@@ -560,17 +592,6 @@ function MarksInner() {
               ›
             </button>
           </div>
-          <button
-            type="button"
-            className={
-              filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
-            }
-            onClick={() => setFiltersOpen((v) => !v)}
-            title="Фильтр"
-            aria-label="Фильтр"
-          >
-            <i className="fas fa-filter" aria-hidden />
-          </button>
           <button
             type="button"
             className={styles.iconBtn}
@@ -800,15 +821,17 @@ function MarksInner() {
                           return (
                             <td
                               key={key}
-                              className={styles.codeCell}
+                              className={`${styles.codeCell} ${
+                                m.isValid === false || m.clockTamper ? styles.invalid : ''
+                              }`}
                               title={
-                                m.clockTamper
-                                  ? m.note || 'Время терминала скорректировано'
+                                m.clockTamper || m.isValid === false
+                                  ? m.note || 'Подозрительное время терминала'
                                   : undefined
                               }
                             >
                               {fmtDt(m.occurredAt)}
-                              {m.clockTamper ? ' ⚠' : ''}
+                              {m.clockTamper || m.isValid === false ? ' ⚠' : ''}
                             </td>
                           );
                         }

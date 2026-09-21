@@ -22,7 +22,7 @@ API = "https://hr-hubapi-production.up.railway.app"
 GW = "http://127.0.0.1:8800"
 DEVICE = "34b673f8-5b7e-4a81-ba7d-577c408cff72"
 HOST = "192.168.0.116"
-PWD_FILE = Path(r"D:\hr-hub\data\verifix-dump\.device-pwd.tmp")
+PWD_FILE = Path(r"D:\hr-hub\data\hrhub-dump\.device-pwd.tmp")
 
 
 def req(method: str, path: str, body=None, headers=None, base=API, timeout=90):
@@ -170,8 +170,8 @@ def main() -> int:
 
     # Re-enroll key faces
     faces = [
-        ("1", "FACE ANVAR", Path(r"D:\hr-hub\data\verifix-dump\live\photos\1.jpg")),
-        ("124248", "XAMIDOV", Path(r"D:\hr-hub\data\verifix-dump\live\photos\94110.jpg")),
+        ("1", "FACE ANVAR", Path(r"D:\hr-hub\data\hrhub-dump\live\photos\1.jpg")),
+        ("124248", "XAMIDOV", Path(r"D:\hr-hub\data\hrhub-dump\live\photos\94110.jpg")),
     ]
     for emp, name, photo in faces:
         if not photo.exists():

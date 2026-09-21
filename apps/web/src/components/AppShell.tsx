@@ -2,9 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { apiFetch, getAccessToken, getSession, setMediaAccessToken, setSession, Session } from '@/lib/api';
 import { MEGA_NAV, findSectionByPath } from '@/lib/mega-nav';
+import {
+  filterMegaItems,
+  isHrefAllowed,
+  type MyAccess,
+} from '@/lib/role-access';
 import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
 import styles from './shell.module.css';
 
@@ -96,8 +109,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   >([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
-  /** Active category index inside multi-column mega (Verifix fly-out). */
+  /** Active category index inside multi-column mega (HR HUB fly-out). */
   const [megaCatIdx, setMegaCatIdx] = useState(0);
+  const [access, setAccess] = useState<MyAccess | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [megaLeft, setMegaLeft] = useState(0);
   const [megaTop, setMegaTop] = useState(45);
@@ -120,24 +134,36 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     }, 160);
   }, [cancelMegaClose]);
 
-  useEffect(() => {
+  // Sync session from localStorage before first paint — do not wait on /auth/me.
+  useLayoutEffect(() => {
     const s = getSession();
     if (!s) {
       router.replace('/');
       return;
     }
     setLocal(s);
-    // Validate session against API (clears stale Bearer via apiFetch retry) and
-    // hydrate JWT for <img> when cross-origin cookie alone is not enough.
-    void apiFetch<{
+
+    const meP = apiFetch<{
       id: string;
       email: string;
       fullName: string;
       role: string;
       tenantId: string | null;
+      catalogRoleIds?: string[];
       tenant: { id: string; code: string; name: string } | null;
-    }>('/api/auth/me')
-      .then(async (me) => {
+    }>('/api/auth/me');
+
+    const mediaP = getAccessToken()
+      ? Promise.resolve(null)
+      : apiFetch<{ accessToken: string }>('/api/auth/media-token').catch(() => null);
+
+    const accessP = apiFetch<MyAccess>('/api/settings/my-access').catch(() => ({
+      bypass: true,
+      allowed: [] as string[],
+    }));
+
+    void Promise.all([meP, mediaP, accessP])
+      .then(([me, media, myAccess]) => {
         const next: Session = {
           user: {
             id: me.id,
@@ -145,21 +171,27 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             fullName: me.fullName,
             role: me.role,
             tenantId: me.tenantId,
+            catalogRoleIds: me.catalogRoleIds || [],
           },
           tenant: me.tenant ?? s.tenant,
         };
         setSession(next);
         setLocal(next);
-        if (!getAccessToken()) {
-          const r = await apiFetch<{ accessToken: string }>('/api/auth/media-token');
-          if (r?.accessToken) setMediaAccessToken(r.accessToken);
-        }
+        setAccess(myAccess);
+        if (media?.accessToken) setMediaAccessToken(media.accessToken);
       })
       .catch(() => {
         setSession(null);
         router.replace('/');
       });
   }, [router]);
+
+  // Block routes the user is not granted (admins / unconfigured roles bypass).
+  useEffect(() => {
+    if (!session || !access || access.bypass) return;
+    if (isHrefAllowed(pathname, search, access.allowed, false)) return;
+    router.replace('/dashboard');
+  }, [session, access, pathname, search, router]);
 
   useEffect(() => {
     const tick = () =>
@@ -205,11 +237,44 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Warm common routes after shell is up (soft-nav feels instant).
   useEffect(() => {
     if (!session) return;
-    loadNotifications();
-    const id = setInterval(loadNotifications, 60_000);
-    return () => clearInterval(id);
+    const paths = ['/dashboard', '/employees', '/positions', '/news'];
+    for (const p of paths) {
+      try {
+        router.prefetch(p);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [session, router]);
+
+  // Defer notifications so list-page fetches win the first network slot.
+  useEffect(() => {
+    if (!session) return;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const start = () => {
+      void loadNotifications();
+      intervalId = setInterval(() => void loadNotifications(), 60_000);
+    };
+
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(start, { timeout: 2500 });
+    } else {
+      timeoutId = setTimeout(start, 600);
+    }
+
+    return () => {
+      if (idleId !== undefined && typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [session, loadNotifications]);
 
   useEffect(() => {
@@ -547,7 +612,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     return <div className={styles.loading}>Загрузка…</div>;
   }
 
-  const openSection = MEGA_NAV.find((s) => s.id === openId) ?? null;
+  const visibleSections = MEGA_NAV.map((sec) => {
+    const columns = sec.columns
+      .map((col) => ({
+        ...col,
+        items: filterMegaItems(col.items, access, session.user.role),
+      }))
+      .filter((col) => col.items.length > 0);
+    return { ...sec, columns };
+  }).filter((sec) => sec.columns.some((c) => c.items.length > 0));
+
+  const openSection = visibleSections.find((s) => s.id === openId) ?? null;
 
   return (
     <div className={styles.shell}>
@@ -587,7 +662,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </Link>
 
           <nav className={styles.topTabs} aria-label="Основные разделы">
-            {MEGA_NAV.map((sec) => {
+            {visibleSections.map((sec) => {
               const isOpen = openId === sec.id;
               const isRoute = !openId && activeSectionId === sec.id;
               return (
@@ -949,7 +1024,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                   </Link>
                   <a
                     className={styles.dropItemLink}
-                    href="mailto:support@verifix.local?subject=Отзыв%20HR%20HUB"
+                    href="mailto:support@hrhub.local?subject=Отзыв%20HR%20HUB"
                     onClick={() => setProfileOpen(false)}
                   >
                     <i className="fas fa-comment-dots" aria-hidden />
@@ -1140,14 +1215,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <nav className={styles.mobileNav}>
-              {MEGA_NAV.map((sec) => (
+              {visibleSections.map((sec) => (
                 <div key={sec.id} className={styles.mobileSec}>
                   <div className={styles.mobileSecTitle}>{sec.label}</div>
                   {sec.columns.map((col, idx) => {
-                    const items = col.items.filter(
-                      (i) =>
-                        i.badge !== 'platform' || session.user.role === 'platform_admin',
-                    );
+                    const items = col.items;
                     return (
                       <div key={col.title || `mcol-${idx}`}>
                         {col.title ? (
@@ -1203,10 +1275,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               const columns = openSection.columns;
               const catIdx = Math.min(megaCatIdx, Math.max(0, columns.length - 1));
               const activeCol = columns[catIdx] ?? columns[0];
-              const flyItems = (activeCol?.items ?? []).filter(
-                (i) =>
-                  i.badge !== 'platform' || session.user.role === 'platform_admin',
-              );
+              const flyItems = activeCol?.items ?? [];
 
               if (useFlyout) {
                 return (
@@ -1276,13 +1345,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                       <div className={styles.homeMegaHead}>Раздел «Главная»</div>
                       <div className={styles.homeMegaList}>
                         {columns.flatMap((col) =>
-                          col.items
-                            .filter(
-                              (i) =>
-                                i.badge !== 'platform' ||
-                                session.user.role === 'platform_admin',
-                            )
-                            .map((item) => {
+                          col.items.map((item) => {
                               const active = linkActive(pathname, search, item.href);
                               const iconCls =
                                 item.icon === 'news'
@@ -1330,11 +1393,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     </div>
                   ) : (
                     columns.map((col, idx) => {
-                      const items = col.items.filter(
-                        (i) =>
-                          i.badge !== 'platform' ||
-                          session.user.role === 'platform_admin',
-                      );
+                      const items = col.items;
                       return (
                         <div key={col.title || `col-${idx}`} className={styles.megaCol}>
                           {col.title ? (

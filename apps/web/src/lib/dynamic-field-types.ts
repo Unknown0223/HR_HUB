@@ -1,4 +1,4 @@
-/** Verifix data types for dynamic fields */
+/** HR HUB data types for dynamic fields */
 
 export const DYNAMIC_FIELD_TYPES = [
   { value: 'number', label: 'номер' },

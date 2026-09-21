@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke: Verifix-style «Индивидуальные графики» full document lifecycle.
+ * Smoke: Arena-style «Индивидуальные графики» full document lifecycle.
  *
  * Usage:
  *   node scripts/smoke-individual-schedules.js

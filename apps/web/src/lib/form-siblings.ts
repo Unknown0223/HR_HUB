@@ -1,5 +1,5 @@
 /**
- * Verifix formSiblings — second-row subheader links under page title.
+ * HR HUB formSiblings — second-row subheader links under page title.
  * Source: output/run_20260725_222506 clone pages (data-doc-subnav).
  */
 
@@ -13,7 +13,7 @@ export type SiblingGroup = {
   siblings: SiblingLink[];
 };
 
-/** Map Verifix page title → sibling links (HR HUB routes). */
+/** Map HR HUB page title → sibling links (HR HUB routes). */
 export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
   employees: {
     title: 'Сотрудники',
@@ -414,11 +414,23 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     title: 'Организации',
     siblings: [],
   },
+  settings: {
+    title: 'Интеграции',
+    siblings: [
+      { label: 'Внешние системы', href: '/settings?tab=integrations' },
+      { label: 'Telegram Bot', href: '/settings/telegram' },
+      { label: 'Google Form', href: '/settings/google-form' },
+      { label: 'ARTIX', href: '/settings/artix' },
+      { label: 'IIKO', href: '/settings/iiko' },
+      { label: 'Billz', href: '/settings/billz' },
+    ],
+  },
   'settings-admin': {
     title: 'Администрирование',
     siblings: [
       { label: 'Организации', href: '/settings/organizations' },
       { label: 'Пользователи', href: '/settings/users' },
+      { label: 'Роли', href: '/settings/users/roles' },
       { label: 'Регионы', href: '/settings/countries' },
       { label: 'Банки', href: '/settings/banks' },
       { label: 'Быстрый запуск', href: '/settings/quickstart' },
@@ -431,18 +443,31 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     title: '',
     siblings: [
       { label: 'Настройки системы', href: '/settings?tab=main' },
-      { label: 'Кадровый учет', href: '/settings?tab=org' },
       { label: 'Расчет зарплаты', href: '/settings/payroll-calc' },
+      { label: 'Настройки счетов', href: '/settings/account-settings' },
       { label: 'Новостная лента', href: '/news' },
+    ],
+  },
+  'settings-users': {
+    title: 'Пользователи и роли',
+    siblings: [
+      { label: 'Пользователи', href: '/settings/users' },
+      { label: 'Роли', href: '/settings/users/roles' },
     ],
   },
   countries: {
     title: 'Страны',
-    siblings: [],
+    siblings: [
+      { label: 'Регионы', href: '/settings/countries' },
+      { label: 'История', href: '/settings/countries/history' },
+    ],
   },
   'countries-history': {
     title: 'История изменений',
-    siblings: [],
+    siblings: [
+      { label: 'Регионы', href: '/settings/countries' },
+      { label: 'История', href: '/settings/countries/history' },
+    ],
   },
   banks: {
     title: 'Банки',

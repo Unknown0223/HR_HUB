@@ -515,6 +515,12 @@
   outline: none;
 }
 
+.monthPicker {
+  flex: 0 0 auto;
+  min-width: 188px;
+  align-self: center;
+}
+
 @media (max-width: 720px) {
   .wrap {
     padding: 12px 12px 40px;

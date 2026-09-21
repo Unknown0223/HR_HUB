@@ -1,4 +1,4 @@
-/** Verifix «Графики работы» settings stored on WorkSchedule.settings */
+/** HR HUB «Графики работы» settings stored on WorkSchedule.settings */
 
 export type WeekPattern = '6/1' | '5/1' | '5/2';
 
@@ -151,7 +151,7 @@ export function buildYearGrid(
   return grid;
 }
 
-/** Empty / initial grid (all day-off style) matching Verifix create screens */
+/** Empty / initial grid (all day-off style) matching HR HUB create screens */
 export function emptyYearGrid(year: number, kind: ScheduleKind): Record<string, string> {
   const grid: Record<string, string> = {};
   const off =

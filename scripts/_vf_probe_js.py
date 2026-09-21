@@ -1,13 +1,13 @@
 from pathlib import Path
 import urllib.request
 
-OUT = Path(__file__).resolve().parents[1] / "data" / "verifix-dump"
+OUT = Path(__file__).resolve().parents[1] / "data" / "hrhub-dump"
 ua = {"User-Agent": "Mozilla/5.0"}
 urls = [
-    "https://app2.verifix.com/biruni/brand-loader.js?_=20260818T122",
-    "https://app2.verifix.com/biruni/login.js",
-    "https://app2.verifix.com/biruni/app.js",
-    "https://app2.verifix.com/b/session/info",
+    "https://example.invalid/biruni/brand-loader.js?_=20260818T122",
+    "https://example.invalid/biruni/login.js",
+    "https://example.invalid/biruni/app.js",
+    "https://example.invalid/b/session/info",
 ]
 for url in urls:
     name = url.split("/")[-1].split("?")[0]

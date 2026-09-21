@@ -827,7 +827,7 @@ export class HrService {
     return updated;
   }
 
-  /** Verifix actions: complete | cancel | restore | approve | reject */
+  /** HR HUB actions: complete | cancel | restore | approve | reject */
   async applyAbsenceAction(
     tenantId: string,
     id: string,
@@ -969,14 +969,14 @@ export class HrService {
         ...(opts.userId ? [{ createdByUserId: opts.userId }] : []),
       ];
     } else if (scope === 'my_requests' || scope === 'created') {
-      // Verifix «Мои запросы»: so‘rovlar foydalanuvchi tomonidan yaratilgan
+      // HR HUB «Мои запросы»: so‘rovlar foydalanuvchi tomonidan yaratilgan
       if (opts.userId) {
         where.createdByUserId = opts.userId;
       } else {
         where.visibility = 'shared';
       }
     } else if (scope === 'available') {
-      // Verifix «Доступные»: shared/inbox of any status (pending, rejected, …)
+      // HR HUB «Доступные»: shared/inbox of any status (pending, rejected, …)
       where.visibility = { in: ['shared', 'inbox'] };
     } else if (scope === 'to_me') {
       where.visibility = 'inbox';
@@ -2336,7 +2336,7 @@ export class HrService {
       previousDismissedAt: payload.previousDismissedAt ?? emp.dismissedAt,
       previousDismissalReasonId:
         payload.previousDismissalReasonId ?? emp.dismissalReasonId ?? null,
-      // Position history entry (Verifix journal carries from→to)
+      // Position history entry (HR HUB journal carries from→to)
       positionHistory: {
         fromDivisionId: emp.divisionId,
         fromPositionId: emp.positionId,
@@ -2483,7 +2483,7 @@ export class HrService {
     if (doc.status === DocumentLifecycle.cancelled) {
       throw new BadRequestException('Document already cancelled');
     }
-    // Verifix: «Отменить» on posted doc reverses side-effects then voids
+    // HR HUB: «Отменить» on posted doc reverses side-effects then voids
     if (doc.status === DocumentLifecycle.posted) {
       await this.unpostDocument(tenantId, id, userId, cancelledBy);
     }
@@ -2821,7 +2821,7 @@ export class HrService {
       req.type === RequestType.schedule_change ||
       req.type === RequestType.roster_change
     ) {
-      // Verifix «Запрос на изменение расписания»: смена + замещающий сотрудник
+      // HR HUB «Запрос на изменение расписания»: смена + замещающий сотрудник
       if (req.type === RequestType.roster_change) {
         const recommendedId = String(
           payload.recommendedEmployeeId ||
@@ -3025,7 +3025,7 @@ export class HrService {
         return;
       }
 
-      // Verifix «Изменение графика»: per-day work/off marks
+      // HR HUB «Изменение графика»: per-day work/off marks
       const dayRows = Array.isArray(payload.days) ? payload.days : [];
       if (dayRows.length) {
         const emp = await this.prisma.employee.findFirst({
@@ -3118,7 +3118,7 @@ export class HrService {
     }
 
     if (req.type === RequestType.overtime) {
-      // Mark attendance days as needing OT hours in note/status — Verifix posts overtime marks
+      // Mark attendance days as needing OT hours in note/status — HR HUB posts overtime marks
       if (start && end) {
         const days = this.eachDate(start, end);
         const otHours = Number(payload.hours ?? payload.otHours ?? 0);
@@ -3299,7 +3299,7 @@ export class HrService {
     return out;
   }
 
-  // —— Verifix: Заявки на кадровые изменения ——
+  // —— HR HUB: Заявки на кадровые изменения ——
 
   private changeRequestInclude() {
     return {

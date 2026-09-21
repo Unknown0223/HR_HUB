@@ -9,7 +9,7 @@ import {
 export { EMPLOYEE_FIELD_LABELS };
 export type { EmployeeFieldKey, SortDir, SortRule };
 
-/** Resolve a Verifix table field value from an attendance/employee row. */
+/** Resolve a HR HUB table field value from an attendance/employee row. */
 export function cellValue(
   r: AttRowLike,
   key: EmployeeFieldKey,

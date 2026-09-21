@@ -41,6 +41,8 @@ CLI on this Windows machine may be blocked by App Control — use the dashboard:
 | `NODE_ENV` | `production` |
 | `CORS_ORIGIN` | `https://<your-web>.up.railway.app` |
 | `PUNCH_INGEST_API_KEY` | strong random string |
+| `DEVICE_LINK_KEY` | Office Link bind secret (prod majburiy) |
+| `DEVICE_CREDENTIAL_VAULT_KEY` | Device password vault (yoki `DEVICE_LINK_KEY` fallback) |
 | `EMPLOYEE_FORM_INGEST_KEY` | Google Form → employee ingest (`X-Employee-Form-Key`) |
 | `PUNCH_INGEST_RATE_LIMIT_PER_MIN` | `120` |
 | `PORT` | `3001` (or leave Railway default and rely on `PORT`) |
@@ -128,10 +130,21 @@ For production, use a named Cloudflare Tunnel with a fixed hostname instead of a
 |-----------|--------|-----|
 | `device-gw` | LAN PC | ISAPI to private IP |
 | Hikvision | LAN | Hardware |
+| **Office Link (Windows)** | Ofis PC | Pairing, tunnel, face push — download from Web |
+| **Office Link (Android)** | Telefon | Qurilma ulash — APK from Web/API |
 | API / Web / DB | Railway | SaaS |
 | NATS / MinIO | optional | HTTP ingest + data-URL photo fallback work without them |
+
+### Redeploy checklist (to‘liq yangilash)
+
+1. `git push origin main` → Railway `api` + `web` auto-build  
+2. API boot: `prisma migrate deploy` (prod-migrate)  
+3. Web: `NEXT_PUBLIC_API_URL` hali to‘g‘ri ekanini tekshirish  
+4. Link paketlar yangilangan bo‘lsa (`apps/api/assets/office-link/*`) — API redeploy yetarli  
+5. Smoke: login + `smoke:quickstart` + Link download URL  
 
 ## Related
 
 - Compose / VM: `docs/DEPLOY.md`
 - Security: `docs/SECURITY_CHECKLIST.md`
+- Role ACL: `npm run smoke:role-access`  

@@ -1,4 +1,4 @@
-/** Отчетность mega-menu — exact Verifix list (Кадры / Посещения / Зарплата). */
+/** Отчетность mega-menu — exact HR HUB list (Кадры / Посещения / Зарплата). */
 
 export type ReportNavLink = {
   href: string;

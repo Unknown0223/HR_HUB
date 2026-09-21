@@ -7,8 +7,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-DUMP = ROOT / "data" / "verifix-dump" / "transfer" / "hrhub.dump"
-URLF = ROOT / "data" / "verifix-dump" / "_railway_url.txt"
+DUMP = ROOT / "data" / "hrhub-dump" / "transfer" / "hrhub.dump"
+URLF = ROOT / "data" / "hrhub-dump" / "_railway_url.txt"
 u = urlsplit(URLF.read_text(encoding="utf-8").strip())
 if not DUMP.exists():
     raise SystemExit(f"dump yo‘q: {DUMP}")

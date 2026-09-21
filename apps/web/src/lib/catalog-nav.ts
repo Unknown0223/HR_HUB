@@ -1,4 +1,4 @@
-﻿/** Verifix-aligned navigation: existing app routes + catalog resources + reports. */
+﻿/** catalog-aligned navigation: existing app routes + catalog resources + reports. */
 
 import { REPORTS_NAV_FLAT } from './reports-nav';
 
@@ -147,13 +147,19 @@ export const CATALOG_NAV: NavGroup[] = [
       { href: '/settings/iiko-sales', label: 'Продажи IIKO' },
       { href: '/settings/billz', label: 'Настройки Billz 2.0' },
       { href: '/settings/billz-sales', label: 'Продажи Billz 1.0' },
+      { href: '/settings/telegram', label: 'Telegram Bot' },
+      { href: '/settings/google-form', label: 'Google Form (сотрудники)' },
+      { href: '/settings/payroll-calc', label: 'Расчет зарплаты' },
+      { href: '/settings/account-settings', label: 'Настройки счетов' },
+      { href: '/settings?tab=audit', label: 'Аудит (хаб)' },
+      { href: '/settings/audit', label: 'Журнал аудита' },
       { href: '/tenants', label: 'Tenants', badge: 'platform' },
     ],
   },
 ];
 
 /** Field labels for generic catalog forms */
-/** Field labels for generic catalog forms — Russian Verifix 1:1 */
+/** Field labels for generic catalog forms — Russian HR HUB 1:1 */
 export type FieldDef = {
   name: string;
   label: string;

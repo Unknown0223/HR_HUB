@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Prisma, Role, DocumentType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -111,7 +113,12 @@ function authRoleFromMeta(meta: Record<string, unknown>, fallback: Role = Role.e
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SettingsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moduleRef: ModuleRef,
+  ) {}
 
   requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
@@ -173,7 +180,7 @@ export class SettingsService {
     });
     const doneCount = steps.filter((s) => s.done).length;
     return {
-      heading: '#qs:ht:verifix',
+      heading: '#qs:ht:hrhub',
       doneCount,
       total: QUICKSTART_KEYS.length,
       steps,
@@ -295,6 +302,46 @@ export class SettingsService {
           ? patch.timepad
           : {}) as object),
       },
+      markPhotos: (() => {
+        const pr =
+          patch.markPhotos && typeof patch.markPhotos === 'object'
+            ? (patch.markPhotos as Record<string, unknown>)
+            : {};
+        const ex = existing.markPhotos;
+        const kind = (key: 'in' | 'out' | 'mark' | 'estimated_out') => ({
+          ...ex[key],
+          ...((pr[key] && typeof pr[key] === 'object' ? pr[key] : {}) as object),
+        });
+        return {
+          in: kind('in'),
+          out: kind('out'),
+          mark: kind('mark'),
+          estimated_out: kind('estimated_out'),
+          compress: {
+            ...ex.compress,
+            ...((pr.compress && typeof pr.compress === 'object'
+              ? pr.compress
+              : {}) as object),
+          },
+        };
+      })(),
+      documentTypeNotifications: (() => {
+        const pr =
+          patch.documentTypeNotifications &&
+          typeof patch.documentTypeNotifications === 'object'
+            ? (patch.documentTypeNotifications as Record<string, unknown>)
+            : null;
+        if (!pr) return existing.documentTypeNotifications;
+        return {
+          enabled:
+            typeof pr.enabled === 'boolean'
+              ? pr.enabled
+              : existing.documentTypeNotifications.enabled,
+          rules: Array.isArray(pr.rules)
+            ? pr.rules
+            : existing.documentTypeNotifications.rules,
+        };
+      })(),
       requiredFields: (() => {
         const pr =
           patch.requiredFields && typeof patch.requiredFields === 'object'
@@ -337,13 +384,45 @@ export class SettingsService {
       })(),
     });
     const cleaned = mergeSystemSettings(next);
+    const wasEstEnabled = existing.markPhotos?.estimated_out?.enabled !== false;
+    const nowEstEnabled = cleaned.markPhotos?.estimated_out?.enabled !== false;
     extras.system = cleaned as unknown as Prisma.InputJsonValue;
     await this.prisma.tenantSetting.update({
       where: { tenantId },
       data: { extras: extras as Prisma.InputJsonValue },
     });
     await this.audit(tenantId, null, 'system.settings.update', 'TenantSetting', settings.id);
+
+    // Turning off «Примерный уход» photos → strip stored frames immediately.
+    if (wasEstEnabled && !nowEstEnabled) {
+      void this.triggerEstimatedOutPhotoPurge(tenantId);
+    }
+
     return { system: cleaned };
+  }
+
+  private async triggerEstimatedOutPhotoPurge(tenantId: string) {
+    try {
+      // Lazy resolve to avoid Settings ↔ Attendance circular import.
+      const { AttendanceService } = await import(
+        '../attendance/attendance.service'
+      );
+      const attendance = this.moduleRef.get(AttendanceService, {
+        strict: false,
+      });
+      if (attendance?.purgeDisabledEstimatedOutPhotos) {
+        const r = await attendance.purgeDisabledEstimatedOutPhotos(tenantId);
+        this.logger.log(
+          `estimated_out photo purge after settings tenant=${tenantId} purged=${r.purged}`,
+        );
+      }
+    } catch (e) {
+      this.logger.warn(
+        `estimated_out photo purge trigger failed: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
   }
 
   async getPayrollCalc(tenantId: string): Promise<{ payrollCalc: PayrollCalcSettings }> {
@@ -619,6 +698,52 @@ export class SettingsService {
         ? (raw as Record<string, Record<string, boolean>>)
         : {};
     return { grants };
+  }
+
+  /**
+   * Effective page grants for the signed-in user (mega-nav / route gating).
+   * Admins bypass. Users without catalog roles or without any configured
+   * grants keep legacy full access (bypass) so existing tenants stay usable.
+   */
+  async getMyAccess(
+    tenantId: string,
+    user: { userId: string; role: string },
+  ) {
+    if (user.role === 'platform_admin' || user.role === 'tenant_admin') {
+      return { bypass: true, allowed: [] as string[] };
+    }
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { meta: true },
+    });
+    const meta =
+      dbUser?.meta && typeof dbUser.meta === 'object' && !Array.isArray(dbUser.meta)
+        ? (dbUser.meta as Record<string, unknown>)
+        : {};
+    const roleIds = Array.isArray(meta.catalogRoleIds)
+      ? meta.catalogRoleIds.filter((x): x is string => typeof x === 'string')
+      : [];
+    if (!roleIds.length) {
+      return { bypass: true, allowed: [] as string[] };
+    }
+    const { grants } = await this.getRoleAccess(tenantId);
+    let configured = false;
+    const allowed = new Set<string>();
+    for (const rid of roleIds) {
+      const rows = grants[rid];
+      if (!rows || typeof rows !== 'object') continue;
+      const keys = Object.keys(rows);
+      if (keys.length) configured = true;
+      for (const [k, v] of Object.entries(rows)) {
+        if (v && k.endsWith('::*')) {
+          allowed.add(k.slice(0, -3));
+        }
+      }
+    }
+    if (!configured) {
+      return { bypass: true, allowed: [] as string[] };
+    }
+    return { bypass: false, allowed: [...allowed] };
   }
 
   async updateRoleAccess(
@@ -1098,7 +1223,7 @@ export class SettingsService {
   }
 
   /**
-   * Настройки маппинга Excel → персональные документы (Verifix 1:1).
+   * Настройки маппинга Excel → персональные документы (HR HUB 1:1).
    */
   async getPersonDocsImport(tenantId: string) {
     const { settings } = await this.getOrg(tenantId);

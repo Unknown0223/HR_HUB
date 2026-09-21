@@ -1,0 +1,236 @@
+/* Arena month / period picker — replaces native input[type=month] */
+
+.wrap {
+  --mpp-ink: #14213a;
+  --mpp-muted: #64788f;
+  --mpp-line: #e3e9f1;
+  --mpp-accent: #0a85e2;
+  --mpp-accent-soft: rgba(10, 133, 226, 0.1);
+  --mpp-surface: #ffffff;
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 168px;
+  z-index: 5;
+}
+
+.compact {
+  min-width: 178px;
+}
+
+.open {
+  z-index: 40;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mpp-muted);
+  line-height: 1;
+  padding-left: 2px;
+}
+
+.trigger {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--mpp-line);
+  border-radius: 10px;
+  background: var(--mpp-surface);
+  color: var(--mpp-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 30, 54, 0.04);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+
+.trigger:hover {
+  border-color: rgba(10, 133, 226, 0.45);
+  background: #f8fbff;
+}
+
+.open .trigger {
+  border-color: rgba(10, 133, 226, 0.55);
+  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.16);
+}
+
+.triggerIcon {
+  color: var(--mpp-accent);
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.triggerText {
+  flex: 1 1 auto;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.chevron {
+  font-size: 10px;
+  color: var(--mpp-muted);
+  transition: transform 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  color: var(--mpp-accent);
+}
+
+.popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 272px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--mpp-line);
+  background: var(--mpp-surface);
+  box-shadow:
+    0 4px 6px rgba(16, 30, 54, 0.04),
+    0 18px 40px -12px rgba(16, 30, 54, 0.22);
+  animation: mppIn 0.14s ease both;
+}
+
+@keyframes mppIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.yearRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.yearLabel {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--mpp-ink);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.yearNav {
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--mpp-line);
+  border-radius: 9px;
+  background: #f2f5f9;
+  color: var(--mpp-ink);
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.yearNav:hover {
+  background: var(--mpp-accent-soft);
+  border-color: rgba(10, 133, 226, 0.35);
+  color: var(--mpp-accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cell {
+  appearance: none;
+  border: none;
+  background: #f2f5f9;
+  color: #354862;
+  border-radius: 9px;
+  height: 36px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.cell:hover {
+  background: #e8eef6;
+  color: var(--mpp-ink);
+}
+
+.cellToday {
+  box-shadow: inset 0 0 0 1.5px rgba(10, 133, 226, 0.45);
+  color: var(--mpp-accent);
+  background: #edf6fe;
+}
+
+.cellOn {
+  background: var(--mpp-accent);
+  color: #fff;
+  box-shadow: 0 6px 14px -6px rgba(10, 133, 226, 0.65);
+}
+
+.cellOn:hover {
+  background: #0770c2;
+  color: #fff;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--mpp-line);
+}
+
+.footerBtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--mpp-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: color 0.1s ease, background 0.1s ease;
+}
+
+.footerBtn:hover {
+  color: var(--mpp-accent);
+  background: var(--mpp-accent-soft);
+}
+
+.footerPrimary {
+  color: var(--mpp-accent);
+}
+
+.footerPrimary:hover {
+  background: var(--mpp-accent-soft);
+}

@@ -63,8 +63,8 @@ apps/mobile/build-log*.txt
 # Docker volumes (local)
 infra/data/
 
-# Verifix live dump (credentials, employee photos, large JSON)
-data/verifix-dump/
+# HR HUB live dump (credentials, employee photos, large JSON)
+data/catalog-dump/
 
 # Misc
 *.pem
@@ -87,7 +87,20 @@ data/verifix-dump/
 /tools/office-link/build/
 /tools/office-link/release/
 /tools/office-link/**/__pycache__/
+/tools/office-link/**/node_modules/
+/tools/office-link/ui-src/node_modules/
 /tools/office-link/*.log
+
+# Accidental recovery / transcript junk (do not re-add)
+apps/api/scripts/_recovered*
+apps/api/scripts/_extract*
+apps/api/scripts/_find_*
+apps/api/scripts/_page_from_*
+apps/api/scripts/_absences_block*
+apps/api/scripts/_map_src_*
+apps/api/scripts/_normalize_*
+apps/api/scripts/_restore_*
+apps/api/scripts/_check_hot*
 
 # Arena zip extract previews
 _arena-redesign-preview/

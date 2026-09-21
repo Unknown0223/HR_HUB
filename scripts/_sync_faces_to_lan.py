@@ -1,4 +1,4 @@
-"""Sync local Verifix JPEGs to LAN Hikvision via device-gw."""
+"""Sync local HR HUB JPEGs to LAN Hikvision via device-gw."""
 from __future__ import annotations
 
 import base64
@@ -15,8 +15,8 @@ DEVICE = "34b673f8-5b7e-4a81-ba7d-577c408cff72"
 GW = "http://127.0.0.1:8800"
 EMAIL = "admin@demo.local"
 PASSWORD = "Demo1234!"
-PHOTOS = Path(r"D:\hr-hub\data\verifix-dump\live\photos")
-EMP_DUMP = Path(r"D:\hr-hub\data\verifix-dump\live\employees.json")
+PHOTOS = Path(r"D:\hr-hub\data\hrhub-dump\live\photos")
+EMP_DUMP = Path(r"D:\hr-hub\data\hrhub-dump\live\employees.json")
 CONCURRENCY = 3
 
 
@@ -88,12 +88,12 @@ def main() -> int:
     def lookup_railway(vf_id: str) -> dict | None:
         if vf_id in cache:
             return cache[vf_id]
-        q = urllib.parse.quote(f"verifix:{vf_id}")
+        q = urllib.parse.quote(f"hrhub:{vf_id}")
         _c, data = req("GET", f"/api/employees?q={q}&limit=10", headers=auth)
         items = data.get("items") if isinstance(data, dict) else []
         hit = None
         for e in items or []:
-            if str(e.get("externalId")) == f"verifix:{vf_id}":
+            if str(e.get("externalId")) == f"hrhub:{vf_id}":
                 hit = e
                 break
         if not hit:

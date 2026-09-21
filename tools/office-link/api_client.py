@@ -352,3 +352,26 @@ def detect_device(
         body,
         pairing_token=token,
     )
+
+
+def ensure_push(
+    api: str,
+    key: str,
+    tenant: str,
+    *,
+    device_id: str,
+    pairing_token: str | None = None,
+) -> tuple[int, Any]:
+    """POST devices/:id/ensure-push — return hikPush HttpHost config (no rotate)."""
+    did = (device_id or "").strip()
+    if not did:
+        return 0, {"error": "deviceId required"}
+    q = urlencode({"tenantCode": tenant})
+    return api_req(
+        api,
+        "POST",
+        f"/api/attendance/office-link/devices/{did}/ensure-push?{q}",
+        key,
+        None,
+        pairing_token=pairing_token,
+    )

@@ -1,11 +1,11 @@
 'use client';
 import { confirm } from '@/lib/dialogs';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import {
   TablePrefsMenuButton,
@@ -18,14 +18,31 @@ import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { FormModal } from '@/components/FormModal';
-import {
-  PassportScanModal,
-  type PassportScanResult,
-} from '@/components/PassportScanModal';
-import { TelegramJoinPanel } from '@/components/employees/TelegramJoinPanel';
+import type { PassportScanResult } from '@/components/PassportScanModal';
 import modal from '@/components/form-modal.module.css';
 import { useUrlParam } from '@/lib/use-url-state';
-import styles from '../../page-shared.module.css';
+import shared from '../../page-shared.module.css';
+import arena from './page.module.css';
+
+const ImportPanel = dynamic(
+  () =>
+    import('@/components/ImportPanel').then((m) => ({ default: m.ImportPanel })),
+  { ssr: false },
+);
+const PassportScanModal = dynamic(
+  () =>
+    import('@/components/PassportScanModal').then((m) => ({
+      default: m.PassportScanModal,
+    })),
+  { ssr: false },
+);
+const TelegramJoinPanel = dynamic(
+  () =>
+    import('@/components/employees/TelegramJoinPanel').then((m) => ({
+      default: m.TelegramJoinPanel,
+    })),
+  { ssr: false },
+);
 
 type Emp = {
   id: string;
@@ -193,6 +210,7 @@ function cellOf(row: Emp, key: string): string {
 function EmployeesPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const [tab] = useUrlParam('tab', 'active', TABS);
   const filters = useFilterFromUrl(FILTER_KEYS);
   const q = filters.q;
@@ -212,10 +230,8 @@ function EmployeesPageInner() {
     'none' | 'create' | 'attach' | 'import' | 'telegram'
   >('none');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(
-    () => Boolean(q || divisionId || positionId),
-  );
   const hasActiveFilters = Boolean(q.trim() || divisionId || positionId);
+  const [filtersOpen, setFiltersOpen] = useState(hasActiveFilters);
   const [exportBusy, setExportBusy] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -354,6 +370,32 @@ function EmployeesPageInner() {
     }
   }, [searchParams]);
 
+  const createParamHandled = useRef(false);
+
+  function clearCreateParam() {
+    if (searchParams.get('create') !== '1') return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('create');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  function closeCreatePanel() {
+    setPanel('none');
+    resetCreateDraft();
+    clearCreateParam();
+  }
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
+      createParamHandled.current = false;
+      return;
+    }
+    if (createParamHandled.current) return;
+    createParamHandled.current = true;
+    setPanel('create');
+  }, [searchParams]);
+
   const query = useMemo(() => {
     const p = new URLSearchParams(exportQuery);
     p.set('page', String(page));
@@ -387,7 +429,7 @@ function EmployeesPageInner() {
       setExpandedId(null);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
     }
   }
 
@@ -523,7 +565,7 @@ function EmployeesPageInner() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bulk dismiss failed');
+      setError(err instanceof Error ? err.message : 'Массовое увольнение не выполнено');
     } finally {
       setBulkBusy(false);
     }
@@ -569,11 +611,10 @@ function EmployeesPageInner() {
         }),
       });
       form.reset();
-      resetCreateDraft();
-      setPanel('none');
+      closeCreatePanel();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create failed');
+      setError(err instanceof Error ? err.message : 'Не удалось создать');
     } finally {
       setSaving(false);
     }
@@ -610,7 +651,7 @@ function EmployeesPageInner() {
       await load();
       await loadUnattachedPersons();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Attach failed');
+      setError(err instanceof Error ? err.message : 'Не удалось прикрепить');
     } finally {
       setSaving(false);
     }
@@ -623,23 +664,28 @@ function EmployeesPageInner() {
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className={arena.wrap}>
       <PageSubnav groupKey={subnavKey} />
       <TablePrefsModals prefs={prefs} />
 
-      <div className={styles.pageHeader}>
-        <div className={`${styles.pageIconBadge} ${styles.pageIconBadgeHr}`}>
+      <div className={shared.pageHeader}>
+        <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>
           <i className="fas fa-users" aria-hidden />
         </div>
-        <div className={styles.pageHeaderText}>
-          <h1 className={styles.pageTitle}>Сотрудники</h1>
-          <p className={styles.pageSubtitle}>Управление кадровым составом организации</p>
+        <div className={shared.pageHeaderText}>
+          <h1 className={shared.pageTitle}>Сотрудники</h1>
+          <p className={shared.pageSubtitle}>
+            Управление кадровым составом организации
+          </p>
         </div>
-        <div className={styles.pageHeaderActions}>
-          <div className={styles.splitBtn} ref={menuRef}>
+      </div>
+
+      <div className={arena.toolbar}>
+        <div className={arena.leftActions}>
+          <div className={shared.splitBtn} ref={menuRef}>
             <button
               type="button"
-              className={`${styles.btnSuccess} ${styles.splitBtnMain}`}
+              className={arena.createBtn}
               onClick={() => {
                 resetCreateDraft();
                 setPanel('create');
@@ -652,7 +698,7 @@ function EmployeesPageInner() {
             </button>
             <button
               type="button"
-              className={`${styles.btnSuccess} ${styles.splitBtnCaret}`}
+              className={`${shared.btnSuccess} ${shared.splitBtnCaret}`}
               aria-label="Дополнительно"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
@@ -660,7 +706,7 @@ function EmployeesPageInner() {
               ▾
             </button>
             {menuOpen ? (
-              <div className={styles.splitMenu} role="menu">
+              <div className={shared.splitMenu} role="menu">
                 <button type="button" role="menuitem" onClick={openAttach}>
                   Прикрепить
                 </button>
@@ -698,9 +744,28 @@ function EmployeesPageInner() {
               </div>
             ) : null}
           </div>
+        </div>
+
+        <div className={arena.rightTools}>
+          <span className={arena.countBadge}>
+            {rows.length} / {total}
+          </span>
           <button
             type="button"
-            className={styles.btnSecondary}
+            className={
+              filtersOpen || hasActiveFilters
+                ? `${arena.iconBtn} ${arena.iconBtnActive}`
+                : arena.iconBtn
+            }
+            onClick={() => setFiltersOpen((v) => !v)}
+            title="Фильтр"
+            aria-label="Фильтр"
+          >
+            <i className="fas fa-filter" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={arena.toolBtn}
             disabled={exportBusy}
             onClick={() => void exportCsv()}
           >
@@ -708,7 +773,7 @@ function EmployeesPageInner() {
           </button>
           <button
             type="button"
-            className={styles.btnSecondary}
+            className={arena.toolBtn}
             disabled={exportBusy}
             onClick={() => void exportXlsx()}
           >
@@ -716,17 +781,7 @@ function EmployeesPageInner() {
           </button>
           <button
             type="button"
-            className={styles.iconBtn}
-            onClick={() => setFiltersOpen((v) => !v)}
-            title="Фильтр"
-            aria-label="Фильтр"
-            aria-pressed={filtersOpen}
-          >
-            <i className="fas fa-filter" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
+            className={arena.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
@@ -740,29 +795,37 @@ function EmployeesPageInner() {
         </div>
       </div>
 
-      <FilterPanel
-        open={filtersOpen}
-        onToggle={() => setFiltersOpen((v) => !v)}
-        fields={[
-          { type: 'search' },
-          {
-            type: 'divisionId',
-            options: divisions.map((d) => ({ value: d.id, label: d.name })),
-          },
-          {
-            type: 'positionId',
-            options: positions.map((p) => ({ value: p.id, label: p.name })),
-          },
-        ]}
-      />
-
+      {filtersOpen ? (
+        <div className={arena.filterBand}>
+          <FilterPanel
+            inline
+            fields={[
+              { type: 'search', placeholder: 'Поиск…' },
+              {
+                type: 'divisionId',
+                label: 'Подразделение',
+                multiple: true,
+                searchable: true,
+                options: divisions.map((d) => ({ value: d.id, label: d.name })),
+              },
+              {
+                type: 'positionId',
+                label: 'Должность',
+                multiple: true,
+                searchable: true,
+                options: positions.map((p) => ({ value: p.id, label: p.name })),
+              },
+            ]}
+          />
+        </div>
+      ) : null}
       {panel === 'import' ? (
-        <div className={styles.panel} style={{ marginBottom: '1rem' }}>
-          <div className={styles.rowActions} style={{ marginBottom: '0.65rem' }}>
+        <div className={shared.panel} style={{ marginBottom: '1rem' }}>
+          <div className={shared.rowActions} style={{ marginBottom: '0.65rem' }}>
             <strong>Импорт сотрудников</strong>
             <button
               type="button"
-              className={styles.btnGhost}
+              className={shared.btnGhost}
               onClick={() => setPanel('none')}
             >
               Закрыть
@@ -789,16 +852,16 @@ function EmployeesPageInner() {
       ) : null}
 
       {panel === 'telegram' ? (
-        <div className={styles.panel} style={{ marginBottom: '1rem' }}>
-          <div className={styles.rowActions} style={{ marginBottom: '0.65rem' }}>
+        <div className={shared.panel} style={{ marginBottom: '1rem' }}>
+          <div className={shared.rowActions} style={{ marginBottom: '0.65rem' }}>
             <strong>Telegram</strong>
-            <div className={styles.rowActions}>
-              <Link href="/settings/telegram" className={styles.btnSecondary}>
+            <div className={shared.rowActions}>
+              <Link href="/settings/telegram" className={shared.btnSecondary}>
                 Настройки бота
               </Link>
               <button
                 type="button"
-                className={styles.btnGhost}
+                className={shared.btnGhost}
                 onClick={() => setPanel('none')}
               >
                 Закрыть
@@ -810,27 +873,35 @@ function EmployeesPageInner() {
       ) : null}
 
       {selectedIds.length > 0 && tab !== 'dismissed' ? (
-        <div className={styles.rowActions} style={{ marginBottom: '0.85rem' }}>
-          <span className={styles.muted}>{selectedIds.length} выбрано</span>
+        <div className={arena.bulkBar}>
+          <span className={arena.bulkMeta}>
+            Выбрано: <strong>{selectedIds.length}</strong>
+          </span>
           <button
             type="button"
-            className={styles.btnGhost}
+            className={`${arena.bulkBtn} ${arena.bulkDanger}`}
             disabled={bulkBusy}
             onClick={bulkDismiss}
           >
             {bulkBusy ? '…' : 'Массовое увольнение'}
           </button>
+          <button
+            type="button"
+            className={arena.bulkGhost}
+            onClick={() => setSelected({})}
+          >
+            Снять выбор
+          </button>
         </div>
       ) : null}
 
-      {error && panel === 'none' ? <p className={styles.error}>{error}</p> : null}
+      {error && panel === 'none' ? <p className={shared.error}>{error}</p> : null}
 
       <FormModal
         open={panel === 'create'}
         title="Создать сотрудника"
         onClose={() => {
-          setPanel('none');
-          resetCreateDraft();
+          closeCreatePanel();
         }}
         width="lg"
         footer={
@@ -852,8 +923,7 @@ function EmployeesPageInner() {
               type="button"
               className={modal.btnGhost}
               onClick={() => {
-                setPanel('none');
-                resetCreateDraft();
+                closeCreatePanel();
               }}
             >
               Отмена
@@ -1158,7 +1228,7 @@ function EmployeesPageInner() {
         {error && panel === 'attach' ? (
           <p className={modal.error}>{error}</p>
         ) : null}
-        <p className={styles.hint} style={{ marginTop: 0 }}>
+        <p className={shared.hint} style={{ marginTop: 0 }}>
           Прикрепить существующее физическое лицо как сотрудника (таб. номер +
           орг. данные).
         </p>
@@ -1225,20 +1295,20 @@ function EmployeesPageInner() {
           </label>
         </form>
         {persons.length === 0 ? (
-          <p className={styles.muted}>
+          <p className={shared.muted}>
             Нет свободных физлиц.{' '}
-            <Link className={styles.link} href="/catalog/persons">
+            <Link className={shared.link} href="/catalog/persons">
               Создать в «Физические лица»
             </Link>
           </p>
         ) : null}
       </FormModal>
 
-      <div className={styles.panelTable} ref={tableRef}>
-        <table className={styles.dataTable}>
+      <div className={shared.panelTable} ref={tableRef}>
+        <table className={shared.dataTable}>
           <thead>
             <tr>
-              <th className={styles.checkCol}>
+              <th className={shared.checkCol}>
                 <input
                   type="checkbox"
                   checked={
@@ -1266,14 +1336,14 @@ function EmployeesPageInner() {
                   <tr
                     className={
                       expanded
-                        ? `${styles.rowSelected} ${styles.rowActive}`
+                        ? `${shared.rowSelected} ${shared.rowActive}`
                         : undefined
                     }
                     onClick={() => toggleExpand(e.id)}
                     aria-expanded={expanded}
                   >
                     <td
-                      className={styles.checkCol}
+                      className={shared.checkCol}
                       onClick={(ev) => ev.stopPropagation()}
                     >
                       <input
@@ -1294,7 +1364,7 @@ function EmployeesPageInner() {
                         return (
                           <td key={key} onClick={(ev) => ev.stopPropagation()}>
                             <Link
-                              className={styles.link}
+                              className={shared.link}
                               href={`/employees/${e.id}`}
                             >
                               {e.tabNumber}
@@ -1306,12 +1376,12 @@ function EmployeesPageInner() {
                         return (
                           <td key={key} onClick={(ev) => ev.stopPropagation()}>
                             <Link
-                              className={styles.fioCell}
+                              className={shared.fioCell}
                               href={`/employees/${e.id}`}
                             >
                               {photo ? (
                                 <PhotoThumb
-                                  className={styles.avatar}
+                                  className={shared.avatar}
                                   src={photo}
                                   alt=""
                                   width={36}
@@ -1337,33 +1407,33 @@ function EmployeesPageInner() {
                                   )}
                                 />
                               ) : (
-                                <span className={styles.avatarFallback}>
+                                <span className={shared.avatarFallback}>
                                   {initials(e.lastName, e.firstName)}
                                 </span>
                               )}
-                              <span className={styles.fioUpper}>{fio}</span>
+                              <span className={shared.fioUpper}>{fio}</span>
                               {(flags.excludeFromStats ||
                                 flags.marksBlocked ||
                                 flags.systemAccessClosed) && (
                                 <span
-                                  className={styles.flagDots}
+                                  className={shared.flagDots}
                                   title="Ограничения"
                                 >
                                   {flags.excludeFromStats ? (
                                     <span
-                                      className={`${styles.flagDot} ${styles.flagDotMuted}`}
+                                      className={`${shared.flagDot} ${shared.flagDotMuted}`}
                                       title="Исключён из статистики"
                                     />
                                   ) : null}
                                   {flags.marksBlocked ? (
                                     <span
-                                      className={`${styles.flagDot} ${styles.flagDotWarn}`}
+                                      className={`${shared.flagDot} ${shared.flagDotWarn}`}
                                       title="Отметки заблокированы"
                                     />
                                   ) : null}
                                   {flags.systemAccessClosed ? (
                                     <span
-                                      className={`${styles.flagDot} ${styles.flagDotDanger}`}
+                                      className={`${shared.flagDot} ${shared.flagDotDanger}`}
                                       title="Доступ к системе закрыт"
                                     />
                                   ) : null}
@@ -1377,10 +1447,10 @@ function EmployeesPageInner() {
                         <td key={key}>{cellOf(e, key) || '—'}</td>
                       );
                     })}
-                    <td className={styles.actionsCell}>
+                    <td className={shared.actionsCell}>
                       <button
                         type="button"
-                        className={styles.rowExpandToggle}
+                        className={shared.rowExpandToggle}
                         aria-label={expanded ? 'Свернуть' : 'Действия'}
                         aria-expanded={expanded}
                         onClick={(ev) => {
@@ -1393,26 +1463,26 @@ function EmployeesPageInner() {
                     </td>
                   </tr>
                   {expanded ? (
-                    <tr className={styles.rowExpand}>
+                    <tr className={shared.rowExpand}>
                       <td colSpan={colSpan}>
                         <div
-                          className={styles.rowExpandInner}
+                          className={shared.rowExpandInner}
                           onClick={(ev) => ev.stopPropagation()}
                         >
                           <Link
-                            className={styles.rowActionBtn}
+                            className={shared.rowActionBtn}
                             href={`/employees/${e.id}`}
                             onClick={(ev) => ev.stopPropagation()}
                           >
-                            <i className={`fas fa-eye ${styles.rowActionIcon}`} aria-hidden />
+                            <i className={`fas fa-eye ${shared.rowActionIcon}`} aria-hidden />
                             Просмотреть
                           </Link>
                           <button
                             type="button"
                             className={
                               !flags.excludeFromStats
-                                ? `${styles.rowActionBtn} ${styles.rowActionBtnOn}`
-                                : styles.rowActionBtn
+                                ? `${shared.rowActionBtn} ${shared.rowActionBtnOn}`
+                                : shared.rowActionBtn
                             }
                             disabled={busy}
                             onClick={(ev) => {
@@ -1423,7 +1493,7 @@ function EmployeesPageInner() {
                             }}
                           >
                             <i
-                              className={`fas fa-check-circle ${styles.rowActionIcon}`}
+                              className={`fas fa-check-circle ${shared.rowActionIcon}`}
                               aria-hidden
                             />
                             Включить в статистику
@@ -1432,8 +1502,8 @@ function EmployeesPageInner() {
                             type="button"
                             className={
                               flags.marksBlocked
-                                ? `${styles.rowActionBtn} ${styles.rowActionBtnOn}`
-                                : styles.rowActionBtn
+                                ? `${shared.rowActionBtn} ${shared.rowActionBtnOn}`
+                                : shared.rowActionBtn
                             }
                             disabled={busy}
                             onClick={(ev) => {
@@ -1444,7 +1514,7 @@ function EmployeesPageInner() {
                             }}
                           >
                             <i
-                              className={`fas fa-ban ${styles.rowActionIcon}`}
+                              className={`fas fa-ban ${shared.rowActionIcon}`}
                               aria-hidden
                             />
                             Блокировать отметки
@@ -1453,8 +1523,8 @@ function EmployeesPageInner() {
                             type="button"
                             className={
                               flags.systemAccessClosed
-                                ? `${styles.rowActionBtn} ${styles.rowActionBtnOn}`
-                                : styles.rowActionBtn
+                                ? `${shared.rowActionBtn} ${shared.rowActionBtnOn}`
+                                : shared.rowActionBtn
                             }
                             disabled={busy}
                             onClick={(ev) => {
@@ -1465,34 +1535,34 @@ function EmployeesPageInner() {
                             }}
                           >
                             <i
-                              className={`fas fa-key ${styles.rowActionIcon}`}
+                              className={`fas fa-key ${shared.rowActionIcon}`}
                               aria-hidden
                             />
                             Закрыть доступ
                           </button>
                           <Link
-                            className={styles.rowActionBtn}
+                            className={shared.rowActionBtn}
                             href={`/employees/${e.id}/reports/attendance`}
                             onClick={(ev) => ev.stopPropagation()}
                           >
-                            <i className={`fas fa-file-alt ${styles.rowActionIcon}`} aria-hidden />
+                            <i className={`fas fa-file-alt ${shared.rowActionIcon}`} aria-hidden />
                             Отчет по посещениям
                           </Link>
                           <Link
-                            className={styles.rowActionBtn}
+                            className={shared.rowActionBtn}
                             href={`/employees/${e.id}/reports/attendance?view=settings`}
                             onClick={(ev) => ev.stopPropagation()}
                           >
-                            <i className={`fas fa-cog ${styles.rowActionIcon}`} aria-hidden />
+                            <i className={`fas fa-cog ${shared.rowActionIcon}`} aria-hidden />
                             Настройки отчета
                           </Link>
                           <Link
-                            className={styles.rowActionBtn}
+                            className={shared.rowActionBtn}
                             href={`/employees/${e.id}/reports/discipline`}
                             onClick={(ev) => ev.stopPropagation()}
                           >
                             <i
-                              className={`fas fa-file-medical ${styles.rowActionIcon}`}
+                              className={`fas fa-file-medical ${shared.rowActionIcon}`}
                               aria-hidden
                             />
                             Отчет по дисциплине
@@ -1507,7 +1577,7 @@ function EmployeesPageInner() {
             {displayed.length === 0 ? (
               <tr>
                 <td colSpan={colSpan}>
-                  <div className={styles.empty}>
+                  <div className={shared.empty}>
                     {hasActiveFilters
                       ? 'По выбранным фильтрам ничего не найдено — измените условия или нажмите «Сбросить».'
                       : 'Сотрудники не найдены — нажмите «Создать» или «Прикрепить».'}
@@ -1517,16 +1587,16 @@ function EmployeesPageInner() {
             ) : null}
           </tbody>
         </table>
-        <div className={styles.pager}>
+        <div className={shared.pager}>
           <button
             type="button"
-            className={styles.pagerBtn}
+            className={shared.pagerBtn}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             ←
           </button>
-          <span className={styles.pagerMeta}>
+          <span className={shared.pagerMeta}>
             <select
               value={pageSize}
               aria-label="Размер страницы"
@@ -1545,7 +1615,7 @@ function EmployeesPageInner() {
           </span>
           <button
             type="button"
-            className={styles.pagerBtn}
+            className={shared.pagerBtn}
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
@@ -1560,7 +1630,7 @@ function EmployeesPageInner() {
 
 export default function EmployeesPage() {
   return (
-    <Suspense fallback={<div className={styles.wrap}>Загрузка…</div>}>
+    <Suspense fallback={<div className={arena.wrap}>Загрузка…</div>}>
       <EmployeesPageInner />
     </Suspense>
   );

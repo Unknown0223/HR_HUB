@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -24,7 +24,9 @@ import shared from '../../../page-shared.module.css';
 const PATH = '/payroll/accruals';
 const PAGE_SIZE = 50;
 const COL_COUNT = 9;
-const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'kind', 'month'] as const;
+const FILTER_KEYS = ['q', 'number', 'posted', 'from', 'to', 'kind', 'month', 'divisionId'] as const;
+
+type DivOpt = { id: string; label: string };
 
 function AccrualsInner() {
   const router = useRouter();
@@ -43,25 +45,47 @@ function AccrualsInner() {
   const [searchDraft, setSearchDraft] = useState(q);
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(
-    Boolean(filters.number || filters.posted || filters.kind || filters.from || filters.to),
-  );
+  const [divisions, setDivisions] = useState<DivOpt[]>([]);
 
   async function load() {
     setError('');
     setLoading(true);
-    try {
+    const path =
+      tab === 'orders' ? '/api/catalog/payment-orders' : '/api/payroll/accruals';
+    const attempt = async () => {
       if (tab === 'orders') {
-        setOrders(await apiFetch('/api/catalog/payment-orders'));
+        setOrders(await apiFetch(path));
       } else {
-        setRows(await apiFetch<AccrualDoc[]>('/api/payroll/accruals'));
+        setRows(await apiFetch<AccrualDoc[]>(path));
       }
+    };
+    try {
+      await attempt();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      // One retry — covers brief API restarts during nest --watch recompile
+      try {
+        await new Promise((r) => setTimeout(r, 400));
+        await attempt();
+      } catch (e2) {
+        setError(e2 instanceof Error ? e2.message : 'Ошибка загрузки');
+        if (tab === 'orders') setOrders([]);
+        else setRows([]);
+      }
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const lookups = await apiFetch<{ divisions?: DivOpt[] }>('/api/catalog/lookups');
+        setDivisions(lookups.divisions || []);
+      } catch {
+        setDivisions([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     void load();
@@ -88,6 +112,9 @@ function AccrualsInner() {
       if (filters.posted === 'yes' && r.status !== 'posted') return false;
       if (filters.posted === 'no' && r.status === 'posted') return false;
       if (month && !String(r.month).startsWith(month.slice(0, 7))) return false;
+      if (filters.divisionId && r.divisionId !== filters.divisionId && r.division?.id !== filters.divisionId) {
+        return false;
+      }
       if (filters.from && r.docDate.slice(0, 10) < filters.from) return false;
       if (filters.to && r.docDate.slice(0, 10) > filters.to) return false;
       if (!qq) return true;
@@ -195,8 +222,6 @@ function AccrualsInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="accruals" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-coins" aria-hidden />
@@ -251,56 +276,12 @@ function AccrualsInner() {
               Создать
             </Link>
           )}
-          {tab === 'accruals' ? (
-            <FilterPanel
-              inline
-              urlSync
-              open={filtersOpen}
-              onToggle={() => setFiltersOpen((v) => !v)}
-              fields={[
-                { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
-                { type: 'dateRange', label: 'Дата' },
-                {
-                  type: 'select',
-                  key: 'kind',
-                  label: 'Тип документа',
-                  options: ACCRUAL_KINDS.map((k) => ({ value: k.value, label: k.label })),
-                },
-                { type: 'postedChecks', key: 'posted', label: 'Проведен' },
-              ]}
-            />
-          ) : null}
         </div>
 
         <div className={styles.rightTools}>
-          {tab === 'accruals' ? (
-            <label className={styles.monthFilter}>
-              месяц
-              <input
-                type="month"
-                value={filters.month ? filters.month.slice(0, 7) : ''}
-                onChange={(e) =>
-                  patchUrl({ month: e.target.value ? `${e.target.value}-01` : null })
-                }
-              />
-            </label>
-          ) : null}
           <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>
-          {tab === 'accruals' ? (
-            <button
-              type="button"
-              className={
-                filtersOpen ? `${styles.iconBtn} ${styles.iconBtnActive}` : styles.iconBtn
-              }
-              onClick={() => setFiltersOpen((v) => !v)}
-              title="Фильтр"
-              aria-label="Фильтр"
-            >
-              <i className="fas fa-filter" aria-hidden />
-            </button>
-          ) : null}
           <button
             type="button"
             className={styles.iconBtn}
@@ -344,6 +325,41 @@ function AccrualsInner() {
           </button>
         </div>
       </div>
+
+      {tab === 'accruals' ? (
+        <div className={styles.filterBand}>
+          <FilterPanel
+            inline
+            urlSync
+            fields={[
+              { type: 'text', key: 'number', label: 'Номер', placeholder: 'Поиск...' },
+              { type: 'dateRange', label: 'Период' },
+              {
+                type: 'divisionId',
+                key: 'divisionId',
+                label: 'Подразделение',
+                searchable: true,
+                options: divisions.map((d) => ({ value: d.id, label: d.label })),
+              },
+              {
+                type: 'select',
+                key: 'kind',
+                label: 'Тип документа',
+                multiple: false,
+                searchable: true,
+                options: ACCRUAL_KINDS.map((k) => ({ value: k.value, label: k.label })),
+              },
+              { type: 'postedChecks', key: 'posted', label: 'Проведен' },
+            ]}
+          />
+          <MonthPeriodPicker
+            className={styles.monthPicker}
+            label="Месяц начисления"
+            value={filters.month}
+            onChange={(next) => patchUrl({ month: next })}
+          />
+        </div>
+      ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
@@ -516,7 +532,16 @@ function AccrualsInner() {
                         <td>{kindLabel(row.kind)}</td>
                         <td className={styles.numCell}>{money(row.accruedTotal)}</td>
                         <td className={styles.numCell}>{money(row.deductedTotal)}</td>
-                        <td className={styles.noteCell}>{row.division?.name || '—'}</td>
+                        <td className={styles.noteCell}>
+                          {row.division?.name ? (
+                            <span className={styles.divisionChip} title={row.division.name}>
+                              <i className="fas fa-sitemap" aria-hidden />
+                              {row.division.name}
+                            </span>
+                          ) : (
+                            <span className={styles.divisionEmpty}>Не указано</span>
+                          )}
+                        </td>
                         <td>
                           {row.status === 'posted' ? (
                             <span className={styles.statusPosted}>Проведен</span>

@@ -400,7 +400,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
     const histPaged = histFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
     return (
       <div className={styles.wrap}>
-        <PageSubnav group={{ title: 'История изменений', siblings: [] }} />
+        <PageSubnav groupKey="countries-history" />
 
         <div className={shared.pageHeader}>
           <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeDoc}`}>
@@ -455,7 +455,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
                     Пользователь: h.meta?.userName || '',
                     'Тип события': histEventLabel(h.action),
                     Организация: orgName,
-                    Продукт: 'Verifix',
+                    Продукт: 'HR HUB',
                   })),
                 )
               }
@@ -516,7 +516,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
                       <td>{h.meta?.userName || '—'}</td>
                       <td>{histEventLabel(h.action)}</td>
                       <td>{orgName}</td>
-                      <td>Verifix</td>
+                      <td>HR HUB</td>
                     </tr>
                   );
                 })
@@ -606,6 +606,16 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
             <i className="fas fa-plus" aria-hidden />
             Создать
           </button>
+          {!oblastsView ? (
+            <button
+              type="button"
+              className={styles.exportBtn}
+              onClick={() => router.push(`${PATH}/history`)}
+            >
+              <i className="fas fa-history" aria-hidden />
+              История
+            </button>
+          ) : null}
           <FilterPanel
             inline
             urlSync

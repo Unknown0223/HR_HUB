@@ -6,6 +6,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { EmployeePickModal } from '@/components/EmployeePickModal';
 import { toPickItems } from '@/components/employee-pick';
 import { apiFetch } from '@/lib/api';
+import shared from '../../../page-shared.module.css';
 import styles from './form.module.css';
 
 type EmpOpt = { id: string; label: string; divisionId?: string; tabNumber?: string; positionName?: string };
@@ -422,8 +423,48 @@ function TimesheetCorrectionFormInner({
 
   const body = (
     <>
-      <div className={styles.docHead}>
-        {!embedded ? <h1 className={styles.docTitle}>{pageTitle}</h1> : null}
+      {!embedded ? (
+        <div className={shared.pageHeader}>
+          <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeTimesheet}`}>
+            <i className="fas fa-clock" aria-hidden />
+          </div>
+          <div className={shared.pageHeaderText}>
+            <h1 className={shared.pageTitle}>{pageTitle}</h1>
+            <p className={shared.pageSubtitle}>
+              {readOnly
+                ? status === 'posted'
+                  ? 'Документ проведён — только просмотр'
+                  : 'Документ отменён — только просмотр'
+                : batch
+                  ? 'Корректировка за период · часы по сотрудникам'
+                  : 'Ручная корректировка учёта рабочего времени'}
+            </p>
+          </div>
+          <div className={shared.pageHeaderActions}>
+            <div className={styles.docActions}>
+              <button
+                type="button"
+                className={styles.primary}
+                disabled={saving || posting || readOnly}
+                onClick={() => void save(false)}
+              >
+                {saving && !posting ? 'Сохранение…' : 'Сохранить'}
+              </button>
+              <button
+                type="button"
+                className={styles.primary}
+                disabled={saving || posting || readOnly}
+                onClick={() => void onPost()}
+              >
+                {posting ? 'Проведение…' : 'Провести'}
+              </button>
+              <button type="button" className={styles.ghost} onClick={close}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div className={styles.docActions}>
           <button
             type="button"
@@ -445,17 +486,17 @@ function TimesheetCorrectionFormInner({
             Закрыть
           </button>
         </div>
-      </div>
+      )}
 
       {error ? <p className={styles.error}>{error}</p> : null}
-      {readOnly ? (
+      {readOnly && embedded ? (
         <p className={styles.banner}>
           Документ {status === 'posted' ? 'проведён' : 'отменён'} — только просмотр
         </p>
       ) : null}
 
       <div className={styles.formCard}>
-        <div className={styles.twoCol}>
+        <div className={styles.formGrid}>
           <div className={styles.col}>
             <label>
               Дата документа
@@ -491,7 +532,7 @@ function TimesheetCorrectionFormInner({
                   ))}
                 </select>
               </label>
-              <label className={styles.switchLabel}>
+              <label className={styles.check}>
                 <input
                   type="checkbox"
                   checked={Boolean(policy.filterByDepartments)}
@@ -546,30 +587,24 @@ function TimesheetCorrectionFormInner({
                 onChange={(e) => setPolicy((p) => ({ ...p, outsideLimit: e.target.value }))}
               />
             </label>
-            <label className={styles.switchLabel}>
-              <span>Обеденное время</span>
-              <span className={styles.switchRight}>
-                Учитывать
-                <input
-                  type="checkbox"
-                  checked={Boolean(policy.countLunch)}
-                  disabled={readOnly}
-                  onChange={(e) => setPolicy((p) => ({ ...p, countLunch: e.target.checked }))}
-                />
-              </span>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={Boolean(policy.countLunch)}
+                disabled={readOnly}
+                onChange={(e) => setPolicy((p) => ({ ...p, countLunch: e.target.checked }))}
+              />
+              Учитывать обеденное время
             </label>
             <div className={styles.rowWithToggle}>
-              <label className={styles.switchLabel}>
-                <span>До работы</span>
-                <span className={styles.switchRight}>
-                  Учитывать
-                  <input
-                    type="checkbox"
-                    checked={Boolean(policy.countBefore)}
-                    disabled={readOnly}
-                    onChange={(e) => setPolicy((p) => ({ ...p, countBefore: e.target.checked }))}
-                  />
-                </span>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(policy.countBefore)}
+                  disabled={readOnly}
+                  onChange={(e) => setPolicy((p) => ({ ...p, countBefore: e.target.checked }))}
+                />
+                Учитывать до работы
               </label>
               <label className={styles.grow}>
                 Мин. и макс. время до графика
@@ -581,17 +616,14 @@ function TimesheetCorrectionFormInner({
               </label>
             </div>
             <div className={styles.rowWithToggle}>
-              <label className={styles.switchLabel}>
-                <span>После работы</span>
-                <span className={styles.switchRight}>
-                  Учитывать
-                  <input
-                    type="checkbox"
-                    checked={Boolean(policy.countAfter)}
-                    disabled={readOnly}
-                    onChange={(e) => setPolicy((p) => ({ ...p, countAfter: e.target.checked }))}
-                  />
-                </span>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(policy.countAfter)}
+                  disabled={readOnly}
+                  onChange={(e) => setPolicy((p) => ({ ...p, countAfter: e.target.checked }))}
+                />
+                Учитывать после работы
               </label>
               <label className={styles.grow}>
                 Мин. и макс. время после графика
@@ -627,18 +659,19 @@ function TimesheetCorrectionFormInner({
           </div>
         ) : null}
         <div className={styles.linesToolbar}>
-          <div className={styles.linesLeft}>
+          <div className={styles.lineActions}>
             <button
               type="button"
-              className={styles.secondary}
+              className={styles.lineBtn}
               disabled={readOnly}
               onClick={() => addLine()}
             >
+              <i className="fas fa-plus" aria-hidden />
               Добавить
             </button>
             <button
               type="button"
-              className={styles.secondary}
+              className={styles.lineBtn}
               disabled={readOnly || filling}
               onClick={() => void fillFromDivision()}
             >
@@ -650,53 +683,34 @@ function TimesheetCorrectionFormInner({
               disabled={readOnly}
               onClick={() => setPickOpen(true)}
             >
+              <i className="fas fa-user-check" aria-hidden />
               {batch ? 'Подбор' : 'Выбрать'}
             </button>
             {batch ? (
               <>
-                <button type="button" className={styles.secondary} disabled={readOnly}>
-                  Вне графика -&gt; Явка
+                <button type="button" className={styles.lineBtn} disabled={readOnly}>
+                  Вне графика → Явка
                 </button>
-                <button type="button" className={styles.secondary} disabled={readOnly}>
-                  Вне графика -&gt; Сверхурочно
+                <button type="button" className={styles.lineBtn} disabled={readOnly}>
+                  Вне графика → Сверхурочно
                 </button>
                 <div style={{ position: 'relative' }}>
                   <button
                     type="button"
-                    className={styles.secondary}
+                    className={styles.lineBtn}
                     disabled={readOnly}
                     onClick={() => setPlanMenu((v) => !v)}
                   >
                     Наполнение плана
                   </button>
                   {planMenu ? (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        zIndex: 20,
-                        background: '#fff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: 6,
-                        minWidth: 260,
-                        boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
-                      }}
-                    >
+                    <div className={styles.planMenu}>
                       {['До графика', 'После графика', 'Сверхурочные с ежемесячным лимитом'].map(
                         (label) => (
                           <button
                             key={label}
                             type="button"
-                            style={{
-                              display: 'block',
-                              width: '100%',
-                              textAlign: 'left',
-                              border: 'none',
-                              background: 'transparent',
-                              padding: '0.45rem 0.7rem',
-                              cursor: 'pointer',
-                            }}
+                            className={styles.planMenuItem}
                             onClick={() => setPlanMenu(false)}
                           >
                             {label}
@@ -718,12 +732,15 @@ function TimesheetCorrectionFormInner({
               </button>
             ) : null}
           </div>
-          <input
-            className={styles.search}
-            placeholder="Поиск..."
-            value={lineSearch}
-            onChange={(e) => setLineSearch(e.target.value)}
-          />
+          <div className={styles.searchWrap}>
+            <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden />
+            <input
+              className={styles.search}
+              placeholder="Поиск…"
+              value={lineSearch}
+              onChange={(e) => setLineSearch(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className={styles.tableWrap}>
@@ -840,7 +857,7 @@ function TimesheetCorrectionFormInner({
     </>
   );
 
-  if (embedded) return <div className={styles.wrap}>{body}</div>;
+  if (embedded) return <div className={`${styles.wrap} ${styles.wrapEmbedded}`}>{body}</div>;
 
   return (
     <div className={styles.wrap}>

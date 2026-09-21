@@ -13,7 +13,7 @@ export const KIND_LABELS: Record<HrChangeKind, string> = {
   dismiss: 'Увольнение',
 };
 
-/** Verifix page titles: «Заявка на … (создание|изменение|просмотр)» */
+/** HR HUB page titles: «Заявка на … (создание|изменение|просмотр)» */
 export function formPageTitle(
   kind: HrChangeKind,
   mode: 'create' | 'edit',

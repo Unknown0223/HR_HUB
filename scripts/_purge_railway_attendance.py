@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-src = ROOT / "data" / "verifix-dump" / "_railway_url.txt"
+src = ROOT / "data" / "hrhub-dump" / "_railway_url.txt"
 if not src.exists():
     raise SystemExit("_railway_url.txt yo‘q")
 

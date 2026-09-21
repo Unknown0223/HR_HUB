@@ -682,7 +682,7 @@ function IikoInner({ section }: { section: IikoSection }) {
                   checked={Boolean(cfg.sendPin)}
                   onChange={(e) => patchCfg({ sendPin: e.target.checked })}
                 />
-                Отправлять ПИН сотрудника в Verifix, как пин-код сотрудника в IIKO
+                Отправлять ПИН сотрудника в HR HUB, как пин-код сотрудника в IIKO
               </label>
             </>
           ) : null}
@@ -863,7 +863,7 @@ function IikoInner({ section }: { section: IikoSection }) {
                 'iiko-positions.csv',
                 filteredPositions.map((p) => ({
                   Должность: p.iikoName,
-                  'Должность Verifix': p.positionName || '',
+                  'Должность HR HUB': p.positionName || '',
                   'Сопоставлено с должностью': p.positionId ? 'Да' : 'Нет',
                 })),
               ),
@@ -892,7 +892,7 @@ function IikoInner({ section }: { section: IikoSection }) {
                   />
                 </th>
                 <th>Должность</th>
-                <th>Должность Verifix</th>
+                <th>Должность HR HUB</th>
                 <th>Сопоставлено с должностью</th>
               </tr>
             </thead>
@@ -982,7 +982,7 @@ function IikoInner({ section }: { section: IikoSection }) {
                 'iiko-divisions.csv',
                 filteredDivs.map((d) => ({
                   Подразделение: d.iikoName,
-                  'Подразделение Verifix': d.divisionName || '',
+                  'Подразделение HR HUB': d.divisionName || '',
                   'Сопоставлено с подразделением': d.divisionId ? 'Да' : 'Нет',
                 })),
               ),
@@ -1011,7 +1011,7 @@ function IikoInner({ section }: { section: IikoSection }) {
                   />
                 </th>
                 <th>Подразделение</th>
-                <th>Подразделение Verifix</th>
+                <th>Подразделение HR HUB</th>
                 <th>Сопоставлено с подразделением</th>
               </tr>
             </thead>

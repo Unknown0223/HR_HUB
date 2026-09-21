@@ -25,17 +25,45 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // Security headers (CSP disabled — Swagger + Next cross-origin in lab)
+  const isProd = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean) ?? ['http://localhost:3001'];
+
+  // Security headers. CSP: Swagger UI needs inline + jsdelivr; JSON API responses are fine.
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          objectSrc: ["'none'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdn.jsdelivr.net',
+            'https://unpkg.com',
+          ],
+          scriptSrcAttr: ["'none'"],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdn.jsdelivr.net',
+            'https://unpkg.com',
+            'https://fonts.googleapis.com',
+          ],
+          connectSrc: ["'self'", ...corsOrigins],
+          frameSrc: ["'self'"],
+          upgradeInsecureRequests: isProd ? [] : null,
+        },
+      },
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
 
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',')
-    .map((s) => s.trim())
-    .filter(Boolean) ?? ['http://localhost:3001'];
   app.set('trust proxy', 1);
   app.enableCors({
     origin: corsOrigins,
@@ -56,10 +84,9 @@ async function bootstrap() {
     'dev-secret',
     'change-me-phase0-dev-secret-min-32-chars!!',
   ]);
-  const isProd = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
-  if (weakSecrets.has(jwtSecret) || jwtSecret.length < 24) {
+  if (weakSecrets.has(jwtSecret) || jwtSecret.length < (isProd ? 32 : 24)) {
     const msg =
-      'JWT_SECRET is missing/weak. Set a long random secret before production.';
+      'JWT_SECRET is missing/weak. Set a long random secret before production (≥32).';
     if (isProd) {
       throw new Error(msg);
     }
@@ -69,6 +96,23 @@ async function bootstrap() {
   if (isProd && !(process.env.PUNCH_INGEST_API_KEY ?? '').trim()) {
     throw new Error(
       'PUNCH_INGEST_API_KEY is required in production. Punch ingest must not start open.',
+    );
+  }
+
+  if (isProd && !(process.env.DEVICE_CREDENTIAL_VAULT_KEY ?? '').trim()) {
+    throw new Error(
+      'DEVICE_CREDENTIAL_VAULT_KEY is required in production for device password encryption.',
+    );
+  }
+
+  const bindSecret = (
+    process.env.OFFICE_LINK_BIND_SECRET ??
+    process.env.JWT_SECRET ??
+    ''
+  ).trim();
+  if (isProd && !bindSecret) {
+    throw new Error(
+      'OFFICE_LINK_BIND_SECRET (or JWT_SECRET) is required in production — no hardcoded bind fallback.',
     );
   }
 

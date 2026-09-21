@@ -1,6 +1,6 @@
 import styles from './status-badge.module.css';
 
-const MUTED = new Set(['draft', 'pending', 'open']);
+const MUTED = new Set(['draft', 'pending', 'open', 'syncing']);
 const SUCCESS = new Set([
   'posted',
   'approved',
@@ -8,8 +8,17 @@ const SUCCESS = new Set([
   'completed',
   'sent',
   'active',
+  'synced',
+  'matched',
 ]);
-const WARN = new Set(['cancelled', 'rejected', 'closed', 'dismissed']);
+const WARN = new Set([
+  'cancelled',
+  'rejected',
+  'closed',
+  'dismissed',
+  'failed',
+  'inactive',
+]);
 
 const LABELS: Record<string, string> = {
   draft: 'Черновик',
@@ -25,6 +34,11 @@ const LABELS: Record<string, string> = {
   rejected: 'Отклонён',
   closed: 'Закрыт',
   dismissed: 'Уволен',
+  matched: 'Сопоставлен',
+  syncing: 'Синхронизация',
+  synced: 'Синхронизирован',
+  failed: 'Ошибка',
+  inactive: 'Неактивный',
 };
 
 export function statusLabel(status: string): string {

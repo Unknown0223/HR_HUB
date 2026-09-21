@@ -7,7 +7,6 @@ import { downloadCsv } from '@/lib/csv';
 import { useUrlParam } from '@/lib/use-url-state';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
-import { PageSubnav } from '@/components/PageSubnav';
 import { SystemSettingsPanel } from './SystemSettingsPanel';
 import styles from '../../page-shared.module.css';
 
@@ -106,6 +105,7 @@ const SYS_CODES = [
   'esign',
   'mehnat',
   'telegram',
+  'google_form',
 ] as const;
 
 function integrationSys(i: Integration): string {
@@ -160,6 +160,8 @@ export default function SettingsPage() {
   const [panel, setPanel] = useUrlParam('panel', '');
   const [group, setGroup] = useUrlParam('group', '');
   const [error, setError] = useState('');
+  const [orgInfo, setOrgInfo] = useState('');
+  const [orgBusy, setOrgBusy] = useState(false);
   const [org, setOrg] = useState<{
     tenant: { code: string; name: string };
     settings: {
@@ -218,7 +220,7 @@ export default function SettingsPage() {
         setAudit(await apiFetch('/api/settings/audit'));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
     }
   }
 
@@ -326,21 +328,31 @@ export default function SettingsPage() {
   async function saveOrg(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    setOrg(
-      await apiFetch('/api/settings/org', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          orgName: fd.get('orgName') || undefined,
-          legalName: fd.get('legalName') || undefined,
-          inn: fd.get('inn') || undefined,
-          address: fd.get('address') || undefined,
-          phone: fd.get('phone') || undefined,
-          timezone: fd.get('timezone') || undefined,
-          currency: fd.get('currency') || undefined,
-          locale: fd.get('locale') || undefined,
+    setOrgBusy(true);
+    setError('');
+    setOrgInfo('');
+    try {
+      setOrg(
+        await apiFetch('/api/settings/org', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            orgName: fd.get('orgName') || undefined,
+            legalName: fd.get('legalName') || undefined,
+            inn: fd.get('inn') || undefined,
+            address: fd.get('address') || undefined,
+            phone: fd.get('phone') || undefined,
+            timezone: fd.get('timezone') || undefined,
+            currency: fd.get('currency') || undefined,
+            locale: fd.get('locale') || undefined,
+          }),
         }),
-      }),
-    );
+      );
+      setOrgInfo('Сохранено');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } finally {
+      setOrgBusy(false);
+    }
   }
 
   async function createUser(e: FormEvent<HTMLFormElement>) {
@@ -970,40 +982,36 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="settings-main" />
-
-      {/* Section tabs always at top (same band as PageSubnav) */}
-      {tab !== 'main' || panel === 'news' ? (
-        <div className={styles.tabs}>
-          {(
-            [
-              ['main', 'Главное'],
-              ['org', 'Кадровый учет'],
-              ['dictionaries', 'Справочники'],
-              ['extra', 'Доп. справочники'],
-              ['admin', 'Администрирование'],
-              ['users', 'Пользователи и роли'],
-              ['integrations', 'Внешние системы'],
-              ['audit', 'Аудит'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              className={tab === k ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setTab(k);
-                if (k !== 'dictionaries' && k !== 'extra') setDictCode('');
-                if (k !== 'integrations') setSysCode('');
-                if (k !== 'admin') setPanel('');
-                if (k !== 'extra') setGroup('');
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {/* Single section tabs — no PageSubnav here (avoids duplicate «Кадровый учет / Справочники / …») */}
+      <div className={styles.tabs}>
+        {(
+          [
+            ['main', 'Главное'],
+            ['org', 'Кадровый учет'],
+            ['dictionaries', 'Справочники'],
+            ['extra', 'Доп. справочники'],
+            ['admin', 'Администрирование'],
+            ['users', 'Пользователи и роли'],
+            ['integrations', 'Внешние системы'],
+            ['audit', 'Аудит'],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            className={tab === k ? styles.tabActive : styles.tab}
+            onClick={() => {
+              setTab(k);
+              if (k !== 'dictionaries' && k !== 'extra') setDictCode('');
+              if (k !== 'integrations') setSysCode('');
+              if (k !== 'admin') setPanel('');
+              if (k !== 'extra') setGroup('');
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {tab === 'main' && panel !== 'news' ? null : (
         <header className={styles.pageHeader}>
@@ -1130,7 +1138,7 @@ export default function SettingsPage() {
 
       {tab === 'org' && org ? (
         <div className={styles.formPanel} style={{ padding: '1.15rem 1.25rem 1.35rem' }}>
-          <form className={styles.form} onSubmit={saveOrg}>
+          <form className={styles.form} onSubmit={(e) => void saveOrg(e)}>
             <label>
               Код tenant
               <input value={org.tenant.code} disabled />
@@ -1171,9 +1179,14 @@ export default function SettingsPage() {
               Locale
               <input name="locale" defaultValue={org.settings.locale} />
             </label>
-            <button className={styles.btn} type="submit">
-              Сохранить
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button className={styles.btn} type="submit" disabled={orgBusy}>
+                {orgBusy ? 'Сохранение…' : 'Сохранить'}
+              </button>
+              {orgInfo ? (
+                <span style={{ color: '#0e9f6e', fontSize: '0.875rem' }}>{orgInfo}</span>
+              ) : null}
+            </div>
           </form>
         </div>
       ) : null}
@@ -1208,8 +1221,38 @@ export default function SettingsPage() {
                   Администрирование
                 </h2>
                 <p className={styles.lead} style={{ marginBottom: '1rem' }}>
-                  Выберите панель выше или откройте ссылку из меню Настройки.
+                  Выберите панель выше или откройте раздел:
                 </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    marginBottom: '1.25rem',
+                  }}
+                >
+                  {(
+                    [
+                      ['/settings/organizations', 'Организации'],
+                      ['/settings/users', 'Пользователи'],
+                      ['/settings/users/roles', 'Роли'],
+                      ['/settings/countries', 'Регионы'],
+                      ['/settings/banks', 'Банки'],
+                      ['/settings/audit', 'Аудит'],
+                      ['/settings/telegram', 'Telegram'],
+                      ['/settings/google-form', 'Google Form'],
+                    ] as const
+                  ).map(([href, label]) => (
+                    <button
+                      key={href}
+                      type="button"
+                      className={styles.tab}
+                      onClick={() => router.push(href)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <div
                   style={{
                     display: 'grid',
@@ -1452,7 +1495,7 @@ export default function SettingsPage() {
                       {i.name}
                       {i.config?.stub ? (
                         <div className={styles.muted} style={{ fontSize: 11 }}>
-                          Stub: {i.config.note || 'внешний API не подключён'}
+                          Заглушка: {i.config.note || 'живой внешний API не подключён'}
                         </div>
                       ) : null}
                     </td>
@@ -1466,7 +1509,11 @@ export default function SettingsPage() {
                     </td>
                     <td>
                       <span className={i.isActive ? styles.badgeOk : styles.badge}>
-                        {i.isActive ? 'active' : i.config?.stub ? 'stub' : 'off'}
+                        {i.config?.stub
+                          ? 'Заглушка'
+                          : i.isActive
+                            ? 'Активна'
+                            : 'Выкл'}
                       </span>
                     </td>
                     <td>
@@ -1475,7 +1522,14 @@ export default function SettingsPage() {
                           type="button"
                           className={styles.btnSecondary}
                           onClick={() => syncIntegration(i.id)}
-                          disabled={!i.isActive && !i.config?.stub}
+                          disabled={Boolean(i.config?.stub) || !i.isActive}
+                          title={
+                            i.config?.stub
+                              ? 'Заглушка: синхронизация недоступна до подключения API'
+                              : !i.isActive
+                                ? 'Сначала включите интеграцию'
+                                : undefined
+                          }
                         >
                           Синхронизация
                         </button>

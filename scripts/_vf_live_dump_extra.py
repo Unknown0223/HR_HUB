@@ -1,4 +1,4 @@
-"""Dump extra Verifix lists: requests, applications, timeoff, ranks, timetable."""
+"""Dump extra HR HUB lists: requests, applications, timeoff, ranks, timetable."""
 from __future__ import annotations
 
 import json
@@ -48,8 +48,8 @@ def main():
     for name, path in FORMS:
 
         req = urllib.request.Request(
-            "https://app2.verifix.com/page/form" + path + ".html",
-            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://app2.verifix.com/"},
+            "https://example.invalid/page/form" + path + ".html",
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://example.invalid/"},
         )
         try:
             with c.opener.open(req, timeout=30) as resp:

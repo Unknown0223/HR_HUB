@@ -1,5 +1,5 @@
 /**
- * Remove seed/demo leftovers. Keep only Verifix-imported employees (externalId verifix:*).
+ * Remove seed/demo leftovers. Keep only HR HUB-imported employees (externalId hrhub:*).
  * Keeps tenant login admin@demo.local.
  */
 const { PrismaClient } = require('@prisma/client');
@@ -53,7 +53,7 @@ const SEED_DIVISION_CODES = ['IT', 'OPS', 'TMP-UI'];
   const demoEmps = await prisma.employee.findMany({
     where: {
       tenantId: tenant.id,
-      OR: [{ externalId: null }, { NOT: { externalId: { startsWith: 'verifix:' } } }],
+      OR: [{ externalId: null }, { NOT: { externalId: { startsWith: 'hrhub:' } } }],
     },
     select: { id: true, lastName: true, firstName: true, tabNumber: true, externalId: true },
   });
@@ -65,9 +65,9 @@ const SEED_DIVISION_CODES = ['IT', 'OPS', 'TMP-UI'];
   );
 
   const marksGone = await prisma.attendanceMark.deleteMany({
-    where: { tenantId: tenant.id, NOT: { source: 'verifix' } },
+    where: { tenantId: tenant.id, NOT: { source: 'hrhub' } },
   });
-  console.log('non-verifix marks', marksGone.count);
+  console.log('non-hrhub marks', marksGone.count);
 
   if (demoIds.length) {
     await prisma.employee.deleteMany({ where: { id: { in: demoIds } } });
@@ -79,7 +79,7 @@ const SEED_DIVISION_CODES = ['IT', 'OPS', 'TMP-UI'];
     select: { id: true, serialNumber: true, name: true, meta: true },
   });
   const dropDeviceIds = demoDevices
-    .filter((d) => !d.meta || d.meta.verifixDeviceId == null)
+    .filter((d) => !d.meta || d.meta.hrhubDeviceId == null)
     .map((d) => d.id);
   if (dropDeviceIds.length) {
     await prisma.device.deleteMany({ where: { id: { in: dropDeviceIds } } });

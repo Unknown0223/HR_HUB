@@ -460,7 +460,7 @@ export class MeService {
     return this.notificationsService.clearAll(user.tenantId, user.userId);
   }
 
-  /** Topbar global search — employees, persons, divisions (Verifix-like). */
+  /** Topbar global search — employees, persons, divisions (catalog-like). */
   async globalSearch(user: AuthUser, q: string) {
     const query = q.trim();
     // Topbar search is tenant-scoped; without a tenant there is nothing to match.

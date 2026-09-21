@@ -251,7 +251,7 @@ export default function AttendancePage() {
         if (tab === 'locations') setLocations(rows as typeof locations);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
       setData([]);
     }
   }

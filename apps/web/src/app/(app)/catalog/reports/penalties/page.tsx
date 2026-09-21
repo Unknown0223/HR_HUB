@@ -123,7 +123,7 @@ function downloadBlob(filename: string, blob: Blob) {
   a.click();
   URL.revokeObjectURL(url);
 }
-/** Verifix: blank for zero, else spaced groups + 2 decimals */
+/** HR HUB: blank for zero, else spaced groups + 2 decimals */
 function money(n: number) {
   const v = Number(n) || 0;
   if (!v) return '';

@@ -5,6 +5,21 @@ Terminalni serverga **bir marta** bog‘lab sozlaydi.
 Yuz sync uchun tunnel/service kerak.  
 **Otmetkalar** — terminal → to‘g‘ridan server (HTTPS HttpHost); **Link ochiq bo‘lishi shart emas**.
 
+## Qachon device-gw, qachon Office Link?
+
+| Vazifa | Vosita | Izoh |
+|--------|--------|------|
+| Lab / mock punch, adapter registry | **`apps/device-gw`** (`:8800`) | Nest API face sync / register shu yerga |
+| Ofisda terminalni birinchi marta ulash | **Office Link** (`tools/office-link`, Android `office-link-mobile`) | Pairing, parol, HttpHost yozish |
+| IP o‘zgarganda tarmoq tiklash | **Office Link → Tiklash** | Tunnel restore (Windows) |
+| Kundalik yuz sync (web tugma) | API → device-gw (yoki tunnel orqali terminal) | Link ochiq bo‘lishi shart emas, lekin ofis tunnel kerak bo‘lishi mumkin |
+| Kundalik otmetka | Terminal → API HttpHost | Link kerak emas |
+
+**Qoida:** yangi terminal adapter / ISAPI protokol → `device-gw`. Field technician UX → Office Link. Ikkalasini bir-biriga aralashtirmang.
+
+### RSA / activation
+Ba’zi Hikvision modellarda RSA challenge **model-specific** — Office Link da `activation_stub` (manual parol / UI orqali). Avtomatik crypto yo‘q; qo‘lda sozlash yoki qo‘llab-quvvatlanadigan model.
+
 | Vazifa | Qayerda |
 |--------|---------|
 | 1. Qurilmani 0→serverga ulash | Link: **Подключение / Ulash** |

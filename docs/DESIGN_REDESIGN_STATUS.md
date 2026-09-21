@@ -45,8 +45,8 @@ Batafsil: [DESIGN_TEMPLATE_PLAN.md](./DESIGN_TEMPLATE_PLAN.md)
 | Foundation (shell, tokens, login) | ✅ |
 | Главная (dashboard, news, device-control) | ✅ |
 | Qurilmalar list + detail | ✅ / ✅ |
-| Кадры → Главное / analitika | ⏳ listlar qisman; dismissal/* ✅ |
-| Кадры → Организация | ✅ divisions/groups, grades, staff-positions, tariff-*, **grade-history**, **career-paths**; org-chart / positions ⏳ |
+| Кадры → Главное / analitika | ✅ listlar Arena + FormModal; dismissal/* ✅ |
+| Кадры → Организация | ✅ divisions/groups, grades, staff-positions, tariff-*, grade-history, career-paths, **positions**, **employees** |
 | Настройки | ✅ settings/org/payroll-calc, dictionaries, news; **Create → FormModal** (валюты, кассы, COA, банки, страны, org/users/roles, …) |
 | Посещения lists | ✅ |
 | Зарплата (14 list) | ✅ Arena + FormModal + bulk + mega-nav icons |
@@ -93,20 +93,16 @@ Batafsil: [DESIGN_TEMPLATE_PLAN.md](./DESIGN_TEMPLATE_PLAN.md)
 
 ---
 
-## Qilinmagan / keyingi
+## Qilinmagan / keyingi (ixtiyoriy)
 
-| Navbat | Izoh |
-|--------|------|
-| `/positions` | OrgPositions shablon |
-| Org-chart | DivisionOrgChart to‘liq |
-| `/employees` to‘liq shablon | header bor — EmployeesList |
-| `/employees/[id]` | EmployeeCard |
-| Кадры Главное qolgan listlar | KadryModule qisman |
-| account-balance / trial-balance | hisobot Arena (ixtiyoriy) |
-| Production calendar **edit** | katta kun paneli — alohida sahifa qolishi mumkin |
-| Mobile | ❌ |
+| Navbat | Holat | Izoh |
+|--------|-------|------|
+| Org-chart vizual fine-tune | 🟡 | ixtiyoriy (dizayn zip kerak) |
+| `/employees/[id]` EmployeeCard | 🟡 | ixtiyoriy pixel |
+| Mobile | ❌ | F4 — alohida sprint |
+| Web ESLint to‘liq | 🟡 | CI soft; typecheck majburiy |
 
-Siz skrinshot yoki sahifa nomi tashlaguncha — yuqoridagi navbatdan davom.
+**List Arena:** `/employees` va `/positions` — ✅ (F13). Rejalashtirilgan redesign qarz yopildi.
 
 ---
 

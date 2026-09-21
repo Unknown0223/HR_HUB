@@ -99,6 +99,8 @@ export class DeviceGwClient implements OnModuleInit {
     const add = (u: string | null | undefined) => {
       const clean = (u || '').trim().replace(/\/$/, '');
       if (!clean || !/^https?:\/\//i.test(clean)) return;
+      // Terminal LAN IPs are reach targets, not device-gw (/health).
+      if (this.isTerminalLanUrl(clean)) return;
       if (!out.includes(clean)) out.push(clean);
     };
     add(this.announcedUrl);
@@ -146,7 +148,9 @@ export class DeviceGwClient implements OnModuleInit {
           ? (extras.deviceLink as Record<string, unknown>)
           : null;
       if (typeof link?.gwUrl === 'string' && /^https?:\/\//i.test(link.gwUrl)) {
-        return link.gwUrl.replace(/\/$/, '');
+        const clean = link.gwUrl.replace(/\/$/, '');
+        if (this.isTerminalLanUrl(clean)) continue;
+        return clean;
       }
     }
     return null;
@@ -193,6 +197,15 @@ export class DeviceGwClient implements OnModuleInit {
   async onModuleInit() {
     try {
       const url = await this.loadAnnouncedUrlFromDb();
+      if (url && this.isTerminalLanUrl(url)) {
+        this.logger.warn(
+          `Ignoring stored terminal LAN as Device GW URL: ${url}`,
+        );
+        this.announcedUrl = null;
+        this.cachedDbUrl = null;
+        this.cachedDbUrlAt = 0;
+        return;
+      }
       if (url) {
         this.announcedUrl = url;
         this.cachedDbUrl = url;
@@ -208,6 +221,14 @@ export class DeviceGwClient implements OnModuleInit {
     const clean = url.replace(/\/$/, '');
     if (!/^https?:\/\//i.test(clean)) {
       throw new Error('Invalid gateway URL');
+    }
+    // Never store bare terminal LAN IPs as device-gw base (no /health there).
+    if (this.isTerminalLanUrl(clean)) {
+      this.logger.warn(
+        `Skipping GW announce for terminal LAN URL ${clean} — use reach mode instead`,
+      );
+      await this.clearGwUrlIfMatches(tenantId, clean);
+      return;
     }
     this.announcedUrl = clean;
     this.cachedDbUrl = clean;
@@ -229,6 +250,59 @@ export class DeviceGwClient implements OnModuleInit {
       where: { tenantId },
       create: { tenantId, extras: extras as Prisma.InputJsonValue },
       update: { extras: extras as Prisma.InputJsonValue },
+    });
+  }
+
+  /** True for http://192.168.x.x (Hikvision terminal), not cloudflared / local GW. */
+  isTerminalLanUrl(url: string): boolean {
+    const u = (url || '').trim().replace(/\/$/, '');
+    if (!/^http:\/\//i.test(u)) return false;
+    if (/trycloudflare\.com|cfargotunnel\.com/i.test(u)) return false;
+    if (/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(\/|$)/i.test(u)) {
+      return false;
+    }
+    return /^http:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?(\/|$)/i.test(
+      u,
+    );
+  }
+
+  /** Drop a poisoned gwUrl that pointed at the terminal instead of device-gw. */
+  async clearGwUrlIfMatches(tenantId: string, url: string) {
+    const clean = (url || '').trim().replace(/\/$/, '');
+    if (!clean) return;
+    if (this.announcedUrl?.replace(/\/$/, '') === clean) {
+      this.announcedUrl = null;
+    }
+    if (this.cachedDbUrl?.replace(/\/$/, '') === clean) {
+      this.cachedDbUrl = null;
+      this.cachedDbUrlAt = 0;
+    }
+    const existing = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId },
+    });
+    if (!existing) return;
+    const extras =
+      existing.extras &&
+      typeof existing.extras === 'object' &&
+      !Array.isArray(existing.extras)
+        ? { ...(existing.extras as Record<string, unknown>) }
+        : {};
+    const link =
+      extras.deviceLink &&
+      typeof extras.deviceLink === 'object' &&
+      !Array.isArray(extras.deviceLink)
+        ? { ...(extras.deviceLink as Record<string, unknown>) }
+        : null;
+    const current =
+      typeof link?.gwUrl === 'string' ? link.gwUrl.replace(/\/$/, '') : '';
+    if (!link || current !== clean) return;
+    delete link.gwUrl;
+    link.clearedAt = new Date().toISOString();
+    link.clearReason = 'terminal_lan_not_gw';
+    extras.deviceLink = link;
+    await this.prisma.tenantSetting.update({
+      where: { tenantId },
+      data: { extras: extras as Prisma.InputJsonValue },
     });
   }
 

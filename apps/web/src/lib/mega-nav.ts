@@ -1,9 +1,9 @@
 /**
- * Mega-menu — exact Verifix header menu clone
+ * Mega-menu — exact HR HUB header menu clone
  * Source: output/run_20260725_222506/clone/pages/001_.../page.html (#kt_header_menu)
  * Keep: brand HR HUB + multi-tenant Tenants (platform only).
  * Nested page links (Физические лица, Типы отпуска, …) stay out of mega —
- * they open from inside list pages, same as Verifix.
+ * they open from inside list pages, same as HR HUB.
  */
 
 import { REPORTS_NAV } from './reports-nav';
@@ -576,6 +576,7 @@ export const MEGA_NAV: MegaSection[] = [
           { href: '/settings/billz', label: 'Настройки Billz 2.0', faIcon: 'fa-store', iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #0a85e2 100%)' },
           { href: '/settings/billz-sales', label: 'Продажи Billz 1.0', faIcon: 'fa-shopping-bag', iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #7c3aed 100%)' },
           { href: '/settings/telegram', label: 'Telegram Bot', faIcon: 'fa-paper-plane', iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #06b6d4 100%)' },
+          { href: '/settings/google-form', label: 'Google Form', faIcon: 'fa-wpforms', iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)' },
           { href: '/settings?tab=integrations&sys=onec', label: '1С:Предприятие', faIcon: 'fa-server', iconAccent: 'linear-gradient(135deg, #e11d48 0%, #f59e0b 100%)' },
           { href: '/settings?tab=integrations&sys=esign', label: 'Электронная подпись', faIcon: 'fa-pen', iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)' },
           { href: '/settings?tab=integrations&sys=mehnat', label: 'Mehnat.gov.uz', faIcon: 'fa-landmark', iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #6366f1 100%)' },

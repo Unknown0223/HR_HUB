@@ -1,5 +1,5 @@
 /**
- * Smoke: Verifix backend 1:1 critical chains (login → workflows).
+ * Smoke: HR HUB backend 1:1 critical chains (login → workflows).
  * Usage: node scripts/smoke-backend-1to1.js
  * Requires API on :3001 and seeded demo tenant.
  */

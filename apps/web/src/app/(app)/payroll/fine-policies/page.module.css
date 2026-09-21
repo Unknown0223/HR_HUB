@@ -89,6 +89,20 @@
   gap: 0.65rem;
 }
 
+.filterBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.filterBand > :first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
 .leftActions,
 .rightTools {
   display: flex;

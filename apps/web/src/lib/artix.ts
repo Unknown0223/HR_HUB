@@ -97,7 +97,7 @@ export function fieldLabel(key: string) {
   return IMPORT_FIELDS.find((f) => f.key === key)?.label || key;
 }
 
-/** Excel template header (Verifix export uses user_login for login). */
+/** Excel template header (HR HUB export uses user_login for login). */
 export function templateHeader(key: string) {
   if (key === 'login') return 'user_login';
   return fieldLabel(key);

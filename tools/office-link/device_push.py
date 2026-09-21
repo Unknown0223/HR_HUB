@@ -268,6 +268,12 @@ def apply_hik_push_prefer_lan(
     if raw_mode not in ("direct", "lan", "auto"):
         raw_mode = "direct"
 
+    # Local API (127.0.0.1): terminal cannot reach "localhost" on the PC —
+    # force LAN punch path (PC LAN IP → API or punch-proxy).
+    api_l = (api_base or "").strip().lower()
+    if "127.0.0.1" in api_l or "localhost" in api_l or "[::1]" in api_l:
+        raw_mode = "lan"
+
     def _try_direct() -> dict[str, Any]:
         direct = apply_hik_push_from_api_response(
             host, port, username, password, hik_push
@@ -284,13 +290,44 @@ def apply_hik_push_prefer_lan(
                 ensure_punch_proxy,
                 lan_ipv4_for_device,
             )
+            from urllib.parse import urlparse
+
+            lan_ip = lan_ipv4_for_device(host)
+            if not lan_ip:
+                return {"ok": False, "message": "no LAN IP for punch proxy"}
+
+            # Prefer direct HTTP to local API on PC LAN IP (no proxy hop).
+            api_host = ""
+            api_port = 0
+            try:
+                u = urlparse((api_base or "").strip())
+                api_host = (u.hostname or "").strip().lower()
+                api_port = int(u.port or (443 if u.scheme == "https" else 80))
+            except Exception:
+                api_host, api_port = "", 0
+            if api_host in ("127.0.0.1", "localhost", "::1") and api_port > 0:
+                lan_direct = {
+                    "urlPath": url_path,
+                    "protocolType": "HTTP",
+                    "addressingFormatType": "ipaddress",
+                    "ipAddress": lan_ip,
+                    "portNo": api_port,
+                    "hostName": "",
+                }
+                res_d = apply_hik_push_from_api_response(
+                    host, port, username, password, lan_direct
+                )
+                if res_d.get("ok"):
+                    return {
+                        **res_d,
+                        "mode": "lan_direct",
+                        "lanIp": lan_ip,
+                        "apiPort": api_port,
+                    }
 
             pport = int(proxy_port or DEFAULT_PORT)
             if api_base:
                 ensure_punch_proxy(api_base, pport)
-            lan_ip = lan_ipv4_for_device(host)
-            if not lan_ip:
-                return {"ok": False, "message": "no LAN IP for punch proxy"}
             lan_cfg = {
                 "urlPath": url_path,
                 "protocolType": "HTTP",

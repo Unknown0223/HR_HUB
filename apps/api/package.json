@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "build": "npm run build -w @hr-hub/shared && prisma generate && tsc -p tsconfig.build.json",
     "start": "node scripts/prod-migrate.js && node dist/main",
     "start:dev": "nest start --watch",
     "start:prod": "node scripts/prod-migrate.js && node dist/main",
@@ -12,12 +12,15 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:push": "prisma db push",
     "prisma:seed": "ts-node --transpile-only prisma/seed.ts",
-    "test": "node --require ts-node/register --test src/news/news-html.spec.ts src/common/excel-import.spec.ts src/attendance/office-link-reconnect.spec.ts src/employees/passport-ocr.spec.ts src/employees/match-former.spec.ts src/attendance/office-link-bind.spec.ts src/attendance/hikvision-event.parser.spec.ts"
+    "vault:backfill": "node scripts/backfill-device-vault.js",
+    "test": "node --require ts-node/register --test src/news/news-html.spec.ts src/common/excel-import.spec.ts src/common/name-search.spec.ts src/attendance/office-link-reconnect.spec.ts src/employees/passport-ocr.spec.ts src/employees/match-former.spec.ts src/attendance/office-link-bind.spec.ts src/attendance/hikvision-event.parser.spec.ts src/settings/mark-photos.spec.ts src/attendance/mark-photo-compress.spec.ts src/auth/jwt-secret.spec.ts src/catalog/incident-lifecycle.spec.ts src/catalog/clearance-lifecycle.spec.ts src/catalog/gph-lifecycle.spec.ts src/catalog/tariff-lifecycle.spec.ts src/catalog/hr-changes-lifecycle.spec.ts src/catalog/finance-lifecycle.spec.ts src/catalog/schedule-lifecycle.spec.ts src/catalog/catalog-hours.util.spec.ts src/catalog/reports-lifecycle.spec.ts",
+    "lint": "node ../../scripts/check-canonical-ports.js && npx tsc -p tsconfig.json --noEmit --pretty false"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "dependencies": {
+    "@hr-hub/shared": "*",
     "@aws-sdk/client-s3": "^3.1094.0",
     "@aws-sdk/s3-request-presigner": "^3.1094.0",
     "@nestjs/common": "^11.0.7",
@@ -41,7 +44,8 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "sanitize-html": "^2.17.7"
+    "sanitize-html": "^2.17.7",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.2",

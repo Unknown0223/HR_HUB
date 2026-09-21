@@ -785,7 +785,7 @@ function plannedWorkMinutes(schedule?: Detail['schedule'] | null) {
   const end = schedule?.endTime || '18:00';
   let mins = parseHm(end) - parseHm(start);
   if (mins <= 0) mins += 24 * 60;
-  // Verifix odatda tushlikni hisobga oladi (~1 soat) — 09-18 → 8 soat net
+  // HR HUB odatda tushlikni hisobga oladi (~1 soat) — 09-18 → 8 soat net
   if (mins >= 8 * 60) mins -= 60;
   return mins;
 }
@@ -1337,7 +1337,7 @@ export default function EmployeeDetailPage() {
       setCitizenshipQuery(data.profileExtras?.citizenship || '');
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
     }
   }
 
@@ -1701,7 +1701,7 @@ export default function EmployeeDetailPage() {
     }
     return map;
   }, [row?.days]);
-  /** Approved vacation days shown as «Отпуск» on the calendar (Verifix). */
+  /** Approved vacation days shown as «Отпуск» on the calendar (каталог). */
   const leaveDateKeys = useMemo(() => {
     const set = new Set<string>();
     for (const a of row?.absences ?? []) {
@@ -3863,7 +3863,7 @@ export default function EmployeeDetailPage() {
       });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
     } finally {
       setBusy(false);
     }

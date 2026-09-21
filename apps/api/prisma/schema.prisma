@@ -64,7 +64,7 @@ enum RequestType {
   hr_change
 }
 
-/// Verifix «Заявки на кадровые изменения» kinds
+/// HR HUB «Заявки на кадровые изменения» kinds
 enum HrChangeKind {
   open_position
   hire
@@ -95,7 +95,7 @@ enum PayrollPeriodStatus {
   closed
 }
 
-/// Verifix document «провести» lifecycle (draft → posted)
+/// HR HUB document «провести» lifecycle (draft → posted)
 enum DocumentLifecycle {
   draft
   posted
@@ -119,7 +119,7 @@ enum PayrollLineType {
   other
 }
 
-/// Verifix «Все начисления» document kinds
+/// HR HUB «Все начисления» document kinds
 enum PayrollAccrualKind {
   salary_contributions
   sick_leave
@@ -163,7 +163,7 @@ enum IncidentStatus {
   closed
 }
 
-/// Verifix: Действия по инциденту
+/// HR HUB: Действия по инциденту
 enum IncidentAction {
   verbal_warning
   written_warning
@@ -305,7 +305,7 @@ model User {
   fullName     String   @map("full_name")
   role         Role     @default(employee)
   isActive     Boolean  @default(true) @map("is_active")
-  /// Verifix profile: login, photo, orgs, catalog roles, phone…
+  /// HR HUB profile: login, photo, orgs, catalog roles, phone…
   meta         Json?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -384,7 +384,7 @@ model Position {
   name            String
   sortOrder       Int      @default(0) @map("sort_order")
   description     String?
-  /// Роль (Verifix)
+  /// Роль (каталог)
   role            String?
   /// Счет затрат
   costAccount     String?  @map("cost_account")
@@ -432,7 +432,7 @@ model Person {
   passport   String?
   phone      String?
   email      String?
-  /// Verifix directory fields
+  /// HR HUB directory fields
   code                 String?  @map("code")
   inn                  String?
   inps                 String?
@@ -484,7 +484,7 @@ model Employee {
   employmentType EmploymentType   @default(staff) @map("employment_type")
   hiredAt        DateTime?        @map("hired_at") @db.Date
   dismissedAt    DateTime?        @map("dismissed_at") @db.Date
-  /// Откуда пришел (Verifix analytics)
+  /// Откуда пришел (HR HUB analytics)
   employmentSource String?        @map("employment_source")
   /// Куда ушел после увольнения
   dismissalDestination String?    @map("dismissal_destination")
@@ -577,7 +577,7 @@ model Employee {
   @@map("employees")
 }
 
-/// Verifix: ordinary | hourly | advanced | multi_shift | advanced_multi_shift
+/// HR HUB: ordinary | hourly | advanced | multi_shift | advanced_multi_shift
 enum WorkScheduleKind {
   ordinary
   hourly
@@ -595,7 +595,7 @@ model WorkSchedule {
   startTime String           @default("09:00") @map("start_time")
   endTime   String           @default("18:00") @map("end_time")
   graceMinutes Int           @default(15) @map("grace_minutes")
-  /// Verifix schedule knobs: weekPattern, graceOut, trackLate/Early, delayMode, yearGrid, …
+  /// HR HUB schedule knobs: weekPattern, graceOut, trackLate/Early, delayMode, yearGrid, …
   settings  Json?
   isActive  Boolean          @default(true) @map("is_active")
   createdAt DateTime         @default(now()) @map("created_at")
@@ -620,7 +620,7 @@ model WorkSchedule {
   @@map("work_schedules")
 }
 
-/// Verifix «Производственные календари»
+/// HR HUB «Производственные календари»
 model ProductionCalendar {
   id                   String   @id @default(uuid()) @db.Uuid
   tenantId             String   @map("tenant_id") @db.Uuid
@@ -684,7 +684,7 @@ model Location {
   longitude      Float?
   geoRadiusM     Int      @default(150) @map("geo_radius_m")
   isActive       Boolean  @default(true) @map("is_active")
-  /// Verifix extras: region, bssid, restrictMarks, polygonalAnalysis,
+  /// HR HUB extras: region, bssid, restrictMarks, polygonalAnalysis,
   /// createdByLabel, updatedByLabel, changeHistory[]
   meta           Json?
   createdAt      DateTime @default(now()) @map("created_at")
@@ -732,12 +732,11 @@ model Device {
   host         String?
   port         Int?
   username     String?
-  passwordEnc  String?   @map("password_enc")
   status       String    @default("offline")
   lastSeenAt   DateTime? @map("last_seen_at")
   gatewayRef   String?   @map("gateway_ref")
   isActive     Boolean   @default(true) @map("is_active")
-  /// Verifix extras: deviceType, timezone, battery, trackingType, autoIn/Out,
+  /// HR HUB extras: deviceType, timezone, battery, trackingType, autoIn/Out,
   /// hikCentral {gatewayHost,gatewayPort,deviceId,isupKey}, ignoredPersonIds[],
   /// ignoredDivisionIds[], commands[]
   meta         Json?
@@ -886,7 +885,7 @@ model AttendanceDay {
   lastOutAt  DateTime? @map("last_out_at")
   lateMinutes Int      @default(0) @map("late_minutes")
   earlyLeaveMinutes Int @default(0) @map("early_leave_minutes")
-  /// Official hours after timesheet correction post (Verifix)
+  /// Official hours after timesheet correction post (каталог)
   plannedHours  Decimal? @map("planned_hours") @db.Decimal(8, 2)
   onTimeHours   Decimal? @map("on_time_hours") @db.Decimal(8, 2)
   outsideHours  Decimal? @map("outside_hours") @db.Decimal(8, 2)
@@ -934,7 +933,7 @@ model AbsenceType {
   timeTypeId  String?  @map("time_type_id") @db.Uuid
   paid        Boolean  @default(true)
   isActive    Boolean  @default(true) @map("is_active")
-  /// Verifix: allow employees to create requests for this type
+  /// HR HUB: allow employees to create requests for this type
   allowEmployeeRequest Boolean @default(true) @map("allow_employee_request")
   /// Учитывать неиспользованное время
   trackUnusedTime Boolean @default(false) @map("track_unused_time")
@@ -963,7 +962,7 @@ model AbsenceType {
   @@map("absence_types")
 }
 
-/// Verifix: Вид отсутствия (сотрудники) — assigned employees + accrual period
+/// HR HUB: Вид отсутствия (сотрудники) — assigned employees + accrual period
 model AbsenceTypeEmployee {
   id            String    @id @default(uuid()) @db.Uuid
   tenantId      String    @map("tenant_id") @db.Uuid
@@ -1001,7 +1000,7 @@ model Absence {
   status        RequestStatus @default(pending)
   note          String?
   managerNote   String?       @map("manager_note")
-  /// Extra Verifix fields: number, requestKind, completed, audit names…
+  /// Extra HR HUB fields: number, requestKind, completed, audit names…
   meta          Json?
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
@@ -1066,7 +1065,7 @@ model HrDocument {
   @@map("hr_documents")
 }
 
-/// Заявки на кадровые изменения (Verifix)
+/// Заявки на кадровые изменения (каталог)
 model HrChangeRequest {
   id                 String        @id @default(uuid()) @db.Uuid
   tenantId           String        @map("tenant_id") @db.Uuid
@@ -1152,7 +1151,7 @@ model PayrollPolicy {
   @@map("payroll_policies")
 }
 
-/// Verifix «Политики штрафов» — scoped monthly rules (company / division / position / employee)
+/// HR HUB «Политики штрафов» — scoped monthly rules (company / division / position / employee)
 model FinePolicy {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -1179,7 +1178,7 @@ model FinePolicy {
   @@map("fine_policies")
 }
 
-/// Verifix «Политика доплат» — scoped monthly overtime/surcharge coefficients
+/// HR HUB «Политика доплат» — scoped monthly overtime/surcharge coefficients
 model AllowancePolicy {
   id         String   @id @default(uuid()) @db.Uuid
   tenantId   String   @map("tenant_id") @db.Uuid
@@ -1287,7 +1286,7 @@ enum PayrollSheetStatus {
   completed
 }
 
-/// VERIFIX «Ведомость» / «Аванс по официальному окладу»
+/// HR_HUB «Ведомость» / «Аванс по официальному окладу»
 model PayrollSheet {
   id            String              @id @default(uuid()) @db.Uuid
   tenantId      String              @map("tenant_id") @db.Uuid
@@ -1380,7 +1379,7 @@ enum PayrollManualStatus {
   posted
 }
 
-/// VERIFIX «Ручные операции» — journal document with postings
+/// HR_HUB «Ручные операции» — journal document with postings
 model PayrollManualOp {
   id            String              @id @default(uuid()) @db.Uuid
   tenantId      String              @map("tenant_id") @db.Uuid
@@ -1437,7 +1436,7 @@ model PayrollManualAudit {
   @@map("payroll_manual_audits")
 }
 
-/// Verifix «Все начисления» — document header
+/// HR HUB «Все начисления» — document header
 model PayrollAccrualDoc {
   id             String             @id @default(uuid()) @db.Uuid
   tenantId       String             @map("tenant_id") @db.Uuid
@@ -1517,7 +1516,7 @@ model PayrollAccrualDeduction {
   @@map("payroll_accrual_deductions")
 }
 
-/// Verifix «Проводки» / transactions.xlsx journal
+/// HR HUB «Проводки» / transactions.xlsx journal
 model PayrollLedgerEntry {
   id             String   @id @default(uuid()) @db.Uuid
   tenantId       String   @map("tenant_id") @db.Uuid
@@ -1598,7 +1597,7 @@ model Dictionary {
   @@map("dictionaries")
 }
 
-/// Verifix «Динамические поля»
+/// HR HUB «Динамические поля»
 model DynamicField {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
@@ -1624,7 +1623,7 @@ model DynamicField {
   @@map("dynamic_fields")
 }
 
-/// Verifix «Объекты» / «Факты» — сущности с динамическими полями
+/// HR HUB «Объекты» / «Факты» — сущности с динамическими полями
 model DynamicObject {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
@@ -1662,7 +1661,7 @@ model DictionaryItem {
   @@map("dictionary_items")
 }
 
-/// Verifix «Исключения по документам при приеме»
+/// HR HUB «Исключения по документам при приеме»
 model HireDocumentException {
   id         String   @id @default(uuid()) @db.Uuid
   tenantId   String   @map("tenant_id") @db.Uuid
@@ -1743,7 +1742,7 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-/// Verifix: Шаблоны обходных листов
+/// HR HUB: Шаблоны обходных листов
 model ClearanceTemplate {
   id                       String   @id @default(uuid()) @db.Uuid
   tenantId                 String   @map("tenant_id") @db.Uuid
@@ -1784,7 +1783,7 @@ model ClearanceTemplateItem {
   @@map("clearance_template_items")
 }
 
-/// Employees who must sign on this template (Verifix nested table)
+/// Employees who must sign on this template (HR HUB nested table)
 model ClearanceTemplateEmployee {
   id         String @id @default(uuid()) @db.Uuid
   templateId String @map("template_id") @db.Uuid
@@ -1800,7 +1799,7 @@ model ClearanceTemplateEmployee {
   @@map("clearance_template_employees")
 }
 
-/// Verifix: Обходные листы (exit checklist)
+/// HR HUB: Обходные листы (exit checklist)
 model ClearanceSheet {
   id           String          @id @default(uuid()) @db.Uuid
   tenantId     String          @map("tenant_id") @db.Uuid
@@ -1842,7 +1841,7 @@ model ClearanceSheetItem {
   @@map("clearance_sheet_items")
 }
 
-/// Verifix: Типы инцидента
+/// HR HUB: Типы инцидента
 model IncidentType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -1862,7 +1861,7 @@ model IncidentType {
   @@map("incident_types")
 }
 
-/// Verifix: Инциденты
+/// HR HUB: Инциденты
 model Incident {
   id               String           @id @default(uuid()) @db.Uuid
   tenantId         String           @map("tenant_id") @db.Uuid
@@ -1993,7 +1992,7 @@ model PositionGroup {
   @@map("position_groups")
 }
 
-/// Verifix «Шаблоны должностей» — шаблон позиции с графиком, разрядом и оплатой
+/// HR HUB «Шаблоны должностей» — шаблон позиции с графиком, разрядом и оплатой
 model PositionTemplate {
   id            String   @id @default(uuid()) @db.Uuid
   tenantId      String   @map("tenant_id") @db.Uuid
@@ -2079,7 +2078,7 @@ enum GradePromotionPeriodType {
   position_and_grade
 }
 
-/// Документ «Повышение разрядов» (Verifix)
+/// Документ «Повышение разрядов» (каталог)
 model GradePromotion {
   id             String                   @id @default(uuid()) @db.Uuid
   tenantId       String                   @map("tenant_id") @db.Uuid
@@ -2209,7 +2208,7 @@ model TariffGroup {
   gradeId   String?  @map("grade_id") @db.Uuid
   code      String
   name      String
-  /// Полное название (Verifix)
+  /// Полное название (каталог)
   fullName  String?  @map("full_name")
   baseRate  Decimal  @default(0) @map("base_rate") @db.Decimal(14, 2)
   isActive  Boolean  @default(true) @map("is_active")
@@ -2324,7 +2323,7 @@ model DismissalReason {
   tenantId  String   @map("tenant_id") @db.Uuid
   code      String
   name      String
-  /// Группа причин увольнения (Verifix)
+  /// Группа причин увольнения (каталог)
   groupName String?  @map("group_name")
   /// positive | negative
   basisType String?  @map("basis_type")
@@ -2481,7 +2480,7 @@ model TimesheetAdjustment {
   @@map("timesheet_adjustments")
 }
 
-/// Корректировка табеля (Verifix document)
+/// Корректировка табеля (HR HUB document)
 model TimesheetCorrection {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2530,7 +2529,7 @@ model TimesheetCorrectionLine {
   @@map("timesheet_correction_lines")
 }
 
-/// Табель (Verifix document — monthly timesheet)
+/// Табель (HR HUB document — monthly timesheet)
 model TimesheetSheet {
   id         String            @id @default(uuid()) @db.Uuid
   tenantId   String            @map("tenant_id") @db.Uuid
@@ -2607,7 +2606,7 @@ model ScheduleShift {
   @@map("schedule_shifts")
 }
 
-/// Verifix «Список смен расписания» — назначения смен сотрудникам (оперативный список)
+/// HR HUB «Список смен расписания» — назначения смен сотрудникам (оперативный список)
 model ScheduleShiftAssignment {
   id           String   @id @default(uuid()) @db.Uuid
   tenantId     String   @map("tenant_id") @db.Uuid
@@ -2663,7 +2662,7 @@ model EmployeeScheduleOverride {
   @@map("employee_schedule_overrides")
 }
 
-/// Verifix «Индивидуальные графики» — monthly plan document (header)
+/// HR HUB «Индивидуальные графики» — monthly plan document (header)
 model IndividualSchedule {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2716,7 +2715,7 @@ model IndividualScheduleLine {
   @@map("individual_schedule_lines")
 }
 
-/// Verifix «Расписание» — monthly roster document (assign template schedule to employees)
+/// HR HUB «Расписание» — monthly roster document (assign template schedule to employees)
 model WorkRoster {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2782,7 +2781,7 @@ model PositionSchedule {
   @@map("position_schedules")
 }
 
-/// Verifix «Индивидуальные графики для позиций» — monthly document
+/// HR HUB «Индивидуальные графики для позиций» — monthly document
 model PositionScheduleDoc {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2842,7 +2841,7 @@ model PositionScheduleDocLine {
 }
 
 /// Внутренняя командировка
-/// Verifix «Внутренняя командировка» — request + trip lifecycle
+/// HR HUB «Внутренняя командировка» — request + trip lifecycle
 model InternalTrip {
   id                   String        @id @default(uuid()) @db.Uuid
   tenantId             String        @map("tenant_id") @db.Uuid
@@ -2940,7 +2939,7 @@ model PaymentOrder {
   @@map("payment_orders")
 }
 
-/// Парные счета (VERIFIX)
+/// Парные счета (HR_HUB)
 model AccountPair {
   id            String   @id @default(uuid()) @db.Uuid
   tenantId      String   @map("tenant_id") @db.Uuid
@@ -2975,7 +2974,7 @@ model AccountPairSubconto {
   @@map("account_pair_subcontos")
 }
 
-/// Взаимозачет / Взаиморасчеты (VERIFIX)
+/// Взаимозачет / Взаиморасчеты (HR_HUB)
 model Settlement {
   id            String           @id @default(uuid()) @db.Uuid
   tenantId      String           @map("tenant_id") @db.Uuid
@@ -3127,7 +3126,7 @@ model SalesCommissionLine {
   @@map("sales_commission_lines")
 }
 
-/// Verifix «Разовые начисления / удержания»
+/// HR HUB «Разовые начисления / удержания»
 model OneTimeAccrualDoc {
   id            String            @id @default(uuid()) @db.Uuid
   tenantId      String            @map("tenant_id") @db.Uuid
@@ -3184,7 +3183,7 @@ model OneTimeAccrualLine {
   @@map("one_time_accrual_lines")
 }
 
-/// Verifix «Бонусные начисления» — Факт / КПЭ
+/// HR HUB «Бонусные начисления» — Факт / КПЭ
 model BonusAccrualDoc {
   id              String            @id @default(uuid()) @db.Uuid
   tenantId        String            @map("tenant_id") @db.Uuid
@@ -3235,7 +3234,7 @@ model BonusAccrualLine {
   @@map("bonus_accrual_lines")
 }
 
-/// Verifix «Начисления» — виды начислений (справочник зарплаты)
+/// HR HUB «Начисления» — виды начислений (справочник зарплаты)
 model AccrualType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3273,7 +3272,7 @@ model AccrualType {
   @@map("accrual_types")
 }
 
-/// Verifix «Удержания» — виды удержаний (справочник зарплаты)
+/// HR HUB «Удержания» — виды удержаний (справочник зарплаты)
 model DeductionType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3308,7 +3307,7 @@ model DeductionType {
   @@map("deduction_types")
 }
 
-/// Verifix «Типы фактов» (продажи Billz/iiko и др.)
+/// HR HUB «Типы фактов» (продажи Billz/iiko и др.)
 model FactType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3336,7 +3335,7 @@ model FactType {
   @@map("fact_types")
 }
 
-/// Verifix «Факты» — факт по сотруднику (импорт Excel)
+/// HR HUB «Факты» — факт по сотруднику (импорт Excel)
 model Fact {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
@@ -3361,7 +3360,7 @@ model Fact {
   @@map("facts")
 }
 
-/// Займы — Verifix «Займы» / «Заем (создание)»
+/// Займы — HR HUB «Займы» / «Заем (создание)»
 model EmployeeLoan {
   id             String     @id @default(uuid()) @db.Uuid
   tenantId       String     @map("tenant_id") @db.Uuid
@@ -3463,7 +3462,7 @@ model Candidate {
   email           String?
   status          String   @default("new")
   note            String?
-  /// Verifix «Дата введения»
+  /// HR HUB «Дата введения»
   introducedAt    DateTime? @map("introduced_at") @db.Date
   category        String?
   education       String?
@@ -3510,7 +3509,7 @@ model EmployeeRelative {
   relation   String
   birthDate  DateTime? @map("birth_date") @db.Date
   phone      String?
-  /// Мужской / Женский (Verifix «Пол»)
+  /// Мужской / Женский (HR HUB «Пол»)
   gender     String?
   /// Рабочее место родственника
   workplace  String?
@@ -3527,7 +3526,7 @@ model EmployeeRelative {
   @@map("employee_relatives")
 }
 
-/// Verifix employee «Справки»
+/// HR HUB employee «Справки»
 model EmployeeCertificate {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
@@ -3549,7 +3548,7 @@ model EmployeeCertificate {
   @@map("employee_certificates")
 }
 
-/// Verifix employee «Стаж»
+/// HR HUB employee «Стаж»
 model EmployeeTenure {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
@@ -3567,7 +3566,7 @@ model EmployeeTenure {
   @@map("employee_tenures")
 }
 
-/// Verifix employee «Места работы»
+/// HR HUB employee «Места работы»
 model EmployeeWorkplace {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
@@ -3588,7 +3587,7 @@ model EmployeeWorkplace {
   @@map("employee_workplaces")
 }
 
-/// Verifix employee «Награды»
+/// HR HUB employee «Награды»
 model EmployeeAward {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
@@ -3607,7 +3606,7 @@ model EmployeeAward {
   @@map("employee_awards")
 }
 
-/// Verifix employee «Файлы»
+/// HR HUB employee «Файлы»
 model EmployeeFile {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3629,7 +3628,7 @@ model EmployeeFile {
   @@map("employee_files")
 }
 
-/// Verifix employee «Инвентарь»
+/// HR HUB employee «Инвентарь»
 model EmployeeInventory {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid
@@ -3655,7 +3654,7 @@ model EmployeeInventory {
   @@map("employee_inventory")
 }
 
-/// Verifix employee «Список машин»
+/// HR HUB employee «Список машин»
 model EmployeeCar {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3674,7 +3673,7 @@ model EmployeeCar {
   @@map("employee_cars")
 }
 
-/// Verifix «Периоды блокировки отметок»
+/// HR HUB «Периоды блокировки отметок»
 model EmployeeMarkBlock {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
@@ -3692,7 +3691,7 @@ model EmployeeMarkBlock {
   @@map("employee_mark_blocks")
 }
 
-/// Verifix employee «Расчетные счета»
+/// HR HUB employee «Расчетные счета»
 model EmployeeBankAccount {
   id            String   @id @default(uuid()) @db.Uuid
   tenantId      String   @map("tenant_id") @db.Uuid
@@ -3720,7 +3719,7 @@ model EmployeeBankAccount {
   @@map("employee_bank_accounts")
 }
 
-/// Verifix employee «Банковские карты»
+/// HR HUB employee «Банковские карты»
 model EmployeeBankCard {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid
@@ -3766,7 +3765,7 @@ model EmployeeAccessGrant {
   @@map("employee_access_grants")
 }
 
-/// Виды рабочего времени (Verifix)
+/// Виды рабочего времени (каталог)
 model TimeType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3797,7 +3796,7 @@ model TimeType {
   @@map("time_types")
 }
 
-/// Шаблоны отчётов / документов (Verifix «Шаблоны отчетов»)
+/// Шаблоны отчётов / документов (HR HUB «Шаблоны отчетов»)
 model ReportTemplate {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid

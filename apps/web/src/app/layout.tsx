@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import { DeferredIconStyles } from '@/components/DeferredIconStyles';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
@@ -32,15 +33,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="" />
         <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
-          integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ=="
-          crossOrigin="anonymous"
-          referrerPolicy="no-referrer"
-        />
       </head>
       <body className={plusJakarta.className}>
+        <DeferredIconStyles />
         <Providers>{children}</Providers>
       </body>
     </html>

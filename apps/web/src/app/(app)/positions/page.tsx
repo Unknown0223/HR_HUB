@@ -18,9 +18,15 @@ import type { ColumnDef } from '@/lib/catalog-columns';
 import { downloadCsv } from '@/lib/csv';
 import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { useUrlParam } from '@/lib/use-url-state';
-import { PositionForm } from './PositionForm';
+import dynamic from 'next/dynamic';
 import list from './list.module.css';
 import shared from '../../page-shared.module.css';
+
+const PositionForm = dynamic(
+  () =>
+    import('./PositionForm').then((m) => ({ default: m.PositionForm })),
+  { ssr: false },
+);
 
 type Tab = 'positions' | 'groups';
 const TABS = ['positions', 'groups'] as const;
@@ -162,7 +168,7 @@ function PositionsPageInner() {
   const [checkedGroup, setCheckedGroup] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
@@ -596,59 +602,6 @@ function PositionsPageInner() {
               </Link>
             </>
           )}
-          <FilterPanel
-            inline
-            urlSync
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((v) => !v)}
-            fields={
-              tab === 'positions'
-                ? [
-                    { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
-                    { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
-                    {
-                      type: 'select',
-                      key: 'groupId',
-                      label: 'Группа должностей',
-                      options: groupFilterOptions,
-                    },
-                    {
-                      type: 'text',
-                      key: 'createdBy',
-                      label: 'Создал',
-                      placeholder: 'Поиск...',
-                    },
-                    {
-                      type: 'dateRange',
-                      fromKey: 'from',
-                      toKey: 'to',
-                      label: 'Дата создания',
-                    },
-                    {
-                      type: 'select',
-                      key: 'status',
-                      label: 'Статус',
-                      options: [
-                        { value: 'active', label: 'Активный' },
-                        { value: 'inactive', label: 'Неактивный' },
-                      ],
-                    },
-                  ]
-                : [
-                    { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
-                    { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
-                    {
-                      type: 'select',
-                      key: 'status',
-                      label: 'Статус',
-                      options: [
-                        { value: 'active', label: 'Активный' },
-                        { value: 'inactive', label: 'Неактивный' },
-                      ],
-                    },
-                  ]
-            }
-          />
         </div>
 
         <div className={list.rightTools}>
@@ -680,6 +633,65 @@ function PositionsPageInner() {
           <TablePrefsMenuButton prefs={prefs} onExport={exportTableCsv} />
         </div>
       </div>
+
+      {filtersOpen ? (
+        <div className={list.filterBand}>
+          <FilterPanel
+            inline
+            urlSync
+            fields={
+              tab === 'positions'
+                ? [
+                    { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+                    { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                    {
+                      type: 'select',
+                      key: 'groupId',
+                      label: 'Группа должностей',
+                      multiple: false,
+                      options: groupFilterOptions,
+                    },
+                    {
+                      type: 'text',
+                      key: 'createdBy',
+                      label: 'Создал',
+                      placeholder: 'Поиск...',
+                    },
+                    {
+                      type: 'dateRange',
+                      fromKey: 'from',
+                      toKey: 'to',
+                      label: 'Дата создания',
+                    },
+                    {
+                      type: 'select',
+                      key: 'status',
+                      label: 'Статус',
+                      multiple: false,
+                      options: [
+                        { value: 'active', label: 'Активный' },
+                        { value: 'inactive', label: 'Неактивный' },
+                      ],
+                    },
+                  ]
+                : [
+                    { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
+                    { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                    {
+                      type: 'select',
+                      key: 'status',
+                      label: 'Статус',
+                      multiple: false,
+                      options: [
+                        { value: 'active', label: 'Активный' },
+                        { value: 'inactive', label: 'Неактивный' },
+                      ],
+                    },
+                  ]
+            }
+          />
+        </div>
+      ) : null}
 
       {error ? <p className={list.error}>{error}</p> : null}
 

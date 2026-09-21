@@ -180,6 +180,9 @@ export class AccrualsService {
           ...r,
           accruedTotal: n(r.accruedTotal),
           deductedTotal: n(r.deductedTotal),
+          ndflTotal: n(r.ndflTotal),
+          inpsTotal: n(r.inpsTotal),
+          espTotal: n(r.espTotal),
         })),
       );
   }

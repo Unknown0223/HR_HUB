@@ -1,5 +1,5 @@
 /**
- * Verifix «Импорт фактов» xlsx — template matching
+ * HR HUB «Импорт фактов» xlsx — template matching
  * sheet «Факты»: person_name, division_name, fact_type_name, fact_value, fact_date
  */
 import ExcelJS from 'exceljs';

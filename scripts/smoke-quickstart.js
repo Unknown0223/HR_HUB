@@ -1,5 +1,5 @@
 /** Smoke: Инструкция для быстрого запуска */
-const API = process.env.API_URL || 'http://127.0.0.1:3001';
+const API = process.env.API_URL || 'http://127.0.0.1:3002';
 
 async function req(method, path, { token, tenant, body } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -34,7 +34,7 @@ async function main() {
   const got = await req('GET', '/api/settings/quickstart', auth);
   assert(got.ok, `get ${got.status} ${JSON.stringify(got.data)}`);
   assert(Array.isArray(got.data.steps) && got.data.steps.length === 10, 'expected 10 steps');
-  assert(got.data.heading === '#qs:ht:verifix', 'heading mismatch');
+  assert(got.data.heading === '#qs:ht:hrhub', 'heading mismatch');
   const keys = got.data.steps.map((s) => s.key);
   assert(keys.includes('organization') && keys.includes('hiring'), 'missing keys');
   const prevHire = got.data.checked?.hiring;

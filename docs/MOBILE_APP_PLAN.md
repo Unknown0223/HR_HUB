@@ -1,12 +1,14 @@
 # HR HUB — Mobil ilova rejasi
 
-**Maqsad:** Xodim va rahbar/HR uchun mobil ilova — mavjud NestJS API (`:3001`) ustida.  
+**Maqsad:** Xodim va rahbar/HR uchun mobil ilova — mavjud NestJS API (`:3002`) ustida.  
 **Emas:** Ofis Face ID terminalining o‘rnini bosish (yuzni tanish asosan **qurilmada** qoladi).
+
+> **SoT (F4):** [MOBILE_SOURCE_OF_TRUTH.md](./MOBILE_SOURCE_OF_TRUTH.md) — asosiy ilova `apps/mobile`; `/m` legacy; office-link-mobile alohida.
 
 **Tavsiya etilgan stack:** Flutter (Dart) — bitta kod → Android + iOS.  
 **Muqobil:** React Native (TypeScript) — web jamoa faqat TS bilsa.
 
-**Bog‘liq:** web HR HUB, `device-gw` (Hikvision/ZK), `docs/VERIFIX_BACKEND_1TO1_PLAN.md`
+**Bog‘liq:** web HR HUB, `device-gw` (Hikvision/ZK), `docs/CATALOG_BACKEND_PARITY_PLAN.md`
 
 ---
 
@@ -66,7 +68,7 @@ apps/mobile/
 
 ### 2.3 Backend bilan bog‘lanish
 
-- **Base URL:** `https://api.../api` (dev: `http://<LAN-IP>:3001/api`)
+- **Base URL:** `https://api.../api` (dev: `http://<LAN-IP>:3002/api`)
 - **Auth:** `POST /auth/login` → JWT; header `Authorization: Bearer …`
 - **Tenant:** `X-Tenant-Id` (login javobidan)
 - **Rollar:** `employee | manager | hr | tenant_admin` — menyu shunga qarab
@@ -325,7 +327,7 @@ Mobil va terminal **parallel** kanallar; ikkalasi ham `AttendanceMark` + `recalc
 
 ## 12. Xulosa (sodda)
 
-- Mobil — **shaxsiy va rahbar oqimlari** uchun; to‘liq Verifix/web o‘rnini bosmaydi.  
+- Mobil — **shaxsiy va rahbar oqimlari** uchun; to‘liq HR HUB/web o‘rnini bosmaydi.  
 - Yuzni tanish — **ofis qurilmasi**; telefonda asosan GPS/QR + ixtiyoriy selfie.  
 - Stack — **Flutter**; backend — **hozirgi Nest API**.  
 - Avval **M1 MVP** (login, belgi, so‘rov, tasdiq, push), keyin QR/jamoa/maosh.

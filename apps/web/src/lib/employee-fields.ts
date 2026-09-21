@@ -1,5 +1,5 @@
 /**
- * Verifix-aligned employee / attendance table fields.
+ * catalog-aligned employee / attendance table fields.
  * Single source for labels used in table settings, sorting, filters, and catalogs.
  */
 
@@ -49,13 +49,13 @@ export type EmployeeFieldDef = {
   column: boolean;
   /** Can be used as a sort key (client or API) */
   sortable: boolean;
-  /** Can be toggled in Verifix-style search settings */
+  /** Can be toggled in Arena-style search settings */
   searchable: boolean;
   /** Attendance-day field (not pure person identity) */
   attendance?: boolean;
 };
 
-/** Exact Verifix Russian labels from «Настройка таблицы / Сортировка». */
+/** Exact HR HUB Russian labels from «Настройка таблицы / Сортировка». */
 export const EMPLOYEE_FIELDS: EmployeeFieldDef[] = [
   { key: 'fullName', label: 'ФИО', column: true, sortable: true, searchable: true },
   { key: 'email', label: 'E-mail', column: true, sortable: true, searchable: true },
@@ -108,7 +108,7 @@ export const ATTENDANCE_DEFAULT_COLUMNS: EmployeeFieldKey[] = [
   'dayState',
 ];
 
-/** Default search toggles matching Verifix «Настройка поиска». */
+/** Default search toggles matching HR HUB «Настройка поиска». */
 export const ATTENDANCE_DEFAULT_SEARCH: EmployeeFieldKey[] = ['fullName'];
 
 export const ATTENDANCE_SEARCH_FIELDS: EmployeeFieldKey[] = [
@@ -135,7 +135,7 @@ export type SortDir = 'asc' | 'desc' | 'none';
 
 export type SortRule = { key: EmployeeFieldKey; dir: SortDir };
 
-/** Merge COLUMN_LABELS-style keys with Verifix labels (aliases included). */
+/** Merge COLUMN_LABELS-style keys with HR HUB labels (aliases included). */
 export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   ...EMPLOYEE_FIELD_LABELS,
   name: 'ФИО',

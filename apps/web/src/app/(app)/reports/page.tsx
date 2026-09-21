@@ -113,7 +113,7 @@ export default function ReportsPage() {
       };
       setData(await apiFetch(map[tab as Tab]));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
       setData(null);
     }
   }
@@ -173,7 +173,7 @@ export default function ReportsPage() {
         await downloadXlsxViaApi(`/api/reports/payroll/fot.xlsx${q}`, `fot-${yearNum}-${monthNum}.xlsx`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Excel export failed');
+      setError(e instanceof Error ? e.message : 'Не удалось экспортировать Excel');
     }
   }
 

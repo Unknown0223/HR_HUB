@@ -2,9 +2,10 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { connect, NatsConnection, StringCodec, Subscription } from 'nats';
 import { PunchDirection } from '@prisma/client';
+import { NATS_SUBJECTS } from '@hr-hub/shared';
 import { AttendanceService } from './attendance.service';
 
-const SUBJECT = 'hrhub.punch.raw';
+const SUBJECT = NATS_SUBJECTS.PUNCH_RAW;
 
 @Injectable()
 export class PunchConsumerService implements OnModuleInit, OnModuleDestroy {

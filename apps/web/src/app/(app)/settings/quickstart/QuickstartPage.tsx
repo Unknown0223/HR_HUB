@@ -86,7 +86,7 @@ export function QuickstartPage() {
       <div className={ui.card}>
         <div className={ui.head}>
           <button type="button" className={ui.headBtn} onClick={() => setOpen((v) => !v)}>
-            {open ? '▾' : '▸'} #qs:ht:verifix
+            {open ? '▾' : '▸'} #qs:ht:hrhub
           </button>
           <div className={ui.progressWrap}>
             <div className={ui.bar} aria-hidden>

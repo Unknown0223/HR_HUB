@@ -90,11 +90,11 @@ async function main() {
       code: `SMOKE_R_${stamp}`,
       name: `Smoke role ${stamp}`,
       sortOrder: 99,
-      meta: { products: ['verifix'] },
+      meta: { products: ['hrhub'] },
     },
   });
   assert(roleRow.ok, `create role ${roleRow.status}`);
-  assert(roleRow.data.meta?.products?.[0] === 'verifix', 'product not stored');
+  assert(roleRow.data.meta?.products?.[0] === 'hrhub', 'product not stored');
 
   const delRole = await req(
     'POST',

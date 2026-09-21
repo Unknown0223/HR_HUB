@@ -9,16 +9,28 @@ function cacheKey(tenantId: string | null | undefined, path: string) {
   return `${tenantId ?? 'none'}::${path}`;
 }
 
+function pathOnly(path: string) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return p.split('?')[0];
+}
+
 export function invalidateCatalogLookupsCache() {
   cache.clear();
   inflight.clear();
 }
 
+/** Cached GETs: catalog lookups + org filter dropdown lists. */
 export function isCatalogLookupsGet(path: string, method?: string): boolean {
   const m = (method ?? 'GET').toUpperCase();
   if (m !== 'GET') return false;
-  const p = path.startsWith('/') ? path : `/${path}`;
-  return p.includes('/api/catalog/lookups');
+  const base = pathOnly(path);
+  return (
+    base === '/api/catalog/lookups' ||
+    base.startsWith('/api/catalog/lookups/') ||
+    base === '/api/organization/divisions' ||
+    base === '/api/organization/positions' ||
+    base === '/api/organization/position-groups'
+  );
 }
 
 export async function withCatalogLookupsCache<T>(

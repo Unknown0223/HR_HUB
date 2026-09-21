@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { FormModal } from '@/components/FormModal';
+import { FilterSelectLookup } from '@/components/FilterSelectLookup';
+import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import modal from '@/components/form-modal.module.css';
 import { apiFetch } from '@/lib/api';
-import { ACCRUAL_KINDS, formatMonthRu, type AccrualKind } from '@/lib/accruals';
+import { ACCRUAL_KINDS, type AccrualKind } from '@/lib/accruals';
 
 type Opt = { id: string; label: string };
 
@@ -13,7 +15,7 @@ function todayIso() {
 }
 
 function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
+  return new Date().toISOString().slice(0, 7) + '-01';
 }
 
 export function AccrualFormModal({
@@ -88,7 +90,7 @@ export function AccrualFormModal({
         method: 'POST',
         body: JSON.stringify({
           kind,
-          month: `${month}-01`,
+          month: month.includes('-01') ? month.slice(0, 10) : `${month.slice(0, 7)}-01`,
           docDate,
           number: number.trim() || undefined,
           title: title.trim() || undefined,
@@ -156,8 +158,12 @@ export function AccrualFormModal({
             <span>
               Месяц начисления <em className={modal.req}>*</em>
             </span>
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <span>{month ? formatMonthRu(`${month}-01`) : ''}</span>
+            <MonthPeriodPicker
+              compact={false}
+              label=""
+              value={month}
+              onChange={(next) => setMonth(next || currentMonth())}
+            />
           </label>
           <label className={modal.field}>
             <span>
@@ -197,18 +203,13 @@ export function AccrualFormModal({
 
         <label className={modal.field}>
           <span>Подразделение</span>
-          <select
+          <FilterSelectLookup
             value={divisionId}
-            disabled={loading}
-            onChange={(e) => setDivisionId(e.target.value)}
-          >
-            <option value="">—</option>
-            {divisions.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.label}
-              </option>
-            ))}
-          </select>
+            searchable
+            placeholder={loading ? 'Загрузка…' : 'Выберите подразделение…'}
+            options={divisions.map((d) => ({ value: d.id, label: d.label }))}
+            onChange={setDivisionId}
+          />
         </label>
 
         <label className={modal.radio}>

@@ -9,17 +9,17 @@ const p = new PrismaClient();
     _count: true,
   });
   const vf = await p.employee.count({
-    where: { tenantId: t.id, externalId: { startsWith: 'verifix:' } },
+    where: { tenantId: t.id, externalId: { startsWith: 'hrhub:' } },
   });
   const activeVf = await p.employee.count({
-    where: { tenantId: t.id, status: 'active', externalId: { startsWith: 'verifix:' } },
+    where: { tenantId: t.id, status: 'active', externalId: { startsWith: 'hrhub:' } },
   });
   const dismissedVf = await p.employee.count({
-    where: { tenantId: t.id, status: 'dismissed', externalId: { startsWith: 'verifix:' } },
+    where: { tenantId: t.id, status: 'dismissed', externalId: { startsWith: 'hrhub:' } },
   });
-  const marks = await p.attendanceMark.count({ where: { tenantId: t.id, source: 'verifix' } });
+  const marks = await p.attendanceMark.count({ where: { tenantId: t.id, source: 'hrhub' } });
   const marksLinked = await p.attendanceMark.count({
-    where: { tenantId: t.id, source: 'verifix', employeeId: { not: null } },
+    where: { tenantId: t.id, source: 'hrhub', employeeId: { not: null } },
   });
   const devices = await p.device.count({ where: { tenantId: t.id } });
   const locs = await p.location.count({ where: { tenantId: t.id } });

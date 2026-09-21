@@ -1,6 +1,6 @@
 import type { TableFieldDef, TablePrefsConfig } from '@/components/table-prefs';
 
-/** Verifix /vhr/htt/request_list — Запросы на отсутствие */
+/** HR HUB /vhr/htt/request_list — Запросы на отсутствие */
 export const ABSENCE_REQUEST_FIELDS: TableFieldDef[] = [
   { key: 'staff_name', label: 'Сотрудник', searchable: true },
   { key: 'request_date', label: 'Дата запроса', searchable: true },

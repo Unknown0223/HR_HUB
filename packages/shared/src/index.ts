@@ -1,4 +1,4 @@
-/** Shared HR HUB constants & types (Phase 0) */
+/** Shared HR HUB constants & types — used by API (and eventually web/mobile). */
 
 export const ROLES = [
   'platform_admin',
@@ -8,7 +8,7 @@ export const ROLES = [
   'employee',
 ] as const;
 
-export type Role = (typeof ROLES)[number];
+export type RoleName = (typeof ROLES)[number];
 
 export const TENANT_HEADER = 'x-tenant-id';
 
@@ -23,7 +23,7 @@ export interface PunchEvent {
   employeeId?: string;
   direction: 'IN' | 'OUT' | 'AUTO';
   occurredAt: string;
-  source: 'mock' | 'hikvision' | 'manual';
+  source: 'mock' | 'hikvision' | 'zkteco' | 'manual' | 'gps' | 'qr';
   raw?: Record<string, unknown>;
 }
 
@@ -31,4 +31,8 @@ export interface ApiErrorBody {
   statusCode: number;
   message: string | string[];
   error?: string;
+}
+
+export function isRoleName(value: string): value is RoleName {
+  return (ROLES as readonly string[]).includes(value);
 }

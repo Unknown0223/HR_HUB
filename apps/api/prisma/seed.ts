@@ -352,7 +352,7 @@ async function main() {
     );
   }
 
-  // Verifix-style attached locations for demo employee (Авто)
+  // Arena-style attached locations for demo employee (Авто)
   for (const l of demoLocs.slice(0, 8)) {
     const existingGrant = await prisma.employeeAccessGrant.findFirst({
       where: {
@@ -405,7 +405,7 @@ async function main() {
         invalidMarks: false,
         useBasicSettings: true,
         hikCentral: {
-          gatewayHost: 'hikvision.verifix.com',
+          gatewayHost: 'hikvision.example.com',
           gatewayPort: 6362,
           deviceId: 'demo-andijon-1',
           isupKey: '25ILAIN83',
@@ -448,7 +448,7 @@ async function main() {
         invalidMarks: false,
         useBasicSettings: true,
         hikCentral: {
-          gatewayHost: 'hikvision.verifix.com',
+          gatewayHost: 'hikvision.example.com',
           gatewayPort: 6362,
           deviceId: 'demo-andijon-1',
           isupKey: '25ILAIN83',
@@ -475,7 +475,7 @@ async function main() {
         autoGenerateIn: true,
         autoGenerateOut: true,
         hikCentral: {
-          gatewayHost: 'hikvision.verifix.com',
+          gatewayHost: 'hikvision.example.com',
           gatewayPort: 8000,
           deviceId: 'mock-terminal-1',
           isupKey: 'MOCKKEY01',
@@ -1033,7 +1033,7 @@ async function main() {
     ],
   });
 
-  // Verifix Настройки справочники (mega-nav dict= codes)
+  // HR HUB Настройки справочники (mega-nav dict= codes)
   const knownDicts: { code: string; name: string; kind: string; items: { code: string; name: string }[] }[] = [
     { code: 'edu', name: 'Виды образования', kind: 'core', items: [{ code: 'HIGH', name: 'Высшее' }] },
     { code: 'institutions', name: 'Учебные заведения', kind: 'core', items: [{ code: 'NUU', name: 'НУУз' }] },
@@ -1222,7 +1222,7 @@ async function main() {
     });
   }
 
-  // Verifix-like demo roster (ФИО + пол + регион + фото-плейсхолдер)
+  // catalog-like demo roster (ФИО + пол + регион + фото-плейсхолдер)
   const regionByCode = (code: string) =>
     regionsDict?.items.find((i) => i.code === code)?.id;
   const posWarehouse = await prisma.position.upsert({
@@ -1281,7 +1281,7 @@ async function main() {
     },
   });
 
-  const verifixRoster: Array<{
+  const demoRoster: Array<{
     tab: string;
     firstName: string;
     lastName: string;
@@ -1393,7 +1393,7 @@ async function main() {
     },
   ];
 
-  for (const row of verifixRoster) {
+  for (const row of demoRoster) {
     const personId = `00000000-0000-4000-8000-00000000${row.personSuffix}`;
     const person = await prisma.person.upsert({
       where: { id: personId },
@@ -1453,7 +1453,7 @@ async function main() {
     });
   }
 
-  // Verifix: кадровые документы for roster (hire + sample dismiss)
+  // HR HUB: кадровые документы for roster (hire + sample dismiss)
   const rosterEmps = await prisma.employee.findMany({
     where: { tenantId: tenant.id, status: 'active' },
     orderBy: { tabNumber: 'asc' },
@@ -1524,7 +1524,7 @@ async function main() {
     });
   }
 
-  // Verifix org chart: HR → ADMIN
+  // HR HUB org chart: HR → ADMIN
   const posHrd = await prisma.position.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'HRD' } },
     update: { name: 'HRD' },
@@ -1618,7 +1618,7 @@ async function main() {
       data: { divisionId: divAdmin.id },
     });
   }
-  // Extra child stubs under ADMIN (Verifix "Кол-во подразделений: 7")
+  // Extra child stubs under ADMIN (HR HUB "Кол-во подразделений: 7")
   for (let i = 1; i <= 7; i++) {
     const code = `ADM${i}`;
     await prisma.division.upsert({
@@ -2443,7 +2443,7 @@ async function main() {
     },
   });
 
-  // Clear any leave flags on today so Verifix calendar demo shows work hours.
+  // Clear any leave flags on today so HR HUB calendar demo shows work hours.
   await prisma.attendanceDay.updateMany({
     where: {
       tenantId: tenant.id,
@@ -3124,7 +3124,7 @@ async function main() {
       birthDate: new Date('1992-05-01'),
       phone: '+998909998877',
       gender: 'Женский',
-      workplace: 'ООО Verifix',
+      workplace: 'ООО Demo',
       dependent: true,
     },
   });
@@ -3142,7 +3142,7 @@ async function main() {
     },
   });
 
-  // Verifix «Кол-во сотрудников» — location attachments (recreate after wipe)
+  // HR HUB «Кол-во сотрудников» — location attachments (recreate after wipe)
   const allLocsForGrants = await prisma.location.findMany({
     where: { tenantId: tenant.id, isActive: true },
     select: { id: true, code: true },
@@ -3854,7 +3854,7 @@ async function main() {
   const { seedMovementStaff } = require('../scripts/seed-movement-staff.js');
   await seedMovementStaff(prisma, tenant.id);
 
-  console.log('Seed OK — full Verifix catalog demo data');
+  console.log('Seed OK — full HR HUB catalog demo data');
   console.log({
     platform: platform.email,
     admin: admin.email,

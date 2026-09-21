@@ -6,6 +6,7 @@ import { ImportPanel } from '@/components/ImportPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import { StatusBadge } from '@/components/StatusBadge';
 import { apiFetch } from '@/lib/api';
+import { payrollTypeLabel } from '@/lib/payroll-type-labels';
 import { downloadCsv } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
 import { useUrlParam } from '@/lib/use-url-state';
@@ -118,7 +119,7 @@ export default function PayrollPage() {
         setPeriods(await apiFetch('/api/payroll/periods'));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
+      setError(e instanceof Error ? e.message : 'Ошибка');
     }
   }
 
@@ -922,7 +923,7 @@ export default function PayrollPage() {
                       : '—'}
                   </td>
                   <td>
-                    <span className={styles.badge}>{l.type}</span>
+                    <span className={styles.badge}>{payrollTypeLabel(l.type)}</span>
                   </td>
                   <td>{money(l.amount)}</td>
                   <td>

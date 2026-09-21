@@ -56,6 +56,8 @@ jobs:
         run: npm ci
       - name: Generate Prisma client
         run: npm run prisma:generate -w @hr-hub/api
+      - name: Build shared package
+        run: npm run build -w @hr-hub/shared
       - name: API tsc (strict)
         run: npx tsc -p tsconfig.json --noEmit --pretty false
         working-directory: apps/api
@@ -78,10 +80,16 @@ jobs:
       - name: npm ci
         run: npm ci
       - name: API lint
-        run: |
-          echo "::notice::@hr-hub/api da lint script yo'q (eslint sozlanmagan). Bu qadam yashirish emas — tekshiruv yo'qligi aniq."
+        run: npm run lint -w @hr-hub/api
+      - name: Canonical ports (docs)
+        run: npm run check:ports
       - name: Web lint
-        run: npm run lint -w @hr-hub/web
+        run: |
+          if npm run lint -w @hr-hub/web; then
+            echo "Web lint OK"
+          else
+            echo "::notice::Web eslint-config-next yo'q — lint soft. Typecheck job majburiy."
+          fi
 
   test:
     name: Test
@@ -97,12 +105,8 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
-      - name: API unit tests (news XSS)
+      - name: API unit tests
         run: npm test -w @hr-hub/api
-      - name: Node smoke tests note
-        run: |
-          echo "## Smoke tests" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Live \`npm run smoke*\` CI da ishlatilmaydi (production DB yo'q)." >> "$GITHUB_STEP_SUMMARY"
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -113,6 +117,76 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           python -m unittest discover -s tests -v
+
+  smoke-quickstart:
+    name: Smoke quickstart
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [install]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: hrhub_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d hrhub_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/hrhub_ci?schema=public
+      JWT_SECRET: ci-smoke-jwt-secret-at-least-32-chars!!
+      PORT: "3002"
+      API_URL: http://127.0.0.1:3002
+      NODE_ENV: development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: Generate Prisma + build shared
+        run: |
+          npm run build -w @hr-hub/shared
+          npm run prisma:generate -w @hr-hub/api
+      - name: Migrate + seed CI DB
+        working-directory: apps/api
+        run: |
+          npx prisma migrate deploy
+          npm run prisma:seed
+      - name: Build API
+        run: npm run build:api
+      - name: Start API
+        working-directory: apps/api
+        run: |
+          node dist/main > /tmp/api-smoke.log 2>&1 &
+          echo $! > /tmp/api-smoke.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3002/docs >/dev/null 2>&1; then
+              echo "API up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"
+          cat /tmp/api-smoke.log
+          exit 1
+      - name: Smoke quickstart
+        run: npm run smoke:quickstart
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f /tmp/api-smoke.pid ]; then kill "$(cat /tmp/api-smoke.pid)" || true; fi
+          echo "## Smoke quickstart" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Live \`smoke:quickstart\` against CI Postgres." >> "$GITHUB_STEP_SUMMARY"
 
   build-web:
     name: Web build

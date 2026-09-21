@@ -118,7 +118,7 @@ function VBarChart({
   );
 }
 
-/** Verifix-style Sankey: labels left of nodes, thick ribbons → destination band */
+/** Arena-style Sankey: labels left of nodes, thick ribbons → destination band */
 function FlowChart({ flows }: { flows: Flow[] }) {
   const uid = useId().replace(/:/g, '');
   const top = flows.slice(0, 18);

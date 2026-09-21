@@ -60,7 +60,7 @@
 
 .layout {
   display: grid;
-  /* Verifix: fixed sidebar + fluid main */
+  /* HR HUB: fixed sidebar + fluid main */
   grid-template-columns: 340px minmax(0, 1fr);
   gap: 1.25rem;
   align-items: start;
@@ -1304,7 +1304,7 @@ button.calCell {
 }
 
 
-/* —— Verifix passport modal —— */
+/* —— HR HUB passport modal —— */
 .modalBackdrop {
   position: fixed;
   inset: 0;
@@ -3656,7 +3656,7 @@ button.calCell {
   background: #ffc700;
 }
 
-/* —— Verifix «Отметки (создание)» page —— */
+/* —— HR HUB «Отметки (создание)» page —— */
 .markCreatePage {
   position: fixed;
   inset: 0;

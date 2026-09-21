@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -586,16 +587,12 @@ function GphServicesPageInner() {
         </div>
 
         <div className={styles.rightTools}>
-          <label className={styles.monthFilter}>
-            месяц
-            <input
-              type="month"
-              value={monthValue(monthFilter)}
-              onChange={(e) =>
-                patchUrl({ month: e.target.value ? `${e.target.value}-01` : null })
-              }
-            />
-          </label>
+          <MonthPeriodPicker
+            className={styles.monthPicker}
+            label="Месяц"
+            value={monthFilter}
+            onChange={(next) => patchUrl({ month: next })}
+          />
           <span className={styles.countBadge}>
             {filtered.length} / {rows.length}
           </span>

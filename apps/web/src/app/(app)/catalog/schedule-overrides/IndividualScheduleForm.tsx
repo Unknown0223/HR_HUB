@@ -785,7 +785,7 @@ export function IndividualScheduleForm({
                   if (f) void onUploadTemplate(f);
                 }}
               />
-              <span className={styles.muted}>Excel Verifix (data + metadata)</span>
+              <span className={styles.muted}>Excel-шаблон (data + metadata)</span>
             </div>
             <label className={styles.check}>
               <input
