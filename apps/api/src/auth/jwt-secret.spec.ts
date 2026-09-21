@@ -59,8 +59,16 @@ function assertProdBootEnv(env: Record<string, string | undefined>): void {
   if (!(env.PUNCH_INGEST_API_KEY ?? '').trim()) {
     throw new Error('PUNCH_INGEST_API_KEY is required in production');
   }
-  if (!(env.DEVICE_CREDENTIAL_VAULT_KEY ?? '').trim()) {
-    throw new Error('DEVICE_CREDENTIAL_VAULT_KEY is required in production');
+  const vaultKey = (
+    env.DEVICE_CREDENTIAL_VAULT_KEY ??
+    env.DEVICE_LINK_KEY ??
+    env.PUNCH_INGEST_API_KEY ??
+    ''
+  ).trim();
+  if (!vaultKey) {
+    throw new Error(
+      'DEVICE_CREDENTIAL_VAULT_KEY (or DEVICE_LINK_KEY / PUNCH_INGEST_API_KEY) is required in production',
+    );
   }
   const bind = (
     env.OFFICE_LINK_BIND_SECRET ??
@@ -83,7 +91,7 @@ describe('prod boot env gates (main.ts mirror)', () => {
     );
   });
 
-  it('prod: requires punch + vault + bind', () => {
+  it('prod: requires punch + vault(source) + bind', () => {
     assert.throws(
       () =>
         assertProdBootEnv({
@@ -92,14 +100,20 @@ describe('prod boot env gates (main.ts mirror)', () => {
         }),
       /PUNCH_INGEST/,
     );
-    assert.throws(
-      () =>
-        assertProdBootEnv({
-          NODE_ENV: 'production',
-          JWT_SECRET: 'prod-secret-must-be-at-least-32c!',
-          PUNCH_INGEST_API_KEY: 'punch-key',
-        }),
-      /DEVICE_CREDENTIAL_VAULT/,
+    assert.doesNotThrow(() =>
+      assertProdBootEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'prod-secret-must-be-at-least-32c!',
+        PUNCH_INGEST_API_KEY: 'punch-key',
+      }),
+    );
+    assert.doesNotThrow(() =>
+      assertProdBootEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'prod-secret-must-be-at-least-32c!',
+        PUNCH_INGEST_API_KEY: 'punch-key',
+        DEVICE_LINK_KEY: 'link-key',
+      }),
     );
     assert.doesNotThrow(() =>
       assertProdBootEnv({

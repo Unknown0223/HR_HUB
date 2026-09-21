@@ -99,9 +99,15 @@ async function bootstrap() {
     );
   }
 
-  if (isProd && !(process.env.DEVICE_CREDENTIAL_VAULT_KEY ?? '').trim()) {
+  const vaultKey = (
+    process.env.DEVICE_CREDENTIAL_VAULT_KEY ??
+    process.env.DEVICE_LINK_KEY ??
+    process.env.PUNCH_INGEST_API_KEY ??
+    ''
+  ).trim();
+  if (isProd && !vaultKey) {
     throw new Error(
-      'DEVICE_CREDENTIAL_VAULT_KEY is required in production for device password encryption.',
+      'DEVICE_CREDENTIAL_VAULT_KEY (or DEVICE_LINK_KEY / PUNCH_INGEST_API_KEY) is required in production for device password encryption.',
     );
   }
 
