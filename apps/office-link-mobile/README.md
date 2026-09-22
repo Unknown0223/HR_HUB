@@ -1,12 +1,15 @@
 # HR HUB Link (Android)
 
-Ofis Face ID terminalini HR HUB platformasiga ulash — Windows [tools/office-link](../../tools/office-link) bilan **bir xil** pairing / Ulash / Web tasdiq oqimi.
+Ofis Face ID terminalini HR HUB platformasiga ulash — Windows [tools/office-link](../../tools/office-link) bilan **bir xil** pairing / Ulash / Web tasdiq / **Cloudflare tunnel** oqimi.
 
-## Cheklov
+## Tunnel (APK)
 
-Telefon ichida **device-gw + Cloudflare tunnel yo‘q**. Yuz sinxroni va punchlar uchun ofisda PC **HR HUB Link** (GW+tunnel) ishlashi kerak.
+Ilova Cloudflare `cloudflared` binary sini yuklab, terminalga **device-direct** quick tunnel ochadi (`http://IP:80` → `*.trycloudflare.com`) va `/office-link/announce` ga yozadi.
 
-PC ilovada **«Internet tunnel»** kartasi tunnel o‘chganda **avtomatik tiklaydi** (`Tunnelni tiklash` / auto-heal / `service_worker.py`). Android faqat LAN Ulash + Web tasdiq.
+- **2. Tiklash → B) Tunnel → Tunnelni ochish / tiklash**
+- Birinchi marta ~50–80 MB `cloudflared` yuklanadi (arm64/arm)
+- Tunnel ishlashi uchun ilovani ochiq qoldiring (fon service hali yo‘q)
+- Lokal `:8800` device-gw Androidda yo‘q — kerak emas (device-direct)
 
 Web: **Устройства → Связь с офисом → Android — APK yuklash**.
 
@@ -14,6 +17,7 @@ Web: **Устройства → Связь с офисом → Android — APK y
 
 - Flutter 3.8+
 - Android telefon/planshet (bir Wi‑Fi da terminal bilan)
+- Tunnel uchun telefonda internet (Cloudflare + Railway)
 
 ## Ishga tushirish
 
@@ -27,24 +31,25 @@ flutter run
 
 ```bash
 cd apps/office-link-mobile
-flutter build apk --release
+flutter build apk --release --no-tree-shake-icons
 ```
 
-Natija: `build/app/outputs/flutter-apk/app-release.apk`
+Natija: `build/app/outputs/flutter-apk/app-release.apk`  
+Deploy: `apps/api/assets/office-link/HRHUB-Link-Android.apk`
 
 ## Operator oqimi
 
 1. Web → pairing token yaratish
 2. Ilovada token → **Saqlash**
 3. Lokatsiya tanlash
-4. **Qidirish** — IP bo‘sh bo‘lsa Wi‑Fi `/24` avto-skan; bir nechta bo‘lsa ro‘yxatdan tanlang
-5. (ixtiyoriy) **Hammada tekshir** — bir xil parolni barcha LAN terminallarda sinab ko‘radi
-6. Joriy admin paroli → **Ulash**
-7. Webda «Подтвердить привязку»
-8. Ilova **TASDIQ → ULANDI** ni kuzatadi
+4. **Qidirish** — IP bo‘sh bo‘lsa Wi‑Fi `/24` avto-skan
+5. Joriy admin paroli → **Ulash**
+6. Webda «Подтвердить привязку»
+7. **2. Tiklash → Tunnelni ochish**
+8. Web «Синхронизировать» (yuzlar)
 
-**2. Tiklash → Tarmoqni qayta ulash** — Wi‑Fi/IP o‘zgaganda (avto skan + Web moslash, parol aylantirilmaydi).  
-**Tunnel** — faqat ofis PC Windows Link.
+**Tarmoqni qayta ulash** — Wi‑Fi/IP o‘zgaganda.  
+**Tunnelni tiklash** — Cloudflare URL yangilash / qayta announce.
 
 ## Config
 
@@ -65,21 +70,9 @@ Natija: `build/app/outputs/flutter-apk/app-release.apk`
 |---------|---------|
 | `api_client.py` | `lib/core/api/office_link_api.dart` |
 | `session.py` | `lib/core/session/office_link_session.dart` |
+| `tunnel_watch.py` / `runtime_setup.py` | `lib/core/tunnel/cloudflared_tunnel.dart` |
 | `provision.py` | `lib/core/provision/provision_engine.dart` |
-| `discovery.py` | `lib/core/device/hikvision_client.dart` |
 | `office_link_gui.py` | `lib/features/link/link_screen.dart` |
-
-## Parol saqlash
-
-Ulashdan keyin yangi admin parol **ikki joyda** saqlanadi:
-
-1. Encrypted secure storage (ilova ichida)
-2. Fayl: `…/files/HRHUB-Link/data/device-credential.json`
-
-Telefon ichida tipik yo‘l:
-`/data/data/com.hrhub.hrhub_office_link/app_flutter/HRHUB-Link/data/device-credential.json`
-
-Ilova: **Admin → Saqlangan terminal parolini ko‘rsat** (fayl yo‘li ham chiqadi).
 
 ## Test
 

@@ -345,14 +345,14 @@ class ProvisionEngine {
         ? '4/4 Parol terminalga o‘rnatildi — Webda tasdiqlang'
         : '4/4 Ulandi');
     emit(
-      'Otmetkalar: terminal → web. Yuzlar: Web «Синхронизировать» + PC GW+tunnel.',
+      'Otmetkalar: terminal → web. Yuzlar: Web sync + telefon Tunnel (2-jadval).',
     );
 
     return SubmitResult(
       kind: 'linked',
       message: needsConfirm
-          ? 'Web tasdiq kutilmoqda. Otmetkalar webga. Yuzlar: Web sync + PC GW+tunnel.'
-          : 'Ulandi. Otmetkalar to‘g‘ridan webga; yuzlar — Web sync + PC office-link.',
+          ? 'Web tasdiq kutilmoqda. Otmetkalar webga. Keyin Tunnelni oching.'
+          : 'Ulandi. Otmetkalar → web; yuzlar — Tunnel ochib Web sync.',
       device: {
         'id': deviceId,
         'host': host,

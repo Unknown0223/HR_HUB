@@ -157,6 +157,28 @@ class OfficeLinkApi {
     );
   }
 
+  Future<({int status, dynamic data})> announce({
+    required String tenant,
+    required String tunnelUrl,
+    String? deviceId,
+    String? pairingToken,
+    String? linkKey,
+  }) {
+    final body = <String, dynamic>{
+      'tenantCode': tenant,
+      'tunnelUrl': tunnelUrl.trim(),
+    };
+    final did = (deviceId ?? '').trim();
+    if (did.isNotEmpty) body['deviceId'] = did;
+    return _req(
+      'POST',
+      '/api/attendance/office-link/announce',
+      body: body,
+      pairingToken: pairingToken,
+      linkKey: linkKey,
+    );
+  }
+
   Future<({int status, dynamic data})> registerDevice({
     required String tenant,
     required Map<String, dynamic> device,

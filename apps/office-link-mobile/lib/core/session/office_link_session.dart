@@ -6,6 +6,7 @@ import '../device/lan_discovery.dart';
 import '../provision/provision_engine.dart';
 import '../security/auth_lock.dart';
 import '../storage/credential_store.dart';
+import '../tunnel/cloudflared_tunnel.dart';
 import 'submit_result.dart';
 
 typedef StatusFn = void Function(String message);
@@ -70,10 +71,12 @@ class OfficeLinkSession {
     OfficeLinkApi? api,
     AuthLock? auth,
     LanDiscovery? discovery,
+    CloudflaredTunnel? tunnel,
   })  : store = store ?? CredentialStore(),
         device = device ?? HikvisionClient(),
         api = api ?? OfficeLinkApi(apiUrl: config.apiUrl),
-        auth = auth ?? AuthLock() {
+        auth = auth ?? AuthLock(),
+        tunnel = tunnel ?? CloudflaredTunnel() {
     harden = DeviceHarden(this.device);
     this.discovery = discovery ?? LanDiscovery(client: this.device);
     engine = ProvisionEngine(
@@ -91,6 +94,7 @@ class OfficeLinkSession {
   final HikvisionClient device;
   final OfficeLinkApi api;
   final AuthLock auth;
+  final CloudflaredTunnel tunnel;
   late final DeviceHarden harden;
   late final LanDiscovery discovery;
   late final ProvisionEngine engine;
@@ -111,6 +115,7 @@ class OfficeLinkSession {
     linkKey = await store.linkKey();
     sessionId = await store.sessionId();
     locationId = await store.locationId();
+    await tunnel.loadPersisted();
     final cred = await store.readDeviceCredential();
     if (cred != null) {
       final h = '${cred['host'] ?? ''}'.trim();
@@ -695,7 +700,7 @@ class OfficeLinkSession {
     return best;
   }
 
-  /// Full Wi‑Fi reconnect (Windows parity, no GW/tunnel on phone).
+  /// Full Wi‑Fi reconnect (Windows parity). Tunnel — alohida [restoreTunnel].
   Future<SubmitResult> autoReconnectNetwork({
     String password = '',
     StatusFn? onStatus,
@@ -868,4 +873,86 @@ class OfficeLinkSession {
       onStatus: onStatus,
     );
   }
+
+  /// Cloudflare quick tunnel → terminal + announce (Windows restore_tunnel parity).
+  Future<SubmitResult> restoreTunnel({
+    StatusFn? onStatus,
+    String? ipHint,
+  }) async {
+    if (!hasCredentials) {
+      return const SubmitResult(
+        kind: 'no_key',
+        message: 'Pairing token yoki link key kerak.',
+      );
+    }
+
+    final cred = await store.readDeviceCredential();
+    var h = (ipHint ?? '').trim();
+    if (h.isEmpty) h = host.trim();
+    if (h.isEmpty) h = '${cred?['host'] ?? ''}'.trim();
+    final p = port > 0
+        ? port
+        : int.tryParse('${cred?['port'] ?? 80}') ?? 80;
+    final deviceId = '${cred?['deviceId'] ?? ''}'.trim();
+
+    if (h.isEmpty) {
+      return const SubmitResult(
+        kind: 'error',
+        message:
+            'Terminal IP yo‘q. Avval Ulash yoki «Tarmoqni qayta ulash», '
+            'keyin Tunnelni oching.',
+      );
+    }
+
+    final target = 'http://$h:$p';
+    onStatus?.call('Туннель -> терминал $h:$p…');
+
+    late final String url;
+    try {
+      url = await tunnel.start(targetUrl: target, onStatus: onStatus);
+    } catch (e) {
+      return SubmitResult(
+        kind: 'tunnel_error',
+        message: '$e'.replaceFirst(RegExp(r'^StateError:\s*'), ''),
+      );
+    }
+
+    onStatus?.call('Announce на платформу…');
+    final ann = await api.announce(
+      tenant: config.tenantCode,
+      tunnelUrl: url,
+      deviceId: deviceId.isEmpty ? null : deviceId,
+      pairingToken: pairingToken,
+      linkKey: linkKey,
+    );
+    if (!api.isSuccess(ann.status)) {
+      final err = ann.data is Map
+          ? '${ann.data['message'] ?? ann.data['error'] ?? ann.data}'
+          : '${ann.data}';
+      return SubmitResult(
+        kind: 'tunnel_error',
+        message:
+            'Tunnel ochildi ($url), lekin announce xato '
+            '(${ann.status}): ${err.trim().isEmpty ? 'noma’lum' : err}',
+        device: {'tunnelUrl': url, 'host': h, 'port': p},
+      );
+    }
+
+    host = h;
+    port = p;
+    return SubmitResult(
+      kind: 'tunnel_ok',
+      message: 'Tunnel ochildi va platformaga yozildi',
+      device: {
+        'tunnelUrl': url,
+        'host': h,
+        'port': p,
+        if (deviceId.isNotEmpty) 'deviceId': deviceId,
+      },
+    );
+  }
+
+  Future<Map<String, String>> tunnelStatus() => tunnel.status();
+
+  Future<void> stopTunnel() => tunnel.stop();
 }

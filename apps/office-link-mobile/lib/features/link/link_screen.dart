@@ -48,10 +48,13 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   String _detectLine = '';
   String _alert = '';
   String _note =
-      'Sozlash asbobi: 1) Ulash  2) Tarmoqni tiklash. '
-      'Tunnel / yuz sync — ofis PC (Windows Link). Link ochiq turishi shart emas.';
+      'Sozlash: 1) Ulash  2) Tarmoqni tiklash  3) Tunnelni ochish. '
+      'Tunnel ochiq turganda Web yuz sync / reach ishlaydi (ilova ochiq qolsin).';
 
   int _tab = 0;
+  String _tunnelState = '—';
+  String _tunnelUrl = '—';
+
 
   List<Map<String, dynamic>> _locations = [];
   String? _locationId;
@@ -79,6 +82,8 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
   @override
   void dispose() {
     _confirmPoll?.cancel();
+    // Keep cloudflared child if any — user may background the app briefly.
+    // Full stop only via «Tunnelni to‘xtat» button.
     _tokenCtrl.dispose();
     _ipCtrl.dispose();
     _pwdCtrl.dispose();
@@ -106,7 +111,65 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
       await _bindAndLoadLocations(showAlert: false);
       await _maybeResumeConfirmPoll();
     }
+    await _refreshTunnelStatus(silent: true);
     if (mounted) setState(() {});
+  }
+
+  Future<void> _refreshTunnelStatus({bool silent = false}) async {
+    if (_session == null) return;
+    final s = await _session!.tunnelStatus();
+    if (!mounted) return;
+    setState(() {
+      _tunnelState = s['state'] ?? '—';
+      _tunnelUrl = s['url'] ?? '—';
+      if (!silent && (s['error'] ?? '').isNotEmpty) {
+        _alert = s['error']!;
+      }
+    });
+  }
+
+  Future<void> _restoreTunnel() async {
+    await _ensureSession();
+    setState(() {
+      _busy = true;
+      _status = 'Tunnel ochilmoqda…';
+      _alert = '';
+    });
+    final result = await _session!.restoreTunnel(
+      ipHint: _ipCtrl.text.trim(),
+      onStatus: (m) {
+        if (mounted) setState(() => _status = m);
+      },
+    );
+    if (!mounted) return;
+    await _refreshTunnelStatus(silent: true);
+    setState(() {
+      _busy = false;
+      if (result.kind == 'tunnel_ok') {
+        _status = 'Tunnel ochiq';
+        _setBadge('TUNNEL', tone: 'ok');
+        _tunnelUrl = '${result.device['tunnelUrl'] ?? _tunnelUrl}';
+        _alert = result.message;
+        _note =
+            'Tunnel ochiq. Web «Синхронизировать» endi terminalga yetadi. '
+            'Ilovani yopmang — tunnel jarayoni ilova bilan birga yashaydi.';
+      } else {
+        _status = result.message.isEmpty ? 'Tunnel xato' : result.message;
+        _setBadge('XATO', tone: 'danger');
+        _alert = result.message;
+      }
+    });
+  }
+
+  Future<void> _stopTunnel() async {
+    await _ensureSession();
+    await _session!.stopTunnel();
+    await _refreshTunnelStatus(silent: true);
+    if (!mounted) return;
+    setState(() {
+      _status = 'Tunnel to‘xtatildi';
+      _alert = '';
+    });
   }
 
   void _setBadge(String text, {required String tone}) {
@@ -448,8 +511,8 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
             ? 'Parol terminalga o‘rnatildi va serverga yuborildi. Web → «Подтвердить привязку».'
             : 'Ulanish mustahkamlandi.';
         _note = needs
-            ? 'Keyingi qadam: Webda «Подтвердить привязку». Yuzlar: Web sync + PC tunnel.'
-            : 'Ulandi. Yangi parolni Web → Устройства sahifasida ko‘ring.';
+            ? 'Keyingi qadam: Webda «Подтвердить привязку». Keyin 2-jadvalda Tunnelni oching.'
+            : 'Ulandi. 2-jadval → Tunnelni ochish (yuz sync / Railway reach).';
       });
       if (needs) {
         _startConfirmPoll();
@@ -497,8 +560,9 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         _status = 'Ulanish mustahkamlandi';
         _setBadge('ULANDI', tone: 'ok');
         _alert =
-            'Web tasdiqlandi. Otmetkalar → web. Yuzlar — Web «Синхронизировать» + ofis PC tunnel.';
-        _note = 'Sozlash tugadi. Ilovani yopishingiz mumkin.';
+            'Web tasdiqlandi. Otmetkalar → web. Yuzlar uchun 2-jadvalda Tunnelni oching.';
+        _note =
+            'Sozlash tugadi. Tunnelni ochib Web «Синхронизировать» ni bosing.';
       });
       return;
     }
@@ -600,8 +664,8 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           _status = 'Tarmoq yangilandi';
           _setBadge('YANGILANDI', tone: 'ok');
           _alert =
-              'Host yangilandi; otmetkalar → web. Tunnel/yuz sync — ofis PC Windows Link.';
-          _note = 'Sozlash OK. Yuz sync faqat Web + ofis PC.';
+              'Host yangilandi; otmetkalar → web. Yuzlar uchun Tunnelni oching (2-jadval).';
+          _note = 'Sozlash OK. Keyin Tunnelni ochib Web sync qiling.';
         });
       } else {
         setState(() {
@@ -999,23 +1063,56 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
                 ),
                 _card(
                   title: 'B) Tunnel',
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Android telefon lokal shlyuz (:8800) va Cloudflare tunnel ochmaydi.',
+                      const Text(
+                        'Cloudflare tunnel telefon orqali terminalni '
+                        'Railway APIga ochadi (Windows Link bilan bir xil).',
                         style: TextStyle(fontSize: 13, color: LinkColors.muted),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
-                        'Tunnel tiklash — ofis PCdagi Windows HR HUB Link → '
-                        '«2. Восстановление» → «Восстановить туннель».',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        'Holat: $_tunnelState',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Yuz sync: Web «Синхронизировать» → ofis PC tunnel → terminal.',
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        'URL: $_tunnelUrl',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: LinkColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Avval Ulash / Tarmoqni qayta ulash (IP saqlansin). '
+                        'Tunnel ochiq turishi uchun ilovani fonida ochiq qoldiring.',
                         style: TextStyle(fontSize: 12, color: LinkColors.muted),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton(
+                            onPressed: _busy ? null : _restoreTunnel,
+                            child: Text(
+                              _busy ? 'Kuting…' : 'Tunnelni ochish / tiklash',
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: _busy
+                                ? null
+                                : () => _refreshTunnelStatus(),
+                            child: const Text('Status'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _busy ? null : _stopTunnel,
+                            child: const Text('To‘xtat'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
