@@ -82,8 +82,11 @@ import {
 } from './schedule-settings';
 import {
   officialLastOutEnabled,
+  parseHmToDate,
   roleForDayMark,
   startOfLocalDay,
+  startOfNextLocalDay,
+  workDateOnly,
 } from './attendance-day';
 
 @Injectable()
@@ -5829,7 +5832,10 @@ export class AttendanceService {
    * older ingest overwrote it with server receive time.
    * Also invalidate face-terminal marks that have no capture photo.
    */
-  async repairMarksToDeviceTime(tenantId: string, opts?: { limit?: number }) {
+  async repairMarksToDeviceTime(
+    tenantId: string,
+    opts?: { limit?: number; recalcDays?: number },
+  ) {
     const limit = Math.min(Math.max(opts?.limit ?? 5000, 1), 50_000);
     const marks = await this.prisma.attendanceMark.findMany({
       where: { tenantId },
@@ -5918,22 +5924,47 @@ export class AttendanceService {
         },
       });
       if (mark.employeeId) {
-        days.add(`${mark.employeeId}|${nextOccurred.toISOString().slice(0, 10)}`);
-        days.add(
-          `${mark.employeeId}|${mark.occurredAt.toISOString().slice(0, 10)}`,
-        );
+        const ymd = (d: Date) =>
+          new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Tashkent',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(d);
+        days.add(`${mark.employeeId}|${ymd(nextOccurred)}`);
+        days.add(`${mark.employeeId}|${ymd(mark.occurredAt)}`);
       }
     }
     for (const key of days) {
       const [empId, day] = key.split('|');
-      await this.recalcDay(tenantId, empId, new Date(`${day}T12:00:00.000Z`));
+      // Noon Tashkent → stable calendar day for recalcDay local midnight
+      await this.recalcDay(
+        tenantId,
+        empId,
+        new Date(`${day}T12:00:00+05:00`),
+      );
     }
+
+    // Re-aggregate recent days with Asia/Tashkent bounds (fixes UTC host drift).
+    const recalcDays = Math.min(Math.max(opts?.recalcDays ?? 14, 0), 60);
+    let daysForceRecalc = 0;
+    if (recalcDays > 0) {
+      const now = new Date();
+      for (let i = 0; i < recalcDays; i++) {
+        const at = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const r = await this.finalizeAttendanceDay(tenantId, at);
+        daysForceRecalc += r.employees;
+      }
+    }
+
     return {
       ok: true,
       scanned: marks.length,
       fixed,
       photoInvalidated,
       daysRecalc: days.size,
+      daysForceRecalc,
+      recalcDays,
     };
   }
 
@@ -7933,16 +7964,15 @@ export class AttendanceService {
   }
 
   async recalcDay(tenantId: string, employeeId: string, when: Date) {
-    const workDate = new Date(when);
-    workDate.setHours(0, 0, 0, 0);
-    const next = new Date(workDate);
-    next.setDate(next.getDate() + 1);
+    const rangeStart = startOfLocalDay(when);
+    const next = startOfNextLocalDay(when);
+    const workDate = workDateOnly(when);
 
     const marksRaw = await this.prisma.attendanceMark.findMany({
       where: {
         tenantId,
         employeeId,
-        occurredAt: { gte: workDate, lt: next },
+        occurredAt: { gte: rangeStart, lt: next },
       },
       orderBy: { occurredAt: 'asc' },
     });
@@ -8092,24 +8122,23 @@ export class AttendanceService {
       if (trackLate) {
         const start = employee?.schedule?.startTime ?? '09:00';
         const grace = employee?.schedule?.graceMinutes ?? 15;
-        const { h, m } = parseHm(start);
-        const planned = new Date(workDate);
         // Дозволено (allowed/loyal): late only after start+grace
         // Строго (strict): late counted from raw start
         const graceUsed = delayMode === 'strict' ? 0 : grace;
-        planned.setHours(h, m + graceUsed, 0, 0);
-        if (firstIn.occurredAt > planned) {
+        const plannedFixed = parseHmToDate(workDate, start);
+        const plannedWithGrace = new Date(
+          plannedFixed.getTime() + graceUsed * 60_000,
+        );
+        if (firstIn.occurredAt > plannedWithGrace) {
           status = DayStatus.late;
           lateMinutes = Math.round(
-            (firstIn.occurredAt.getTime() - planned.getTime()) / 60000,
+            (firstIn.occurredAt.getTime() - plannedWithGrace.getTime()) / 60000,
           );
           // If «считать опоздание в дозволенной зоне» — also count minutes inside grace
           if (settings.lateInGraceZone && delayMode !== 'strict' && grace > 0) {
-            const rawStart = new Date(workDate);
-            rawStart.setHours(h, m, 0, 0);
-            if (firstIn.occurredAt > rawStart) {
+            if (firstIn.occurredAt > plannedFixed) {
               lateMinutes = Math.round(
-                (firstIn.occurredAt.getTime() - rawStart.getTime()) / 60000,
+                (firstIn.occurredAt.getTime() - plannedFixed.getTime()) / 60000,
               );
             }
           }
@@ -8118,9 +8147,10 @@ export class AttendanceService {
 
       if (trackEarly && lastOut) {
         const end = employee?.schedule?.endTime ?? '18:00';
-        const { h, m } = parseHm(end);
-        const plannedOut = new Date(workDate);
-        plannedOut.setHours(h, Math.max(0, m - graceOut), 0, 0);
+        const plannedOutBase = parseHmToDate(workDate, end);
+        const plannedOut = new Date(
+          plannedOutBase.getTime() - graceOut * 60_000,
+        );
         if (lastOut.occurredAt < plannedOut) {
           earlyLeaveMinutes = Math.round(
             (plannedOut.getTime() - lastOut.occurredAt.getTime()) / 60000,
@@ -8154,21 +8184,20 @@ export class AttendanceService {
   }
 
   async finalizeAttendanceDay(tenantId: string, when: Date) {
-    const workDate = startOfLocalDay(when);
-    const next = new Date(workDate);
-    next.setDate(next.getDate() + 1);
+    const rangeStart = startOfLocalDay(when);
+    const next = startOfNextLocalDay(when);
     const rows = await this.prisma.attendanceMark.findMany({
       where: {
         tenantId,
         employeeId: { not: null },
-        occurredAt: { gte: workDate, lt: next },
+        occurredAt: { gte: rangeStart, lt: next },
       },
       select: { employeeId: true },
       distinct: ['employeeId'],
     });
     for (const row of rows) {
       if (!row.employeeId) continue;
-      await this.recalcDay(tenantId, row.employeeId, workDate);
+      await this.recalcDay(tenantId, row.employeeId, when);
     }
     return { ok: true, employees: rows.length };
   }
@@ -8176,8 +8205,7 @@ export class AttendanceService {
   async finalizeOpenDays(at = new Date()) {
     const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
     const today = startOfLocalDay(at);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     let days = 0;
     for (const t of tenants) {
       await this.finalizeAttendanceDay(t.id, yesterday);
@@ -8188,8 +8216,7 @@ export class AttendanceService {
   }
 
   async markAbsentsForToday(tenantId: string) {
-    const workDate = new Date();
-    workDate.setHours(0, 0, 0, 0);
+    const workDate = workDateOnly(new Date());
     const actives = await this.prisma.employee.findMany({
       where: { tenantId, status: 'active', employmentType: 'staff' },
       select: { id: true, schedule: { select: { settings: true } } },

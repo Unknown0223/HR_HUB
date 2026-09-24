@@ -36,21 +36,32 @@ function parseIdList(raw?: string | string[]): string[] {
 }
 
 function parseDay(dateStr?: string): Date {
-  const base = dateStr ? new Date(`${dateStr}T12:00:00`) : new Date();
-  if (Number.isNaN(base.getTime())) {
+  // UTC midnight of org Y-M-D — matches Prisma @db.Date / AttendanceDay.workDate
+  const ymd =
+    dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+      ? dateStr
+      : toLocalYmd(new Date());
+  const day = new Date(`${ymd}T00:00:00.000Z`);
+  if (Number.isNaN(day.getTime())) {
     throw new BadRequestException('Invalid date');
   }
-  const day = new Date(base);
-  day.setHours(0, 0, 0, 0);
   return day;
 }
 
-/** Local calendar YYYY-MM-DD — never use toISOString() (UTC shifts the day in UTC+). */
+function markBoundsForYmd(ymd: string): { start: Date; end: Date } {
+  const start = new Date(`${ymd}T00:00:00+05:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
+}
+
+/** Org calendar YYYY-MM-DD in Asia/Tashkent (API host may be UTC). */
 function toLocalYmd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
 }
 
 export type DashboardStatsFilters = {
@@ -76,8 +87,8 @@ export class DashboardService {
 
   async stats(tenantId: string, filters: DashboardStatsFilters = {}) {
     const today = parseDay(filters.date);
-    const nextDay = new Date(today);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const ymd = today.toISOString().slice(0, 10);
+    const { start: markFrom, end: markTo } = markBoundsForYmd(ymd);
 
     const divisionIds = parseIdList(filters.divisionIds);
     const positionIds = parseIdList(filters.positionIds);
@@ -106,7 +117,7 @@ export class DashboardService {
       employeeWhere.marks = {
         some: {
           tenantId,
-          occurredAt: { gte: today, lt: nextDay },
+          occurredAt: { gte: markFrom, lt: markTo },
           device: { locationId: { in: locationIds } },
         },
       };
@@ -162,7 +173,7 @@ export class DashboardService {
       this.prisma.device.count({ where: { tenantId, status: 'online' } }),
       this.prisma.device.count({ where: { tenantId } }),
       this.prisma.attendanceMark.count({
-        where: { tenantId, occurredAt: { gte: today, lt: nextDay } },
+        where: { tenantId, occurredAt: { gte: markFrom, lt: markTo } },
       }),
       this.prisma.problemMark.count({ where: { tenantId, resolved: false } }),
       this.prisma.division.count({ where: { tenantId, isActive: true } }),
@@ -272,7 +283,7 @@ export class DashboardService {
         },
         faceProfile: { select: { photoUrl: true, photoKey: true } },
         marks: {
-          where: { occurredAt: { gte: today, lt: nextDay } },
+          where: { occurredAt: { gte: markFrom, lt: markTo } },
           orderBy: { occurredAt: 'asc' },
           take: 1,
           select: {
@@ -285,7 +296,15 @@ export class DashboardService {
     const dayByEmp = new Map(days.map((d) => [d.employeeId, d]));
     const now = new Date();
     const viewingToday = toLocalYmd(today) === toLocalYmd(now);
-    const workdayOpen = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+    const nowParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: APP_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(now);
+    const nowH = Number(nowParts.find((p) => p.type === 'hour')?.value || 0);
+    const nowM = Number(nowParts.find((p) => p.type === 'minute')?.value || 0);
+    const workdayOpen = nowH > 9 || (nowH === 9 && nowM > 0);
     const missingStatus =
       viewingToday && !workdayOpen ? DayStatus.not_started : DayStatus.absent;
 

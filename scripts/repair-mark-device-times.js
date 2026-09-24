@@ -71,7 +71,7 @@ async function main() {
       Authorization: `Bearer ${token}`,
       'X-Tenant-Code': TENANT,
     },
-    body: JSON.stringify({ limit: LIMIT }),
+    body: JSON.stringify({ limit: LIMIT, recalcDays: Number(process.env.RECALC_DAYS || 14) }),
   });
   const text = await res.text();
   let data;

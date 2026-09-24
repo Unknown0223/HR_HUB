@@ -1023,11 +1023,11 @@ export class AttendanceController {
   @Post('marks/repair-device-times')
   repairMarksDeviceTimes(
     @CurrentTenant() tenantId: string | null,
-    @Body() body?: { limit?: number },
+    @Body() body?: { limit?: number; recalcDays?: number },
   ) {
     return this.attendance.repairMarksToDeviceTime(
       this.attendance.requireTenant(tenantId),
-      { limit: body?.limit },
+      { limit: body?.limit, recalcDays: body?.recalcDays },
     );
   }
 
