@@ -29,6 +29,7 @@ import {
   ApplyMarkSettingsDto,
   BulkDeviceIdsDto,
   BulkMarksDto,
+  CorrectionMatrixBatchDto,
   CopyMarksDto,
   CopyMarksPreviewDto,
   CreateDeviceDto,
@@ -1015,6 +1016,43 @@ export class AttendanceController {
     @Body() dto: BulkMarksDto,
   ) {
     return this.attendance.bulkMarks(this.attendance.requireTenant(tenantId), dto);
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr, Role.manager)
+  @Get('correction-matrix')
+  @ApiQuery({ name: 'month', required: true, example: '2026-09' })
+  @ApiQuery({ name: 'divisionIds', required: false })
+  @ApiQuery({ name: 'positionIds', required: false })
+  @ApiQuery({ name: 'scheduleIds', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  correctionMatrix(
+    @CurrentTenant() tenantId: string | null,
+    @Query('month') month: string,
+    @Query('divisionIds') divisionIds?: string,
+    @Query('positionIds') positionIds?: string,
+    @Query('scheduleIds') scheduleIds?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.attendance.correctionMatrix(
+      this.attendance.requireTenant(tenantId),
+      { month, divisionIds, positionIds, scheduleIds, q },
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Post('correction-matrix/batch')
+  correctionMatrixBatch(
+    @CurrentTenant() tenantId: string | null,
+    @Body() dto: CorrectionMatrixBatchDto,
+  ) {
+    return this.attendance.applyCorrectionMatrixBatch(
+      this.attendance.requireTenant(tenantId),
+      dto,
+    );
   }
 
   @ApiBearerAuth()

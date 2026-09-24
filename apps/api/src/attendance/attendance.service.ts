@@ -6888,6 +6888,270 @@ export class AttendanceService {
     return result;
   }
 
+  /**
+   * Month grid for manual DayStatus correction (SALEC-style tabel UX).
+   * Cells come from AttendanceDay; missing days → not_started / day_off by schedule.
+   */
+  async correctionMatrix(
+    tenantId: string,
+    opts: {
+      month: string;
+      divisionIds?: string;
+      positionIds?: string;
+      scheduleIds?: string;
+      q?: string;
+    },
+  ) {
+    const month = String(opts.month || '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      throw new BadRequestException('month must be YYYY-MM');
+    }
+    const [yStr, mStr] = month.split('-');
+    const year = Number(yStr);
+    const mon = Number(mStr);
+    const daysInMonth = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const from = workDateOnly(new Date(`${month}-01T12:00:00+05:00`));
+    const to = workDateOnly(
+      new Date(`${month}-${String(daysInMonth).padStart(2, '0')}T12:00:00+05:00`),
+    );
+
+    const parseIds = (raw?: string) =>
+      (raw || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+
+    const employeeWhere: Prisma.EmployeeWhereInput = {
+      tenantId,
+      status: 'active',
+      employmentType: 'staff',
+    };
+    const divisionIds = parseIds(opts.divisionIds);
+    const positionIds = parseIds(opts.positionIds);
+    const scheduleIds = parseIds(opts.scheduleIds);
+    if (divisionIds.length) employeeWhere.divisionId = { in: divisionIds };
+    if (positionIds.length) employeeWhere.positionId = { in: positionIds };
+    if (scheduleIds.length) employeeWhere.scheduleId = { in: scheduleIds };
+    if (opts.q?.trim()) {
+      const nameWhere = employeeNameSearchWhere(opts.q);
+      if (nameWhere) employeeWhere.AND = [nameWhere];
+      else {
+        employeeWhere.OR = [
+          { tabNumber: { contains: opts.q.trim(), mode: 'insensitive' } },
+        ];
+      }
+    }
+
+    const employees = await this.prisma.employee.findMany({
+      where: employeeWhere,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        tabNumber: true,
+        division: { select: { id: true, name: true } },
+        position: { select: { id: true, name: true } },
+        schedule: {
+          select: {
+            id: true,
+            name: true,
+            startTime: true,
+            endTime: true,
+            settings: true,
+          },
+        },
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      take: 500,
+    });
+
+    const empIds = employees.map((e) => e.id);
+    const dayRows =
+      empIds.length === 0
+        ? []
+        : await this.prisma.attendanceDay.findMany({
+            where: {
+              tenantId,
+              employeeId: { in: empIds },
+              workDate: { gte: from, lte: to },
+            },
+            select: {
+              employeeId: true,
+              workDate: true,
+              status: true,
+              firstInAt: true,
+              lastOutAt: true,
+              lateMinutes: true,
+              earlyLeaveMinutes: true,
+            },
+          });
+
+    const dayKey = (empId: string, ymd: string) => `${empId}|${ymd}`;
+    const byKey = new Map<string, (typeof dayRows)[0]>();
+    for (const d of dayRows) {
+      const ymd = d.workDate.toISOString().slice(0, 10);
+      byKey.set(dayKey(d.employeeId, ymd), d);
+    }
+
+    const rows = employees.map((e) => {
+      const pattern = (mergeScheduleSettings(e.schedule?.settings).weekPattern ??
+        '6/1') as WeekPattern;
+      const cells = days.map((day) => {
+        const ymd = `${month}-${String(day).padStart(2, '0')}`;
+        const rec = byKey.get(dayKey(e.id, ymd));
+        const workDate = workDateOnly(new Date(`${ymd}T12:00:00+05:00`));
+        const off = isDayOffByPattern(workDate, pattern);
+        const status = rec?.status
+          ? String(rec.status)
+          : off
+            ? DayStatus.day_off
+            : DayStatus.not_started;
+        return {
+          day,
+          date: ymd,
+          status,
+          lateMinutes: rec?.lateMinutes ?? 0,
+          earlyLeaveMinutes: rec?.earlyLeaveMinutes ?? 0,
+          firstInAt: rec?.firstInAt?.toISOString() ?? null,
+          lastOutAt: rec?.lastOutAt?.toISOString() ?? null,
+        };
+      });
+      const present = cells.filter(
+        (c) => c.status === DayStatus.on_time || c.status === DayStatus.late,
+      ).length;
+      return {
+        employeeId: e.id,
+        fullName: [e.lastName, e.firstName, e.middleName]
+          .filter(Boolean)
+          .join(' '),
+        tabNumber: e.tabNumber,
+        division: e.division?.name ?? null,
+        position: e.position?.name ?? null,
+        schedule: e.schedule?.name ?? null,
+        presentDays: present,
+        cells,
+      };
+    });
+
+    const todayYmd = ymdInTz(new Date());
+    const refDate = todayYmd.startsWith(month)
+      ? todayYmd
+      : `${month}-${String(daysInMonth).padStart(2, '0')}`;
+    const refDay = Number(refDate.slice(8, 10));
+    let atWork = 0;
+    let absent = 0;
+    let onLeave = 0;
+    let dayOff = 0;
+    for (const r of rows) {
+      const cell = r.cells.find((c) => c.day === refDay);
+      if (!cell) continue;
+      if (cell.status === DayStatus.on_time || cell.status === DayStatus.late)
+        atWork += 1;
+      else if (cell.status === DayStatus.absent) absent += 1;
+      else if (cell.status === DayStatus.leave) onLeave += 1;
+      else if (cell.status === DayStatus.day_off) dayOff += 1;
+      else absent += 1;
+    }
+
+    return {
+      month,
+      days,
+      referenceDate: refDate,
+      stats: {
+        employees: rows.length,
+        atWork,
+        absent,
+        leave: onLeave,
+        dayOff,
+      },
+      rows,
+    };
+  }
+
+  async applyCorrectionMatrixBatch(
+    tenantId: string,
+    dto: { entries: Array<{ employeeId: string; date: string; status: string; lateMinutes?: number; note?: string }> },
+  ) {
+    const entries = Array.isArray(dto.entries) ? dto.entries : [];
+    if (!entries.length) return { ok: true, updated: 0 };
+
+    const allowed = new Set<string>(Object.values(DayStatus));
+    let updated = 0;
+    const seen = new Set<string>();
+
+    for (const raw of entries) {
+      const empId = String(raw.employeeId || '');
+      const ymd = String(raw.date || '').slice(0, 10);
+      const status = String(raw.status || '');
+      if (!empId || !/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !allowed.has(status)) {
+        continue;
+      }
+      const key = `${empId}|${ymd}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const emp = await this.prisma.employee.findFirst({
+        where: { id: empId, tenantId },
+        select: { id: true },
+      });
+      if (!emp) continue;
+
+      const workDate = workDateOnly(new Date(`${ymd}T12:00:00+05:00`));
+      const existing = await this.prisma.attendanceDay.findUnique({
+        where: {
+          tenantId_employeeId_workDate: { tenantId, employeeId: empId, workDate },
+        },
+      });
+
+      let lateMinutes = Number(raw.lateMinutes);
+      if (!Number.isFinite(lateMinutes) || lateMinutes < 0) lateMinutes = 0;
+      if (status === DayStatus.on_time) lateMinutes = 0;
+      if (status === DayStatus.late && lateMinutes <= 0) {
+        lateMinutes = existing?.lateMinutes && existing.lateMinutes > 0
+          ? existing.lateMinutes
+          : 15;
+      }
+      if (
+        status === DayStatus.absent ||
+        status === DayStatus.day_off ||
+        status === DayStatus.leave ||
+        status === DayStatus.not_started
+      ) {
+        lateMinutes = 0;
+      }
+
+      await this.prisma.attendanceDay.upsert({
+        where: {
+          tenantId_employeeId_workDate: { tenantId, employeeId: empId, workDate },
+        },
+        create: {
+          tenantId,
+          employeeId: empId,
+          workDate,
+          status: status as DayStatus,
+          firstInAt: existing?.firstInAt ?? null,
+          lastOutAt: existing?.lastOutAt ?? null,
+          lateMinutes,
+          earlyLeaveMinutes: existing?.earlyLeaveMinutes ?? 0,
+        },
+        update: {
+          status: status as DayStatus,
+          lateMinutes,
+          ...(status === DayStatus.absent ||
+          status === DayStatus.day_off ||
+          status === DayStatus.leave
+            ? {}
+            : {}),
+        },
+      });
+      updated += 1;
+    }
+
+    return { ok: true, updated };
+  }
+
   async listDays(
     tenantId: string,
     opts: { date?: string; page?: string | number; limit?: string | number } = {},

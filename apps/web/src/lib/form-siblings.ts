@@ -663,7 +663,16 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     title: 'Список проблемных отметок',
     siblings: [
       { label: 'Отметки', href: '/attendance/marks' },
+      { label: 'Корректировка табеля', href: '/attendance/correction' },
       { label: 'Отображение последних отметок', href: '/attendance/latest' },
+    ],
+  },
+  'attendance-correction': {
+    title: 'Корректировка табеля',
+    siblings: [
+      { label: 'Отметки', href: '/attendance/marks' },
+      { label: 'Корректировки табеля (часы)', href: '/catalog/timesheet-adjustments' },
+      { label: 'Список проблемных отметок', href: '/attendance/problems' },
     ],
   },
   days: {

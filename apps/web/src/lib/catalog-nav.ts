@@ -80,6 +80,7 @@ export const CATALOG_NAV: NavGroup[] = [
       { href: '/catalog/locations', label: 'Локации' },
       { href: '/catalog/devices', label: 'Устройства' },
       { href: '/attendance/marks', label: 'Отметки' },
+      { href: '/attendance/correction', label: 'Корректировка табеля' },
       { href: '/catalog/schedule-overrides', label: 'Индивидуальные графики' },
       {
         href: '/catalog/position-schedules',

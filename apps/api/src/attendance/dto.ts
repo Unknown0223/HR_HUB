@@ -297,6 +297,26 @@ export class BulkMarksDto {
   markType?: string;
 }
 
+/** One cell in the correction-grid batch (manual DayStatus override). */
+export class CorrectionMatrixEntryDto {
+  @ApiProperty() @IsUUID('4') employeeId!: string;
+  @ApiProperty({ example: '2026-09-24' }) @IsDateString() date!: string;
+  @ApiProperty({
+    enum: ['on_time', 'late', 'absent', 'day_off', 'leave', 'not_started'],
+  })
+  @IsString()
+  status!: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsNumber() lateMinutes?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() note?: string;
+}
+
+export class CorrectionMatrixBatchDto {
+  @ApiProperty({ type: [CorrectionMatrixEntryDto] })
+  @IsArray()
+  entries!: CorrectionMatrixEntryDto[];
+}
+
 export class CopyMarksPreviewDto {
   @ApiProperty({ type: [String] })
   @IsArray()

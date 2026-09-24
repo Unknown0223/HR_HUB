@@ -334,6 +334,12 @@ export const MEGA_NAV: MegaSection[] = [
             iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #6366f1 100%)',
           },
           {
+            href: '/attendance/correction',
+            label: 'Корректировка табеля',
+            faIcon: 'fa-th',
+            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #0e9f6e 100%)',
+          },
+          {
             href: '/catalog/schedule-overrides',
             label: 'Индивидуальные графики',
             faIcon: 'fa-user-edit',
