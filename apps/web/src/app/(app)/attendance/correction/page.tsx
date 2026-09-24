@@ -2,6 +2,7 @@
 
 import {
   Suspense,
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -38,13 +39,30 @@ import {
 type DivOpt = { id: string; name: string };
 type PosOpt = { id: string; name: string };
 type Pending = Record<string, { status: CorrectionStatus; lateMinutes: number }>;
+type DraftFilters = {
+  month: string;
+  q: string;
+  divisionId: string;
+  positionId: string;
+};
 
-function effectiveCell(
-  row: CorrectionRow,
+const EMPTY_DRAFT: DraftFilters = {
+  month: monthNow(),
+  q: '',
+  divisionId: '',
+  positionId: '',
+};
+
+function filtersReady(f: DraftFilters) {
+  return Boolean(f.divisionId || f.positionId || f.q.trim());
+}
+
+function effectiveStatus(
+  employeeId: string,
   cell: CorrectionCell,
   pending: Pending,
 ): CorrectionCell {
-  const p = pending[cellKey(row.employeeId, cell.date)];
+  const p = pending[cellKey(employeeId, cell.date)];
   if (!p) return cell;
   return { ...cell, status: p.status, lateMinutes: p.lateMinutes };
 }
@@ -82,7 +100,7 @@ function DayPickerPanel({
   const today = ymdToday();
   const isCurrentMonth = today.startsWith(month);
   const todayDay = Number(today.slice(8, 10));
-  const selected = new Set(editDays);
+  const selected = useMemo(() => new Set(editDays), [editDays]);
   const dim = days.length;
 
   const label =
@@ -185,7 +203,10 @@ function DayPickerPanel({
                 <button
                   type="button"
                   className={styles.dayRangeApply}
-                  onClick={() => onSelectRange(from, to)}
+                  onClick={() => {
+                    onSelectRange(from, to);
+                    setOpen(false);
+                  }}
                 >
                   Выбрать
                 </button>
@@ -216,8 +237,8 @@ function DayPickerPanel({
                 })}
               </div>
               <p className={styles.dayHint}>
-                Выберите диапазон или отдельные дни. Статус проставится выбранным
-                (зелёным) дням × отмеченным сотрудникам (или всем видимым).
+                Диапазон или отдельные дни → статус сверху. Галочки слева —
+                кому проставить (пусто = всем в таблице).
               </p>
             </div>,
             document.body,
@@ -227,11 +248,119 @@ function DayPickerPanel({
   );
 }
 
+type GridRowProps = {
+  row: CorrectionRow;
+  month: string;
+  days: number[];
+  today: string;
+  selected: boolean;
+  selectedDays: Set<number>;
+  pending: Pending;
+  onToggleRow: (id: string) => void;
+  onCellClick: (employeeId: string, cell: CorrectionCell) => void;
+};
+
+const GridRow = memo(function GridRow({
+  row,
+  month,
+  days,
+  today,
+  selected,
+  selectedDays,
+  pending,
+  onToggleRow,
+  onCellClick,
+}: GridRowProps) {
+  let total = 0;
+  const cells = days.map((d) => {
+    const c =
+      row.cells.find((x) => x.day === d) ||
+      ({
+        day: d,
+        date: `${month}-${String(d).padStart(2, '0')}`,
+        status: 'not_started',
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+      } as CorrectionCell);
+    const eff = effectiveStatus(row.employeeId, c, pending);
+    total += workValue(eff.status);
+    return { c, eff };
+  });
+
+  return (
+    <tr className={selected ? styles.rowSelected : undefined}>
+      <td className={styles.stickyCheck}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleRow(row.employeeId)}
+        />
+      </td>
+      <td className={styles.stickyName}>
+        <div className={styles.fio}>{row.fullName}</div>
+        <div className={styles.muted}>{row.tabNumber}</div>
+      </td>
+      <td className={styles.stickyPos}>
+        <span className={styles.muted}>{row.position || '—'}</span>
+      </td>
+      <td className={styles.stickyDiv}>
+        <span className={styles.muted}>{row.division || '—'}</span>
+      </td>
+      <td className={styles.total}>{fmtTotal(total)}</td>
+      {cells.map(({ c, eff }) => {
+        const meta = statusMeta(eff.status);
+        const key = cellKey(row.employeeId, c.date);
+        const isPend = Boolean(pending[key]);
+        const selCol = selectedDays.has(c.day);
+        const future = c.date > today;
+        const tdClass = [
+          styles.cell,
+          selCol ? styles.cellColSel : '',
+          isPend ? styles.cellPending : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        if (future) {
+          return (
+            <td key={c.date} className={tdClass}>
+              <span className={styles.futureDot}>·</span>
+            </td>
+          );
+        }
+
+        return (
+          <td key={c.date} className={tdClass}>
+            <button
+              type="button"
+              className={`${styles.cellBadge} ${styles[meta.cellClass as keyof typeof styles] || ''}`}
+              title={`${meta.label}${
+                eff.lateMinutes ? ` · ${eff.lateMinutes} мин` : ''
+              } — клик: сменить статус`}
+              onClick={() => onCellClick(row.employeeId, c)}
+            >
+              {cellShort(eff)}
+            </button>
+          </td>
+        );
+      })}
+    </tr>
+  );
+});
+
+/** Cycle quick statuses on cell click (fast, no expand). */
+const CYCLE: CorrectionStatus[] = [
+  'on_time',
+  'late',
+  'absent',
+  'day_off',
+  'leave',
+  'on_time',
+];
+
 function CorrectionPageInner() {
-  const [month, setMonth] = useState(monthNow);
-  const [q, setQ] = useState('');
-  const [divisionId, setDivisionId] = useState('');
-  const [positionId, setPositionId] = useState('');
+  const [draft, setDraft] = useState<DraftFilters>(EMPTY_DRAFT);
+  const [applied, setApplied] = useState<DraftFilters | null>(null);
   const [divisions, setDivisions] = useState<DivOpt[]>([]);
   const [positions, setPositions] = useState<PosOpt[]>([]);
   const [data, setData] = useState<CorrectionMatrix | null>(null);
@@ -241,14 +370,13 @@ function CorrectionPageInner() {
   const [toast, setToast] = useState<string | null>(null);
 
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  /** Days chosen for bulk fill (SALEC editDays). */
   const [editDays, setEditDays] = useState<number[]>([]);
   const [pending, setPending] = useState<Pending>({});
   const [lateMinutes, setLateMinutes] = useState(15);
 
-  /** Single expanded column — header click (SALEC). */
-  const singleDay = editDays.length === 1 ? editDays[0] : null;
   const bulkActive = editDays.length > 0;
+  const canApply = filtersReady(draft);
+  const today = ymdToday();
 
   const loadLookups = useCallback(async () => {
     try {
@@ -279,36 +407,9 @@ function CorrectionPageInner() {
     }
   }, []);
 
-  const loadMatrix = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ month });
-      if (divisionId) params.set('divisionIds', divisionId);
-      if (positionId) params.set('positionIds', positionId);
-      if (q.trim()) params.set('q', q.trim());
-      const res = await apiFetch<CorrectionMatrix>(
-        `/api/attendance/correction-matrix?${params}`,
-      );
-      setData(res);
-      setPending({});
-      setSelectedRows(new Set());
-      setEditDays([]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить табель');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [month, divisionId, positionId, q]);
-
   useEffect(() => {
     void loadLookups();
   }, [loadLookups]);
-
-  useEffect(() => {
-    void loadMatrix();
-  }, [loadMatrix]);
 
   useEffect(() => {
     if (!toast) return;
@@ -316,32 +417,79 @@ function CorrectionPageInner() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const loadMatrix = useCallback(async (f: DraftFilters) => {
+    if (!filtersReady(f)) {
+      setError('Выберите подразделение, должность или сотрудника');
+      setData(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        month: f.month,
+        limit: '100',
+      });
+      if (f.divisionId) params.set('divisionIds', f.divisionId);
+      if (f.positionId) params.set('positionIds', f.positionId);
+      if (f.q.trim()) params.set('q', f.q.trim());
+      const res = await apiFetch<CorrectionMatrix>(
+        `/api/attendance/correction-matrix?${params}`,
+      );
+      setData(res);
+      setPending({});
+      setSelectedRows(new Set());
+      setEditDays([]);
+      setApplied(f);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить табель');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const onApply = () => {
+    if (!canApply) {
+      setToast('Сначала выберите фильтр (подразделение / должность / ФИО)');
+      return;
+    }
+    void loadMatrix(draft);
+  };
+
   const days = data?.days ?? [];
   const rows = data?.rows ?? [];
-  const today = ymdToday();
   const pendingCount = Object.keys(pending).length;
   const selectedDaySet = useMemo(() => new Set(editDays), [editDays]);
 
   const allSelected =
     rows.length > 0 && rows.every((r) => selectedRows.has(r.employeeId));
 
-  const toggleRow = (id: string) => {
+  const toggleRow = useCallback((id: string) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
   const toggleAllRows = () => {
     if (allSelected) setSelectedRows(new Set());
     else setSelectedRows(new Set(rows.map((r) => r.employeeId)));
   };
 
-  /** Header click: expand only this day column (toggle). */
-  const headerDayClick = (d: number) => {
-    setEditDays((prev) => (prev.length === 1 && prev[0] === d ? [] : [d]));
+  /** Header: select day for bulk (Shift = add to selection). */
+  const headerDayClick = (d: number, shiftKey: boolean) => {
+    setEditDays((prev) => {
+      if (shiftKey) {
+        const set = new Set(prev);
+        if (set.has(d)) set.delete(d);
+        else set.add(d);
+        return [...set].sort((a, b) => a - b);
+      }
+      return prev.length === 1 && prev[0] === d ? [] : [d];
+    });
   };
 
   const toggleDayInPicker = (d: number) => {
@@ -364,46 +512,74 @@ function CorrectionPageInner() {
   const clearDays = () => setEditDays([]);
 
   const pickToday = () => {
+    const month = applied?.month || draft.month;
     if (!today.startsWith(month)) return;
     const d = Number(today.slice(8, 10));
     if (days.includes(d)) setEditDays([d]);
   };
 
-  const setCellStatus = (
-    employeeId: string,
-    cell: CorrectionCell,
-    status: CorrectionStatus,
-  ) => {
-    const mins = status === 'late' ? Math.max(1, Number(lateMinutes) || 15) : 0;
-    const key = cellKey(employeeId, cell.date);
-    setPending((p) => {
-      const next = { ...p };
-      const same =
-        cell.status === status &&
-        (status !== 'late' || (cell.lateMinutes || 0) === mins) &&
-        !p[key];
-      if (same || (p[key]?.status === status && p[key]?.lateMinutes === mins)) {
-        // toggle off if clicking same as original
-        if (p[key]?.status === status && (status !== 'late' || p[key]?.lateMinutes === mins)) {
-          if (cell.status === status && (status !== 'late' || cell.lateMinutes === mins)) {
-            delete next[key];
-            return next;
-          }
+  const setCellStatus = useCallback(
+    (employeeId: string, cell: CorrectionCell, status: CorrectionStatus) => {
+      const mins =
+        status === 'late' ? Math.max(1, Number(lateMinutes) || 15) : 0;
+      const key = cellKey(employeeId, cell.date);
+      setPending((p) => {
+        const next = { ...p };
+        if (
+          cell.status === status &&
+          (status !== 'late' || cell.lateMinutes === mins) &&
+          !p[key]
+        ) {
+          return next;
         }
-      }
-      if (cell.status === status && (status !== 'late' || cell.lateMinutes === mins)) {
-        delete next[key];
-      } else {
-        next[key] = { status, lateMinutes: mins };
-      }
-      return next;
-    });
-  };
+        if (
+          p[key]?.status === status &&
+          p[key]?.lateMinutes === mins
+        ) {
+          delete next[key];
+          return next;
+        }
+        if (
+          cell.status === status &&
+          (status !== 'late' || cell.lateMinutes === mins)
+        ) {
+          delete next[key];
+        } else {
+          next[key] = { status, lateMinutes: mins };
+        }
+        return next;
+      });
+    },
+    [lateMinutes],
+  );
 
-  /** Bulk like SALEC: editDays × (selected rows OR all visible). */
+  const onCellClick = useCallback(
+    (employeeId: string, cell: CorrectionCell) => {
+      const minsBase = Math.max(1, Number(lateMinutes) || 15);
+      setPending((p) => {
+        const cur = effectiveStatus(employeeId, cell, p);
+        const idx = CYCLE.indexOf(cur.status as CorrectionStatus);
+        const status = CYCLE[idx >= 0 ? idx + 1 : 0] || 'on_time';
+        const mins = status === 'late' ? minsBase : 0;
+        const key = cellKey(employeeId, cell.date);
+        const next = { ...p };
+        if (
+          cell.status === status &&
+          (status !== 'late' || cell.lateMinutes === mins)
+        ) {
+          delete next[key];
+        } else {
+          next[key] = { status, lateMinutes: mins };
+        }
+        return next;
+      });
+    },
+    [lateMinutes],
+  );
+
   const bulkApply = (status: CorrectionStatus) => {
     if (editDays.length === 0) {
-      setToast('Сначала выберите дни (клик по заголовку или «Дни»)');
+      setToast('Сначала выберите дни (шапка или «Дни»)');
       return;
     }
     const mins = status === 'late' ? Math.max(1, Number(lateMinutes) || 15) : 0;
@@ -412,7 +588,7 @@ function CorrectionPageInner() {
         ? rows.filter((r) => selectedRows.has(r.employeeId))
         : rows;
     if (!targets.length) {
-      setToast('Нет сотрудников для заполнения');
+      setToast('Нет сотрудников');
       return;
     }
     setPending((p) => {
@@ -420,8 +596,7 @@ function CorrectionPageInner() {
       for (const r of targets) {
         for (const d of editDays) {
           const cell = r.cells.find((c) => c.day === d);
-          if (!cell) continue;
-          if (cell.date > today) continue;
+          if (!cell || cell.date > today) continue;
           const key = cellKey(r.employeeId, cell.date);
           if (
             cell.status === status &&
@@ -436,9 +611,9 @@ function CorrectionPageInner() {
       return next;
     });
     const scope =
-      selectedRows.size > 0 ? `${targets.length} сотр.` : 'всем видимым';
+      selectedRows.size > 0 ? `${targets.length} сотр.` : 'всем в таблице';
     setToast(
-      `«${statusMeta(status).label}» за ${editDays.length} дн. (${scope}) — нажмите «Сохранить»`,
+      `«${statusMeta(status).label}» · ${editDays.length} дн. (${scope})`,
     );
   };
 
@@ -465,14 +640,16 @@ function CorrectionPageInner() {
         '/api/attendance/correction-matrix/batch',
         { method: 'POST', body: JSON.stringify({ entries }) },
       );
-      setToast(`Сохранено: ${res.updated} ячеек`);
-      await loadMatrix();
+      setToast(`Сохранено: ${res.updated}`);
+      if (applied) await loadMatrix(applied);
     } catch (e) {
       setToast(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
       setSaving(false);
     }
   };
+
+  const monthLabel = fmtMonthLabel(draft.month);
 
   return (
     <div className={styles.wrap}>
@@ -482,66 +659,66 @@ function CorrectionPageInner() {
         <div className={styles.titleBlock}>
           <h1>Корректировка табеля</h1>
           <p>
-            Клик по дню в шапке — раскрыть колонку. «Дни» — несколько дней.
-            Сотрудники (галочки) + статус = массовое заполнение.
+            Сначала фильтры → «Применить». Клик по дню в шапке выделяет колонку;
+            клик по ячейке меняет статус. Без тяжёлого раскрытия колонки.
           </p>
         </div>
         <div className={styles.monthNav}>
           <button
             type="button"
             className={styles.monthBtn}
-            onClick={() => setMonth((m) => shiftMonth(m, -1))}
+            onClick={() =>
+              setDraft((d) => ({ ...d, month: shiftMonth(d.month, -1) }))
+            }
           >
             ‹
           </button>
-          <div className={styles.monthLabel}>{fmtMonthLabel(month)}</div>
+          <div className={styles.monthLabel}>{monthLabel}</div>
           <button
             type="button"
             className={styles.monthBtn}
-            onClick={() => setMonth((m) => shiftMonth(m, 1))}
+            onClick={() =>
+              setDraft((d) => ({ ...d, month: shiftMonth(d.month, 1) }))
+            }
           >
             ›
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={() => void loadMatrix()}
-            title="Обновить"
-          >
-            ↻
           </button>
         </div>
       </div>
 
-      <div className={styles.stats}>
-        <div className={styles.statCard}>
-          <div className={styles.statVal}>{data?.stats.employees ?? 0}</div>
-          <div className={styles.statLbl}>Сотрудников</div>
+      {data ? (
+        <div className={styles.stats}>
+          <div className={styles.statCard}>
+            <div className={styles.statVal}>{data.stats.employees}</div>
+            <div className={styles.statLbl}>В выборке</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statVal}>{data.stats.atWork}</div>
+            <div className={styles.statLbl}>В работе</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statVal}>{data.stats.absent}</div>
+            <div className={styles.statLbl}>Отсутствуют</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statVal}>{data.stats.leave}</div>
+            <div className={styles.statLbl}>Отпуск</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statVal}>{data.stats.dayOff}</div>
+            <div className={styles.statLbl}>Выходной</div>
+          </div>
         </div>
-        <div className={styles.statCard}>
-          <div className={styles.statVal}>{data?.stats.atWork ?? 0}</div>
-          <div className={styles.statLbl}>В работе</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statVal}>{data?.stats.absent ?? 0}</div>
-          <div className={styles.statLbl}>Отсутствуют</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statVal}>{data?.stats.leave ?? 0}</div>
-          <div className={styles.statLbl}>Отпуск</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statVal}>{data?.stats.dayOff ?? 0}</div>
-          <div className={styles.statLbl}>Выходной</div>
-        </div>
-      </div>
+      ) : null}
 
       <div className={styles.filters}>
         <div className={styles.field}>
           <label>Подразделение</label>
           <select
-            value={divisionId}
-            onChange={(e) => setDivisionId(e.target.value)}
+            value={draft.divisionId}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, divisionId: e.target.value }))
+            }
           >
             <option value="">Все</option>
             {divisions.map((d) => (
@@ -554,8 +731,10 @@ function CorrectionPageInner() {
         <div className={styles.field}>
           <label>Должность</label>
           <select
-            value={positionId}
-            onChange={(e) => setPositionId(e.target.value)}
+            value={draft.positionId}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, positionId: e.target.value }))
+            }
           >
             <option value="">Все</option>
             {positions.map((p) => (
@@ -568,330 +747,229 @@ function CorrectionPageInner() {
         <div className={styles.field}>
           <label>Сотрудник</label>
           <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            value={draft.q}
+            onChange={(e) => setDraft((d) => ({ ...d, q: e.target.value }))}
             placeholder="ФИО или таб. №"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onApply();
+            }}
           />
         </div>
+        <button
+          type="button"
+          className={styles.applyBtn}
+          disabled={!canApply || loading}
+          onClick={onApply}
+        >
+          {loading ? 'Загрузка…' : 'Применить'}
+        </button>
       </div>
 
-      <div className={styles.toolbar}>
-        <div className={styles.toolbarLeft}>
-          <div
-            className={`${styles.quickGroup} ${bulkActive ? styles.quickGroupActive : ''}`}
-          >
-            {QUICK_STATUSES.map((st) => {
-              const meta = statusMeta(st);
-              const cls =
-                st === 'on_time'
-                  ? styles.quickOnTime
-                  : st === 'late'
-                    ? styles.quickLate
-                    : styles.quickAbsent;
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  className={`${styles.quickBtn} ${cls}`}
-                  disabled={!bulkActive}
-                  title={
-                    bulkActive
-                      ? `Проставить «${meta.label}» за выбранные дни`
-                      : 'Сначала выберите дни'
-                  }
-                  onClick={() => bulkApply(st)}
-                >
-                  {meta.code || meta.short}
-                </button>
-              );
-            })}
-            <input
-              className={styles.lateInput}
-              type="number"
-              min={1}
-              max={720}
-              value={lateMinutes}
-              onChange={(e) => setLateMinutes(Number(e.target.value) || 15)}
-              title="Минуты опоздания"
-            />
-            <span className={styles.muted}>мин</span>
-            {SPECIAL_STATUSES.map((st) => {
-              const meta = statusMeta(st);
-              const cls =
-                st === 'day_off' ? styles.quickDayOff : styles.quickLeave;
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  className={`${styles.quickBtn} ${cls}`}
-                  disabled={!bulkActive}
-                  onClick={() => bulkApply(st)}
-                >
-                  {meta.short}
-                </button>
-              );
-            })}
-          </div>
-
-          <DayPickerPanel
-            month={month}
-            days={days}
-            editDays={editDays}
-            onToggleDay={toggleDayInPicker}
-            onSelectRange={selectRange}
-            onClearDays={clearDays}
-            onToday={pickToday}
-          />
-
-          <span className={styles.muted}>
-            {editDays.length
-              ? `Дней: ${editDays.length}${
-                  selectedRows.size
-                    ? ` · сотр.: ${selectedRows.size}`
-                    : ' · всем видимым'
-                }`
-              : 'Дни не выбраны'}
-            {pendingCount ? ` · черновик ${pendingCount}` : ''}
-          </span>
+      {!applied && !loading ? (
+        <div className={styles.emptyGate}>
+          <strong>Выберите фильтры и нажмите «Применить»</strong>
+          <p>
+            Таблица не загружается сразу — так страница не зависает на сотнях
+            сотрудников. Укажите подразделение, должность или ФИО.
+          </p>
         </div>
-        <div className={styles.toolbarRight}>
-          <button
-            type="button"
-            className={styles.cancelBtn}
-            disabled={!pendingCount || saving}
-            onClick={discard}
-          >
-            Отменить
-          </button>
-          <button
-            type="button"
-            className={styles.saveBtn}
-            disabled={!pendingCount || saving}
-            onClick={() => void save()}
-          >
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
-        </div>
-      </div>
+      ) : null}
 
-      <div className={styles.tableWrap}>
-        {loading && !data ? (
-          <div className={styles.loading}>Загрузка…</div>
-        ) : error ? (
-          <div className={styles.empty}>{error}</div>
-        ) : !rows.length ? (
-          <div className={styles.empty}>Нет сотрудников по фильтру</div>
-        ) : (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.stickyCheck}>
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAllRows}
-                    aria-label="Выбрать всех"
-                  />
-                </th>
-                <th className={styles.stickyName}>ФИО</th>
-                <th className={styles.stickyPos}>Должность</th>
-                <th className={styles.stickyDiv}>Подразделение</th>
-                <th className={styles.total}>Итого</th>
-                {days.map((d) => {
-                  const ymd = `${month}-${String(d).padStart(2, '0')}`;
-                  const sel = selectedDaySet.has(d);
-                  const isSingle = singleDay === d;
-                  const weekend = isWeekend(ymd);
-                  const isToday = ymd === today;
+      {error ? <div className={styles.empty}>{error}</div> : null}
+
+      {applied && data ? (
+        <>
+          <div className={styles.toolbar}>
+            <div className={styles.toolbarLeft}>
+              <div
+                className={`${styles.quickGroup} ${bulkActive ? styles.quickGroupActive : ''}`}
+              >
+                {QUICK_STATUSES.map((st) => {
+                  const meta = statusMeta(st);
+                  const cls =
+                    st === 'on_time'
+                      ? styles.quickOnTime
+                      : st === 'late'
+                        ? styles.quickLate
+                        : styles.quickAbsent;
                   return (
-                    <th
-                      key={d}
-                      className={[
-                        styles.dayHead,
-                        isSingle ? styles.dayHeadExpand : '',
-                        sel ? styles.dayHeadSel : '',
-                        !sel && weekend ? styles.dayHeadWeekend : '',
-                        isToday ? styles.dayHeadToday : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      onClick={() => headerDayClick(d)}
+                    <button
+                      key={st}
+                      type="button"
+                      className={`${styles.quickBtn} ${cls}`}
+                      disabled={!bulkActive}
                       title={
-                        isSingle
-                          ? `${String(d).padStart(2, '0')} — свернуть колонку`
-                          : `${String(d).padStart(2, '0')} — открыть колонку (Вовремя / Опоздание / Не пришел)`
+                        bulkActive
+                          ? `Проставить «${meta.label}»`
+                          : 'Сначала выберите дни'
                       }
+                      onClick={() => bulkApply(st)}
                     >
-                      <div className={styles.dayNum}>
-                        {String(d).padStart(2, '0')}
-                      </div>
-                      <div className={styles.dayWd}>
-                        {WEEKDAY_SHORT_RU[weekdayOf(ymd)]}
-                      </div>
-                    </th>
+                      {meta.code || meta.short}
+                    </button>
                   );
                 })}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const rowOn = selectedRows.has(r.employeeId);
-                let total = 0;
-                for (const c of r.cells) {
-                  total += workValue(effectiveCell(r, c, pending).status);
-                }
-                return (
-                  <tr
-                    key={r.employeeId}
-                    className={rowOn ? styles.rowSelected : undefined}
-                  >
-                    <td className={styles.stickyCheck}>
+                <input
+                  className={styles.lateInput}
+                  type="number"
+                  min={1}
+                  max={720}
+                  value={lateMinutes}
+                  onChange={(e) =>
+                    setLateMinutes(Number(e.target.value) || 15)
+                  }
+                  title="Минуты опоздания"
+                />
+                <span className={styles.muted}>мин</span>
+                {SPECIAL_STATUSES.map((st) => {
+                  const meta = statusMeta(st);
+                  const cls =
+                    st === 'day_off' ? styles.quickDayOff : styles.quickLeave;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      className={`${styles.quickBtn} ${cls}`}
+                      disabled={!bulkActive}
+                      onClick={() => bulkApply(st)}
+                    >
+                      {meta.short}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <DayPickerPanel
+                month={applied.month}
+                days={days}
+                editDays={editDays}
+                onToggleDay={toggleDayInPicker}
+                onSelectRange={selectRange}
+                onClearDays={clearDays}
+                onToday={pickToday}
+              />
+
+              <span className={styles.muted}>
+                {editDays.length
+                  ? `Дней: ${editDays.length}${
+                      selectedRows.size
+                        ? ` · сотр.: ${selectedRows.size}`
+                        : ' · всем в таблице'
+                    }`
+                  : 'Дни не выбраны'}
+                {pendingCount ? ` · черновик ${pendingCount}` : ''}
+                {rows.length >= 100 ? ' · макс. 100 в выборке' : ''}
+              </span>
+            </div>
+            <div className={styles.toolbarRight}>
+              <button
+                type="button"
+                className={styles.cancelBtn}
+                disabled={!pendingCount || saving}
+                onClick={discard}
+              >
+                Отменить
+              </button>
+              <button
+                type="button"
+                className={styles.saveBtn}
+                disabled={!pendingCount || saving}
+                onClick={() => void save()}
+              >
+                {saving ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.tableWrap}>
+            {!rows.length ? (
+              <div className={styles.empty}>Нет сотрудников по фильтру</div>
+            ) : (
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.stickyCheck}>
                       <input
                         type="checkbox"
-                        checked={rowOn}
-                        onChange={() => toggleRow(r.employeeId)}
+                        checked={allSelected}
+                        onChange={toggleAllRows}
+                        aria-label="Выбрать всех"
                       />
-                    </td>
-                    <td className={styles.stickyName}>
-                      <div className={styles.fio}>{r.fullName}</div>
-                      <div className={styles.muted}>{r.tabNumber}</div>
-                    </td>
-                    <td className={styles.stickyPos}>
-                      <span className={styles.muted}>{r.position || '—'}</span>
-                    </td>
-                    <td className={styles.stickyDiv}>
-                      <span className={styles.muted}>{r.division || '—'}</span>
-                    </td>
-                    <td className={styles.total}>{fmtTotal(total)}</td>
-                    {r.cells.map((c) => {
-                      const eff = effectiveCell(r, c, pending);
-                      const meta = statusMeta(eff.status);
-                      const key = cellKey(r.employeeId, c.date);
-                      const isPend = Boolean(pending[key]);
-                      const selCol = selectedDaySet.has(c.day);
-                      const isSingle = singleDay === c.day;
-                      const future = c.date > today;
-                      const tdClass = [
-                        styles.cell,
-                        selCol ? styles.cellColSel : '',
-                        isPend ? styles.cellPending : '',
-                        isSingle ? styles.cellExpand : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ');
-
-                      if (future) {
-                        return (
-                          <td key={c.date} className={tdClass}>
-                            <span className={styles.futureDot}>·</span>
-                          </td>
-                        );
-                      }
-
-                      if (isSingle) {
-                        const special =
-                          eff.status === 'day_off' || eff.status === 'leave';
-                        return (
-                          <td key={c.date} className={tdClass}>
-                            <div className={styles.inlineBtns}>
-                              {QUICK_STATUSES.map((st) => {
-                                const m = statusMeta(st);
-                                const active =
-                                  !special && eff.status === st;
-                                return (
-                                  <button
-                                    key={st}
-                                    type="button"
-                                    className={`${styles.inlineBtn} ${active ? styles.inlineBtnOn : ''}`}
-                                    title={`${m.label} — ${r.fullName}`}
-                                    onClick={() =>
-                                      setCellStatus(r.employeeId, c, st)
-                                    }
-                                  >
-                                    {m.code || m.short}
-                                  </button>
-                                );
-                              })}
-                              {SPECIAL_STATUSES.map((st) => {
-                                const m = statusMeta(st);
-                                const active = eff.status === st;
-                                return (
-                                  <button
-                                    key={st}
-                                    type="button"
-                                    className={`${styles.inlineBtn} ${styles.inlineBtnSpec} ${active ? styles.inlineBtnOn : ''}`}
-                                    style={
-                                      active
-                                        ? {
-                                            background:
-                                              st === 'day_off'
-                                                ? '#3b82f6'
-                                                : '#eab308',
-                                            color:
-                                              st === 'day_off'
-                                                ? '#fff'
-                                                : '#422006',
-                                            borderColor: 'transparent',
-                                          }
-                                        : undefined
-                                    }
-                                    title={m.label}
-                                    onClick={() =>
-                                      setCellStatus(r.employeeId, c, st)
-                                    }
-                                  >
-                                    {m.short}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        );
-                      }
-
+                    </th>
+                    <th className={styles.stickyName}>ФИО</th>
+                    <th className={styles.stickyPos}>Должность</th>
+                    <th className={styles.stickyDiv}>Подразделение</th>
+                    <th className={styles.total}>Итого</th>
+                    {days.map((d) => {
+                      const ymd = `${applied.month}-${String(d).padStart(2, '0')}`;
+                      const sel = selectedDaySet.has(d);
+                      const weekend = isWeekend(ymd);
+                      const isToday = ymd === today;
                       return (
-                        <td key={c.date} className={tdClass}>
-                          <button
-                            type="button"
-                            className={`${styles.cellBadge} ${styles[meta.cellClass as keyof typeof styles] || ''}`}
-                            title={`${meta.label}${
-                              eff.lateMinutes
-                                ? ` · ${eff.lateMinutes} мин`
-                                : ''
-                            } — клик по заголовку дня для ввода`}
-                            onClick={() => headerDayClick(c.day)}
-                          >
-                            {cellShort(eff)}
-                          </button>
-                        </td>
+                        <th
+                          key={d}
+                          className={[
+                            styles.dayHead,
+                            sel ? styles.dayHeadSel : '',
+                            !sel && weekend ? styles.dayHeadWeekend : '',
+                            isToday ? styles.dayHeadToday : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          onClick={(e) => headerDayClick(d, e.shiftKey)}
+                          title="Клик — выбрать день · Shift+клик — несколько дней"
+                        >
+                          <div className={styles.dayNum}>
+                            {String(d).padStart(2, '0')}
+                          </div>
+                          <div className={styles.dayWd}>
+                            {WEEKDAY_SHORT_RU[weekdayOf(ymd)]}
+                          </div>
+                        </th>
                       );
                     })}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <GridRow
+                      key={r.employeeId}
+                      row={r}
+                      month={applied.month}
+                      days={days}
+                      today={today}
+                      selected={selectedRows.has(r.employeeId)}
+                      selectedDays={selectedDaySet}
+                      pending={pending}
+                      onToggleRow={toggleRow}
+                      onCellClick={onCellClick}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
 
-      <div className={styles.legend}>
-        {[...QUICK_STATUSES, ...SPECIAL_STATUSES].map((st) => {
-          const meta = statusMeta(st);
-          return (
-            <span key={st} className={styles.legendItem}>
-              <span
-                className={`${styles.cellBadge} ${styles[meta.cellClass as keyof typeof styles] || ''}`}
-              >
-                {meta.code || meta.short}
-              </span>
-              {meta.code || meta.short} — {meta.label}
+          <div className={styles.legend}>
+            {[...QUICK_STATUSES, ...SPECIAL_STATUSES].map((st) => {
+              const meta = statusMeta(st);
+              return (
+                <span key={st} className={styles.legendItem}>
+                  <span
+                    className={`${styles.cellBadge} ${styles[meta.cellClass as keyof typeof styles] || ''}`}
+                  >
+                    {meta.code || meta.short}
+                  </span>
+                  {meta.code || meta.short} — {meta.label}
+                </span>
+              );
+            })}
+            <span className={styles.muted} style={{ marginLeft: 'auto' }}>
+              Ячейка: клик = следующий статус · Шапка дня + 1/0.5/0 = массово
             </span>
-          );
-        })}
-        <span className={styles.muted} style={{ marginLeft: 'auto' }}>
-          Шапка дня = колонка · «Дни» = несколько · галочки = кому проставить
-        </span>
-      </div>
+          </div>
+        </>
+      ) : null}
 
       {toast ? <div className={styles.toast}>{toast}</div> : null}
     </div>

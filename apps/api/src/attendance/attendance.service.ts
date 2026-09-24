@@ -6900,6 +6900,7 @@ export class AttendanceService {
       positionIds?: string;
       scheduleIds?: string;
       q?: string;
+      limit?: string | number;
     },
   ) {
     const month = String(opts.month || '').slice(0, 7);
@@ -6964,7 +6965,7 @@ export class AttendanceService {
         },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-      take: 500,
+      take: Math.min(Math.max(Number(opts.limit) || 100, 1), 200),
     });
 
     const empIds = employees.map((e) => e.id);
