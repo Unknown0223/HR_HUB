@@ -5827,6 +5827,7 @@ export class AttendanceService {
   /**
    * Restore occurredAt from terminal stamp (deviceOccurredAt / raw.time) when
    * older ingest overwrote it with server receive time.
+   * Also invalidate face-terminal marks that have no capture photo.
    */
   async repairMarksToDeviceTime(tenantId: string, opts?: { limit?: number }) {
     const limit = Math.min(Math.max(opts?.limit ?? 5000, 1), 50_000);
@@ -5838,44 +5839,86 @@ export class AttendanceService {
         id: true,
         employeeId: true,
         occurredAt: true,
+        source: true,
+        deviceId: true,
         rawPayload: true,
       },
     });
     let fixed = 0;
+    let photoInvalidated = 0;
     const days = new Set<string>();
+    const ignorePhotosByDevice = new Map<string, boolean>();
+
     for (const mark of marks) {
       const payload =
         mark.rawPayload &&
         typeof mark.rawPayload === 'object' &&
         !Array.isArray(mark.rawPayload)
-          ? (mark.rawPayload as Record<string, unknown>)
+          ? { ...(mark.rawPayload as Record<string, unknown>) }
           : {};
+      let changed = false;
+
       const deviceIso =
         this.extractRawEventTime(payload) ||
         (typeof payload.deviceOccurredAt === 'string'
           ? payload.deviceOccurredAt
           : null);
-      if (!deviceIso) continue;
-      const deviceAt = new Date(deviceIso);
-      if (Number.isNaN(deviceAt.getTime())) continue;
-      if (Math.abs(deviceAt.getTime() - mark.occurredAt.getTime()) < 2_000) continue;
+      let nextOccurred = mark.occurredAt;
+      if (deviceIso) {
+        const deviceAt = new Date(deviceIso);
+        if (
+          !Number.isNaN(deviceAt.getTime()) &&
+          Math.abs(deviceAt.getTime() - mark.occurredAt.getTime()) >= 2_000
+        ) {
+          payload.deviceOccurredAt = deviceAt.toISOString();
+          payload.repairedFromOccurredAt = mark.occurredAt.toISOString();
+          payload.repairedAt = new Date().toISOString();
+          nextOccurred = deviceAt;
+          changed = true;
+          fixed += 1;
+        }
+      }
 
-      const nextPayload = {
-        ...payload,
-        deviceOccurredAt: deviceAt.toISOString(),
-        repairedFromOccurredAt: mark.occurredAt.toISOString(),
-        repairedAt: new Date().toISOString(),
-      };
+      let ignorePhotos = false;
+      if (mark.deviceId) {
+        if (!ignorePhotosByDevice.has(mark.deviceId)) {
+          const d = await this.prisma.device.findFirst({
+            where: { id: mark.deviceId, tenantId },
+            select: { meta: true },
+          });
+          ignorePhotosByDevice.set(
+            mark.deviceId,
+            this.asMeta(d?.meta).ignorePhotos === true,
+          );
+        }
+        ignorePhotos = ignorePhotosByDevice.get(mark.deviceId) === true;
+      }
+      if (
+        this.sourceRequiresCapturePhoto(mark.source) &&
+        !ignorePhotos &&
+        !this.markHasCapturePhoto(payload) &&
+        payload.isValid !== false
+      ) {
+        payload.isValid = false;
+        payload.missingCapturePhoto = true;
+        payload.note =
+          (typeof payload.note === 'string' && payload.note) ||
+          'Нет фото отметки с терминала — не учитывается в табеле';
+        changed = true;
+        photoInvalidated += 1;
+      }
+
+      if (!changed) continue;
+
       await this.prisma.attendanceMark.update({
         where: { id: mark.id },
         data: {
-          occurredAt: deviceAt,
-          rawPayload: nextPayload as Prisma.InputJsonValue,
+          occurredAt: nextOccurred,
+          rawPayload: payload as Prisma.InputJsonValue,
         },
       });
-      fixed += 1;
       if (mark.employeeId) {
-        days.add(`${mark.employeeId}|${deviceAt.toISOString().slice(0, 10)}`);
+        days.add(`${mark.employeeId}|${nextOccurred.toISOString().slice(0, 10)}`);
         days.add(
           `${mark.employeeId}|${mark.occurredAt.toISOString().slice(0, 10)}`,
         );
@@ -5885,7 +5928,13 @@ export class AttendanceService {
       const [empId, day] = key.split('|');
       await this.recalcDay(tenantId, empId, new Date(`${day}T12:00:00.000Z`));
     }
-    return { ok: true, scanned: marks.length, fixed, daysRecalc: days.size };
+    return {
+      ok: true,
+      scanned: marks.length,
+      fixed,
+      photoInvalidated,
+      daysRecalc: days.size,
+    };
   }
 
   async bulkMarks(
@@ -6446,7 +6495,8 @@ export class AttendanceService {
       payload.offlineUnverified === true &&
       payload.clockSkew !== true &&
       payload.clockRollback !== true &&
-      payload.adminLoginBlocked !== true;
+      payload.adminLoginBlocked !== true &&
+      payload.missingCapturePhoto !== true;
     const rawNote =
       typeof payload.note === 'string' && payload.note.trim() ? payload.note.trim() : '';
     const noteLooksOffline = /офлайн|offline/i.test(rawNote);
@@ -6455,7 +6505,8 @@ export class AttendanceService {
       (noteLooksOffline &&
         payload.clockSkew !== true &&
         payload.clockRollback !== true &&
-        payload.adminLoginBlocked !== true);
+        payload.adminLoginBlocked !== true &&
+        payload.missingCapturePhoto !== true);
     const markValid = softAcceptOffline || payload.isValid !== false;
 
     // Always prefer terminal event time over server-receive / rewritten stamp.
@@ -6501,12 +6552,15 @@ export class AttendanceService {
         (payload.clockTamper === true ||
           payload.clockSkew === true ||
           payload.clockRollback === true ||
-          payload.adminLoginBlocked === true),
+          payload.adminLoginBlocked === true ||
+          payload.missingCapturePhoto === true),
       note:
         softAcceptOffline
           ? null
           : rawNote ||
-            (payload.clockSkew === true || payload.clockTamper === true
+            (payload.missingCapturePhoto === true
+              ? 'Нет фото отметки с терминала — не учитывается в табеле'
+              : payload.clockSkew === true || payload.clockTamper === true
               ? `Время терминала не совпадает с сервером (сдвиг ${Number(payload.clockDriftSeconds || 0)} с)`
               : payload.clockRollback === true
                 ? 'Время терминала откатили назад'
@@ -6860,6 +6914,27 @@ export class AttendanceService {
     const raw = dto.raw;
     if (!raw) return null;
     return pick(raw.photoBase64) || pick(raw.photo_base64);
+  }
+
+  /** Face terminals must send a capture snapshot for the mark to count in timesheet. */
+  private sourceRequiresCapturePhoto(source?: string | null): boolean {
+    const s = String(source || '').toLowerCase();
+    if (!s) return false;
+    if (s === 'manual' || s === 'qr' || s === 'gps' || s.includes('mock')) return false;
+    return (
+      s.includes('hikvision') ||
+      s.includes('http_host') ||
+      s === 'face' ||
+      s.includes('zkteco') ||
+      s.includes('isapi')
+    );
+  }
+
+  private markHasCapturePhoto(payload: Record<string, unknown> | null | undefined): boolean {
+    if (!payload) return false;
+    const key = typeof payload.photoKey === 'string' ? payload.photoKey.trim() : '';
+    const url = typeof payload.photoUrl === 'string' ? payload.photoUrl.trim() : '';
+    return Boolean(key || url);
   }
 
   private stripPunchPhoto(raw?: Record<string, unknown>) {
@@ -7791,6 +7866,53 @@ export class AttendanceService {
           : {}) as Record<string, unknown>),
         ...guardResult.extra,
       } as Prisma.InputJsonValue;
+    }
+
+    // Face terminal punch without capture → keep row (red) but exclude from timesheet.
+    {
+      let ignorePhotos = false;
+      if (deviceId) {
+        const d = await this.prisma.device.findFirst({
+          where: { id: deviceId, tenantId },
+          select: { meta: true },
+        });
+        const meta = this.asMeta(d?.meta);
+        ignorePhotos = meta.ignorePhotos === true;
+      }
+      const payloadObj =
+        rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
+          ? { ...(rawPayload as Record<string, unknown>) }
+          : {};
+      const needsPhoto =
+        this.sourceRequiresCapturePhoto(dto.source) && !ignorePhotos;
+      const hasPhoto = this.markHasCapturePhoto(payloadObj);
+      if (needsPhoto && !hasPhoto && payloadObj.isValid !== false) {
+        payloadObj.isValid = false;
+        payloadObj.missingCapturePhoto = true;
+        payloadObj.note =
+          (typeof payloadObj.note === 'string' && payloadObj.note) ||
+          'Нет фото отметки с терминала — не учитывается в табеле';
+        rawPayload = payloadObj as Prisma.InputJsonValue;
+        await this.prisma.problemMark.create({
+          data: {
+            tenantId,
+            reason: 'missing_capture_photo',
+            payload: {
+              employeeExternalId: dto.employeeExternalId,
+              employeeId,
+              deviceId,
+              occurredAt: occurredAt.toISOString(),
+              source: dto.source || null,
+              note: payloadObj.note,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        this.logger.warn(
+          `Mark without capture photo employee=${dto.employeeExternalId} source=${dto.source}`,
+        );
+      } else {
+        rawPayload = payloadObj as Prisma.InputJsonValue;
+      }
     }
 
     const mark = await this.prisma.attendanceMark.create({

@@ -49,6 +49,7 @@ function reasonLabel(reason: string) {
   if (reason === 'offline_unverified') return 'Отметка в офлайн-периоде (устарело)';
   if (reason === 'unknown_employee') return 'Неизвестный сотрудник';
   if (reason === 'device_admin_login') return 'Пароль администратора на терминале';
+  if (reason === 'missing_capture_photo') return 'Нет фото отметки';
   return reason;
 }
 
