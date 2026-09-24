@@ -17,6 +17,7 @@ import { apiFetch, type PageResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { mediaSrc } from '@/lib/media';
 import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
+import { fmtDateTimeTz } from '@/lib/tz';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from './page.module.css';
 import shared from '../../../page-shared.module.css';
@@ -106,9 +107,7 @@ function empName(e?: Emp | null) {
 }
 
 function fmtDt(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('ru-RU');
+  return fmtDateTimeTz(iso);
 }
 
 function typeClass(t: string) {

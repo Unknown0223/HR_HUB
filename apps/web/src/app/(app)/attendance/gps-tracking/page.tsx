@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
+import { APP_TZ } from '@/lib/tz';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from './page.module.css';
 
@@ -190,6 +191,7 @@ function GpsTrackingInner() {
                 const time = new Date(m.occurredAt).toLocaleTimeString('ru-RU', {
                   hour: '2-digit',
                   minute: '2-digit',
+                  timeZone: APP_TZ,
                 });
                 const tone =
                   m.markType === 'in'

@@ -8,6 +8,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { StatusBadge } from '@/components/StatusBadge';
 import { apiFetch, getSession, PageResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { fmtDateTimeTz, fmtHm } from '@/lib/tz';
 import { useUrlParam } from '@/lib/use-url-state';
 import styles from '../../page-shared.module.css';
 
@@ -1234,7 +1235,7 @@ export default function AttendancePage() {
                 const device = r.device as { name?: string } | null;
                 return (
                   <tr key={id}>
-                    <td>{String(r.occurredAt).replace('T', ' ').slice(0, 19)}</td>
+                    <td>{fmtDateTimeTz(r.occurredAt as string)}</td>
                     <td>
                       {emp ? `${emp.lastName} ${emp.firstName}` : String(r.employeeExternalId ?? '—')}
                     </td>
@@ -1252,8 +1253,8 @@ export default function AttendancePage() {
                     <td>
                       <StatusBadge status={String(r.status)} />
                     </td>
-                    <td>{r.firstInAt ? String(r.firstInAt).slice(11, 19) : '—'}</td>
-                    <td>{r.lastOutAt ? String(r.lastOutAt).slice(11, 19) : '—'}</td>
+                    <td>{fmtHm(r.firstInAt as string | null) ?? '—'}</td>
+                    <td>{fmtHm(r.lastOutAt as string | null) ?? '—'}</td>
                     <td>{String(r.lateMinutes ?? 0)}</td>
                   </tr>
                 );
@@ -1354,7 +1355,7 @@ export default function AttendancePage() {
                       {r.latitude != null ? `${r.latitude}, ${r.longitude}` : '—'}
                     </td>
                     <td>{r.accuracyM != null ? String(r.accuracyM) : '—'}</td>
-                    <td>{String(r.recordedAt ?? '').replace('T', ' ').slice(0, 19)}</td>
+                    <td>{fmtDateTimeTz((r.recordedAt as string) ?? null)}</td>
                     <td>{String(r.source ?? '—')}</td>
                   </tr>
                 );

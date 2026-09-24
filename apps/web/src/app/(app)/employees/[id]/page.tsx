@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { fmtHm, APP_TZ } from '@/lib/tz';
 import { FormModal } from '@/components/FormModal';
 import { PassportScanModal } from '@/components/PassportScanModal';
 import { ModalPortal } from '@/components/ModalPortal';
@@ -772,12 +773,7 @@ function parseHm(hm: string) {
 }
 
 function fmtHmFromIso(iso?: string | null) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mi}`;
+  return fmtHm(iso);
 }
 
 function plannedWorkMinutes(schedule?: Detail['schedule'] | null) {
@@ -11985,7 +11981,7 @@ export default function EmployeeDetailPage() {
                                   const daySlides = dayMarks
                                     .map((x) => ({
                                       src: mediaSrc(x.photoUrl) || '',
-                                      caption: `${markTypeMeta(x).label} ${new Date(x.occurredAt).toLocaleTimeString('ru-RU')}`,
+                                      caption: `${markTypeMeta(x).label} ${new Date(x.occurredAt).toLocaleTimeString('ru-RU', { timeZone: APP_TZ })}`,
                                     }))
                                     .filter((s) => s.src);
                                   const photo = mediaSrc(m.photoUrl);
@@ -12001,6 +11997,7 @@ export default function EmployeeDetailPage() {
                                             day: '2-digit',
                                             month: '2-digit',
                                             year: 'numeric',
+                                            timeZone: APP_TZ,
                                           },
                                         )}
                                       </td>
@@ -12011,6 +12008,7 @@ export default function EmployeeDetailPage() {
                                             hour: '2-digit',
                                             minute: '2-digit',
                                             second: '2-digit',
+                                            timeZone: APP_TZ,
                                           },
                                         )}
                                       </td>

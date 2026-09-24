@@ -3,9 +3,17 @@ import { DayStatus, EmploymentStatus, Prisma, RequestStatus } from '@prisma/clie
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 
+/** Railway/API often runs in UTC — always show org local time (Tashkent). */
+const APP_TZ = 'Asia/Tashkent';
+
 function fmtTime(d: Date | null | undefined) {
   if (!d) return null;
-  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return d.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: APP_TZ,
+  });
 }
 
 function parseHm(hm: string) {

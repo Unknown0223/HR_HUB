@@ -283,12 +283,23 @@ function fmtPeriodRu(from?: string | null, to?: string | null) {
 
 function fmtHm(iso?: string | null) {
   if (!iso) return '';
+  if (/^\d{1,2}:\d{2}/.test(iso) && !iso.includes('T') && iso.length <= 8) {
+    return iso.slice(0, 5);
+  }
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) {
     if (/^\d{1,2}:\d{2}/.test(iso)) return iso.slice(0, 5);
     return '';
   }
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tashkent',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const hh = parts.find((p) => p.type === 'hour')?.value ?? '00';
+  const mi = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return `${hh}:${mi}`;
 }
 
 function num(v: unknown) {

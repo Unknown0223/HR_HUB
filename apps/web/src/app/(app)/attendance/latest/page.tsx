@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
+import { fmtDateTimeTz } from '@/lib/tz';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from './page.module.css';
 
@@ -115,12 +116,7 @@ function LatestInner() {
                 </h3>
                 <p className={styles.pos}>{e?.position?.name || '—'}</p>
                 <span className={badge}>{m.markTypeLabel}</span>
-                <time>
-                  {new Date(m.occurredAt)
-                    .toISOString()
-                    .slice(0, 19)
-                    .replace('T', ' ')}
-                </time>
+                <time>{fmtDateTimeTz(m.occurredAt)}</time>
               </article>
             );
           })
