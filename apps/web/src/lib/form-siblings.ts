@@ -22,6 +22,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
       { label: 'Физические лица', href: '/catalog/persons' },
       { label: 'Уволенные сотрудники', href: '/employees?tab=dismissed' },
       { label: 'Сотрудники по договору ГПХ', href: '/employees?tab=gph' },
+      { label: 'Заявки из Telegram', href: '/employees/join-requests' },
     ],
   },
   'employees-dismissed': {

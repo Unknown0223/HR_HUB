@@ -120,12 +120,8 @@ function typeClass(t: string) {
 }
 
 function markPhotoSrc(m: Mark): string | null {
-  // Punch capture only. For «Примерный уход» never fall back to employee face —
-  // if snapshot was not saved, list stays text-only.
-  const punch = mediaSrc(m.photoUrl);
-  if (punch) return punch;
-  if (m.markType === 'estimated_out') return null;
-  return mediaSrc(m.employee?.faceProfile?.photoUrl) || null;
+  // Faqat terminal capture — avatar/profile rasm otmetka o‘rniga KO‘RSATILMAYDI.
+  return mediaSrc(m.photoUrl) || null;
 }
 
 function markDay(iso: string) {
@@ -756,18 +752,25 @@ function MarksInner() {
                 const slides = displayRows
                   .map((x) => ({
                     src: markPhotoSrc(x) || '',
-                    caption: `${empName(x.employee)} В· ${x.markTypeLabel || x.markType} В· ${fmtDt(x.occurredAt)}`,
+                    caption: `${empName(x.employee)} · ${x.markTypeLabel || x.markType} · ${fmtDt(x.occurredAt)}`,
                   }))
                   .filter((s) => s.src);
                 const idx = photo ? slides.findIndex((s) => s.src === photo) : -1;
                 const open = selectedId === m.id;
                 const isChecked = Boolean(checked[m.id]);
+                const rejected = m.isValid === false || Boolean(m.clockTamper);
                 return (
                   <Fragment key={m.id}>
                     <tr
-                      className={open || isChecked ? styles.rowSelected : undefined}
-                      onClick={() => setSelectedId(open ? null : m.id)}
+                      className={[
+                        open || isChecked ? styles.rowSelected : '',
+                        rejected ? styles.rowRejected : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ') || undefined}
                       style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedId(open ? null : m.id)}
+                      title={rejected ? m.note || 'Недействительная отметка' : undefined}
                     >
                       <td className={styles.checkCol}>
                         <input
@@ -796,12 +799,32 @@ function MarksInner() {
                             </td>
                           );
                         }
+                        if (key === 'time') {
+                          return (
+                            <td
+                              key={key}
+                              className={`${styles.codeCell} ${
+                                rejected ? styles.invalid : ''
+                              }`}
+                              title={
+                                rejected
+                                  ? m.note || 'Недействительная отметка'
+                                  : undefined
+                              }
+                            >
+                              {fmtDt(m.occurredAt)}
+                              {rejected ? (
+                                <span className={styles.rejectedBadge}>недейств.</span>
+                              ) : null}
+                            </td>
+                          );
+                        }
                         if (key === 'person') {
                           return (
                             <td
                               key={key}
                               className={`${styles.nameCell} ${
-                                m.isValid === false ? styles.invalid : ''
+                                rejected ? styles.invalid : ''
                               }`}
                             >
                               {empName(m.employee)}
@@ -817,21 +840,13 @@ function MarksInner() {
                             </td>
                           );
                         }
-                        if (key === 'time') {
+                        if (key === 'note') {
                           return (
                             <td
                               key={key}
-                              className={`${styles.codeCell} ${
-                                m.isValid === false || m.clockTamper ? styles.invalid : ''
-                              }`}
-                              title={
-                                m.clockTamper || m.isValid === false
-                                  ? m.note || 'Подозрительное время терминала'
-                                  : undefined
-                              }
+                              className={rejected ? styles.invalid : undefined}
                             >
-                              {fmtDt(m.occurredAt)}
-                              {m.clockTamper || m.isValid === false ? ' ⚠' : ''}
+                              {m.note || (rejected ? 'Недействительная' : '—')}
                             </td>
                           );
                         }

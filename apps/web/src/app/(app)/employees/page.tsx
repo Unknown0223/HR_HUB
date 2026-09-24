@@ -853,22 +853,7 @@ function EmployeesPageInner() {
 
       {panel === 'telegram' ? (
         <div className={shared.panel} style={{ marginBottom: '1rem' }}>
-          <div className={shared.rowActions} style={{ marginBottom: '0.65rem' }}>
-            <strong>Telegram</strong>
-            <div className={shared.rowActions}>
-              <Link href="/settings/telegram" className={shared.btnSecondary}>
-                Настройки бота
-              </Link>
-              <button
-                type="button"
-                className={shared.btnGhost}
-                onClick={() => setPanel('none')}
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-          <TelegramJoinPanel />
+          <TelegramJoinPanel onClose={() => setPanel('none')} />
         </div>
       ) : null}
 

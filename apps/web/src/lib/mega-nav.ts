@@ -85,6 +85,12 @@ export const MEGA_NAV: MegaSection[] = [
             iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)',
           },
           {
+            href: '/employees/join-requests',
+            label: 'Заявки из Telegram',
+            faIcon: 'fa-paper-plane',
+            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #06b6d4 100%)',
+          },
+          {
             href: '/catalog/hr-documents',
             label: 'Все кадровые документы',
             faIcon: 'fa-file-alt',

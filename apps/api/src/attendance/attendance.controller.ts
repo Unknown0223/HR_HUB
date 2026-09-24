@@ -1019,6 +1019,20 @@ export class AttendanceController {
 
   @ApiBearerAuth()
   @ApiSecurity('tenant')
+  @Roles(Role.platform_admin, Role.tenant_admin)
+  @Post('marks/repair-device-times')
+  repairMarksDeviceTimes(
+    @CurrentTenant() tenantId: string | null,
+    @Body() body?: { limit?: number },
+  ) {
+    return this.attendance.repairMarksToDeviceTime(
+      this.attendance.requireTenant(tenantId),
+      { limit: body?.limit },
+    );
+  }
+
+  @ApiBearerAuth()
+  @ApiSecurity('tenant')
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
   @Post('marks/copy/preview')
   copyMarksPreview(

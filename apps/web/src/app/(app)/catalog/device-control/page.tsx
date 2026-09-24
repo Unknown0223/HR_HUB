@@ -17,7 +17,20 @@ type Device = {
   lastSeenAt?: string | null;
   isActive: boolean;
   location?: { id: string; name: string } | null;
+  meta?: {
+    clockGuard?: {
+      lastDeviceClockAt?: string | null;
+      lastTrustedDeviceClockAt?: string | null;
+      lastDriftSeconds?: number | null;
+    };
+  } | null;
 };
+
+function deviceClockOf(d: Device): string {
+  const g = d.meta?.clockGuard;
+  const iso = g?.lastDeviceClockAt || g?.lastTrustedDeviceClockAt || '';
+  return iso ? fmtDt(iso) : '—';
+}
 
 type Action = 'heartbeat' | 'sync' | 'sync_clock' | 'pull_events' | 'open_door' | 'reboot';
 
@@ -422,6 +435,7 @@ export default function DeviceControlPage() {
                 <th>Локация</th>
                 <th>Статус</th>
                 <th>Последний сеанс</th>
+                <th>Часы терминала</th>
                 <th>Управление</th>
                 <th className={styles.colExpand}>
                   <span className={styles.srOnly}>Действия</span>
@@ -431,14 +445,14 @@ export default function DeviceControlPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className={styles.empty}>
+                  <td colSpan={7} className={styles.empty}>
                     <div className={styles.spinner} aria-hidden="true" />
                     Загрузка…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <div className={styles.emptyState}>
                       <span className={styles.emptyIcon}>{I.inbox}</span>
                       <p className={styles.emptyTitle}>Нет устройств</p>
@@ -489,6 +503,11 @@ export default function DeviceControlPage() {
                         <td>
                           <span className={styles.mono} title={fmtDt(d.lastSeenAt)}>
                             {fmtRelative(d.lastSeenAt)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={styles.mono} title="Время на терминале">
+                            {deviceClockOf(d)}
                           </span>
                         </td>
                         <td>

@@ -46,7 +46,7 @@ const problemsListPrefs = prefsConfigFromColumns({
 function reasonLabel(reason: string) {
   if (reason === 'device_clock_skew') return 'Сдвиг часов терминала';
   if (reason === 'device_clock_rollback') return 'Часы терминала откатили назад';
-  if (reason === 'offline_unverified') return 'Отметка в офлайн-периоде';
+  if (reason === 'offline_unverified') return 'Отметка в офлайн-периоде (устарело)';
   if (reason === 'unknown_employee') return 'Неизвестный сотрудник';
   if (reason === 'device_admin_login') return 'Пароль администратора на терминале';
   return reason;

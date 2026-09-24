@@ -37,4 +37,20 @@ export class EmployeeFormController {
   ingest(@Body() dto: EmployeeFormIngestDto) {
     return this.employees.ingestFromGoogleForm(dto);
   }
+
+  /** Attach face/passport photos to an existing employee (DriveApp / re-sync). */
+  @Public()
+  @SkipTenant()
+  @UseGuards(EmployeeFormIngestGuard)
+  @ApiSecurity('employee-form-key')
+  @ApiHeader({
+    name: 'X-Employee-Form-Key',
+    required: true,
+    description: 'EMPLOYEE_FORM_INGEST_KEY',
+  })
+  @ApiBody({ type: EmployeeFormIngestDto })
+  @Post('attach-photos')
+  attachPhotos(@Body() dto: EmployeeFormIngestDto) {
+    return this.employees.attachFormPhotos(dto);
+  }
 }

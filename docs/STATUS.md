@@ -17,4 +17,5 @@
 Barcha F0–F13 yaxshilash fazalari yopildi.
 
 ### Ixtiyoriy (keyingi sprint)
-Mobile `/m`, web ESLint to‘liq, EmployeeCard/org-chart pixel (dizayn zip tiklanganda).
+- Mobile `/m`, web ESLint to‘liq, EmployeeCard/org-chart pixel (dizayn zip tiklanganda).
+- **Telegram join so‘rovlari** — alohida sahifa + TTL purge: [TELEGRAM_JOIN_REQUESTS_PLAN.md](./TELEGRAM_JOIN_REQUESTS_PLAN.md)

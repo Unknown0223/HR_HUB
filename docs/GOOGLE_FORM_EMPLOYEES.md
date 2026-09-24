@@ -27,4 +27,55 @@ Rasm uchun Web App yoki formada qo‘lda «Загрузка файла».
 | Yuz rasmi, Pasport rasmi | ha |
 | PINFL, pasport, bo‘lim, lavozim… | yo‘q |
 
-Rasm: JPG/PNG, yuz markazda; pasport aniq.
+## Allaqachon yig‘ilgan «Ответы» + **rasmlar**
+
+Drive fayllari **ochiq** bo‘lmasa Node/skript ularni ocholmaydi (Google login HTML).  
+**Egasi sifatida** Apps Script `DriveApp` ochadi — yoki papkalarni Download qilib lokal attach.
+
+## Drive silka → rasm (zip yuklamasdan)
+
+Google Sheets dagi `drive.google.com/open?id=…` **silka** — fayl emas.
+Yopiq Drive ni Node ocholmaydi → **Apps Script `DriveApp`** (egasi huquqi).
+
+### A) Lokal — tunnel + sync (tavsiya)
+
+```bash
+node scripts/start-drive-photo-tunnel.js
+```
+
+Chiqqan `https://….trycloudflare.com` ni Apps Script `CONFIG.API_URL` ga qo‘ying,
+keyin **`syncPhotosFromDriveLinksOnly`** → Run (zip yo‘q).
+
+### B) Photo-proxy (Node pull)
+
+1. `tools/google-form-employee/Code.gs` ni Script editorga paste  
+2. **Deploy → Web app** (Me / Anyone)  
+3. `printPhotoProxyHelp` → URL ni oling  
+4. `.env`:
+```env
+GOOGLE_DRIVE_PHOTO_PROXY=https://script.google.com/macros/s/XXXX/exec
+EMPLOYEE_FORM_INGEST_KEY=<CONFIG.FORM_KEY>
+```
+5. API restart, keyin:
+```bash
+node scripts/attach-photos-from-drive-links.js
+```
+XLSX dagi yuz/pasport **silkalari** proxy orqali o‘qiladi va xodimga birikadi.
+
+### C) Lokal xlsx import (matn + ochiq Drive)
+
+```bash
+node scripts/import-google-form-xlsx.js "path/to/Ответы.xlsx" demo
+node scripts/backfill-google-form-org-photos.js "path/to/Ответы.xlsx"
+```
+
+`facePhotoUrl` / `passportPhotoUrl` yuboriladi — Drive **Anyone with link** bo‘lsa server yuklaydi.
+
+### API
+
+| Method | Path | Vazifa |
+|--------|------|--------|
+| POST | `/api/employee-form/ingest` | Yangi xodim (+ base64 yoki photo URL) |
+| POST | `/api/employee-form/attach-photos` | Mavjud xodimga rasm (FIO/tel yoki employeeId) |
+
+Header: `X-Employee-Form-Key: $EMPLOYEE_FORM_INGEST_KEY`

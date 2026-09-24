@@ -177,11 +177,30 @@ export class EmployeeFormIngestDto {
   @IsString()
   passportPhotoContentType?: string;
 
+  /** Google Drive / public image URL — server fetches when base64 empty. */
+  @ApiPropertyOptional({
+    example: 'https://drive.google.com/open?id=FILE_ID',
+  })
+  @IsOptional()
+  @IsString()
+  facePhotoUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  passportPhotoUrl?: string;
+
   /** Idempotency / Google response id */
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   googleResponseId?: string;
+
+  /** Existing employee (photo backfill) */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

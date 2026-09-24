@@ -214,18 +214,22 @@ async def apply_admin_login_guard(rec: DeviceRecord) -> bool:
 async def maybe_unlock_after_sync(
     rec: DeviceRecord, locked_this_cycle: bool, hb_ok: bool
 ) -> None:
+    """After admin+time change: unlock only when online AND clock re-aligned with server."""
     if not isinstance(rec.adapter, HikvisionIsapiAdapter):
         return
     adapter = rec.adapter
     if locked_this_cycle:
         return
     if not hb_ok:
-        logger.info("punch unlock deferred — device heartbeat failed")
+        logger.info("punch unlock deferred — device offline / heartbeat failed")
         return
     reason = adapter.ready_to_unlock()
     if reason is not None:
         if adapter.punch_locked:
-            logger.info("punch unlock deferred — %s", reason)
+            logger.info(
+                "punch unlock deferred — %s (need online + clock sync)",
+                reason,
+            )
         return
     if not publisher.server_ready:
         logger.info(
@@ -299,6 +303,9 @@ async def poll_hikvision_events() -> None:
                         "adminLoginAt": admin_login_at,
                         "adminLoginSerial": admin_login_serial,
                         "authFailed": auth_failed,
+                        "timeChangedAfterLock": bool(
+                            getattr(rec.adapter, "time_changed_after_lock", False)
+                        ),
                     }
                 )
                 await maybe_unlock_after_sync(rec, locked_this_cycle, hb_ok)

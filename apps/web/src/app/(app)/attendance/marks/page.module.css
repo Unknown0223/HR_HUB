@@ -523,6 +523,28 @@
   border: 1px solid var(--line);
 }
 .invalid { color: #b91c1c; text-decoration: line-through; }
+.rowRejected td {
+  color: #b91c1c !important;
+  background: #fef2f2;
+}
+.rowRejected td .invalid,
+.rowRejected .nameCell,
+.rowRejected .codeCell {
+  color: #b91c1c !important;
+  text-decoration: line-through;
+}
+.rejectedBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #991b1b;
+  background: #fecaca;
+  text-decoration: none;
+  vertical-align: middle;
+}
 .dotIn, .dotOut, .dotMark, .dotEst, .dotBreak {
   display: inline-flex;
   align-items: center;

@@ -41,6 +41,9 @@ export class PunchConsumerService implements OnModuleInit, OnModuleDestroy {
                 adminLoginAt: raw.adminLoginAt ?? raw.admin_login_at ?? null,
                 adminLoginSerial: Number(raw.adminLoginSerial ?? raw.admin_login_serial ?? 0),
                 authFailed: raw.authFailed === true || raw.auth_failed === true,
+                timeChangedAfterLock:
+                  raw.timeChangedAfterLock === true ||
+                  raw.time_changed_after_lock === true,
               });
               continue;
             }

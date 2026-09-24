@@ -103,7 +103,35 @@ export default function GoogleFormEmployeesPage() {
             <code>updateHrHubEmployeeForm</code> (URL saqlanadi)
           </li>
           <li>
-            Formada yuz + pasport rasmi majburiy (JPG/PNG). Namuna:{' '}
+            <b>Silka orqali rasm (zip yo‘q) — tavsiya:</b>
+            <ol>
+              <li>
+                Lokal: <code>node scripts/start-drive-photo-tunnel.js</code> →
+                chiqqan URL ni <code>CONFIG.API_URL</code> ga qo‘ying
+              </li>
+              <li>
+                Apps Script: <code>syncPhotosFromDriveLinksOnly</code> → Run
+                (DriveApp silkalardan yuz+pasport o‘qiydi)
+              </li>
+              <li>
+                Yoki Web App Deploy + <code>GOOGLE_DRIVE_PHOTO_PROXY</code> +{' '}
+                <code>node scripts/attach-photos-from-drive-links.js</code>
+              </li>
+            </ol>
+          </li>
+          <li>
+            <b>Rasmlar (Yuz / Pasport papkalari):</b> funksiya{' '}
+            <code>syncPhotosFromYuzPasportFolders</code> — fayl nomidagi FIO
+            bo‘yicha biriktiradi. Lokal demo uchun papkalarni Download qilib{' '}
+            <code>tmp/form-photos/yuz</code> va <code>pasport</code> ga qo‘ying,
+            keyin <code>node scripts/attach-photos-from-folders.js</code>
+          </li>
+          <li>
+            <b>Eski javoblar + rasmlar:</b> funksiya{' '}
+            <code>syncAllResponsesSheetToHrHub</code> ni Run qiling
+            (DriveApp orqali yopiq fotolar ham yuklanadi)
+          </li>
+          <li>Formada yuz + pasport rasmi majburiy (JPG/PNG). Namuna:{' '}
             <code>SampleBlobs.gs</code>
           </li>
           <li>Form linkini kandidatlarga yuboring</li>

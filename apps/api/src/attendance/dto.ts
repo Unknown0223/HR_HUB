@@ -227,6 +227,7 @@ export class IngestHeartbeatDto {
   @ApiPropertyOptional() @IsOptional() @IsString() adminLoginAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() adminLoginSerial?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() authFailed?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() timeChangedAfterLock?: boolean;
 }
 
 export class AssignScheduleDto {

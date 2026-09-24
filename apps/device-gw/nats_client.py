@@ -190,6 +190,9 @@ class PunchPublisher:
             "authFailed": payload.get("authFailed")
             if "authFailed" in payload
             else payload.get("auth_failed"),
+            "timeChangedAfterLock": payload.get("timeChangedAfterLock")
+            if "timeChangedAfterLock" in payload
+            else payload.get("time_changed_after_lock"),
         }
         headers = {"Content-Type": "application/json"}
         if self.punch_key:

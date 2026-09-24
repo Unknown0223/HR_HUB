@@ -63,10 +63,17 @@ function printWebAppDeployHelp() {
 }
 
 /**
- * Web App ochilishi — rasm yuklash formasi.
+ * Web App ochilishi —
+ *  ?action=photo&id=FILE_ID&key=FORM_KEY  → Drive rasm JSON (base64)
+ *  aks holda → kandidat forma (HTML)
  */
-function doGet() {
+function doGet(e) {
   saveConfigProps_();
+  e = e || {};
+  var p = e.parameter || {};
+  if (String(p.action || '') === 'photo') {
+    return serveDrivePhotoProxy_(p);
+  }
   var html = '';
   try {
     html = HtmlService.createHtmlOutputFromFile('WebApp').getContent();
@@ -108,6 +115,174 @@ function doGet() {
     .setTitle(CONFIG.FORM_TITLE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Drive silkasidagi faylni egasi sifatida o‘qiydi → JSON { ok, base64, contentType }
+ * HR HUB / lokal import shu proxy orqali yuklaydi (zip yuklamasdan).
+ */
+function serveDrivePhotoProxy_(p) {
+  var props = PropertiesService.getScriptProperties();
+  var expected = props.getProperty('FORM_KEY') || CONFIG.FORM_KEY;
+  var key = String(p.key || '').trim();
+  if (!expected || key !== expected) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ ok: false, error: 'unauthorized' }),
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+  var id = String(p.id || '').trim();
+  if (!id) {
+    var url = String(p.url || '').trim();
+    var m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) id = m[1];
+  }
+  if (!id) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ ok: false, error: 'id required' }),
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+  try {
+    var file = DriveApp.getFileById(id);
+    var blob = file.getBlob();
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        ok: true,
+        id: id,
+        name: file.getName(),
+        contentType: blob.getContentType() || 'image/jpeg',
+        base64: Utilities.base64Encode(blob.getBytes()),
+      }),
+    ).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        ok: false,
+        error: String(err),
+        id: id,
+      }),
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/** Deploy qilingan Web App URL + photo proxy namuna. */
+function printPhotoProxyHelp() {
+  setupPhotoUploadApp();
+  try {
+    var u = ScriptApp.getService().getUrl();
+    if (u) {
+      Logger.log('');
+      Logger.log('=== PHOTO PROXY (silka orqali rasm) ===');
+      Logger.log(u + '?action=photo&id=DRIVE_FILE_ID&key=FORM_KEY');
+      Logger.log('HR HUB .env:');
+      Logger.log('GOOGLE_DRIVE_PHOTO_PROXY=' + u);
+      Logger.log('EMPLOYEE_FORM_INGEST_KEY=<FORM_KEY bilan bir xil>');
+    }
+  } catch (e) {
+    Logger.log('Avval Deploy → Web app qiling');
+  }
+}
+
+/**
+ * Sheets dagi Drive SILKALARIDAN rasmlarni o‘qiydi (zip yo‘q) → HR HUB attach-photos.
+ * Xodimlar allaqachon import qilingan bo‘lsa shu funksiya yetarli.
+ *
+ * Run: syncPhotosFromDriveLinksOnly
+ * CONFIG.API_URL = Railway YOKI lokal tunnel (https://….trycloudflare.com)
+ * Lab: FORM_KEY bo‘sh / CHANGE_ME bo‘lishi mumkin (API kalitsiz ochiq bo‘lsa).
+ */
+function syncPhotosFromDriveLinksOnly() {
+  saveConfigProps_();
+  var props = PropertiesService.getScriptProperties();
+  var api = (props.getProperty('API_URL') || CONFIG.API_URL).replace(/\/$/, '');
+  var key = props.getProperty('FORM_KEY') || CONFIG.FORM_KEY || '';
+  var tenant = props.getProperty('TENANT_CODE') || CONFIG.TENANT_CODE;
+  if (key.indexOf('CHANGE_ME') === 0) key = '';
+
+  var ss = openResponsesSpreadsheet_();
+  var sh = ss.getSheets()[0];
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    Logger.log('Jadval bo‘sh');
+    return { ok: 0, miss: 0, fail: 0 };
+  }
+  var headers = values[0].map(function (h) {
+    return String(h || '').trim();
+  });
+  function col(title) {
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i] === title) return i;
+    }
+    return -1;
+  }
+  function cell(row, title) {
+    var i = col(title);
+    if (i < 0) return '';
+    var v = row[i];
+    if (v instanceof Date) {
+      return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+    return String(v == null ? '' : v).trim();
+  }
+
+  var ok = 0;
+  var miss = 0;
+  var fail = 0;
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var lastName = cell(row, TITLES.lastName);
+    var firstName = cell(row, TITLES.firstName);
+    if (!lastName || !firstName) continue;
+
+    var faceLink = cell(row, TITLES.facePhotoLink);
+    var passLink = cell(row, TITLES.passportPhotoLink);
+    var faceBlob = blobFromDriveUrl_(faceLink);
+    var passBlob = blobFromDriveUrl_(passLink);
+    if (!faceBlob && !passBlob) {
+      miss++;
+      Logger.log('MISS row ' + (r + 1) + ' ' + lastName + ' ' + firstName);
+      continue;
+    }
+
+    var payload = {
+      tenantCode: tenant,
+      source: 'apps_script',
+      lastName: lastName,
+      firstName: firstName,
+      phone: cell(row, TITLES.phone) || undefined,
+    };
+    if (faceBlob) {
+      payload.facePhotoBase64 = faceBlob.b64;
+      payload.facePhotoContentType = faceBlob.type;
+    }
+    if (passBlob) {
+      payload.passportPhotoBase64 = passBlob.b64;
+      payload.passportPhotoContentType = passBlob.type;
+    }
+    Object.keys(payload).forEach(function (k) {
+      if (payload[k] === '' || payload[k] == null) delete payload[k];
+    });
+
+    var headersOut = { 'Content-Type': 'application/json' };
+    if (key) headersOut['X-Employee-Form-Key'] = key;
+    var att = UrlFetchApp.fetch(api + '/api/employee-form/attach-photos', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: headersOut,
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    var ac = att.getResponseCode();
+    var body = att.getContentText();
+    if (ac >= 200 && ac < 300) {
+      ok++;
+      Logger.log('OK row ' + (r + 1) + ' ' + lastName + ' ' + firstName + ' ' + body.slice(0, 120));
+    } else {
+      fail++;
+      Logger.log('FAIL row ' + (r + 1) + ' HTTP ' + ac + ' ' + body.slice(0, 200));
+    }
+  }
+  Logger.log('DONE ok=' + ok + ' miss=' + miss + ' fail=' + fail);
+  return { ok: ok, miss: miss, fail: fail };
 }
 
 /**
@@ -693,4 +868,377 @@ function testIngestPing() {
     muteHttpExceptions: true,
   });
   Logger.log(res.getResponseCode() + ' ' + res.getContentText());
+}
+
+/**
+ * Javoblar jadvalidagi (Ответы) BARCHA qatorlarni HR HUB ga yuboradi + Drive rasmlar.
+ * DriveApp egasi sifatida ishlaydi — yopiq fayllar ham o‘qiladi.
+ *
+ * Run: syncAllResponsesSheetToHrHub
+ * Ixtiyoriy: Script Properties RESPONSES_SHEET_ID = jadval ID
+ */
+function syncAllResponsesSheetToHrHub() {
+  saveConfigProps_();
+  var props = PropertiesService.getScriptProperties();
+  var api = (props.getProperty('API_URL') || CONFIG.API_URL).replace(/\/$/, '');
+  var key = props.getProperty('FORM_KEY') || CONFIG.FORM_KEY;
+  var tenant = props.getProperty('TENANT_CODE') || CONFIG.TENANT_CODE;
+  if (key.indexOf('CHANGE_ME') === 0) key = '';
+
+  var ss = openResponsesSpreadsheet_();
+  var sh = ss.getSheets()[0];
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    Logger.log('Jadval bo‘sh');
+    return { ok: 0 };
+  }
+  var headers = values[0].map(function (h) {
+    return String(h || '').trim();
+  });
+  function col(title) {
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i] === title) return i;
+    }
+    return -1;
+  }
+  function cell(row, title) {
+    var i = col(title);
+    if (i < 0) return '';
+    var v = row[i];
+    if (v instanceof Date) {
+      return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+    return String(v == null ? '' : v).trim();
+  }
+
+  var ok = 0;
+  var photos = 0;
+  var fail = 0;
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var lastName = cell(row, TITLES.lastName);
+    var firstName = cell(row, TITLES.firstName);
+    if (!lastName || !firstName) continue;
+
+    var faceLink = cell(row, TITLES.facePhotoLink);
+    var passLink = cell(row, TITLES.passportPhotoLink);
+    var faceBlob = blobFromDriveUrl_(faceLink);
+    var passBlob = blobFromDriveUrl_(passLink);
+
+    var payload = {
+      tenantCode: tenant,
+      source: 'apps_script',
+      lastName: lastName,
+      firstName: firstName,
+      middleName: cell(row, TITLES.middleName) || undefined,
+      phone: cell(row, TITLES.phone) || undefined,
+      pinfl: cell(row, TITLES.pinfl) || undefined,
+      birthDate: cell(row, TITLES.birthDate) || undefined,
+      gender: cell(row, TITLES.gender) || undefined,
+      passportDocType: cell(row, TITLES.passportDocType) || undefined,
+      passportSeries: cell(row, TITLES.passportSeries) || undefined,
+      passportNumber: cell(row, TITLES.passportNumber) || undefined,
+      divisionCode: cell(row, TITLES.division) || undefined,
+      divisionName: cell(row, TITLES.division) || undefined,
+      positionCode: cell(row, TITLES.position) || undefined,
+      positionName: cell(row, TITLES.position) || undefined,
+      employmentType: cell(row, TITLES.employmentType) || undefined,
+      hiredAt: cell(row, TITLES.hiredAt) || undefined,
+      note: 'syncAllResponsesSheetToHrHub row=' + (r + 1),
+    };
+    if (faceBlob) {
+      payload.facePhotoBase64 = faceBlob.b64;
+      payload.facePhotoContentType = faceBlob.type;
+    } else if (faceLink) {
+      payload.facePhotoUrl = faceLink;
+    }
+    if (passBlob) {
+      payload.passportPhotoBase64 = passBlob.b64;
+      payload.passportPhotoContentType = passBlob.type;
+    } else if (passLink) {
+      payload.passportPhotoUrl = passLink;
+    }
+    Object.keys(payload).forEach(function (k) {
+      if (payload[k] === '' || payload[k] == null) delete payload[k];
+    });
+
+    var ingestHeaders = {};
+    if (key) ingestHeaders['X-Employee-Form-Key'] = key;
+    var ingest = UrlFetchApp.fetch(api + '/api/employee-form/ingest', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: ingestHeaders,
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    var code = ingest.getResponseCode();
+    var body = ingest.getContentText();
+    if (code >= 200 && code < 300) {
+      ok++;
+      if (faceBlob || passBlob) photos++;
+      Logger.log('OK ingest row ' + (r + 1) + ' ' + lastName + ' ' + firstName);
+      continue;
+    }
+    // Already exists → attach photos only
+    if (code === 409 || String(body).indexOf('already exists') >= 0 || code === 400) {
+      var attachPayload = {
+        tenantCode: tenant,
+        source: 'apps_script',
+        lastName: lastName,
+        firstName: firstName,
+        phone: payload.phone,
+        facePhotoBase64: payload.facePhotoBase64,
+        facePhotoContentType: payload.facePhotoContentType,
+        passportPhotoBase64: payload.passportPhotoBase64,
+        passportPhotoContentType: payload.passportPhotoContentType,
+        facePhotoUrl: payload.facePhotoUrl,
+        passportPhotoUrl: payload.passportPhotoUrl,
+      };
+      Object.keys(attachPayload).forEach(function (k) {
+        if (attachPayload[k] === '' || attachPayload[k] == null) delete attachPayload[k];
+      });
+      var attachHeaders = {};
+      if (key) attachHeaders['X-Employee-Form-Key'] = key;
+      var att = UrlFetchApp.fetch(api + '/api/employee-form/attach-photos', {
+        method: 'post',
+        contentType: 'application/json',
+        headers: attachHeaders,
+        payload: JSON.stringify(attachPayload),
+        muteHttpExceptions: true,
+      });
+      var ac = att.getResponseCode();
+      Logger.log(
+        'attach row ' + (r + 1) + ' HTTP ' + ac + ' ' + att.getContentText().slice(0, 180),
+      );
+      if (ac >= 200 && ac < 300) {
+        ok++;
+        photos++;
+      } else {
+        fail++;
+      }
+      continue;
+    }
+    fail++;
+    Logger.log('FAIL row ' + (r + 1) + ' HTTP ' + code + ' ' + body.slice(0, 200));
+  }
+  Logger.log('DONE ok=' + ok + ' photos=' + photos + ' fail=' + fail);
+  return { ok: ok, photos: photos, fail: fail };
+}
+
+function openResponsesSpreadsheet_() {
+  var props = PropertiesService.getScriptProperties();
+  var sid = props.getProperty('RESPONSES_SHEET_ID');
+  if (sid) return SpreadsheetApp.openById(sid);
+  // Formga bog‘langan javoblar jadvali
+  try {
+    var form = openExistingHrHubForm_();
+    var dest = form.getDestinationId();
+    if (dest) return SpreadsheetApp.openById(dest);
+  } catch (e) {
+    Logger.log('form destination: ' + e);
+  }
+  // Nom bo‘yicha qidirish
+  var files = DriveApp.getFilesByName(CONFIG.FORM_TITLE + ' (Ответы)');
+  if (files.hasNext()) {
+    return SpreadsheetApp.open(files.next());
+  }
+  files = DriveApp.getFilesByName('HR HUB – Yangi xodim arizasi (Ответы)');
+  if (files.hasNext()) {
+    return SpreadsheetApp.open(files.next());
+  }
+  throw new Error(
+    'Javoblar jadvali topilmadi. Script Properties ga RESPONSES_SHEET_ID qo‘ying ' +
+      '(Sheets URL dagi /d/XXXX/ id).',
+  );
+}
+
+/**
+ * Rasm: Drive dagi «Yuz rasmi …» va «Pasport rasmi …» papkalaridan
+ * fayl nomidagi FIO bo‘yicha topib, mavjud xodimlarga biriktiradi.
+ *
+ * Run: syncPhotosFromYuzPasportFolders
+ * CONFIG.API_URL = Railway (localhost Google dan ochilmaydi!)
+ */
+function syncPhotosFromYuzPasportFolders() {
+  saveConfigProps_();
+  var props = PropertiesService.getScriptProperties();
+  var api = (props.getProperty('API_URL') || CONFIG.API_URL).replace(/\/$/, '');
+  var key = props.getProperty('FORM_KEY') || CONFIG.FORM_KEY;
+  var tenant = props.getProperty('TENANT_CODE') || CONFIG.TENANT_CODE;
+  if (!key || key.indexOf('CHANGE_ME') === 0) {
+    throw new Error('CONFIG.FORM_KEY ni Railway EMPLOYEE_FORM_INGEST_KEY ga teng qiling');
+  }
+
+  var faceFolder = findPhotoFolder_('Yuz rasmi');
+  var passFolder = findPhotoFolder_('Pasport rasmi');
+  if (!faceFolder && !passFolder) {
+    throw new Error(
+      '«Yuz rasmi» / «Pasport rasmi» papkalari topilmadi. Drive da form upload papkalarini tekshiring.',
+    );
+  }
+  Logger.log('Face folder: ' + (faceFolder ? faceFolder.getName() : '—'));
+  Logger.log('Passport folder: ' + (passFolder ? passFolder.getName() : '—'));
+
+  var faceFiles = indexPhotoFiles_(faceFolder);
+  var passFiles = indexPhotoFiles_(passFolder);
+  Logger.log('Face files=' + faceFiles.length + ' Passport files=' + passFiles.length);
+
+  var ss = openResponsesSpreadsheet_();
+  var sh = ss.getSheets()[0];
+  var values = sh.getDataRange().getValues();
+  var headers = values[0].map(function (h) {
+    return String(h || '').trim();
+  });
+  function col(title) {
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i] === title) return i;
+    }
+    return -1;
+  }
+  function cell(row, title) {
+    var i = col(title);
+    if (i < 0) return '';
+    return String(row[i] == null ? '' : row[i]).trim();
+  }
+
+  var ok = 0;
+  var fail = 0;
+  var miss = 0;
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var lastName = cell(row, TITLES.lastName);
+    var firstName = cell(row, TITLES.firstName);
+    if (!lastName || !firstName) continue;
+
+    var faceBlob = matchPhotoBlob_(faceFiles, lastName, firstName);
+    var passBlob = matchPhotoBlob_(passFiles, lastName, firstName);
+    // fallback: sheet Drive links
+    if (!faceBlob) faceBlob = blobFromDriveUrl_(cell(row, TITLES.facePhotoLink));
+    if (!passBlob) passBlob = blobFromDriveUrl_(cell(row, TITLES.passportPhotoLink));
+
+    if (!faceBlob && !passBlob) {
+      miss++;
+      Logger.log('NO PHOTO ' + lastName + ' ' + firstName);
+      continue;
+    }
+
+    var payload = {
+      tenantCode: tenant,
+      source: 'apps_script',
+      lastName: lastName,
+      firstName: firstName,
+      phone: cell(row, TITLES.phone) || undefined,
+    };
+    if (faceBlob) {
+      payload.facePhotoBase64 = faceBlob.b64;
+      payload.facePhotoContentType = faceBlob.type;
+    }
+    if (passBlob) {
+      payload.passportPhotoBase64 = passBlob.b64;
+      payload.passportPhotoContentType = passBlob.type;
+    }
+    Object.keys(payload).forEach(function (k) {
+      if (payload[k] === '' || payload[k] == null) delete payload[k];
+    });
+
+    var att = UrlFetchApp.fetch(api + '/api/employee-form/attach-photos', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'X-Employee-Form-Key': key },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    var ac = att.getResponseCode();
+    var body = att.getContentText();
+    if (ac >= 200 && ac < 300) {
+      ok++;
+      Logger.log(
+        'PHOTO OK ' +
+          lastName +
+          ' ' +
+          firstName +
+          ' face=' +
+          !!faceBlob +
+          ' pass=' +
+          !!passBlob,
+      );
+    } else {
+      fail++;
+      Logger.log('PHOTO FAIL ' + lastName + ' HTTP ' + ac + ' ' + body.slice(0, 160));
+    }
+  }
+  Logger.log('DONE photos ok=' + ok + ' fail=' + fail + ' miss=' + miss);
+  return { ok: ok, fail: fail, miss: miss };
+}
+
+function findPhotoFolder_(needle) {
+  var it = DriveApp.getFolders();
+  var n = String(needle || '').toLowerCase();
+  while (it.hasNext()) {
+    var f = it.next();
+    var name = String(f.getName() || '').toLowerCase();
+    if (name.indexOf(n) >= 0) return f;
+  }
+  // nested (form creates folders under a parent)
+  var parents = DriveApp.getFoldersByName('HR HUB – Yangi xodim arizasi');
+  while (parents.hasNext()) {
+    var p = parents.next();
+    var sub = p.getFolders();
+    while (sub.hasNext()) {
+      var s = sub.next();
+      if (String(s.getName() || '').toLowerCase().indexOf(n) >= 0) return s;
+    }
+  }
+  return null;
+}
+
+function indexPhotoFiles_(folder) {
+  var out = [];
+  if (!folder) return out;
+  var files = folder.getFiles();
+  while (files.hasNext()) {
+    var file = files.next();
+    var name = file.getName();
+    var mime = file.getMimeType() || '';
+    if (mime.indexOf('image/') !== 0 && !/\.(jpe?g|png|webp|gif)$/i.test(name)) {
+      continue;
+    }
+    out.push({
+      name: name,
+      nameLow: String(name).toLowerCase(),
+      file: file,
+    });
+  }
+  return out;
+}
+
+function matchPhotoBlob_(index, lastName, firstName) {
+  if (!index || !index.length) return null;
+  var ln = String(lastName || '').toLowerCase().trim();
+  var fn = String(firstName || '').toLowerCase().trim();
+  if (!ln && !fn) return null;
+  var best = null;
+  for (var i = 0; i < index.length; i++) {
+    var n = index[i].nameLow;
+    var score = 0;
+    if (ln && n.indexOf(ln) >= 0) score += 2;
+    if (fn && n.indexOf(fn) >= 0) score += 2;
+    // partial (first 4 chars) for typos
+    if (ln && ln.length >= 4 && n.indexOf(ln.slice(0, 4)) >= 0) score += 1;
+    if (fn && fn.length >= 4 && n.indexOf(fn.slice(0, 4)) >= 0) score += 1;
+    if (score >= 3 && (!best || score > best.score)) {
+      best = { score: score, file: index[i].file };
+    }
+  }
+  if (!best) return null;
+  try {
+    var blob = best.file.getBlob();
+    return {
+      b64: Utilities.base64Encode(blob.getBytes()),
+      type: blob.getContentType() || 'image/jpeg',
+    };
+  } catch (e) {
+    Logger.log('matchPhotoBlob_: ' + e);
+    return null;
+  }
 }

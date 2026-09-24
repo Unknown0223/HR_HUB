@@ -158,6 +158,11 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self.lock_method: Optional[str] = None
         self.lock_started_at: Optional[datetime] = None
         self.clock_synced_after_lock: bool = False
+        # True only after local admin login AND device clock drifted/changed.
+        self.time_changed_after_lock: bool = False
+        # After unlock, still reject punches that happened in the fraud window.
+        self.fraud_window_start: Optional[str] = None
+        self.fraud_window_end: Optional[str] = None
         self._saved_card_reader: Optional[tuple[str, dict[str, Any]]] = None
         self.saw_local_logout: bool = False
         self._acs_skip_minors: set[int] = set()
@@ -980,6 +985,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         )
         self.lock_started_at = datetime.now(timezone.utc)
         self.clock_synced_after_lock = False
+        self.time_changed_after_lock = False
         self.saw_local_logout = False
         ok = await self.set_punching_enabled(False)
         self.punch_locked = True
@@ -994,7 +1000,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         return ok
 
     def ready_to_unlock(self) -> str | None:
-        """Return a reason to keep the lock, or None if unlock is safe."""
+        """Unlock only when online clock is aligned with server after the lock."""
         if not self.punch_locked or not self.awaiting_sync_unlock:
             return "not_locked"
         if self.lock_started_at is None:
@@ -1011,18 +1017,28 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         return None
 
     async def unlock_punching(self) -> bool:
-        """Re-enable authentication after a clean online sync with the server."""
+        """Re-enable face/card after online + clock sync; keep fraud window for history."""
         ok = await self.set_punching_enabled(True)
         if not ok:
             logger.error("punch unlock failed method=%s — keeping lock", self.lock_method)
             return False
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if self.time_changed_after_lock and self.admin_login_at:
+            self.fraud_window_start = self.admin_login_at
+            self.fraud_window_end = now_iso
+            logger.warning(
+                "fraud window kept %s .. %s (admin+clock change)",
+                self.fraud_window_start,
+                self.fraud_window_end,
+            )
         self.punch_locked = False
         self.awaiting_sync_unlock = False
         self.clock_synced_after_lock = False
+        self.time_changed_after_lock = False
         self.saw_local_logout = False
         self.lock_started_at = None
         logger.info(
-            "punch UNLOCKED after server sync serial=%s",
+            "punch UNLOCKED after online clock sync serial=%s — new marks accepted",
             self.last_admin_login_serial,
         )
         return True
@@ -1144,26 +1160,45 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         server_now = datetime.now(self._offset_tz(tz))
         return (device_aware - server_now).total_seconds()
 
-    def _apply_clock_trust(self, punches: list[dict[str, Any]], drift: float) -> None:
-        """Rewrite punch time to server-trusted time if the terminal clock is skewed.
+    def _note_clock_after_lock(self, drift: float) -> None:
+        """Admin password alone is OK; large drift after lock = time was changed."""
+        if self.punch_locked and abs(float(drift or 0)) > CLOCK_SKEW_SECONDS:
+            if not self.time_changed_after_lock:
+                logger.warning(
+                    "device clock changed after admin login (drift=%.0fs) — later punches blocked",
+                    drift,
+                )
+            self.time_changed_after_lock = True
 
-        Fraud: set device clock back, punch late, appear on time.
-        true_time = device_event_time - drift, where drift = device_now - server_now.
+    def _apply_clock_trust(self, punches: list[dict[str, Any]], drift: float) -> None:
+        """Tag skewed / fraud punches; keep DEVICE event time (never overwrite with server now).
+
+        - Offline / historical marks: keep device event time, do NOT mark invalid.
+        - Live punches with large drift: flag clock_tamper, keep occurred_at as on device.
+        - After admin login + time change: tag punches after login as blocked.
         """
+        self._note_clock_after_lock(drift)
+        device_now = self._as_dt(str(self.last_device_now_iso or "")) or datetime.now(
+            timezone.utc
+        )
+        live_window = timedelta(minutes=30)
         for punch in punches:
             punch["clock_drift_seconds"] = int(round(drift))
+            after_fraud = self._punch_after_admin_login(str(punch.get("occurred_at") or ""))
+            if after_fraud:
+                punch["admin_login_blocked"] = True
+                punch["clock_tamper"] = True
+                punch["device_occurred_at"] = punch.get("occurred_at")
+                continue
             if abs(drift) <= CLOCK_SKEW_SECONDS:
+                continue
+            event = self._as_dt(str(punch.get("occurred_at") or ""))
+            is_live = bool(event and abs(event - device_now) <= live_window)
+            if not is_live:
                 continue
             punch["clock_tamper"] = True
             punch["device_occurred_at"] = punch.get("occurred_at")
-            try:
-                event_at = datetime.fromisoformat(
-                    str(punch.get("occurred_at") or "").replace("Z", "+00:00")
-                )
-                trusted = event_at - timedelta(seconds=drift)
-                punch["occurred_at"] = trusted.isoformat()
-            except ValueError:
-                punch["occurred_at"] = datetime.now(timezone.utc).isoformat()
+            # Keep occurred_at = device clock stamp (UI shows terminal time).
 
     def _punch_from_acs_item(self, item: dict[str, Any]) -> dict[str, Any] | None:
         eid = (
@@ -1232,14 +1267,22 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         return dt
 
     def _punch_after_admin_login(self, occurred_at: str) -> bool:
-        """Only marks after the admin login are blocked — never the whole day."""
-        if not self.punch_locked:
-            return False
-        login = self._as_dt(str(self.admin_login_at or ""))
+        """Block marks after admin+clock change until unlock; keep fraud window after unlock."""
         punch = self._as_dt(occurred_at)
-        if not login or not punch:
-            return True
-        return punch >= login - timedelta(seconds=2)
+        # Active lock episode with time change.
+        if self.punch_locked and self.time_changed_after_lock:
+            login = self._as_dt(str(self.admin_login_at or ""))
+            if not login:
+                return True
+            if not punch:
+                return True
+            return punch >= login - timedelta(seconds=2)
+        # Closed fraud window (after online clock sync unlock).
+        start = self._as_dt(str(self.fraud_window_start or ""))
+        end = self._as_dt(str(self.fraud_window_end or ""))
+        if start and end and punch:
+            return start - timedelta(seconds=2) <= punch <= end + timedelta(seconds=2)
+        return False
 
     async def _fetch_capture_jpeg(self, picture_url: Any) -> Optional[str]:
         """Download the terminal snapshot taken at punch time (digest auth)."""

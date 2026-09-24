@@ -54,6 +54,7 @@ const deviceListPrefs = prefsConfigFromColumns({
     { key: 'zone', label: 'Зона' },
     { key: 'status', label: 'Статус' },
     { key: 'activity', label: 'Активность' },
+    { key: 'deviceClock', label: 'Часы терминала' },
     { key: 'battery', label: 'Батарея' },
     { key: 'serialNumber', label: 'Серийный номер' },
     { key: 'model', label: 'Модель' },
@@ -61,7 +62,15 @@ const deviceListPrefs = prefsConfigFromColumns({
     { key: 'isActive', label: 'Активен' },
     { key: 'host', label: 'Host' },
   ],
-  defaultColumns: ['name', 'location', 'zone', 'status', 'activity', 'battery'],
+  defaultColumns: [
+    'name',
+    'location',
+    'zone',
+    'status',
+    'activity',
+    'deviceClock',
+    'battery',
+  ],
   defaultSearchKeys: ['name', 'serialNumber', 'location', 'deviceType'],
   defaultSort: [{ key: 'name', dir: 'asc' }],
   searchableKeys: ['name', 'serialNumber', 'location', 'deviceType', 'model', 'host'],
@@ -112,6 +121,17 @@ function zoneOf(d: Device) {
   );
 }
 
+function deviceClockOf(d: Device): string {
+  const guard = d.meta?.clockGuard;
+  if (!guard || typeof guard !== 'object' || Array.isArray(guard)) return '';
+  const g = guard as Record<string, unknown>;
+  const iso =
+    (typeof g.lastDeviceClockAt === 'string' && g.lastDeviceClockAt) ||
+    (typeof g.lastTrustedDeviceClockAt === 'string' && g.lastTrustedDeviceClockAt) ||
+    '';
+  return iso ? fmtDt(iso) : '';
+}
+
 function deviceCell(d: Device, key: string): string {
   switch (key) {
     case 'name':
@@ -124,6 +144,8 @@ function deviceCell(d: Device, key: string): string {
       return statusLabel(d.status, d.isActive, punchLockActive(d.meta));
     case 'activity':
       return d.lastSeenAt ? fmtDt(d.lastSeenAt) : '';
+    case 'deviceClock':
+      return deviceClockOf(d);
     case 'battery':
       return typeof d.meta?.battery === 'number' ? `${d.meta.battery}%` : '';
     case 'serialNumber':
@@ -803,6 +825,13 @@ function DevicesInner() {
                           return (
                             <td key={key} className={styles.mono}>
                               {fmtDt(d.lastSeenAt)}
+                            </td>
+                          );
+                        }
+                        if (key === 'deviceClock') {
+                          return (
+                            <td key={key} className={styles.mono} title="Время на терминале">
+                              {deviceClockOf(d) || '—'}
                             </td>
                           );
                         }

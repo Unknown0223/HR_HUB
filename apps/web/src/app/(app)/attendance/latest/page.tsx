@@ -73,9 +73,7 @@ function LatestInner() {
             const name = e
               ? [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ')
               : '—';
-            const photo = mediaSrc(
-              m.photoUrl || e?.faceProfile?.photoUrl || e?.person?.photoUrl,
-            );
+            const photo = mediaSrc(m.photoUrl);
             const slides = rows
               .flatMap((x) => {
                 const pe = x.employee;
@@ -83,12 +81,8 @@ function LatestInner() {
                   ? [pe.lastName, pe.firstName, pe.middleName].filter(Boolean).join(' ')
                   : '—';
                 const markSrc = mediaSrc(x.photoUrl);
-                const faceSrc = mediaSrc(pe?.faceProfile?.photoUrl || pe?.person?.photoUrl);
                 const items: { src: string; caption: string }[] = [];
                 if (markSrc) items.push({ src: markSrc, caption: `${nm} · отметка` });
-                if (faceSrc && faceSrc !== markSrc) {
-                  items.push({ src: faceSrc, caption: nm });
-                }
                 return items;
               });
             const idx = photo ? slides.findIndex((s) => s.src === photo) : -1;

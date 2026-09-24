@@ -1171,6 +1171,30 @@ function DeviceDetailInner() {
                   <div>{fmtDt(device.lastSeenAt)}</div>
                 </div>
                 <div className={styles.field}>
+                  <label>Часы терминала</label>
+                  <div>
+                    {(() => {
+                      const g =
+                        meta.clockGuard &&
+                        typeof meta.clockGuard === 'object' &&
+                        !Array.isArray(meta.clockGuard)
+                          ? (meta.clockGuard as Record<string, unknown>)
+                          : null;
+                      const iso =
+                        (typeof g?.lastDeviceClockAt === 'string' && g.lastDeviceClockAt) ||
+                        (typeof g?.lastTrustedDeviceClockAt === 'string' &&
+                          g.lastTrustedDeviceClockAt) ||
+                        '';
+                      const drift =
+                        typeof g?.lastDriftSeconds === 'number' ? g.lastDriftSeconds : null;
+                      if (!iso) return '—';
+                      return drift != null && Math.abs(drift) > 60
+                        ? `${fmtDt(iso)} (сдвиг ${Math.round(drift / 60)} мин)`
+                        : fmtDt(iso);
+                    })()}
+                  </div>
+                </div>
+                <div className={styles.field}>
                   <label>Авто-генерация приходов</label>
                   <div>{yesNo(!!meta.autoGenerateIn)}</div>
                 </div>

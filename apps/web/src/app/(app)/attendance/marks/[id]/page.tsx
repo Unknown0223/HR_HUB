@@ -24,6 +24,7 @@ type Mark = {
   markType: string;
   markTypeLabel: string;
   isValid?: boolean;
+  clockTamper?: boolean;
   faceRecognized?: boolean;
   photoUrl?: string | null;
   locationName?: string | null;
@@ -91,13 +92,12 @@ function MarkDetailInner() {
 
   const punchPhoto = mediaSrc(mark?.photoUrl) || null;
   const face = mediaSrc(mark?.employee?.faceProfile?.photoUrl) || null;
-  // «Примерный уход» without capture photo → text-only detail (no face avatar as mark photo)
-  const isEstimatedOut = mark?.markType === 'estimated_out';
-  const photo = punchPhoto || (!isEstimatedOut ? face : null);
+  // Otmetka kartochkasida asosiy rasm — faqat terminal capture (avatar emas).
+  const photo = punchPhoto;
   const name = mark ? empName(mark) : '';
   const slides = [
     punchPhoto ? { src: punchPhoto, caption: `Отметка · ${name}` } : null,
-    !isEstimatedOut && face && face !== punchPhoto
+    face && face !== punchPhoto
       ? { src: face, caption: `Аватар · ${name}` }
       : null,
   ].filter((s): s is { src: string; caption: string } => Boolean(s));
@@ -177,7 +177,9 @@ function MarkDetailInner() {
             />
           ) : (
             <div className={styles.photoEmpty}>
-              {isEstimatedOut ? 'Нет фото отметки' : 'Нет фото'}
+              {mark?.markType === 'estimated_out'
+                ? 'Нет фото отметки'
+                : 'Нет фото отметки (только снимок терминала)'}
             </div>
           )}
           <div className={styles.sideTitle}>
@@ -188,9 +190,22 @@ function MarkDetailInner() {
               <span className={styles.badgeInfo}>Лицо распознано</span>
             ) : null}
             <span className={styles.badgeType}>{mark.markTypeLabel}</span>
-            <span className={mark.isValid === false ? styles.badgeBad : styles.badgeOk}>
-              {mark.isValid === false ? 'Недействительная' : 'Действительная'}
+            <span
+              className={
+                mark.isValid === false || mark.clockTamper
+                  ? styles.badgeBad
+                  : styles.badgeOk
+              }
+            >
+              {mark.isValid === false || mark.clockTamper
+                ? 'Недействительная'
+                : 'Действительная'}
             </span>
+            {mark.note && (mark.isValid === false || mark.clockTamper) ? (
+              <span className={styles.badgeBad} title={mark.note}>
+                {mark.note.length > 60 ? `${mark.note.slice(0, 60)}…` : mark.note}
+              </span>
+            ) : null}
           </div>
           <nav className={styles.sideNav}>
             <button

@@ -484,8 +484,16 @@ export class EmployeesService {
   }
 
   async findOne(tenantId: string, id: string) {
+    const raw = String(id || '').trim();
+    const uuidOk =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        raw,
+      );
+    if (!uuidOk) {
+      throw new BadRequestException('Invalid employee id');
+    }
     const emp = await this.prisma.employee.findFirst({
-      where: { id, tenantId },
+      where: { id: raw, tenantId },
       include: {
         division: { select: { id: true, name: true, code: true } },
         position: { select: { id: true, name: true, code: true } },
@@ -2498,7 +2506,38 @@ export class EmployeesService {
       where: { tenantId, name: { equals: q, mode: 'insensitive' } },
       select: { id: true },
     });
-    return byName?.id;
+    if (byName) return byName.id;
+    // Google Form / ingest: create missing division by display name
+    const codeSlug = q
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .toUpperCase()
+      .slice(0, 24) || `DIV_${Date.now().toString(36).toUpperCase()}`;
+    try {
+      const created = await this.prisma.division.create({
+        data: {
+          tenantId,
+          name: q,
+          code: codeSlug,
+        },
+        select: { id: true },
+      });
+      return created.id;
+    } catch {
+      const again = await this.prisma.division.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { code: { equals: codeSlug, mode: 'insensitive' } },
+            { name: { equals: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      return again?.id;
+    }
   }
 
   private async resolvePositionId(
@@ -2517,7 +2556,37 @@ export class EmployeesService {
       where: { tenantId, name: { equals: q, mode: 'insensitive' } },
       select: { id: true },
     });
-    return byName?.id;
+    if (byName) return byName.id;
+    const codeSlug = q
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .toUpperCase()
+      .slice(0, 24) || `POS_${Date.now().toString(36).toUpperCase()}`;
+    try {
+      const created = await this.prisma.position.create({
+        data: {
+          tenantId,
+          name: q,
+          code: codeSlug,
+        },
+        select: { id: true },
+      });
+      return created.id;
+    } catch {
+      const again = await this.prisma.position.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { code: { equals: codeSlug, mode: 'insensitive' } },
+            { name: { equals: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      return again?.id;
+    }
   }
 
   async allocateTabNumber(tenantId: string): Promise<string> {
@@ -2687,17 +2756,28 @@ export class EmployeesService {
 
     let facePhotoSaved = false;
     let passportPhotoSaved = false;
-    const faceB64 = String(dto.facePhotoBase64 || '').trim();
+
+    // Resolve remote Drive / HTTP URLs → base64 when Apps Script / import sends links
+    let faceB64 = String(dto.facePhotoBase64 || '').trim();
+    let faceMime =
+      String(dto.facePhotoContentType || '').trim() || 'image/jpeg';
+    if (!faceB64 && String(dto.facePhotoUrl || '').trim()) {
+      const remote = await this.fetchRemoteImage(
+        String(dto.facePhotoUrl).trim(),
+      );
+      if (remote) {
+        faceB64 = remote.base64;
+        faceMime = remote.contentType;
+      }
+    }
     if (faceB64) {
       try {
         const buf = Buffer.from(faceB64, 'base64');
         if (buf.length > 0) {
-          const mime =
-            String(dto.facePhotoContentType || '').trim() || 'image/jpeg';
-          const ext = mime.includes('png') ? 'png' : 'jpg';
+          const ext = faceMime.includes('png') ? 'png' : 'jpg';
           await this.face.uploadFace(tenant.id, emp.id, {
             buffer: buf,
-            mimetype: mime,
+            mimetype: faceMime,
             originalname: `form-face.${ext}`,
             size: buf.length,
           } as Express.Multer.File);
@@ -2713,19 +2793,28 @@ export class EmployeesService {
       }
     }
 
-    const passB64 = String(dto.passportPhotoBase64 || '').trim();
+    let passB64 = String(dto.passportPhotoBase64 || '').trim();
+    let passMime =
+      String(dto.passportPhotoContentType || '').trim() || 'image/jpeg';
+    if (!passB64 && String(dto.passportPhotoUrl || '').trim()) {
+      const remote = await this.fetchRemoteImage(
+        String(dto.passportPhotoUrl).trim(),
+      );
+      if (remote) {
+        passB64 = remote.base64;
+        passMime = remote.contentType;
+      }
+    }
     if (passB64) {
       try {
         const buf = Buffer.from(passB64, 'base64');
         if (buf.length > 0) {
-          const mime =
-            String(dto.passportPhotoContentType || '').trim() || 'image/jpeg';
-          const ext = mime.includes('png') ? 'png' : 'jpg';
+          const ext = passMime.includes('png') ? 'png' : 'jpg';
           const key = `person-docs/${tenant.id}/${emp.id}/passport-${Date.now()}.${ext}`;
           const { url, key: storedKey } = await this.storage.putObject(
             key,
             buf,
-            mime,
+            passMime,
           );
           const personIdForDoc =
             emp.personId ||
@@ -2758,7 +2847,7 @@ export class EmployeesService {
                   source: 'google_form',
                   photoUrl: url,
                   photoKey: storedKey,
-                  contentType: mime,
+                  contentType: passMime,
                 } as Prisma.InputJsonValue,
               },
             });
@@ -2803,6 +2892,290 @@ export class EmployeesService {
       facePhotoSaved,
       passportPhotoSaved,
     };
+  }
+
+  /**
+   * Backfill face + passport photos for an existing employee
+   * (Google Form re-sync / Apps Script DriveApp).
+   */
+  async attachFormPhotos(dto: EmployeeFormIngestDto) {
+    const tenantCode = String(dto.tenantCode || '')
+      .trim()
+      .toLowerCase();
+    if (!tenantCode) throw new BadRequestException('tenantCode required');
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { code: { equals: tenantCode, mode: 'insensitive' } },
+      select: { id: true, code: true },
+    });
+    if (!tenant) {
+      throw new BadRequestException(`Unknown tenantCode: ${tenantCode}`);
+    }
+
+    let emp =
+      dto.employeeId &&
+      (await this.prisma.employee.findFirst({
+        where: { id: String(dto.employeeId).trim(), tenantId: tenant.id },
+        select: {
+          id: true,
+          personId: true,
+          tabNumber: true,
+          firstName: true,
+          lastName: true,
+        },
+      }));
+
+    if (!emp) {
+      const lastName = String(dto.lastName || '').trim();
+      const firstName = String(dto.firstName || '').trim();
+      const phoneDigits = String(dto.phone || '').replace(/\D/g, '');
+      if (!lastName || !firstName) {
+        throw new BadRequestException(
+          'employeeId or lastName+firstName required',
+        );
+      }
+      const candidates = await this.prisma.employee.findMany({
+        where: {
+          tenantId: tenant.id,
+          lastName: { equals: lastName, mode: 'insensitive' },
+          firstName: { equals: firstName, mode: 'insensitive' },
+        },
+        select: {
+          id: true,
+          personId: true,
+          tabNumber: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+        },
+        take: 20,
+      });
+      emp =
+        candidates.find((c) => {
+          if (!phoneDigits) return true;
+          const p = String(c.phone || '').replace(/\D/g, '');
+          return (
+            p === phoneDigits ||
+            p.endsWith(phoneDigits.slice(-9)) ||
+            phoneDigits.endsWith(p.slice(-9))
+          );
+        }) || candidates[0];
+    }
+
+    if (!emp) throw new NotFoundException('Employee not found for photo attach');
+
+    let facePhotoSaved = false;
+    let passportPhotoSaved = false;
+
+    let faceB64 = String(dto.facePhotoBase64 || '').trim();
+    let faceMime =
+      String(dto.facePhotoContentType || '').trim() || 'image/jpeg';
+    if (!faceB64 && String(dto.facePhotoUrl || '').trim()) {
+      const remote = await this.fetchRemoteImage(
+        String(dto.facePhotoUrl).trim(),
+      );
+      if (remote) {
+        faceB64 = remote.base64;
+        faceMime = remote.contentType;
+      }
+    }
+    if (faceB64) {
+      const buf = Buffer.from(faceB64, 'base64');
+      if (buf.length > 0) {
+        const ext = faceMime.includes('png') ? 'png' : 'jpg';
+        await this.face.uploadFace(tenant.id, emp.id, {
+          buffer: buf,
+          mimetype: faceMime,
+          originalname: `form-face.${ext}`,
+          size: buf.length,
+        } as Express.Multer.File);
+        facePhotoSaved = true;
+        this.scheduleEmployeeDeviceSync(tenant.id, emp.id);
+      }
+    }
+
+    let passB64 = String(dto.passportPhotoBase64 || '').trim();
+    let passMime =
+      String(dto.passportPhotoContentType || '').trim() || 'image/jpeg';
+    if (!passB64 && String(dto.passportPhotoUrl || '').trim()) {
+      const remote = await this.fetchRemoteImage(
+        String(dto.passportPhotoUrl).trim(),
+      );
+      if (remote) {
+        passB64 = remote.base64;
+        passMime = remote.contentType;
+      }
+    }
+    if (passB64) {
+      const buf = Buffer.from(passB64, 'base64');
+      if (buf.length > 0) {
+        const ext = passMime.includes('png') ? 'png' : 'jpg';
+        const key = `person-docs/${tenant.id}/${emp.id}/passport-${Date.now()}.${ext}`;
+        const { url, key: storedKey } = await this.storage.putObject(
+          key,
+          buf,
+          passMime,
+        );
+        let personId = emp.personId;
+        if (!personId) {
+          const person = await this.prisma.person.create({
+            data: {
+              tenantId: tenant.id,
+              firstName: emp.firstName,
+              lastName: emp.lastName,
+            },
+          });
+          await this.prisma.employee.update({
+            where: { id: emp.id },
+            data: { personId: person.id },
+          });
+          personId = person.id;
+        }
+        await this.prisma.personDocument.create({
+          data: {
+            tenantId: tenant.id,
+            personId,
+            employeeId: emp.id,
+            docType:
+              this.normalizePassportDocType(dto.passportDocType) || 'PASSPORT',
+            docNumber:
+              [dto.passportSeries, dto.passportNumber]
+                .filter(Boolean)
+                .join(' ')
+                .trim() || 'form-upload',
+            payload: {
+              source: 'google_form_photo_attach',
+              photoUrl: url,
+              photoKey: storedKey,
+              contentType: passMime,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        passportPhotoSaved = true;
+      }
+    }
+
+    if (!facePhotoSaved && !passportPhotoSaved) {
+      throw new BadRequestException(
+        'No photos attached — provide base64 or reachable photo URL (Drive must be public, or use Apps Script DriveApp)',
+      );
+    }
+
+    return {
+      ok: true,
+      employeeId: emp.id,
+      tabNumber: emp.tabNumber,
+      facePhotoSaved,
+      passportPhotoSaved,
+    };
+  }
+
+  /** Fetch image bytes from Drive/public URL (best-effort).
+   *  Private Drive: set GOOGLE_DRIVE_PHOTO_PROXY = Apps Script Web App URL
+   *  (?action=photo&id=…&key=EMPLOYEE_FORM_INGEST_KEY).
+   */
+  private async fetchRemoteImage(
+    url: string,
+  ): Promise<{ base64: string; contentType: string } | null> {
+    const raw = String(url || '').trim();
+    if (!raw) return null;
+    const fileId =
+      raw.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] ||
+      raw.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ||
+      '';
+
+    const proxy = (process.env.GOOGLE_DRIVE_PHOTO_PROXY ?? '')
+      .trim()
+      .replace(/\/$/, '');
+    const proxyKey = (process.env.EMPLOYEE_FORM_INGEST_KEY ?? '').trim();
+
+    if (proxy && fileId) {
+      try {
+        const qs = new URLSearchParams({
+          action: 'photo',
+          id: fileId,
+          key: proxyKey,
+        });
+        const res = await fetch(`${proxy}?${qs.toString()}`, {
+          redirect: 'follow',
+          headers: { Accept: 'application/json' },
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            ok?: boolean;
+            base64?: string;
+            contentType?: string;
+          };
+          if (data?.ok && data.base64 && data.base64.length > 100) {
+            return {
+              base64: data.base64,
+              contentType: data.contentType || 'image/jpeg',
+            };
+          }
+        }
+      } catch (e) {
+        this.logger.warn(
+          `Drive photo proxy fail: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+    }
+
+    const candidates = fileId
+      ? [
+          `https://drive.google.com/uc?export=download&id=${fileId}`,
+          `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`,
+          `https://lh3.googleusercontent.com/d/${fileId}`,
+          raw,
+        ]
+      : [raw];
+
+    for (const u of candidates) {
+      try {
+        const res = await fetch(u, {
+          redirect: 'follow',
+          headers: { 'User-Agent': 'HRHUB-EmployeeForm/1.0' },
+        });
+        if (!res.ok) continue;
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length < 400) continue;
+        // login / interstitial HTML
+        if (
+          ct.includes('text/html') ||
+          buf.slice(0, 15).toString('utf8').toLowerCase().includes('<!doctype')
+        ) {
+          const html = buf.toString('utf8');
+          const confirm = html.match(/confirm=([0-9A-Za-z_-]+)/)?.[1];
+          if (confirm && fileId) {
+            const res2 = await fetch(
+              `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${confirm}`,
+              { redirect: 'follow' },
+            );
+            if (!res2.ok) continue;
+            const ct2 = (res2.headers.get('content-type') || '').toLowerCase();
+            const buf2 = Buffer.from(await res2.arrayBuffer());
+            if (buf2.length < 400 || ct2.includes('text/html')) continue;
+            return {
+              base64: buf2.toString('base64'),
+              contentType: ct2.startsWith('image/')
+                ? ct2.split(';')[0]
+                : 'image/jpeg',
+            };
+          }
+          continue;
+        }
+        return {
+          base64: buf.toString('base64'),
+          contentType: ct.startsWith('image/')
+            ? ct.split(';')[0]
+            : 'image/jpeg',
+        };
+      } catch (e) {
+        this.logger.debug(
+          `fetchRemoteImage fail ${u}: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+    }
+    return null;
   }
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {

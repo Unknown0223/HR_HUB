@@ -767,6 +767,7 @@ export class AttendanceService {
     adminLoginAt?: string | null;
     adminLoginSerial?: number;
     authFailed?: boolean;
+    timeChangedAfterLock?: boolean;
   }) {
     const device = await this.prisma.device.findFirst({
       where: {
@@ -788,15 +789,30 @@ export class AttendanceService {
     const nowIso = new Date().toISOString();
     const becomingLocked =
       dto.adminLoginDetected === true || dto.punchLocked === true;
+    const driftNum = Number(dto.clockDriftSeconds);
+    const clockAligned =
+      Number.isFinite(driftNum) && Math.abs(driftNum) <= 180;
+    // Unlock only when GW says unlocked AND clock is back in sync with server.
     const unlocking =
       prevLock.active === true &&
       dto.punchLocked === false &&
-      dto.adminLoginDetected !== true;
-    const punchLock = {
+      dto.adminLoginDetected !== true &&
+      (dto.deviceNow ? clockAligned : true);
+    const timeChangedNow =
+      dto.timeChangedAfterLock === true ||
+      (prevLock.active === true &&
+        Number.isFinite(driftNum) &&
+        Math.abs(driftNum) > 180) ||
+      (becomingLocked && Number.isFinite(driftNum) && Math.abs(driftNum) > 180);
+    const timeChanged = unlocking
+      ? false
+      : Boolean(prevLock.timeChanged === true || timeChangedNow);
+    const punchLock: Record<string, unknown> = {
       ...prevLock,
       active: becomingLocked && !unlocking,
       lastSerial: serial,
       loginAt: dto.adminLoginAt || prevLock.loginAt || null,
+      timeChanged,
       lockedAt:
         becomingLocked && prevLock.active !== true ? nowIso : prevLock.lockedAt || null,
       unlockedAt: unlocking
@@ -805,7 +821,19 @@ export class AttendanceService {
           ? null
           : prevLock.unlockedAt || null,
     };
-    const driftNum = Number(dto.clockDriftSeconds);
+    // Persist fraud window so historical marks after admin+clock change stay invalid
+    // even after the device is unlocked and starts accepting new real punches.
+    if (
+      unlocking &&
+      (prevLock.timeChanged === true || dto.timeChangedAfterLock === true)
+    ) {
+      punchLock.blockFrom = prevLock.loginAt || prevLock.lockedAt || nowIso;
+      punchLock.blockUntil = nowIso;
+    } else if (becomingLocked && prevLock.active !== true) {
+      // New lock episode — clear previous window endpoints until time changes again.
+      punchLock.blockFrom = dto.adminLoginAt || nowIso;
+      punchLock.blockUntil = null;
+    }
     const clockGuard: Record<string, unknown> = {
       ...prev,
       lastHeartbeatAt: nowIso,
@@ -5796,6 +5824,70 @@ export class AttendanceService {
     return { ok: true, id: markId };
   }
 
+  /**
+   * Restore occurredAt from terminal stamp (deviceOccurredAt / raw.time) when
+   * older ingest overwrote it with server receive time.
+   */
+  async repairMarksToDeviceTime(tenantId: string, opts?: { limit?: number }) {
+    const limit = Math.min(Math.max(opts?.limit ?? 5000, 1), 50_000);
+    const marks = await this.prisma.attendanceMark.findMany({
+      where: { tenantId },
+      orderBy: { occurredAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        employeeId: true,
+        occurredAt: true,
+        rawPayload: true,
+      },
+    });
+    let fixed = 0;
+    const days = new Set<string>();
+    for (const mark of marks) {
+      const payload =
+        mark.rawPayload &&
+        typeof mark.rawPayload === 'object' &&
+        !Array.isArray(mark.rawPayload)
+          ? (mark.rawPayload as Record<string, unknown>)
+          : {};
+      const deviceIso =
+        this.extractRawEventTime(payload) ||
+        (typeof payload.deviceOccurredAt === 'string'
+          ? payload.deviceOccurredAt
+          : null);
+      if (!deviceIso) continue;
+      const deviceAt = new Date(deviceIso);
+      if (Number.isNaN(deviceAt.getTime())) continue;
+      if (Math.abs(deviceAt.getTime() - mark.occurredAt.getTime()) < 2_000) continue;
+
+      const nextPayload = {
+        ...payload,
+        deviceOccurredAt: deviceAt.toISOString(),
+        repairedFromOccurredAt: mark.occurredAt.toISOString(),
+        repairedAt: new Date().toISOString(),
+      };
+      await this.prisma.attendanceMark.update({
+        where: { id: mark.id },
+        data: {
+          occurredAt: deviceAt,
+          rawPayload: nextPayload as Prisma.InputJsonValue,
+        },
+      });
+      fixed += 1;
+      if (mark.employeeId) {
+        days.add(`${mark.employeeId}|${deviceAt.toISOString().slice(0, 10)}`);
+        days.add(
+          `${mark.employeeId}|${mark.occurredAt.toISOString().slice(0, 10)}`,
+        );
+      }
+    }
+    for (const key of days) {
+      const [empId, day] = key.split('|');
+      await this.recalcDay(tenantId, empId, new Date(`${day}T12:00:00.000Z`));
+    }
+    return { ok: true, scanned: marks.length, fixed, daysRecalc: days.size };
+  }
+
   async bulkMarks(
     tenantId: string,
     dto: { ids: string[]; action: string; markType?: string },
@@ -6350,8 +6442,36 @@ export class AttendanceService {
         ? payload.accuracyM
         : m.device?.location?.geoRadiusM ?? null;
 
+    const offlineOnly =
+      payload.offlineUnverified === true &&
+      payload.clockSkew !== true &&
+      payload.clockRollback !== true &&
+      payload.adminLoginBlocked !== true;
+    const rawNote =
+      typeof payload.note === 'string' && payload.note.trim() ? payload.note.trim() : '';
+    const noteLooksOffline = /офлайн|offline/i.test(rawNote);
+    const softAcceptOffline =
+      offlineOnly ||
+      (noteLooksOffline &&
+        payload.clockSkew !== true &&
+        payload.clockRollback !== true &&
+        payload.adminLoginBlocked !== true);
+    const markValid = softAcceptOffline || payload.isValid !== false;
+
+    // Always prefer terminal event time over server-receive / rewritten stamp.
+    const deviceTimeRaw =
+      (typeof payload.deviceOccurredAt === 'string' && payload.deviceOccurredAt) ||
+      (typeof payload.device_occurred_at === 'string' && payload.device_occurred_at) ||
+      this.extractRawEventTime(payload);
+    let displayOccurredAt = m.occurredAt;
+    if (deviceTimeRaw) {
+      const d = new Date(deviceTimeRaw);
+      if (!Number.isNaN(d.getTime())) displayOccurredAt = d;
+    }
+
     return {
       ...m,
+      occurredAt: displayOccurredAt,
       employee: m.employee
         ? {
             ...m.employee,
@@ -6375,24 +6495,24 @@ export class AttendanceService {
       deviceName: (payload.deviceName as string) || m.device?.name || null,
       identificationType,
       bssid: (payload.bssid as string) || null,
-      isValid: payload.isValid !== false,
+      isValid: markValid,
       clockTamper:
-        payload.clockTamper === true ||
-        payload.clockSkew === true ||
-        payload.clockRollback === true ||
-        payload.offlineUnverified === true ||
-        payload.adminLoginBlocked === true,
+        !softAcceptOffline &&
+        (payload.clockTamper === true ||
+          payload.clockSkew === true ||
+          payload.clockRollback === true ||
+          payload.adminLoginBlocked === true),
       note:
-        (typeof payload.note === 'string' && payload.note) ||
-        (payload.clockSkew === true || payload.clockTamper === true
-          ? `Время терминала скорректировано (сдвиг ${Number(payload.clockDriftSeconds || 0)} с)`
-          : payload.clockRollback === true
-            ? 'Время терминала откатили назад'
-            : payload.offlineUnverified === true
-              ? 'Отметка в офлайн-периоде'
-              : payload.adminLoginBlocked === true
-                ? 'Отметка после ввода пароля администратора на терминале'
-                : null),
+        softAcceptOffline
+          ? null
+          : rawNote ||
+            (payload.clockSkew === true || payload.clockTamper === true
+              ? `Время терминала не совпадает с сервером (сдвиг ${Number(payload.clockDriftSeconds || 0)} с)`
+              : payload.clockRollback === true
+                ? 'Время терминала откатили назад'
+                : payload.adminLoginBlocked === true
+                  ? 'Отметка после пароля администратора и смены времени (до синхронизации часов)'
+                  : null),
       faceRecognized: payload.faceRecognized !== false && identificationType.includes('лиц'),
       photoUrl,
       latitude: lat,
@@ -7069,6 +7189,36 @@ export class AttendanceService {
     });
   }
 
+  private extractRawEventTime(payload: Record<string, unknown>): string | null {
+    const tryParse = (v: unknown): string | null => {
+      if (typeof v !== 'string' || !v.trim()) return null;
+      const d = new Date(v.includes('T') ? v : v.replace(' ', 'T'));
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    };
+    const direct = tryParse(payload.deviceOccurredAt) || tryParse(payload.device_occurred_at);
+    if (direct) return direct;
+    const nested =
+      payload.raw && typeof payload.raw === 'object' && !Array.isArray(payload.raw)
+        ? (payload.raw as Record<string, unknown>)
+        : null;
+    if (nested) {
+      const fromNested =
+        tryParse(nested.time) ||
+        tryParse(nested.dateTime) ||
+        tryParse(nested.device_occurred_at) ||
+        tryParse(nested.deviceOccurredAt);
+      if (fromNested) return fromNested;
+      const alert =
+        nested.alert && typeof nested.alert === 'object' && !Array.isArray(nested.alert)
+          ? (nested.alert as Record<string, unknown>)
+          : null;
+      if (alert) {
+        return tryParse(alert.dateTime) || tryParse(alert.time);
+      }
+    }
+    return null;
+  }
+
   private clockTamperFromRaw(raw?: Record<string, unknown>) {
     if (!raw) {
       return { tamper: false, drift: 0, deviceOccurredAt: null as string | null };
@@ -7122,11 +7272,11 @@ export class AttendanceService {
   private static readonly CLOCK_ONLINE_WINDOW_MS = 15 * 60_000;
 
   /**
-   * Four anti-fraud clock protections on every ingest path (incl. HttpHost):
-   * 1) Online skew — |deviceTime−serverNow| > 3 min while recently online → invalid
+   * Anti-fraud clock protections:
+   * 1) Live online skew — |deviceTime−serverNow| > 3 min for a *recent* punch → invalid
    * 2) Rollback — punch behind last online watermark / late replay → invalid
-   * 3) Offline unverified — punch stamped in gap after last heartbeat → invalid
-   * 4) Admin login lock — punches after local admin password → invalid
+   * 3) Admin login + time change — punches after that → invalid
+   * Offline marks (before admin+time change) stay valid.
    */
   private async applyClockGuard(opts: {
     tenantId: string;
@@ -7175,11 +7325,16 @@ export class AttendanceService {
       (lastHb &&
         !Number.isNaN(lastHb.getTime()) &&
         now.getTime() - lastHb.getTime() <= AttendanceService.CLOCK_ONLINE_WINDOW_MS) ||
-      // HttpHost means the terminal is actively pushing right now.
       String(opts.source || '').includes('http_host');
+    // Historical offline backfill must not look like "clock skew vs now".
+    const isLivePunch = absSkewMs <= AttendanceService.CLOCK_ONLINE_WINDOW_MS;
 
-    // (1) Online skew — terminal clock/timezone changed while device talks to server.
-    if (recentlyOnline && absSkewMs > AttendanceService.CLOCK_SKEW_MS) {
+    // (1) Live online skew only — not for old offline events pulled later.
+    if (
+      isLivePunch &&
+      recentlyOnline &&
+      absSkewMs > AttendanceService.CLOCK_SKEW_MS
+    ) {
       const driftSec = Math.round(skewMs / 1000);
       extra.clockTamper = true;
       extra.clockSkew = true;
@@ -7190,7 +7345,7 @@ export class AttendanceService {
         'Время терминала не совпадает с сервером (сдвиг ' +
         Math.round(absSkewMs / 60_000) +
         ' мин) — отметка недействительна';
-      occurredAt = now;
+      // Keep device event time — never replace with server "now" for display/storage.
       const emp = await this.prisma.employee.findFirst({
         where: { id: opts.employeeId, tenantId: opts.tenantId },
         select: { firstName: true, lastName: true, middleName: true },
@@ -7206,7 +7361,7 @@ export class AttendanceService {
               : opts.employeeExternalId,
             deviceId: device.id,
             deviceOccurredAt: deviceOccurredAtIso,
-            trustedOccurredAt: occurredAt.toISOString(),
+            serverReceivedAt: now.toISOString(),
             clockDriftSeconds: driftSec,
             source: opts.source || null,
             note: extra.note,
@@ -7251,7 +7406,7 @@ export class AttendanceService {
       extra.deviceOccurredAt = deviceOccurredAtIso;
       extra.note =
         'Отметка с прошлым временем после онлайн-периода (откат часов) — недействительна';
-      occurredAt = now;
+      // Keep device event time (do not stamp server receive time).
       const emp = await this.prisma.employee.findFirst({
         where: { id: opts.employeeId, tenantId: opts.tenantId },
         select: { firstName: true, lastName: true, middleName: true },
@@ -7267,7 +7422,7 @@ export class AttendanceService {
               : opts.employeeExternalId,
             deviceId: device.id,
             deviceOccurredAt: extra.deviceOccurredAt,
-            trustedOccurredAt: occurredAt.toISOString(),
+            serverReceivedAt: now.toISOString(),
             lastOnlineEventAt: lastEventAt?.toISOString() ?? null,
             lastTrustedDeviceClockAt: lastTrustedClock?.toISOString() ?? null,
             lateOnlineReplay: Boolean(lateOnlineReplay),
@@ -7285,42 +7440,45 @@ export class AttendanceService {
           ' lastTrusted=' +
           (lastTrustedClock?.toISOString() ?? '-'),
       );
-    } else if (
-      // (3) Offline gap — cannot verify terminal time against server.
-      !extra.clockSkew &&
-      lastHb &&
-      now.getTime() - lastHb.getTime() > AttendanceService.CLOCK_ONLINE_WINDOW_MS &&
-      opts.occurredAt.getTime() > lastHb.getTime() &&
-      opts.occurredAt.getTime() < now.getTime() - 30_000
-    ) {
-      extra.offlineUnverified = true;
-      extra.clockTamper = true;
-      extra.isValid = false;
-      extra.deviceOccurredAt = deviceOccurredAtIso;
-      extra.note =
-        'Отметка в офлайн-периоде: время терминала нельзя подтвердить сервером — недействительна';
     }
 
-    // (4) Admin login punch-lock.
+    // (3) Admin login + time change — block that window; after online clock sync,
+    // new punches are accepted again (lock inactive, occurredAt after blockUntil).
     const punchLock =
       guard.punchLock && typeof guard.punchLock === 'object' && !Array.isArray(guard.punchLock)
-        ? (guard.punchLock as Record<string, unknown>)
+        ? { ...(guard.punchLock as Record<string, unknown>) }
         : {};
     const taggedBlocked = this.adminLoginBlockedFromRaw(opts.raw);
     const loginAt = punchLock.loginAt ? new Date(String(punchLock.loginAt)) : null;
+    const blockFrom = punchLock.blockFrom
+      ? new Date(String(punchLock.blockFrom))
+      : loginAt;
+    const blockUntil = punchLock.blockUntil
+      ? new Date(String(punchLock.blockUntil))
+      : null;
     const afterAdminLogin =
       loginAt &&
       !Number.isNaN(loginAt.getTime()) &&
       opts.occurredAt.getTime() >= loginAt.getTime() - 2000;
     const lockActive = punchLock.active === true;
-    if (
-      taggedBlocked ||
-      (lockActive && (!loginAt || Number.isNaN(loginAt.getTime()) || afterAdminLogin))
-    ) {
+    const timeChangedAfterLogin = punchLock.timeChanged === true;
+    const inClosedFraudWindow =
+      blockFrom &&
+      !Number.isNaN(blockFrom.getTime()) &&
+      blockUntil &&
+      !Number.isNaN(blockUntil.getTime()) &&
+      opts.occurredAt.getTime() >= blockFrom.getTime() - 2000 &&
+      opts.occurredAt.getTime() <= blockUntil.getTime() + 2000;
+    const inActiveFraudLock =
+      lockActive &&
+      timeChangedAfterLogin &&
+      (!loginAt || Number.isNaN(loginAt.getTime()) || afterAdminLogin);
+    if (taggedBlocked || inActiveFraudLock || inClosedFraudWindow) {
       extra.adminLoginBlocked = true;
       extra.isValid = false;
-      extra.note =
-        'Отметка после ввода пароля администратора на терминале (заблокировано до синхронизации)';
+      extra.note = inClosedFraudWindow
+        ? 'Отметка в окне после пароля администратора и смены времени (до синхронизации часов)'
+        : 'Отметка после пароля администратора и смены времени терминала — недействительна';
     }
 
     const trustedMs = occurredAt.getTime();
@@ -7337,7 +7495,6 @@ export class AttendanceService {
       extra.isValid !== false &&
       !extra.clockRollback &&
       !extra.clockSkew &&
-      !extra.offlineUnverified &&
       !extra.adminLoginBlocked &&
       absSkewMs <= AttendanceService.CLOCK_SKEW_MS;
 
@@ -7346,6 +7503,7 @@ export class AttendanceService {
       lastSerial: Math.max(serial || 0, lastSerial || 0),
       lastEventAt: nextLastEventAt,
       lastHeartbeatAt: now.toISOString(),
+      punchLock,
       ...(punchClean
         ? {
             lastTrustedDeviceClockAt: new Date(
@@ -7576,7 +7734,7 @@ export class AttendanceService {
     const tamper = this.clockTamperFromRaw(dto.raw);
     if (tamper.tamper) {
       const mins = Math.round(Math.abs(tamper.drift) / 60);
-      const note = `Время терминала скорректировано (сдвиг ${mins} мин) — отметка недействительна`;
+      const note = `Время терминала не совпадает с сервером (сдвиг ${mins} мин) — отметка недействительна`;
       rawPayload = {
         ...((rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
           ? rawPayload
@@ -7585,7 +7743,7 @@ export class AttendanceService {
         clockSkew: true,
         isValid: false,
         clockDriftSeconds: tamper.drift,
-        deviceOccurredAt: tamper.deviceOccurredAt,
+        deviceOccurredAt: tamper.deviceOccurredAt || dto.occurredAt,
         note,
       } as Prisma.InputJsonValue;
       const emp = await this.prisma.employee.findFirst({
@@ -7602,8 +7760,8 @@ export class AttendanceService {
               ? [emp.lastName, emp.firstName, emp.middleName].filter(Boolean).join(' ')
               : dto.employeeExternalId,
             deviceId,
-            deviceOccurredAt: tamper.deviceOccurredAt,
-            trustedOccurredAt: occurredAt.toISOString(),
+            deviceOccurredAt: tamper.deviceOccurredAt || dto.occurredAt,
+            serverReceivedAt: new Date().toISOString(),
             clockDriftSeconds: tamper.drift,
             note,
           },
@@ -7612,6 +7770,18 @@ export class AttendanceService {
       this.logger.warn(
         `Clock skew punch employee=${dto.employeeExternalId} drift=${tamper.drift}s`,
       );
+    }
+
+    // Always keep terminal stamp for display / later repair.
+    {
+      const base =
+        rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
+          ? { ...(rawPayload as Record<string, unknown>) }
+          : {};
+      if (!base.deviceOccurredAt && !base.device_occurred_at) {
+        base.deviceOccurredAt = dto.occurredAt;
+      }
+      rawPayload = base as Prisma.InputJsonValue;
     }
 
     if (Object.keys(guardResult.extra).length) {
