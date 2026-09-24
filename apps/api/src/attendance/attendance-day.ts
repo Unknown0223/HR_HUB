@@ -37,6 +37,15 @@ export function startOfNextLocalDay(when: Date): Date {
   return new Date(startOfLocalDay(when).getTime() + 24 * 60 * 60 * 1000);
 }
 
+/** Inclusive [start, end] bounds for a YYYY-MM-DD in org TZ (mark/GPS filters). */
+export function dayBoundsFromYmd(ymd: string): { start: Date; end: Date } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const start = new Date(`${ymd}T00:00:00${TZ_OFFSET}`);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}
+
 export function parseHmToDate(workDate: Date, hm: string): Date {
   const [h, m] = String(hm || '18:00')
     .split(':')

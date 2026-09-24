@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
-import { fmtHm, APP_TZ } from '@/lib/tz';
+import { fmtHm, fmtDateTimeTz, APP_TZ, ymdToday } from '@/lib/tz';
 import { FormModal } from '@/components/FormModal';
 import { PassportScanModal } from '@/components/PassportScanModal';
 import { ModalPortal } from '@/components/ModalPortal';
@@ -554,16 +554,7 @@ function scheduleReqStatusRu(status: string) {
 }
 
 function fmtDateTime(iso?: string | null) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `${dd}.${mm}.${yyyy} ${hh}:${mi}:${ss}`;
+  return fmtDateTimeTz(iso);
 }
 
 function toDatetimeLocalValue(d = new Date()) {
@@ -4888,7 +4879,7 @@ export default function EmployeeDetailPage() {
                           const key = date.toISOString().slice(0, 10);
                           const day = dayByDate.get(key);
                           const off = isWeekendPattern(date, row.schedule);
-                          const todayKey = new Date().toISOString().slice(0, 10);
+                          const todayKey = ymdToday();
                           const isToday = inMonth && key === todayKey;
                           const isLeave = leaveDateKeys.has(key);
                           const isDayOff = day?.status === 'day_off' || off;

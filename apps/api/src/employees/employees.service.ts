@@ -33,6 +33,7 @@ import {
   type MatchFormerQuery,
 } from './match-former';
 import { SettingsService } from '../settings/settings.service';
+import { creditedOnTimeHours as creditedOnTimeHoursUtil } from '../catalog/catalog-hours.util';
 
 /** Query strings reach us untyped — reject unknown enum values with 400, not a Prisma 500. */
 function assertEnum<T extends Record<string, string>>(
@@ -4018,29 +4019,7 @@ export class EmployeesService {
     planStart: string,
     planEnd: string,
   ) {
-    const day = new Date(firstIn);
-    day.setHours(0, 0, 0, 0);
-    const parse = (hm: string) => {
-      const [h, m] = hm.split(':').map((x) => Number(x) || 0);
-      const d = new Date(day);
-      d.setHours(h, m, 0, 0);
-      return d;
-    };
-    const planS = parse(planStart);
-    const planE = parse(planEnd);
-    const winStart = firstIn > planS ? firstIn : planS;
-    const winEnd = lastOut < planE ? lastOut : planE;
-    if (winEnd.getTime() <= winStart.getTime()) return 0;
-    let mins = (winEnd.getTime() - winStart.getTime()) / 60000;
-    const lunchS = parse('13:00');
-    const lunchE = parse('14:00');
-    const overlapMs = Math.max(
-      0,
-      Math.min(winEnd.getTime(), lunchE.getTime()) -
-        Math.max(winStart.getTime(), lunchS.getTime()),
-    );
-    mins -= overlapMs / 60000;
-    return Math.max(0, mins / 60);
+    return creditedOnTimeHoursUtil(firstIn, lastOut, planStart, planEnd, true);
   }
 
   private async requireEmployee(tenantId: string, employeeId: string) {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { mediaSrc } from '@/lib/media';
-import { APP_TZ } from '@/lib/tz';
+import { APP_TZ, ymdToday } from '@/lib/tz';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from './page.module.css';
 
@@ -35,7 +35,7 @@ type Detail = {
 function GpsTrackingInner() {
   const router = useRouter();
   const [q, setQ] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => ymdToday());
   const [emps, setEmps] = useState<EmpCard[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);

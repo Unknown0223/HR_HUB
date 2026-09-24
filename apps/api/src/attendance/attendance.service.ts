@@ -81,12 +81,15 @@ import {
   type WeekPattern,
 } from './schedule-settings';
 import {
+  dayBoundsFromYmd,
+  endOfLocalDay,
   officialLastOutEnabled,
   parseHmToDate,
   roleForDayMark,
   startOfLocalDay,
   startOfNextLocalDay,
   workDateOnly,
+  ymdInTz,
 } from './attendance-day';
 
 @Injectable()
@@ -5462,17 +5465,11 @@ export class AttendanceService {
     else if (employeeIds.length > 1) where.employeeId = { in: employeeIds };
     const localDay = (value: string, endOfDay: boolean) => {
       const ymd = value.trim().slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
-        const [y, m, d] = ymd.split('-').map(Number);
-        return endOfDay
-          ? new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999)
-          : new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
-      }
+      const bounds = dayBoundsFromYmd(ymd);
+      if (bounds) return endOfDay ? bounds.end : bounds.start;
       const parsed = new Date(value);
       if (Number.isNaN(parsed.getTime())) return null;
-      if (endOfDay) parsed.setHours(23, 59, 59, 999);
-      else parsed.setHours(0, 0, 0, 0);
-      return parsed;
+      return endOfDay ? endOfLocalDay(parsed) : startOfLocalDay(parsed);
     };
     if (opts.from || opts.to) {
       where.occurredAt = {};
@@ -6123,13 +6120,19 @@ export class AttendanceService {
       targetFrom: string;
     },
   ) {
-    const from = new Date(dto.from);
-    const to = new Date(dto.to);
-    to.setHours(23, 59, 59, 999);
-    const targetFrom = new Date(dto.targetFrom);
-    targetFrom.setHours(0, 0, 0, 0);
-    const sourceStart = new Date(from);
-    sourceStart.setHours(0, 0, 0, 0);
+    const fromYmd = String(dto.from).slice(0, 10);
+    const toYmd = String(dto.to).slice(0, 10);
+    const targetYmd = String(dto.targetFrom).slice(0, 10);
+    const fromBounds = dayBoundsFromYmd(fromYmd);
+    const toBounds = dayBoundsFromYmd(toYmd);
+    const targetBounds = dayBoundsFromYmd(targetYmd);
+    if (!fromBounds || !toBounds || !targetBounds) {
+      throw new BadRequestException('Invalid date range');
+    }
+    const from = fromBounds.start;
+    const to = toBounds.end;
+    const targetFrom = targetBounds.start;
+    const sourceStart = fromBounds.start;
     const dayShiftMs = targetFrom.getTime() - sourceStart.getTime();
 
     const source = await this.prisma.attendanceMark.findMany({
@@ -6165,7 +6168,7 @@ export class AttendanceService {
         },
       });
       copied += 1;
-      recalc.set(`${m.employeeId}:${occurredAt.toISOString().slice(0, 10)}`, occurredAt);
+      recalc.set(`${m.employeeId}:${ymdInTz(occurredAt)}`, occurredAt);
     }
     for (const [key, at] of recalc) {
       const empId = key.split(':')[0];
@@ -6349,10 +6352,13 @@ export class AttendanceService {
   }
 
   async gpsTrackingDetail(tenantId: string, employeeId: string, date?: string) {
-    const day = date ? new Date(date) : new Date();
-    day.setHours(0, 0, 0, 0);
-    const end = new Date(day);
-    end.setHours(23, 59, 59, 999);
+    const ymd =
+      date && /^\d{4}-\d{2}-\d{2}$/.test(date.slice(0, 10))
+        ? date.slice(0, 10)
+        : ymdInTz(new Date());
+    const bounds = dayBoundsFromYmd(ymd)!;
+    const day = bounds.start;
+    const end = bounds.end;
 
     const emp = await this.prisma.employee.findFirst({
       where: { id: employeeId, tenantId },
@@ -6405,7 +6411,7 @@ export class AttendanceService {
           emp.faceProfile?.photoUrl,
         ),
       },
-      date: day.toISOString().slice(0, 10),
+      date: ymd,
       tracks,
       marks,
       lastPoint: last,
