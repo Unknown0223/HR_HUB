@@ -1,4 +1,5 @@
 import { DayStatus } from '@prisma/client';
+import { parseHmToDate } from '../attendance/attendance-day';
 
 export function round2(h: number) {
   return Math.round(h * 100) / 100;
@@ -39,23 +40,16 @@ export function creditedOnTimeHours(
   planEnd: string,
   countLunch: boolean,
 ) {
-  const day = new Date(firstIn);
-  day.setHours(0, 0, 0, 0);
-  const parse = (hm: string) => {
-    const [h, m] = hm.split(':').map((x) => Number(x) || 0);
-    const d = new Date(day);
-    d.setHours(h, m, 0, 0);
-    return d;
-  };
-  const planS = parse(planStart);
-  const planE = parse(planEnd);
+  const day = firstIn;
+  const planS = parseHmToDate(day, planStart);
+  const planE = parseHmToDate(day, planEnd);
   const winStart = firstIn > planS ? firstIn : planS;
   const winEnd = lastOut < planE ? lastOut : planE;
   if (winEnd.getTime() <= winStart.getTime()) return 0;
   let mins = (winEnd.getTime() - winStart.getTime()) / 60000;
   if (countLunch) {
-    const lunchS = parse('13:00');
-    const lunchE = parse('14:00');
+    const lunchS = parseHmToDate(day, '13:00');
+    const lunchE = parseHmToDate(day, '14:00');
     const overlapMs = Math.max(
       0,
       Math.min(winEnd.getTime(), lunchE.getTime()) -
@@ -67,21 +61,13 @@ export function creditedOnTimeHours(
 }
 
 export function hoursBefore(firstIn: Date, planStart: string) {
-  const day = new Date(firstIn);
-  day.setHours(0, 0, 0, 0);
-  const [h, m] = planStart.split(':').map((x) => Number(x) || 0);
-  const planS = new Date(day);
-  planS.setHours(h, m, 0, 0);
+  const planS = parseHmToDate(firstIn, planStart);
   if (firstIn.getTime() >= planS.getTime()) return 0;
   return (planS.getTime() - firstIn.getTime()) / 3600000;
 }
 
 export function hoursAfter(lastOut: Date, planEnd: string) {
-  const day = new Date(lastOut);
-  day.setHours(0, 0, 0, 0);
-  const [h, m] = planEnd.split(':').map((x) => Number(x) || 0);
-  const planE = new Date(day);
-  planE.setHours(h, m, 0, 0);
+  const planE = parseHmToDate(lastOut, planEnd);
   if (lastOut.getTime() <= planE.getTime()) return 0;
   return (lastOut.getTime() - planE.getTime()) / 3600000;
 }

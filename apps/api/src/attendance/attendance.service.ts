@@ -6886,8 +6886,9 @@ export class AttendanceService {
     tenantId: string,
     opts: { date?: string; page?: string | number; limit?: string | number } = {},
   ) {
-    const workDate = opts.date ? new Date(opts.date) : new Date();
-    workDate.setHours(0, 0, 0, 0);
+    const workDate = opts.date
+      ? workDateOnly(new Date(`${opts.date}T12:00:00+05:00`))
+      : workDateOnly(new Date());
     const where: Prisma.AttendanceDayWhereInput = { tenantId, workDate };
     const { page, limit, skip } = parsePagination(opts.page, opts.limit, {
       defaultLimit: 100,

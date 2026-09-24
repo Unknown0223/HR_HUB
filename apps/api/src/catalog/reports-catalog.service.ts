@@ -12,6 +12,7 @@ import {
   parseScheduleSettings,
 } from '../attendance/schedule-settings';
 import { round2 } from './catalog-hours.util';
+import { fmtHm, minutesOfDay } from '../attendance/attendance-day';
 
 /**
  * F11: analytics reports / dashboards extracted from CatalogService.
@@ -3200,10 +3201,7 @@ ORDER BY pp.month;`,
       const [h, m] = String(s || '0:0').split(':').map(Number);
       return (h || 0) * 60 + (m || 0);
     };
-    const hm = (d?: Date | null) => {
-      if (!d) return '';
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    };
+    const hm = (d?: Date | null) => fmtHm(d);
     const r2 = (n: number) => Math.round(n * 100) / 100;
     const planHoursOf = (start: string, end: string) => {
       let d = toMin(end) - toMin(start);
@@ -3349,7 +3347,7 @@ ORDER BY pp.month;`,
         const hasMarks = empMarks.length > 0 || !!rec?.firstInAt;
         if (!hasMarks && !showEmpty) continue;
 
-        const firstMin = firstIn ? firstIn.getHours() * 60 + firstIn.getMinutes() : null;
+        const firstMin = firstIn ? minutesOfDay(firstIn) : null;
         const night = firstMin != null && (firstMin < winStart || firstMin > winEnd);
         const shiftType = night || (dayOff && hasMarks) ? 'Ночь' : 'День';
         const dateWarn = !!(hasMarks && (dayOff || night));
@@ -3861,7 +3859,7 @@ ORDER BY pp.month;`,
         return hit?.amount || 0;
       }
       if (!firstInAt) return 0;
-      const t = firstInAt.getHours() * 60 + firstInAt.getMinutes();
+      const t = minutesOfDay(firstInAt);
       const hit = timeRules.find((r) => {
         const a = toMin(r.from);
         const b = toMin(r.to);
@@ -7956,10 +7954,7 @@ ORDER BY pp.month;`,
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const ruDay = (d: Date) =>
       `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
-    const hm = (d?: Date | null) => {
-      if (!d) return '';
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
+    const hm = (d?: Date | null) => fmtHm(d);
     const hoursOf = (v: unknown) => {
       if (v == null) return null;
       const n = Number(v);
@@ -8652,10 +8647,7 @@ ORDER BY pp.month;`,
     const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
     const iso = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const hm = (d?: Date | null) => {
-      if (!d) return '';
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
+    const hm = (d?: Date | null) => fmtHm(d);
     const hoursOf = (v: unknown) => {
       if (v == null) return null;
       const n = Number(v);
@@ -8964,10 +8956,7 @@ ORDER BY pp.month;`,
     const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
     const iso = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const hm = (d?: Date | null) => {
-      if (!d) return '';
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
+    const hm = (d?: Date | null) => fmtHm(d);
 
     const dayList: { iso: string; day: string; weekday: string; sunday: boolean }[] = [];
     for (let t = new Date(gte); t <= lte; t.setDate(t.getDate() + 1)) {
@@ -9100,7 +9089,7 @@ ORDER BY pp.month;`,
         })()
       : '';
 
-    const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes();
+    const minutesOf = (d: Date) => minutesOfDay(d);
     const hoursOf = (row: (typeof attDays)[number] | undefined, sunday: boolean) => {
       if (!row) return 0;
       let inAt = row.firstInAt;
@@ -9893,7 +9882,7 @@ ORDER BY pp.month;`,
       const [h, m] = String(s || '0:0').split(':').map(Number);
       return (h || 0) * 60 + (m || 0);
     };
-    const hm = (d?: Date | null) => (d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '');
+    const hm = (d?: Date | null) => fmtHm(d);
     const r2 = (n: number) => Math.round(n * 100) / 100;
     const planH = (start: string, end: string) => {
       let d = toMin(end) - toMin(start);

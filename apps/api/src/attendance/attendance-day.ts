@@ -47,6 +47,28 @@ export function parseHmToDate(workDate: Date, hm: string): Date {
   return new Date(`${ymd}T${hh}:${mi}:00${TZ_OFFSET}`);
 }
 
+/** HH:MM in org timezone (never host-local getHours). */
+export function fmtHm(d?: Date | null, timeZone = ATTENDANCE_TZ): string {
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const hh = parts.find((p) => p.type === 'hour')?.value ?? '00';
+  const mi = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return `${hh}:${mi}`;
+}
+
+/** Minutes since org midnight for wall-clock comparisons (late/early). */
+export function minutesOfDay(d: Date, timeZone = ATTENDANCE_TZ): number {
+  const hm = fmtHm(d, timeZone);
+  if (!hm) return 0;
+  const [h, m] = hm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
 export type DayMarkRole = 'in' | 'out' | 'estimated_out';
 
 export function isAttendanceDayClosed(now: Date, workDate: Date, scheduleEndHm: string): boolean {

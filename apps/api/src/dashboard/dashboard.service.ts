@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DayStatus, EmploymentStatus, Prisma, RequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { minutesOfDay } from '../attendance/attendance-day';
 
 /** Railway/API often runs in UTC — always show org local time (Tashkent). */
 const APP_TZ = 'Asia/Tashkent';
@@ -390,7 +391,7 @@ export class DashboardService {
       const endMin = parseHm(endHm);
       let earlyOut = false;
       if (d?.lastOutAt) {
-        const outMin = d.lastOutAt.getHours() * 60 + d.lastOutAt.getMinutes();
+        const outMin = minutesOfDay(d.lastOutAt);
         if (outMin + 5 < endMin) {
           earlyOut = true;
           row.note = 'Ertaroq chiqdi';
