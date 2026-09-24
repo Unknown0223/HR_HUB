@@ -46,7 +46,7 @@ async function login() {
   const res = await fetch(`${API}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, tenantCode: TENANT }),
+    body: JSON.stringify({ email, password }),
   });
   const text = await res.text();
   let data;
