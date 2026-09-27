@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { confirm as confirmDialog } from '@/lib/dialogs';
 
 import Link from 'next/link';

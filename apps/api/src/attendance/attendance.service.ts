@@ -1,4 +1,4 @@
-﻿import { createHash, randomBytes, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import * as path from 'path';

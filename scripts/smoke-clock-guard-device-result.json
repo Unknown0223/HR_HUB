@@ -1,0 +1,48 @@
+{
+  "api": "http://127.0.0.1:3002",
+  "device": "192.168.100.127",
+  "deviceIsapi": true,
+  "results": [
+    {
+      "case": "0_clean_httphost",
+      "ok": true,
+      "detail": "httphost=200 ingested=1 isValid=True deviceClockSet=True",
+      "markId": "d303a5d6-e54f-4f49-b24e-d68d0c284b20",
+      "via": "ISAPI set_time + HttpHost JSON"
+    },
+    {
+      "case": "1_online_skew",
+      "ok": true,
+      "detail": "deviceClockShifted=True isValid=False clockTamper=True note=Время терминала не совпадает с сервером (сдвиг 12 мин) — отметка недействительна",
+      "markId": "060ea3da-bb6b-4fb0-a1df-3ecae7c20911",
+      "via": "ISAPI clock -12m + HttpHost"
+    },
+    {
+      "case": "2_rollback",
+      "ok": true,
+      "detail": "deduped=True isValid=False note=Отметка с прошлым временем после онлайн-периода (откат часов) — недействительна",
+      "markId": "0341a9ca-6942-4d17-818e-9aa2c4a80a8b",
+      "via": "HttpHost now then now-2min (rollback without >3min skew)"
+    },
+    {
+      "case": "3_offline_unverified",
+      "ok": true,
+      "detail": "patchedHB=True deduped=True offlineNote=True isValid=False note=Отметка в офлайн-периоде: время терминала нельзя подтвердить сервером — недействительна",
+      "markId": "f71ff234-6aea-4e43-9faf-4dceca2b5b62",
+      "via": "aged clockGuard + device_gw_pull"
+    },
+    {
+      "case": "4_admin_login_lock",
+      "ok": true,
+      "detail": "punchLockSet=True deduped=True isValid=False note=Отметка после ввода пароля администратора на терминале (заблокировано до синхронизации)",
+      "markId": "67b25fba-bedb-42c7-8326-3e5a918a7ffd",
+      "via": "meta.punchLock.active + HttpHost (device push path)"
+    },
+    {
+      "case": "bonus_sync_clock_api",
+      "ok": true,
+      "detail": "status=201 message=Синхронизация часов выполнено (reach)",
+      "via": "Web remote sync_clock (reach)"
+    }
+  ]
+}
