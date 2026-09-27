@@ -14,12 +14,14 @@ import { PairingTokenGuard } from './pairing-token.guard';
 import { DeviceCredentialVaultService } from './device-credential-vault.service';
 import { DeviceCredentialAuditService } from './device-credential-audit.service';
 import { AttendanceDayScheduler } from './attendance-day.scheduler';
+import { MarkPhotoPurgeScheduler } from './mark-photo-purge.scheduler';
 import { DeviceGwModule } from '../device-gw/device-gw.module';
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [DeviceGwModule, StorageModule, NotificationsModule],
+  imports: [DeviceGwModule, StorageModule, NotificationsModule, SettingsModule],
   controllers: [
     AttendanceController,
     OfficeLinkController,
@@ -38,6 +40,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     DeviceCredentialVaultService,
     DeviceCredentialAuditService,
     AttendanceDayScheduler,
+    MarkPhotoPurgeScheduler,
   ],
   exports: [AttendanceService, DeviceCredentialVaultService],
 })

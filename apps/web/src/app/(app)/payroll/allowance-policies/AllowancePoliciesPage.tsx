@@ -4,7 +4,6 @@ import { confirm } from '@/lib/dialogs';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { formatMonthRu } from '@/lib/fine-policies';
@@ -292,8 +291,6 @@ function AllowancePoliciesInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="allowance-policies" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-hand-holding-usd" aria-hidden />

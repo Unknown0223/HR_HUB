@@ -1,6 +1,6 @@
 {
-  "apiUrl": "https://hr-hubapi-production.up.railway.app",
-  "webUrl": "https://hr-hubweb-production.up.railway.app",
+  "apiUrl": "http://127.0.0.1:3002",
+  "webUrl": "http://127.0.0.1:3001",
   "tenantCode": "demo",
   "recoveryEmail": "botirovanvar96@gmail.com"
 }

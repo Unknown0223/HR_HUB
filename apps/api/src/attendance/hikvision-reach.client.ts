@@ -261,6 +261,46 @@ export class HikvisionReachClient {
     }
   }
 
+  /** Align terminal clock with server (Uzbekistan UTC+5), same as device-gw. */
+  async syncClock(
+    baseUrl: string,
+    username: string,
+    password: string,
+  ): Promise<ReachResult> {
+    const now = new Date();
+    const shifted = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+    const local = shifted.toISOString().slice(0, 19);
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<Time>' +
+      '<timeMode>manual</timeMode>' +
+      `<localTime>${local}+05:00</localTime>` +
+      '<timeZone>CST-5:00:00</timeZone>' +
+      '</Time>';
+    try {
+      const r = await this.digestRequest(baseUrl, '/ISAPI/System/time', {
+        method: 'PUT',
+        username,
+        password,
+        body: xml,
+        contentType: 'application/xml',
+        timeoutMs: 20_000,
+      });
+      if (r.status > 0 && r.status < 400) return { ok: true };
+      return {
+        ok: false,
+        error: snipError(r.status, r.text, 'sync_clock'),
+        retryable: isRetryableHttp(r.status, r.text),
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+        retryable: true,
+      };
+    }
+  }
+
   async upsertUser(
     baseUrl: string,
     username: string,
@@ -470,6 +510,15 @@ export class HikvisionReachClient {
       }
       last = snipError(r.status, r.text, `Face(${attempt.label})`);
       const low = (r.text || '').toLowerCase();
+      // Prefer the meaningful device reason over later JSON faceLibType noise.
+      if (low.includes('subpicanalysismodelingerror')) {
+        return {
+          ok: false,
+          error:
+            'Face rejected by terminal (SubpicAnalysisModelingError) — нужен чёткий реальный снимок лица, не avatar',
+          retryable: false,
+        };
+      }
       if (
         isRetryableHttp(r.status, r.text) ||
         r.status === 0 ||

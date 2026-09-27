@@ -24,6 +24,14 @@ import {
   type AuditActor,
 } from './device-credential-audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
+import {
+  markPhotoKindFromDirection,
+  markPhotoKindFromMarkType,
+  retentionToDays,
+  type MarkPhotoKind,
+} from '../settings/system-settings.defaults';
+import { compressMarkCaptureJpeg } from './mark-photo-compress';
 import type { PairingAuthContext } from './pairing-token.guard';
 import {
   buildStoreZip,
@@ -83,6 +91,8 @@ export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
   /** Per-device in-flight persons sync — prevents double wave pipelines. */
   private readonly personsSyncInFlight = new Map<string, Promise<void>>();
+  /** One-shot kickoff: purge estimated_out photos when policy is already off. */
+  private readonly estimatedOutPurgeKickoff = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -93,6 +103,7 @@ export class AttendanceService {
     private readonly credentialAudit: DeviceCredentialAuditService,
     private readonly config: ConfigService,
     private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
@@ -1134,11 +1145,14 @@ export class AttendanceService {
             try {
               const faceB64 = await this.resolveFaceBase64(fs.faceProfile);
               if (!faceB64) {
+                const placeholder = this.isPlaceholderFacePhoto(fs.faceProfile);
                 await this.prisma.deviceFaceSync.update({
                   where: { id: fs.id },
                   data: {
                     syncStatus: FaceSyncStatus.failed,
-                    lastError: 'No face photo',
+                    lastError: placeholder
+                      ? 'Нужно реальное фото лица (сейчас avatar/placeholder — терминал не примет)'
+                      : 'No face photo',
                   },
                 });
                 return { ok: false, name, connectivity: false as const };
@@ -1463,10 +1477,29 @@ export class AttendanceService {
     return String(BigInt(digits));
   }
 
+  private isPlaceholderFacePhoto(profile: {
+    photoKey?: string | null;
+    photoUrl?: string | null;
+  }): boolean {
+    if (profile.photoKey) return false;
+    const url = String(profile.photoUrl || '').trim().toLowerCase();
+    if (!url) return false;
+    return (
+      url.includes('ui-avatars.com') ||
+      url.includes('avatar.iran.liara') ||
+      url.includes('dicebear.com') ||
+      url.includes('robohash.org') ||
+      url.includes('pravatar.cc')
+    );
+  }
+
   private async resolveFaceBase64(profile: {
     photoKey?: string | null;
     photoUrl?: string | null;
   }): Promise<string | null> {
+    if (this.isPlaceholderFacePhoto(profile)) {
+      return null;
+    }
     if (profile.photoUrl?.startsWith('data:')) {
       const idx = profile.photoUrl.indexOf('base64,');
       return idx >= 0 ? profile.photoUrl.slice(idx + 7) : null;
@@ -1614,6 +1647,38 @@ export class AttendanceService {
     }
 
     const device = await this.getDevice(tenantId, id);
+
+    // Prefer direct ISAPI (Cloudflare tunnel or LAN) for clock — no device-gw needed.
+    if (action === 'sync_clock') {
+      const reachUrl = this.deviceReachBaseUrl(device.meta);
+      const plain =
+        (await this.passwordForGw(tenantId, device.id, device.passwordEnc)) || '';
+      const username = (device.username || 'admin').trim() || 'admin';
+      if (reachUrl && plain) {
+        const res = await this.reach.syncClock(reachUrl, username, plain);
+        const ok = res.ok === true;
+        await this.appendCommand(tenantId, id, {
+          type: 'Синхронизация часов',
+          status: ok ? 'completed' : 'failed',
+        });
+        if (ok) {
+          await this.prisma.device.update({
+            where: { id: device.id },
+            data: { lastSeenAt: new Date(), status: 'online' },
+          });
+        }
+        return {
+          ok,
+          action,
+          message: ok
+            ? 'Синхронизация часов выполнено (reach)'
+            : res.error ||
+              this.remoteActionMessage(device, action, false, 'Синхронизация часов'),
+          via: 'reach',
+        };
+      }
+    }
+
     const ref = await this.ensureGwRegistered(device);
 
     const labels: Record<string, string> = {
@@ -1882,7 +1947,12 @@ export class AttendanceService {
         id: e.id,
         pin: e.tabNumber,
         fullName: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' '),
-        hasPhoto: Boolean(r.faceProfile.photoUrl || r.faceProfile.photoKey),
+        hasPhoto: Boolean(
+          (r.faceProfile.photoKey && String(r.faceProfile.photoKey).trim()) ||
+            (r.faceProfile.photoUrl &&
+              !this.isPlaceholderFacePhoto(r.faceProfile) &&
+              String(r.faceProfile.photoUrl).trim()),
+        ),
         role: 'Обычный пользователь',
         synchronized: r.syncStatus === 'synced',
         syncStatus: r.syncStatus,
@@ -3109,10 +3179,26 @@ export class AttendanceService {
   ) {
     const tenant = await this.resolveTenantByCode(tenantCode);
     const url = (tunnelUrl || '').trim().replace(/\/$/, '');
-    if (!/^https:\/\/[a-z0-9.-]+/i.test(url)) {
-      throw new BadRequestException('Tunnel URL https bo‘lishi kerak');
+    // Production: Cloudflare https://*.trycloudflare.com (or named tunnel).
+    // Local/dev: allow http:// LAN / loopback so office-link can bind without cloudflared.
+    const httpsOk = /^https:\/\/[a-z0-9.-]+/i.test(url);
+    const httpLocalOk =
+      /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?(\/.*)?$/i.test(
+        url,
+      );
+    if (!httpsOk && !httpLocalOk) {
+      throw new BadRequestException(
+        'Tunnel URL https (Cloudflare) yoki lokal http://LAN/loopback bo‘lishi kerak',
+      );
     }
-    await this.gw.announceUrl(tenant.id, url);
+
+    const lanTerminal = this.gw.isTerminalLanUrl(url);
+    // LAN terminal IP → reach (ISAPI) only. Never poison device-gw /health base.
+    if (lanTerminal) {
+      await this.gw.clearGwUrlIfMatches(tenant.id, url);
+    } else {
+      await this.gw.announceUrl(tenant.id, url);
+    }
 
     const id = (deviceId || '').trim();
     if (id) {
@@ -3123,7 +3209,7 @@ export class AttendanceService {
         const meta = this.asMeta(device.meta);
         meta.reach = {
           baseUrl: url,
-          mode: 'cloudflare_device',
+          mode: lanTerminal ? 'lan_device' : 'cloudflare_device',
           at: new Date().toISOString(),
         };
         await this.prisma.device.update({
@@ -3137,7 +3223,13 @@ export class AttendanceService {
       }
     }
 
-    return { ok: true, gwUrl: url, reachDeviceId: id || null };
+    return {
+      ok: true,
+      gwUrl: lanTerminal ? null : url,
+      reachUrl: url,
+      reachMode: lanTerminal ? 'lan_device' : 'cloudflare_device',
+      reachDeviceId: id || null,
+    };
   }
 
   private deviceReachBaseUrl(meta: unknown): string | null {
@@ -3446,7 +3538,11 @@ export class AttendanceService {
       results.push(res as { ok: boolean; reason?: string });
     }
 
-    const meta = this.asMeta(device.meta);
+    const metaRow = await this.prisma.device.findFirst({
+      where: { id: device.id },
+      select: { meta: true, status: true },
+    });
+    const meta = this.asMeta(metaRow?.meta ?? device.meta);
     const prev =
       meta.hikPush && typeof meta.hikPush === 'object' && !Array.isArray(meta.hikPush)
         ? { ...(meta.hikPush as Record<string, unknown>) }
@@ -3456,10 +3552,20 @@ export class AttendanceService {
       lastEventAt: new Date().toISOString(),
       lastIngested: results.filter((r) => r.ok).length,
     };
+    const guard =
+      meta.clockGuard && typeof meta.clockGuard === 'object' && !Array.isArray(meta.clockGuard)
+        ? (meta.clockGuard as Record<string, unknown>)
+        : {};
+    const punchLock =
+      guard.punchLock && typeof guard.punchLock === 'object' && !Array.isArray(guard.punchLock)
+        ? (guard.punchLock as Record<string, unknown>)
+        : {};
+    const locked =
+      punchLock.active === true || String(metaRow?.status || device.status) === 'locked';
     await this.prisma.device.update({
       where: { id: device.id },
       data: {
-        status: 'online',
+        status: locked ? 'locked' : 'online',
         lastSeenAt: new Date(),
         meta: meta as Prisma.InputJsonValue,
       },
@@ -5330,7 +5436,14 @@ export class AttendanceService {
     } = {},
   ) {
     const where: Prisma.AttendanceMarkWhereInput = { tenantId };
-    if (opts.employeeId) where.employeeId = opts.employeeId;
+    const idList = (raw?: string) =>
+      (raw || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+    const employeeIds = idList(opts.employeeId);
+    if (employeeIds.length === 1) where.employeeId = employeeIds[0];
+    else if (employeeIds.length > 1) where.employeeId = { in: employeeIds };
     const localDay = (value: string, endOfDay: boolean) => {
       const ymd = value.trim().slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
@@ -5356,11 +5469,23 @@ export class AttendanceService {
         if (end) where.occurredAt.lte = end;
       }
     }
-    if (opts.divisionId) {
-      where.employee = { ...(where.employee as object), divisionId: opts.divisionId };
+    const divisionIds = idList(opts.divisionId);
+    if (divisionIds.length === 1) {
+      where.employee = {
+        ...(where.employee as object),
+        divisionId: divisionIds[0],
+      };
+    } else if (divisionIds.length > 1) {
+      where.employee = {
+        ...(where.employee as object),
+        divisionId: { in: divisionIds },
+      };
     }
-    if (opts.locationId) {
-      where.device = { locationId: opts.locationId };
+    const locationIds = idList(opts.locationId);
+    if (locationIds.length === 1) {
+      where.device = { locationId: locationIds[0] };
+    } else if (locationIds.length > 1) {
+      where.device = { locationId: { in: locationIds } };
     }
     if (opts.q?.trim()) {
       const nameWhere = employeeNameSearchWhere(opts.q);
@@ -5437,6 +5562,33 @@ export class AttendanceService {
         mapped = mapped.filter((m) => allowed.has(String(m.markType).toLowerCase()));
       }
     }
+
+    // «Примерный уход» photo policy off: strip photos; hide from main Отметки list
+    // (employee card / explicit markTypes filter still shows text-only rows).
+    const estPolicy = await this.getEstimatedOutPhotoPolicy(tenantId);
+    if (!estPolicy.enabled) {
+      // Opportunistic cleanup if toggle was off before this fix shipped.
+      if (!this.estimatedOutPurgeKickoff.has(tenantId)) {
+        this.estimatedOutPurgeKickoff.add(tenantId);
+        void this.purgeDisabledEstimatedOutPhotos(tenantId).catch(() => {
+          this.estimatedOutPurgeKickoff.delete(tenantId);
+        });
+      }
+      mapped = mapped.map((m) =>
+        m.markType === 'estimated_out' ? { ...m, photoUrl: null } : m,
+      );
+      const wantEst =
+        Boolean(opts.employeeId) ||
+        (opts.markTypes || '')
+          .toLowerCase()
+          .split(',')
+          .map((x) => x.trim())
+          .includes('estimated_out');
+      if (!wantEst) {
+        mapped = mapped.filter((m) => m.markType !== 'estimated_out');
+      }
+    }
+
     return pageResult(mapped, total, page, limit);
   }
 
@@ -5651,6 +5803,7 @@ export class AttendanceService {
       where: { id: markId, tenantId },
     });
     if (!mark) throw new NotFoundException('Mark not found');
+    await this.deleteMarkCapturePhoto(mark.rawPayload);
     await this.prisma.attendanceMark.delete({ where: { id: markId } });
     if (mark.employeeId) {
       await this.recalcDay(tenantId, mark.employeeId, mark.occurredAt);
@@ -5678,6 +5831,9 @@ export class AttendanceService {
     };
 
     if (action === 'delete') {
+      for (const m of marks) {
+        await this.deleteMarkCapturePhoto(m.rawPayload);
+      }
       await this.prisma.attendanceMark.deleteMany({
         where: { tenantId, id: { in: marks.map((m) => m.id) } },
       });
@@ -6237,12 +6393,13 @@ export class AttendanceService {
       isValid: payload.isValid !== false,
       clockTamper:
         payload.clockTamper === true ||
+        payload.clockSkew === true ||
         payload.clockRollback === true ||
         payload.offlineUnverified === true ||
         payload.adminLoginBlocked === true,
       note:
         (typeof payload.note === 'string' && payload.note) ||
-        (payload.clockTamper === true
+        (payload.clockSkew === true || payload.clockTamper === true
           ? `Время терминала скорректировано (сдвиг ${Number(payload.clockDriftSeconds || 0)} с)`
           : payload.clockRollback === true
             ? 'Время терминала откатили назад'
@@ -6339,7 +6496,12 @@ export class AttendanceService {
       },
     });
     if (!mark) throw new NotFoundException('Mark not found');
-    return this.enrichMark(mark);
+    const enriched = this.enrichMark(mark);
+    const estPolicy = await this.getEstimatedOutPhotoPolicy(tenantId);
+    if (!estPolicy.enabled && enriched.markType === 'estimated_out') {
+      return { ...enriched, photoUrl: null };
+    }
+    return enriched;
   }
 
   async marksImportTemplate() {
@@ -6605,14 +6767,284 @@ export class AttendanceService {
     return rest;
   }
 
+  private async isMarkPhotoCaptureEnabled(
+    tenantId: string,
+    direction: PunchDirection | string | null | undefined,
+  ): Promise<boolean> {
+    try {
+      const { system } = await this.settings.getSystemSettings(tenantId);
+      const kind = markPhotoKindFromDirection(
+        typeof direction === 'string' ? direction : String(direction || ''),
+      );
+      return Boolean(system.markPhotos?.[kind]?.enabled);
+    } catch (e) {
+      this.logger.warn(
+        `markPhotos policy read failed tenant=${tenantId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+      return true;
+    }
+  }
+
+  private async getEstimatedOutPhotoPolicy(
+    tenantId: string,
+  ): Promise<{ enabled: boolean }> {
+    try {
+      const { system } = await this.settings.getSystemSettings(tenantId);
+      return {
+        enabled: system.markPhotos?.estimated_out?.enabled !== false,
+      };
+    } catch {
+      return { enabled: true };
+    }
+  }
+
+  /** Drop punch snapshot when «Примерный уход» photo policy is off. */
+  private async stripEstimatedOutPhotoIfDisabled(
+    tenantId: string,
+    payload: Record<string, unknown>,
+  ) {
+    const policy = await this.getEstimatedOutPhotoPolicy(tenantId);
+    if (policy.enabled) return;
+    const key = typeof payload.photoKey === 'string' ? payload.photoKey.trim() : '';
+    if (key) {
+      try {
+        await this.storage.deleteObject(key);
+      } catch (e) {
+        this.logger.warn(
+          `estimated_out photo strip failed: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+    }
+    if (payload.photoKey || payload.photoUrl) {
+      delete payload.photoKey;
+      delete payload.photoUrl;
+      payload.photoSkippedReason = 'estimated_out_disabled';
+    }
+  }
+
+  /**
+   * When «Примерный уход → Сохранять фото» is OFF: delete all stored snapshots
+   * for that kind immediately (not only on day recalc).
+   */
+  async purgeDisabledEstimatedOutPhotos(tenantId: string): Promise<{
+    scanned: number;
+    purged: number;
+    errors: number;
+  }> {
+    const policy = await this.getEstimatedOutPhotoPolicy(tenantId);
+    if (policy.enabled) {
+      return { scanned: 0, purged: 0, errors: 0 };
+    }
+
+    const rows = await this.prisma.attendanceMark.findMany({
+      where: { tenantId },
+      select: { id: true, direction: true, rawPayload: true },
+      take: 2000,
+      orderBy: { occurredAt: 'desc' },
+    });
+
+    let scanned = 0;
+    let purged = 0;
+    let errors = 0;
+    for (const row of rows) {
+      const payload =
+        row.rawPayload &&
+        typeof row.rawPayload === 'object' &&
+        !Array.isArray(row.rawPayload)
+          ? { ...(row.rawPayload as Record<string, unknown>) }
+          : null;
+      if (!payload) continue;
+      const kind = markPhotoKindFromMarkType(
+        typeof payload.markType === 'string' ? payload.markType : null,
+        row.direction,
+      );
+      const isEst =
+        kind === 'estimated_out' ||
+        payload.dayRole === 'estimated_out' ||
+        String(payload.markTypeLabel || '')
+          .toLowerCase()
+          .includes('примерн');
+      if (!isEst) continue;
+      const photoKey =
+        typeof payload.photoKey === 'string' ? payload.photoKey.trim() : '';
+      if (!photoKey && !payload.photoUrl) continue;
+      scanned += 1;
+      try {
+        if (photoKey) await this.storage.deleteObject(photoKey);
+        delete payload.photoKey;
+        delete payload.photoUrl;
+        payload.photoSkippedReason = 'estimated_out_disabled';
+        payload.photoPurgedAt = new Date().toISOString();
+        await this.prisma.attendanceMark.update({
+          where: { id: row.id },
+          data: { rawPayload: payload as Prisma.InputJsonValue },
+        });
+        purged += 1;
+      } catch (e) {
+        errors += 1;
+        this.logger.warn(
+          `estimated_out bulk strip failed id=${row.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+    if (purged > 0) {
+      this.logger.log(
+        `estimated_out photos purged tenant=${tenantId} purged=${purged}`,
+      );
+    }
+    return { scanned, purged, errors };
+  }
+
+  private async deleteMarkCapturePhoto(
+    rawPayload: Prisma.JsonValue | null | undefined,
+  ) {
+    if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+      return;
+    }
+    const key = (rawPayload as Record<string, unknown>).photoKey;
+    if (typeof key === 'string' && key.trim()) {
+      await this.storage.deleteObject(key.trim());
+    }
+  }
+
+  /**
+   * Retention purge for punch capture photos (MinIO marks/… + rawPayload fields).
+   * kind-specific cutoffs from tenant system.markPhotos settings.
+   */
+  async purgeExpiredMarkPhotos(tenantId: string): Promise<{
+    scanned: number;
+    purged: number;
+    errors: number;
+  }> {
+    const { system } = await this.settings.getSystemSettings(tenantId);
+    const policies = system.markPhotos;
+    const now = Date.now();
+    const cutoffs: Partial<Record<MarkPhotoKind, Date>> = {};
+    for (const kind of ['in', 'out', 'mark', 'estimated_out'] as MarkPhotoKind[]) {
+      const p = policies[kind];
+      const days = retentionToDays(p.retentionValue, p.retentionUnit);
+      if (days >= 1) {
+        cutoffs[kind] = new Date(now - days * 24 * 60 * 60 * 1000);
+      }
+    }
+    if (!Object.keys(cutoffs).length) {
+      return { scanned: 0, purged: 0, errors: 0 };
+    }
+    const oldest = Object.values(cutoffs).reduce((a, b) =>
+      a.getTime() < b.getTime() ? a : b,
+    );
+
+    const rows = await this.prisma.attendanceMark.findMany({
+      where: {
+        tenantId,
+        occurredAt: { lt: oldest },
+      },
+      select: {
+        id: true,
+        direction: true,
+        occurredAt: true,
+        rawPayload: true,
+      },
+      take: 500,
+      orderBy: { occurredAt: 'asc' },
+    });
+
+    let scanned = 0;
+    let purged = 0;
+    let errors = 0;
+    for (const row of rows) {
+      const payload =
+        row.rawPayload &&
+        typeof row.rawPayload === 'object' &&
+        !Array.isArray(row.rawPayload)
+          ? { ...(row.rawPayload as Record<string, unknown>) }
+          : null;
+      if (!payload) continue;
+      const photoKey =
+        typeof payload.photoKey === 'string' ? payload.photoKey.trim() : '';
+      if (!photoKey) continue;
+      scanned += 1;
+      const kind = markPhotoKindFromMarkType(
+        typeof payload.markType === 'string' ? payload.markType : null,
+        row.direction,
+      );
+      const cutoff = cutoffs[kind];
+      if (!cutoff || row.occurredAt >= cutoff) continue;
+      try {
+        await this.storage.deleteObject(photoKey);
+        delete payload.photoKey;
+        delete payload.photoUrl;
+        payload.photoPurgedAt = new Date().toISOString();
+        payload.photoPurgeReason = `retention_${kind}`;
+        await this.prisma.attendanceMark.update({
+          where: { id: row.id },
+          data: { rawPayload: payload as Prisma.InputJsonValue },
+        });
+        purged += 1;
+      } catch (e) {
+        errors += 1;
+        this.logger.warn(
+          `mark photo purge failed id=${row.id}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+    if (purged > 0) {
+      try {
+        await this.prisma.auditLog.create({
+          data: {
+            tenantId,
+            action: 'mark.photo_retention_purge',
+            entity: 'attendance_mark',
+            entityId: tenantId,
+            meta: { scanned, purged, errors } as Prisma.InputJsonValue,
+          },
+        });
+      } catch (e) {
+        this.logger.warn(
+          `mark photo purge audit failed: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+    }
+    return { scanned, purged, errors };
+  }
+
   private async storeCapturePhoto(tenantId: string, jpegB64: string) {
     try {
-      const buf = Buffer.from(jpegB64, 'base64');
-      if (buf.length < 100 || buf[0] !== 0xff || buf[1] !== 0xd8) {
+      const raw = Buffer.from(jpegB64, 'base64');
+      if (raw.length < 100) {
         return null;
       }
+      // Accept JPEG SOI or other formats sharp can decode (some adapters send PNG).
+      let compressOpts = {
+        enabled: true,
+        maxEdge: 720,
+        quality: 62,
+      };
+      try {
+        const { system } = await this.settings.getSystemSettings(tenantId);
+        if (system.markPhotos?.compress) {
+          compressOpts = { ...system.markPhotos.compress };
+        }
+      } catch {
+        /* use defaults */
+      }
+      const { buffer, compressed, bytesIn, bytesOut } =
+        await compressMarkCaptureJpeg(raw, compressOpts);
+      if (buffer.length < 80) return null;
       const key = `marks/${tenantId}/${randomUUID()}.jpg`;
-      return await this.storage.putObject(key, buf, 'image/jpeg');
+      const stored = await this.storage.putObject(key, buffer, 'image/jpeg');
+      if (compressed && bytesIn > bytesOut) {
+        this.logger.debug(
+          `mark photo compressed tenant=${tenantId} ${bytesIn}→${bytesOut}b`,
+        );
+      }
+      return stored;
     } catch (e) {
       this.logger.warn(`Capture photo store failed: ${e}`);
       return null;
@@ -6620,10 +7052,19 @@ export class AttendanceService {
   }
 
   private async mergeMarkCapturePhoto(
-    mark: { id: string; rawPayload: Prisma.JsonValue | null },
+    mark: {
+      id: string;
+      rawPayload: Prisma.JsonValue | null;
+      direction?: PunchDirection | string | null;
+    },
     tenantId: string,
     jpegB64: string,
   ) {
+    const allowed = await this.isMarkPhotoCaptureEnabled(
+      tenantId,
+      mark.direction,
+    );
+    if (!allowed) return;
     const payload =
       mark.rawPayload &&
       typeof mark.rawPayload === 'object' &&
@@ -6692,6 +7133,16 @@ export class AttendanceService {
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
+  private static readonly CLOCK_SKEW_MS = 180_000;
+  private static readonly CLOCK_ONLINE_WINDOW_MS = 15 * 60_000;
+
+  /**
+   * Four anti-fraud clock protections on every ingest path (incl. HttpHost):
+   * 1) Online skew — |deviceTime−serverNow| > 3 min while recently online → invalid
+   * 2) Rollback — punch behind last online watermark / late replay → invalid
+   * 3) Offline unverified — punch stamped in gap after last heartbeat → invalid
+   * 4) Admin login lock — punches after local admin password → invalid
+   */
   private async applyClockGuard(opts: {
     tenantId: string;
     deviceId: string | null;
@@ -6732,24 +7183,89 @@ export class AttendanceService {
       : device.lastSeenAt;
     const serial = this.extractAcsSerial(opts.raw);
     const now = new Date();
+    const deviceOccurredAtIso = occurredAt.toISOString();
+    const skewMs = occurredAt.getTime() - now.getTime();
+    const absSkewMs = Math.abs(skewMs);
+    const recentlyOnline =
+      (lastHb &&
+        !Number.isNaN(lastHb.getTime()) &&
+        now.getTime() - lastHb.getTime() <= AttendanceService.CLOCK_ONLINE_WINDOW_MS) ||
+      // HttpHost means the terminal is actively pushing right now.
+      String(opts.source || '').includes('http_host');
+
+    // (1) Online skew — terminal clock/timezone changed while device talks to server.
+    if (recentlyOnline && absSkewMs > AttendanceService.CLOCK_SKEW_MS) {
+      const driftSec = Math.round(skewMs / 1000);
+      extra.clockTamper = true;
+      extra.clockSkew = true;
+      extra.isValid = false;
+      extra.deviceOccurredAt = deviceOccurredAtIso;
+      extra.clockDriftSeconds = driftSec;
+      extra.note =
+        'Время терминала не совпадает с сервером (сдвиг ' +
+        Math.round(absSkewMs / 60_000) +
+        ' мин) — отметка недействительна';
+      occurredAt = now;
+      const emp = await this.prisma.employee.findFirst({
+        where: { id: opts.employeeId, tenantId: opts.tenantId },
+        select: { firstName: true, lastName: true, middleName: true },
+      });
+      await this.prisma.problemMark.create({
+        data: {
+          tenantId: opts.tenantId,
+          reason: 'device_clock_skew',
+          payload: {
+            employeeExternalId: opts.employeeExternalId,
+            employeeName: emp
+              ? [emp.lastName, emp.firstName, emp.middleName].filter(Boolean).join(' ')
+              : opts.employeeExternalId,
+            deviceId: device.id,
+            deviceOccurredAt: deviceOccurredAtIso,
+            trustedOccurredAt: occurredAt.toISOString(),
+            clockDriftSeconds: driftSec,
+            source: opts.source || null,
+            note: extra.note,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      this.logger.warn(
+        'Clock skew punch employee=' +
+          opts.employeeExternalId +
+          ' drift=' +
+          driftSec +
+          's source=' +
+          opts.source,
+      );
+    }
 
     const serialAdvanced = serial == null || serial > lastSerial;
     const behindEvent =
       lastEventAt &&
       !Number.isNaN(lastEventAt.getTime()) &&
-      occurredAt.getTime() < lastEventAt.getTime() - 30_000;
+      opts.occurredAt.getTime() < lastEventAt.getTime() - 30_000;
     const behindTrustedClock =
       lastTrustedClock &&
       !Number.isNaN(lastTrustedClock.getTime()) &&
-      occurredAt.getTime() < lastTrustedClock.getTime() - 30_000;
-    const rolledBack = Boolean((behindEvent || behindTrustedClock) && serialAdvanced);
+      opts.occurredAt.getTime() < lastTrustedClock.getTime() - 30_000;
+    const lateOnlineReplay =
+      lastHb &&
+      !Number.isNaN(lastHb.getTime()) &&
+      opts.occurredAt.getTime() <= lastHb.getTime() + 60_000 &&
+      now.getTime() - lastHb.getTime() > 60_000 &&
+      opts.occurredAt.getTime() < now.getTime() - 60_000;
 
+    const rolledBack = Boolean(
+      ((behindEvent || behindTrustedClock) && serialAdvanced) || lateOnlineReplay,
+    );
+
+    // (2) Rollback / delayed online-period punch after clock was turned back.
     if (rolledBack) {
       extra.clockTamper = true;
       extra.clockRollback = true;
-      extra.deviceOccurredAt = occurredAt.toISOString();
+      extra.isValid = false;
+      extra.deviceOccurredAt = deviceOccurredAtIso;
       extra.note =
-        'Время терминала откатили назад (сравнение с последней онлайн-отметкой)';
+        'Отметка с прошлым временем после онлайн-периода (откат часов) — недействительна';
       occurredAt = now;
       const emp = await this.prisma.employee.findFirst({
         where: { id: opts.employeeId, tenantId: opts.tenantId },
@@ -6769,25 +7285,38 @@ export class AttendanceService {
             trustedOccurredAt: occurredAt.toISOString(),
             lastOnlineEventAt: lastEventAt?.toISOString() ?? null,
             lastTrustedDeviceClockAt: lastTrustedClock?.toISOString() ?? null,
+            lateOnlineReplay: Boolean(lateOnlineReplay),
             acsSerial: serial,
           } as Prisma.InputJsonValue,
         },
       });
       this.logger.warn(
-        `Clock rollback punch employee=${opts.employeeExternalId} deviceTime=${extra.deviceOccurredAt} lastEvent=${lastEventAt?.toISOString() ?? '-'} lastTrusted=${lastTrustedClock?.toISOString() ?? '-'}`,
+        'Clock rollback punch employee=' +
+          opts.employeeExternalId +
+          ' deviceTime=' +
+          String(extra.deviceOccurredAt) +
+          ' lastEvent=' +
+          (lastEventAt?.toISOString() ?? '-') +
+          ' lastTrusted=' +
+          (lastTrustedClock?.toISOString() ?? '-'),
       );
     } else if (
+      // (3) Offline gap — cannot verify terminal time against server.
+      !extra.clockSkew &&
       lastHb &&
-      now.getTime() - lastHb.getTime() > 15 * 60_000 &&
-      occurredAt.getTime() > lastHb.getTime() &&
-      occurredAt.getTime() < now.getTime()
+      now.getTime() - lastHb.getTime() > AttendanceService.CLOCK_ONLINE_WINDOW_MS &&
+      opts.occurredAt.getTime() > lastHb.getTime() &&
+      opts.occurredAt.getTime() < now.getTime() - 30_000
     ) {
       extra.offlineUnverified = true;
+      extra.clockTamper = true;
+      extra.isValid = false;
+      extra.deviceOccurredAt = deviceOccurredAtIso;
       extra.note =
-        extra.note ||
-        'Отметка в офлайн-периоде: время терминала нельзя подтвердить сервером';
+        'Отметка в офлайн-периоде: время терминала нельзя подтвердить сервером — недействительна';
     }
 
+    // (4) Admin login punch-lock.
     const punchLock =
       guard.punchLock && typeof guard.punchLock === 'object' && !Array.isArray(guard.punchLock)
         ? (guard.punchLock as Record<string, unknown>)
@@ -6811,18 +7340,39 @@ export class AttendanceService {
 
     const trustedMs = occurredAt.getTime();
     const prevMs = lastEventAt && !Number.isNaN(lastEventAt.getTime()) ? lastEventAt.getTime() : 0;
-    const nextLastEventAt = extra.clockRollback
+    const nextLastEventAt = extra.clockRollback || extra.clockSkew
       ? lastEventAt && !Number.isNaN(lastEventAt.getTime())
         ? lastEventAt.toISOString()
         : lastTrustedClock && !Number.isNaN(lastTrustedClock.getTime())
           ? lastTrustedClock.toISOString()
           : now.toISOString()
-      : new Date(Math.max(trustedMs, prevMs)).toISOString();
+      : new Date(Math.max(trustedMs, prevMs, now.getTime())).toISOString();
+
+    const punchClean =
+      extra.isValid !== false &&
+      !extra.clockRollback &&
+      !extra.clockSkew &&
+      !extra.offlineUnverified &&
+      !extra.adminLoginBlocked &&
+      absSkewMs <= AttendanceService.CLOCK_SKEW_MS;
+
     meta.clockGuard = {
       ...guard,
       lastSerial: Math.max(serial || 0, lastSerial || 0),
       lastEventAt: nextLastEventAt,
       lastHeartbeatAt: now.toISOString(),
+      ...(punchClean
+        ? {
+            lastTrustedDeviceClockAt: new Date(
+              Math.max(
+                opts.occurredAt.getTime(),
+                lastTrustedClock && !Number.isNaN(lastTrustedClock.getTime())
+                  ? lastTrustedClock.getTime()
+                  : 0,
+              ),
+            ).toISOString(),
+          }
+        : {}),
     };
     await this.prisma.device.update({
       where: { id: device.id },
@@ -6991,6 +7541,9 @@ export class AttendanceService {
     });
     occurredAt = guardResult.occurredAt;
     const photoB64 = this.extractPunchPhotoBase64(dto);
+    const photoAllowed = photoB64
+      ? await this.isMarkPhotoCaptureEnabled(tenantId, dto.direction)
+      : false;
 
     // Dedupe: same employee within В±60s of this punch (not all future marks).
     const recent = await this.prisma.attendanceMark.findFirst({
@@ -7005,14 +7558,14 @@ export class AttendanceService {
       orderBy: { occurredAt: 'asc' },
     });
     if (recent) {
-      if (photoB64) {
+      if (photoB64 && photoAllowed) {
         await this.mergeMarkCapturePhoto(recent, tenantId, photoB64);
       }
       return { ok: true, deduped: true, markId: recent.id };
     }
 
     let rawPayload = this.stripPunchPhoto(dto.raw) as Prisma.InputJsonValue | undefined;
-    if (photoB64) {
+    if (photoB64 && photoAllowed) {
       const stored = await this.storeCapturePhoto(tenantId, photoB64);
       if (stored) {
         rawPayload = {
@@ -7038,12 +7591,14 @@ export class AttendanceService {
     const tamper = this.clockTamperFromRaw(dto.raw);
     if (tamper.tamper) {
       const mins = Math.round(Math.abs(tamper.drift) / 60);
-      const note = `Время терминала скорректировано (сдвиг ${mins} мин)`;
+      const note = `Время терминала скорректировано (сдвиг ${mins} мин) — отметка недействительна`;
       rawPayload = {
         ...((rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
           ? rawPayload
           : {}) as Record<string, unknown>),
         clockTamper: true,
+        clockSkew: true,
+        isValid: false,
         clockDriftSeconds: tamper.drift,
         deviceOccurredAt: tamper.deviceOccurredAt,
         note,
@@ -7171,12 +7726,28 @@ export class AttendanceService {
         prevType === 'перерыв уход';
       if (keepManual) continue;
       if (prev.markType === nextType && mark.direction === nextDir && prev.dayRole === role) {
+        if (nextType === 'estimated_out' && (prev.photoKey || prev.photoUrl)) {
+          const before = Boolean(prev.photoKey || prev.photoUrl);
+          await this.stripEstimatedOutPhotoIfDisabled(tenantId, prev);
+          if (before && !(prev.photoKey || prev.photoUrl)) {
+            await this.prisma.attendanceMark.update({
+              where: { id: mark.id },
+              data: { rawPayload: prev as Prisma.InputJsonValue },
+            });
+          }
+        }
         continue;
       }
       prev.markType = nextType;
       prev.dayRole = role;
       prev.markTypeLabel =
         role === 'in' ? 'Приход' : role === 'out' ? 'Уход' : 'Примерный уход';
+
+      // If mid-day mark becomes «Примерный уход» and photo capture is disabled for it — drop stored photo.
+      if (nextType === 'estimated_out') {
+        await this.stripEstimatedOutPhotoIfDisabled(tenantId, prev);
+      }
+
       await this.prisma.attendanceMark.update({
         where: { id: mark.id },
         data: {

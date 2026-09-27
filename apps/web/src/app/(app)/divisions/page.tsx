@@ -30,6 +30,7 @@ type Tab = 'tree' | 'divisions' | 'groups';
 const TABS = ['divisions', 'tree', 'groups'] as const;
 
 const DIV_FILTER_KEYS = [
+  'q',
   'code',
   'name',
   'groupId',
@@ -538,7 +539,6 @@ function DivisionsPageInner() {
   const [checkedDiv, setCheckedDiv] = useState<Record<string, boolean>>({});
   const [checkedGroup, setCheckedGroup] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
@@ -643,7 +643,7 @@ function DivisionsPageInner() {
   }, []);
 
   const filteredDivisions = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = (filters.q || '').trim().toLowerCase();
     const codeF = (filters.code || '').trim().toLowerCase();
     const nameF = (filters.name || '').trim().toLowerCase();
     const groupF = (filters.groupId || '').trim();
@@ -687,10 +687,10 @@ function DivisionsPageInner() {
         .toLowerCase();
       return blob.includes(q);
     });
-  }, [divisions, search, filters]);
+  }, [divisions, filters]);
 
   const filteredGroups = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = (filters.q || '').trim().toLowerCase();
     const codeF = (filters.code || '').trim().toLowerCase();
     const nameF = (filters.name || '').trim().toLowerCase();
     const statusF = (filters.status || '').trim();
@@ -702,7 +702,7 @@ function DivisionsPageInner() {
       if (!q) return true;
       return [g.code, g.name].filter(Boolean).join(' ').toLowerCase().includes(q);
     });
-  }, [groups, search, filters]);
+  }, [groups, filters]);
 
   function managerLabel(d: Division) {
     const m = d.manager;
@@ -813,7 +813,7 @@ function DivisionsPageInner() {
     setCheckedGroup({});
   }, [
     tab,
-    search,
+    filters.q,
     filters.code,
     filters.name,
     filters.groupId,
@@ -1027,20 +1027,6 @@ function DivisionsPageInner() {
           <h1 className={shared.pageTitle}>{pageTitle}</h1>
           <p className={shared.pageSubtitle}>{pageSubtitle}</p>
         </div>
-        {tab !== 'tree' ? (
-          <div className={shared.pageHeaderActions}>
-            <div className={list.searchWrap}>
-              <i className={`fas fa-search ${list.searchIcon}`} aria-hidden />
-              <input
-                className={list.search}
-                placeholder="Поиск…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Поиск"
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <div className={list.toolbar}>
@@ -1101,8 +1087,18 @@ function DivisionsPageInner() {
               fields={
                 tab === 'divisions'
                   ? [
-                      { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
-                      { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                      {
+                        type: 'search',
+                        key: 'q',
+                        placeholder: 'Поиск…',
+                      },
+                      { type: 'text', key: 'code', label: 'Код', placeholder: 'Код' },
+                      {
+                        type: 'text',
+                        key: 'name',
+                        label: 'Название',
+                        placeholder: 'Название',
+                      },
                       {
                         type: 'select',
                         key: 'groupId',
@@ -1113,7 +1109,7 @@ function DivisionsPageInner() {
                         type: 'text',
                         key: 'createdBy',
                         label: 'Создал',
-                        placeholder: 'Поиск...',
+                        placeholder: 'Создал',
                       },
                       {
                         type: 'dateRange',
@@ -1132,8 +1128,11 @@ function DivisionsPageInner() {
                       },
                     ]
                   : [
-                      { type: 'text', key: 'code', label: 'Код', placeholder: 'Поиск...' },
-                      { type: 'text', key: 'name', label: 'Название', placeholder: 'Поиск...' },
+                      {
+                        type: 'search',
+                        key: 'q',
+                        placeholder: 'Поиск по коду и названию…',
+                      },
                       {
                         type: 'select',
                         key: 'status',

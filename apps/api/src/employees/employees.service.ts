@@ -32,6 +32,7 @@ import {
   type MatchFormerHit,
   type MatchFormerQuery,
 } from './match-former';
+import { SettingsService } from '../settings/settings.service';
 
 /** Query strings reach us untyped — reject unknown enum values with 400, not a Prisma 500. */
 function assertEnum<T extends Record<string, string>>(
@@ -56,6 +57,7 @@ export class EmployeesService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly face: FaceService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Push face to devices of employee's locations (non-blocking). */
@@ -67,6 +69,30 @@ export class EmployeesService {
         }`,
       );
     });
+  }
+
+  /** Remove face from devices of detached locations only (non-blocking). */
+  private scheduleEmployeeDeviceRemove(
+    tenantId: string,
+    employeeId: string,
+    locationIds: string[],
+  ) {
+    void this.face
+      .removeFromLocationDevices(tenantId, employeeId, locationIds)
+      .then((r) => {
+        if (r.removed || r.failed) {
+          this.logger.log(
+            `Auto face remove employee=${employeeId} removed=${r.removed} failed=${r.failed}`,
+          );
+        }
+      })
+      .catch((e) => {
+        this.logger.warn(
+          `Auto face remove after location detach employee=${employeeId}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      });
   }
 
   requireTenant(tenantId: string | null): string {
@@ -160,8 +186,22 @@ export class EmployeesService {
         'employmentType',
       );
     }
-    if (filters.divisionId) where.divisionId = filters.divisionId;
-    if (filters.positionId) where.positionId = filters.positionId;
+    if (filters.divisionId) {
+      const ids = filters.divisionId
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (ids.length === 1) where.divisionId = ids[0];
+      else if (ids.length > 1) where.divisionId = { in: ids };
+    }
+    if (filters.positionId) {
+      const ids = filters.positionId
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (ids.length === 1) where.positionId = ids[0];
+      else if (ids.length > 1) where.positionId = { in: ids };
+    }
     if (filters.q) {
       const nameWhere = employeeNameSearchWhere(filters.q);
       if (nameWhere) {
@@ -2107,6 +2147,20 @@ export class EmployeesService {
       });
     }
 
+    const { system } = await this.settings.getSystemSettings(tenantId);
+    if (system.checkAdultAge18 && dto.birthDate) {
+      const birth = new Date(dto.birthDate.slice(0, 10));
+      const now = new Date();
+      let age = now.getUTCFullYear() - birth.getUTCFullYear();
+      const m = now.getUTCMonth() - birth.getUTCMonth();
+      if (m < 0 || (m === 0 && now.getUTCDate() < birth.getUTCDate())) age -= 1;
+      if (age < 18) {
+        throw new BadRequestException(
+          'Сотрудник младше 18 лет (проверка возраста включена в настройках системы)',
+        );
+      }
+    }
+
     const hasPassportBits = Boolean(
       dto.pinfl ||
         dto.birthDate ||
@@ -2506,6 +2560,12 @@ export class EmployeesService {
 
     let tabNumber = String(dto.tabNumber || '').trim();
     if (!tabNumber) {
+      const { system } = await this.settings.getSystemSettings(tenant.id);
+      if (system.autoTabNumber === false) {
+        throw new BadRequestException(
+          'tabNumber required (автогенерация табельных номеров отключена в настройках)',
+        );
+      }
       tabNumber = await this.allocateTabNumber(tenant.id);
     } else {
       const exists = await this.prisma.employee.findFirst({
@@ -2944,7 +3004,12 @@ export class EmployeesService {
     }
 
     if ((dto.attach?.length ?? 0) > 0) {
+      // Incremental: push only this employee to devices of new locations.
       this.scheduleEmployeeDeviceSync(tenantId, employeeId);
+    }
+    if ((dto.detach?.length ?? 0) > 0) {
+      // Incremental: delete only this employee from devices of detached locations.
+      this.scheduleEmployeeDeviceRemove(tenantId, employeeId, dto.detach ?? []);
     }
 
     return this.findOne(tenantId, employeeId);
@@ -4025,6 +4090,22 @@ export class EmployeesService {
     if (startsAt) payload.startsAt = startsAt;
     if (dto.fileNames?.length) payload.fileNames = dto.fileNames.map(String).filter(Boolean);
 
+    let expiresAt = dto.expiresAt ? new Date(dto.expiresAt.slice(0, 10)) : null;
+    if (!expiresAt) {
+      const medicalLike = /мед|medical|медосмотр/i.test(docType);
+      if (medicalLike) {
+        const { system } = await this.settings.getSystemSettings(tenantId);
+        const months = Number(system.medicalExamIntervalMonths);
+        if (Number.isFinite(months) && months > 0) {
+          const base = dto.issuedAt
+            ? new Date(dto.issuedAt.slice(0, 10))
+            : new Date();
+          base.setUTCMonth(base.getUTCMonth() + Math.floor(months));
+          expiresAt = base;
+        }
+      }
+    }
+
     const row = await this.prisma.personDocument.create({
       data: {
         tenantId,
@@ -4035,7 +4116,7 @@ export class EmployeesService {
         issuer: String(dto.issuer || '').trim() || null,
         note: String(dto.note || '').trim() || null,
         issuedAt: dto.issuedAt ? new Date(dto.issuedAt.slice(0, 10)) : null,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt.slice(0, 10)) : null,
+        expiresAt,
         payload: payload as Prisma.InputJsonValue,
       },
     });

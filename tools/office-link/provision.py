@@ -32,6 +32,29 @@ STATE_LABELS_UZ = {
     STATE_UNKNOWN: "Неизвестно",
 }
 
+
+def _is_local_api(api_url: str) -> bool:
+    """True when API is on this PC — Cloudflare quick tunnel not required."""
+    raw = (api_url or "").strip().lower()
+    if not raw:
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        host = (urlparse(raw).hostname or "").strip().lower()
+    except Exception:
+        host = ""
+    return host in ("127.0.0.1", "localhost", "::1") or host.endswith(".local")
+
+
+def _lan_device_url(host: str, port: int = 80) -> str:
+    h = (host or "").strip()
+    p = int(port or 80)
+    if p in (80, 0):
+        return f"http://{h}"
+    return f"http://{h}:{p}"
+
+
 # Clear operator message when activation cannot complete (kept if attempts fail).
 ACTIVATION_STUB_UZ = (
     "Автонастройка для нового (активация) устройства пока неполная. "
@@ -647,19 +670,41 @@ class ProvisionEngine:
                 message="Gateway",
             )
             _emit(on_status, "2/4 Открытие gateway + tunnel...")
-            bundle.gw = runtime_setup.start_gateway(
-                session.api_url, gw_key, session.root, on_status
-            )
+            local_api = _is_local_api(str(session.api_url or ""))
+            if local_api:
+                # Local API on same LAN: no Cloudflare, device GW optional.
+                url = _lan_device_url(
+                    session.chosen.host,
+                    int(session.chosen.port or 80),
+                )
+                bundle.gw = None
+                bundle.tunnel = None
+                bundle.tunnel_url = url
+                _emit(
+                    on_status,
+                    f"2/4 Lokal API — Cloudflare/GW kerak emas, LAN: {url}",
+                )
+            else:
+                bundle.gw = runtime_setup.start_gateway(
+                    session.api_url, gw_key, session.root, on_status
+                )
+                _progress(
+                    session,
+                    status="configuring",
+                    step="tunnel",
+                    percent=55,
+                    message="Tunnel",
+                )
+                proc, url = runtime_setup.start_tunnel(session.root, on_status)
+                bundle.tunnel = proc
+                bundle.tunnel_url = url
             _progress(
                 session,
                 status="configuring",
                 step="tunnel",
                 percent=55,
-                message="Tunnel",
+                message="Tunnel" if not local_api else "LAN reach",
             )
-            proc, url = runtime_setup.start_tunnel(session.root, on_status)
-            bundle.tunnel = proc
-            bundle.tunnel_url = url
             if not (url or "").strip():
                 bundle.stop()
                 _progress(
@@ -785,6 +830,26 @@ class ProvisionEngine:
                     ),
                 )
 
+            # Bind reach URL to the new device row (LAN or Cloudflare).
+            try:
+                did = str(
+                    ((linked.get("device") if isinstance(linked, dict) else {}) or {}).get(
+                        "id"
+                    )
+                    or ""
+                )
+                if did and (url or "").strip():
+                    api_client.announce(
+                        session.api_url,
+                        key,
+                        session.tenant,
+                        url,
+                        pairing_token=pairing or None,
+                        device_id=did,
+                    )
+            except Exception:
+                pass
+
             # Keep local recovery copy even after successful server write.
             try:
                 from credential_store import save_device_credential
@@ -842,6 +907,36 @@ class ProvisionEngine:
                             )
                         else:
                             _emit(on_status, "HttpHost OK — otmetkalar → web")
+                        try:
+                            from auto_resume import persist_hik_push_to_service
+
+                            persist_hik_push_to_service(
+                                session.root,
+                                str(session.api_url or ""),
+                                str(session.tenant or "demo"),
+                                hik_push,
+                                host=str(
+                                    session.chosen.host if session.chosen else ""
+                                ),
+                                port=int(
+                                    session.chosen.port or 80
+                                )
+                                if session.chosen
+                                else 80,
+                                device_id=str(
+                                    (
+                                        (
+                                            linked.get("device")
+                                            if isinstance(linked, dict)
+                                            else {}
+                                        )
+                                        or {}
+                                    ).get("id")
+                                    or ""
+                                ),
+                            )
+                        except Exception:
+                            pass
                     else:
                         _emit(
                             on_status,
@@ -987,13 +1082,20 @@ class ProvisionEngine:
             )
             # Prefer direct tunnel → terminal (no local :8800). Faces use this path.
             target = f"http://{host}:{port}"
-            _emit(on_status, f"1/3 Туннель → терминал {host}:{port}…")
-            proc, url = runtime_setup.start_tunnel(
-                session.root, on_status, target_url=target
-            )
-            bundle.tunnel = proc
-            bundle.tunnel_url = url
-            bundle.gw = None
+            if _is_local_api(str(session.api_url or "")):
+                url = _lan_device_url(host, port)
+                bundle.tunnel = None
+                bundle.tunnel_url = url
+                bundle.gw = None
+                _emit(on_status, f"1/3 Lokal API — LAN reach {url} (Cloudflare yo‘q)")
+            else:
+                _emit(on_status, f"1/3 Туннель → терминал {host}:{port}…")
+                proc, url = runtime_setup.start_tunnel(
+                    session.root, on_status, target_url=target
+                )
+                bundle.tunnel = proc
+                bundle.tunnel_url = url
+                bundle.gw = None
             if not (url or "").strip():
                 bundle.stop()
                 return SubmitResult(
@@ -1147,6 +1249,20 @@ class ProvisionEngine:
                                 on_status,
                                 "HttpHost OK — otmetkalar terminal → web",
                             )
+                        try:
+                            from auto_resume import persist_hik_push_to_service
+
+                            persist_hik_push_to_service(
+                                session.root,
+                                str(session.api_url or ""),
+                                str(session.tenant or "demo"),
+                                hik_push,
+                                host=host,
+                                port=port,
+                                device_id=device_id,
+                            )
+                        except Exception:
+                            pass
                     else:
                         _emit(
                             on_status,

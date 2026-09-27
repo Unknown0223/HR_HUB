@@ -32,10 +32,10 @@ def main() -> None:
         sys.path.insert(0, str(here))
     _attach_stdio()
 
-    # Product default: native Windows (Tkinter) setup tool — like an installed .exe app.
-    # WebView2 only when explicitly requested (OFFICE_LINK_UI=webview|html|edge).
-    ui = os.environ.get("OFFICE_LINK_UI", "").strip().lower()
-    if ui in ("webview", "html", "edge", "web"):
+    # Product default: Fluent WebView2 UI (Arena design). Fallback: Tkinter.
+    # Force Tk with OFFICE_LINK_UI=tk|native|classic.
+    ui = os.environ.get("OFFICE_LINK_UI", "webview").strip().lower()
+    if ui not in ("tk", "tkinter", "native", "classic", "gui"):
         try:
             from desktop_app import run_desktop
 

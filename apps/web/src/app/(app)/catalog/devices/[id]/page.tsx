@@ -658,12 +658,17 @@ function DeviceDetailInner() {
   async function doSyncClock() {
     setBusy(true);
     setError('');
+    setSyncNotice('');
     try {
       const res = await apiFetch<{ ok?: boolean; message?: string }>(
         `/api/attendance/devices/${id}/remote`,
         { method: 'POST', body: JSON.stringify({ action: 'sync_clock' }) },
       );
-      setError(res.message || (res.ok === false ? 'Синхронизация часов не удалась' : ''));
+      if (res.ok === false) {
+        setError(res.message || 'Синхронизация часов не удалась');
+      } else {
+        setSyncNotice(res.message || 'Синхронизация часов выполнено');
+      }
       await loadDevice();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Синхронизация часов не удалась');
@@ -978,7 +983,8 @@ function DeviceDetailInner() {
                     <strong>Требуется подтверждение привязки.</strong> Office-link установил
                     пароль на терминале и отправил его на сервер. Проверьте пароль и нажмите
                     «Подтвердить привязку» — после этого отметки идут с терминала на Web,
-                    а лица — через Web «Синхронизировать» (PC office-link GW+tunnel).
+                    а лица — через Web «Синхронизировать» (server → tunnel/LAN → терминал).
+                    Link-приложение — первичная настройка; в sync очередь сервер сам пушит.
                   </p>
                   {device.passwordEnc ? (
                     <div className={styles.pwdRevealRow} style={{ marginBottom: 10 }}>

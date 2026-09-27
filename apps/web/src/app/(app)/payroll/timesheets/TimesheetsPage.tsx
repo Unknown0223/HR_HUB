@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { formatMonthRu } from '@/lib/fine-policies';
@@ -85,7 +84,7 @@ function TimesheetsInner() {
   async function load() {
     setError('');
     setLoading(true);
-    try {
+    const attempt = async () => {
       const lookups = await apiFetch<{ divisions?: Opt[] }>('/api/catalog/lookups');
       setDivisions(lookups.divisions || []);
       if (tab === 'corrections') {
@@ -93,8 +92,18 @@ function TimesheetsInner() {
       } else {
         setSheets(await apiFetch<TimesheetSheetRow[]>('/api/payroll/timesheets'));
       }
+    };
+    try {
+      await attempt();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      try {
+        await new Promise((r) => setTimeout(r, 400));
+        await attempt();
+      } catch (e2) {
+        setError(e2 instanceof Error ? e2.message : 'Ошибка загрузки');
+        if (tab === 'corrections') setCorrections([]);
+        else setSheets([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -323,8 +332,6 @@ function TimesheetsInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="timesheet" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-calendar-check" aria-hidden />

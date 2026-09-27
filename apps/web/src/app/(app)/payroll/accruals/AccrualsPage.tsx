@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { confirm } from '@/lib/dialogs';
 import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
-import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -50,14 +49,27 @@ function AccrualsInner() {
   async function load() {
     setError('');
     setLoading(true);
-    try {
+    const path =
+      tab === 'orders' ? '/api/catalog/payment-orders' : '/api/payroll/accruals';
+    const attempt = async () => {
       if (tab === 'orders') {
-        setOrders(await apiFetch('/api/catalog/payment-orders'));
+        setOrders(await apiFetch(path));
       } else {
-        setRows(await apiFetch<AccrualDoc[]>('/api/payroll/accruals'));
+        setRows(await apiFetch<AccrualDoc[]>(path));
       }
+    };
+    try {
+      await attempt();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      // One retry — covers brief API restarts during nest --watch recompile
+      try {
+        await new Promise((r) => setTimeout(r, 400));
+        await attempt();
+      } catch (e2) {
+        setError(e2 instanceof Error ? e2.message : 'Ошибка загрузки');
+        if (tab === 'orders') setOrders([]);
+        else setRows([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -195,8 +207,6 @@ function AccrualsInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="accruals" />
-
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeWage}`}>
           <i className="fas fa-coins" aria-hidden />

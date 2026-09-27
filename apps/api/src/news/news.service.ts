@@ -6,6 +6,7 @@ import {
 import { EmploymentStatus, NotificationKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
 import { sanitizeNewsHtml } from './news-html';
 
 const NEWS_DICTIONARY_CODE = 'news_feed';
@@ -34,6 +35,7 @@ export class NewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
@@ -59,6 +61,10 @@ export class NewsService {
   }
 
   async list(tenantId: string, limit = 50) {
+    const { system } = await this.settings.getSystemSettings(tenantId);
+    if (!system.corporateNewsFeed) {
+      return [];
+    }
     const dict = await this.ensureDict(tenantId);
     const items = await this.prisma.dictionaryItem.findMany({
       where: { dictionaryId: dict.id, isActive: true },

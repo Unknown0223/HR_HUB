@@ -111,7 +111,7 @@
   gap: 14px;
   flex-wrap: wrap;
   width: 100%;
-  margin: 8px 0 20px;
+  margin: 8px 0 16px;
   padding: 4px 0 2px;
   box-sizing: border-box;
 }
@@ -144,8 +144,15 @@
 .pageIconBadgeIncident { background: linear-gradient(135deg, #e11d48 0%, #0a85e2 100%); }
 
 .pageHeaderText {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 1 220px;
+  min-width: 140px;
+  max-width: 260px;
+}
+
+.pageHeaderFilters {
+  flex: 1 1 360px;
+  min-width: 220px;
+  max-width: 100%;
 }
 
 .pageTitle {
@@ -169,8 +176,24 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-left: auto;
   flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 960px) {
+  .pageHeaderText {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .pageHeaderFilters {
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .pageHeaderActions {
+    margin-left: auto;
+  }
 }
 
 @media (max-width: 720px) {

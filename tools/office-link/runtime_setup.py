@@ -318,7 +318,34 @@ def install_gw_deps(root: Path | None = None, cb: StatusFn | None = None) -> Non
             + (f" {err}" if err else "")
         )
     if not _gw_deps_ready(py):
-        raise RuntimeError("Kutubxona o‘rnatildi, lekin import tekshiruvi yiqildi.")
+        # Face-agent needs Pillow; older gw/requirements.txt may omit it.
+        _status(cb, "Yetishmayotgan kutubxona (Pillow) o‘rnatilmoqda…")
+        try:
+            r2 = _run_hidden(
+                [
+                    str(py),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "--no-input",
+                    "-q",
+                    "Pillow>=10.0.0",
+                ],
+                cwd=gw_dir(root),
+                env=_clean_child_env(),
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                "Pillow o‘rnatish vaqti tugadi. Keyinroq qayta urining."
+            ) from exc
+        if r2.returncode != 0 or not _gw_deps_ready(py):
+            err = ((r2.stderr or "") + "\n" + (r2.stdout or "")).strip()[:220]
+            raise RuntimeError(
+                "Kutubxona o‘rnatildi, lekin import tekshiruvi yiqildi."
+                + (f" {err}" if err else "")
+            )
 
 
 

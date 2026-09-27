@@ -212,9 +212,6 @@ function EmployeesPageInner() {
     'none' | 'create' | 'attach' | 'import' | 'telegram'
   >('none');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(
-    () => Boolean(q || divisionId || positionId),
-  );
   const hasActiveFilters = Boolean(q.trim() || divisionId || positionId);
   const [exportBusy, setExportBusy] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -635,6 +632,27 @@ function EmployeesPageInner() {
           <h1 className={styles.pageTitle}>Сотрудники</h1>
           <p className={styles.pageSubtitle}>Управление кадровым составом организации</p>
         </div>
+        <div className={styles.pageHeaderFilters}>
+          <FilterPanel
+            fields={[
+              { type: 'search', placeholder: 'Поиск…' },
+              {
+                type: 'divisionId',
+                label: 'Подразделение',
+                multiple: true,
+                searchable: true,
+                options: divisions.map((d) => ({ value: d.id, label: d.name })),
+              },
+              {
+                type: 'positionId',
+                label: 'Должность',
+                multiple: true,
+                searchable: true,
+                options: positions.map((p) => ({ value: p.id, label: p.name })),
+              },
+            ]}
+          />
+        </div>
         <div className={styles.pageHeaderActions}>
           <div className={styles.splitBtn} ref={menuRef}>
             <button
@@ -717,16 +735,6 @@ function EmployeesPageInner() {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={() => setFiltersOpen((v) => !v)}
-            title="Фильтр"
-            aria-label="Фильтр"
-            aria-pressed={filtersOpen}
-          >
-            <i className="fas fa-filter" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
             onClick={() => void load()}
             title="Обновить"
             aria-label="Обновить"
@@ -739,23 +747,6 @@ function EmployeesPageInner() {
           />
         </div>
       </div>
-
-      <FilterPanel
-        open={filtersOpen}
-        onToggle={() => setFiltersOpen((v) => !v)}
-        fields={[
-          { type: 'search' },
-          {
-            type: 'divisionId',
-            options: divisions.map((d) => ({ value: d.id, label: d.name })),
-          },
-          {
-            type: 'positionId',
-            options: positions.map((p) => ({ value: p.id, label: p.name })),
-          },
-        ]}
-      />
-
       {panel === 'import' ? (
         <div className={styles.panel} style={{ marginBottom: '1rem' }}>
           <div className={styles.rowActions} style={{ marginBottom: '0.65rem' }}>

@@ -38,10 +38,10 @@ const FILTER_KEYS = ['q', 'name', 'login', 'org', 'role', 'isActive'] as const;
 const TZ_OPTS: Opt[] = TIMEZONES.map((t) => ({ id: t.id, label: t.label }));
 
 const SIBLINGS = {
-  title: 'Пользователи',
+  title: 'Пользователи и роли',
   siblings: [
+    { label: 'Пользователи', href: '/settings/users' },
     { label: 'Роли', href: '/settings/users/roles' },
-    { label: 'Все пользователи', href: '/settings/users' },
   ],
 };
 
@@ -340,7 +340,7 @@ function UsersInner() {
     return (
       <>
       <div className={styles.wrap}>
-        <PageSubnav group={{ title, siblings: [] }} />
+        <PageSubnav group={SIBLINGS} titleOverride={title} />
         <div className={formStyles.page}>
           <div className={formStyles.actions} style={{ marginBottom: '0.35rem' }}>
             {locked ? (
@@ -591,7 +591,7 @@ function UsersInner() {
 
   return (
     <div className={styles.wrap}>
-      <PageSubnav groupKey="settings-admin" />
+      <PageSubnav group={SIBLINGS} />
 
       <div className={shared.pageHeader}>
         <div className={`${shared.pageIconBadge} ${shared.pageIconBadgeHr}`}>

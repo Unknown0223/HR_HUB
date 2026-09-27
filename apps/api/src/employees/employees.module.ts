@@ -7,9 +7,10 @@ import { FaceService } from './face.service';
 import { FacePurgeScheduler } from './face-purge.scheduler';
 import { StorageModule } from '../storage/storage.module';
 import { DeviceGwModule } from '../device-gw/device-gw.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [StorageModule, DeviceGwModule],
+  imports: [StorageModule, DeviceGwModule, SettingsModule],
   controllers: [EmployeesController, EmployeeFormController],
   providers: [
     EmployeesService,

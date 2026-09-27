@@ -89,12 +89,17 @@ function MarkDetailInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const photo = mediaSrc(mark?.photoUrl) || mediaSrc(mark?.employee?.faceProfile?.photoUrl) || null;
+  const punchPhoto = mediaSrc(mark?.photoUrl) || null;
   const face = mediaSrc(mark?.employee?.faceProfile?.photoUrl) || null;
+  // «Примерный уход» without capture photo → text-only detail (no face avatar as mark photo)
+  const isEstimatedOut = mark?.markType === 'estimated_out';
+  const photo = punchPhoto || (!isEstimatedOut ? face : null);
   const name = mark ? empName(mark) : '';
   const slides = [
-    photo ? { src: photo, caption: `Отметка · ${name}` } : null,
-    face && face !== photo ? { src: face, caption: `Аватар · ${name}` } : null,
+    punchPhoto ? { src: punchPhoto, caption: `Отметка · ${name}` } : null,
+    !isEstimatedOut && face && face !== punchPhoto
+      ? { src: face, caption: `Аватар · ${name}` }
+      : null,
   ].filter((s): s is { src: string; caption: string } => Boolean(s));
   const history = useMemo(() => {
     const rows = mark?.changeHistory || [];
@@ -170,17 +175,10 @@ function MarkDetailInner() {
               slides={slides}
               index={0}
             />
-          ) : face ? (
-            <PhotoThumb
-              src={face}
-              alt=""
-              className={styles.photo}
-              lightbox={photos}
-              slides={slides}
-              index={0}
-            />
           ) : (
-            <div className={styles.photoEmpty}>Нет фото</div>
+            <div className={styles.photoEmpty}>
+              {isEstimatedOut ? 'Нет фото отметки' : 'Нет фото'}
+            </div>
           )}
           <div className={styles.sideTitle}>
             Отметка ({empName(mark)}, {fmtDt(mark.occurredAt)})

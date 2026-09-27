@@ -142,67 +142,73 @@ def run_forever(poll_sec: float = 8.0) -> int:
         bundle, tun = restore_tunnel(root=root, bundle=bundle, keep_bundle=True)
         return tun
 
-    # Do not poke Cloudflare at all while rate-limited.
+    # While Cloudflare is rate-limited, restore_tunnel falls back to LAN announce.
     cool0 = tunnel_cooldown_remaining(root)
-    if cool0 > 0:
-        mins = max(1, (cool0 + 59) // 60)
+    try:
+        url = restart()
+        tunnel_ok = bool(url)
+    except Exception as exc:
+        # Face agent still works on LAN without Cloudflare.
+        tunnel_ok = False
+        msg = str(exc)
+        if cool0 > 0:
+            mins = max(1, (cool0 + 59) // 60)
+            msg = (
+                f"Cloudflare limithi ~{mins} daq — LAN announce ham ishlamadi: {exc}"
+            )[:240]
+        else:
+            msg = f"Tunnel yo‘q — faqat face agent: {exc}"[:240]
         write_status(
             root,
             {
                 "ok": True,
                 "state": "face_agent",
-                "tunnelMode": "off",
-                "message": (
-                    f"Tunnel kutilyapti (Cloudflare limithi ~{mins} daqiqa). "
-                    "Avtomatik urinish o‘chirilgan — faqat LAN."
-                ),
+                "message": msg,
                 "faceAgent": True,
                 "autoHeal": False,
             },
         )
-    else:
-        try:
-            url = restart()
-            tunnel_ok = bool(url)
-        except Exception as exc:
-            # Face agent still works on LAN without Cloudflare.
-            tunnel_ok = False
-            write_status(
-                root,
-                {
-                    "ok": True,
-                    "state": "face_agent",
-                    "message": f"Tunnel yo‘q — faqat face agent: {exc}"[:240],
-                    "faceAgent": True,
-                    "autoHeal": False,
-                },
-            )
-            traceback.print_exc()
+        traceback.print_exc()
 
-        if tunnel_ok:
-            write_status(
-                root,
-                {
-                    "ok": True,
-                    "state": "running",
-                    "tunnelMode": mode,
-                    "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
-                    "apiUrl": api_url,
-                    "tenantCode": tenant,
-                    "message": "Face agent + GW/tunnel",
-                    "faceAgent": True,
-                    "autoHeal": False,
-                },
-            )
+    if tunnel_ok:
+        lan = bool(url) and "trycloudflare" not in (url or "").lower()
+        write_status(
+            root,
+            {
+                "ok": True,
+                "state": "running",
+                "tunnelMode": "lan" if lan else mode,
+                "tunnelUrl": url or read_tunnel_url(root) or resolve_named_tunnel_url(cfg, root),
+                "apiUrl": api_url,
+                "tenantCode": tenant,
+                "message": (
+                    "Face agent + LAN announce"
+                    if lan
+                    else "Face agent + GW/tunnel"
+                ),
+                "faceAgent": True,
+                "lanFallback": lan,
+                "autoHeal": False,
+            },
+        )
 
     announce_every = 45.0
     health_every = 20.0
     face_every = 20.0
+    reconcile_every = 90.0
     last_announce = time.monotonic()
     last_health = time.monotonic()
     last_face = 0.0
+    last_reconcile = 0.0
 
     punch_st = _start_punch_proxy(root, api_url)
+    try:
+        from auto_resume import reconcile_link
+
+        reconcile_link(root, api_url, tenant, force_httphost=True)
+        last_reconcile = time.monotonic()
+    except Exception:
+        pass
     write_status(
         root,
         {
@@ -214,6 +220,7 @@ def run_forever(poll_sec: float = 8.0) -> int:
             "tenantCode": tenant,
             "faceAgent": True,
             "punchProxy": punch_st,
+            "autoResume": True,
             "message": (
                 "Punch proxy :"
                 + str(punch_st.get("port") or 8787)
@@ -221,13 +228,51 @@ def run_forever(poll_sec: float = 8.0) -> int:
                 if punch_st.get("ok")
                 else (punch_st.get("message") or "face agent")
             ),
-            "autoHeal": False,
+            "autoHeal": True,
         },
     )
 
     while True:
         time.sleep(poll_sec)
         now = time.monotonic()
+
+        if now - last_reconcile >= reconcile_every:
+            last_reconcile = now
+            try:
+                from auto_resume import reconcile_link
+
+                rec = reconcile_link(root, api_url, tenant)
+                write_status(
+                    root,
+                    {
+                        "ok": True,
+                        "state": "face_agent" if not tunnel_ok else "running",
+                        "tunnelMode": mode if tunnel_ok else "off",
+                        "tunnelUrl": url if tunnel_ok else "",
+                        "apiUrl": api_url,
+                        "tenantCode": tenant,
+                        "faceAgent": True,
+                        "autoResume": True,
+                        "autoHeal": True,
+                        "lastReconcile": rec,
+                        "deviceOnline": rec.get("deviceOnline"),
+                        "message": (
+                            "Qurilma online — HttpHost tiklandi"
+                            if rec.get("deviceOnline")
+                            else "Qurilma offline — qayta ulanish kutilmoqda"
+                        ),
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                write_status(
+                    root,
+                    {
+                        "ok": True,
+                        "state": "face_agent" if not tunnel_ok else "running",
+                        "message": f"reconcile: {exc}"[:200],
+                        "autoResume": True,
+                    },
+                )
 
         if now - last_face >= face_every:
             last_face = now
@@ -245,32 +290,61 @@ def run_forever(poll_sec: float = 8.0) -> int:
                     "faceAgent": True,
                     "faceLast": fr,
                     "punchProxy": punch_st,
+                    "autoResume": True,
+                    "autoHeal": True,
                     "message": fr.get("message") or "face agent tick",
-                    "autoHeal": False,
                 },
             )
 
-        # Never spam Cloudflare while rate-limited — face agent keeps working on LAN.
+        # Never spam Cloudflare while rate-limited — keep LAN announce + face agent.
         cool_left = tunnel_cooldown_remaining(root)
         if cool_left > 0:
             mins = max(1, (cool_left + 59) // 60)
-            write_status(
-                root,
-                {
-                    "ok": True,
-                    "state": "face_agent",
-                    "tunnelMode": "off",
-                    "tunnelUrl": "",
-                    "apiUrl": api_url,
-                    "tenantCode": tenant,
-                    "faceAgent": True,
-                    "autoHeal": False,
-                    "message": (
-                        f"Tunnel kutilyapti (Cloudflare limithi ~{mins} daqiqa). "
-                        "Faqat LAN face sync — avtomatik qayta urinish o‘chirilgan."
-                    ),
-                },
+            current_lan = (
+                bundle.tunnel_url
+                or read_tunnel_url(root)
+                or ""
             )
+            if current_lan and "trycloudflare" not in current_lan.lower():
+                if now - last_announce >= announce_every:
+                    announce_best_effort(root, api_url, tenant, current_lan)
+                    last_announce = now
+                write_status(
+                    root,
+                    {
+                        "ok": True,
+                        "state": "running",
+                        "tunnelMode": "lan",
+                        "tunnelUrl": current_lan,
+                        "apiUrl": api_url,
+                        "tenantCode": tenant,
+                        "faceAgent": True,
+                        "lanFallback": True,
+                        "autoHeal": False,
+                        "message": (
+                            f"LAN OK — Cloudflare limithi ~{mins} daq "
+                            "(qayta urinish o‘chirilgan)"
+                        ),
+                    },
+                )
+            else:
+                write_status(
+                    root,
+                    {
+                        "ok": True,
+                        "state": "face_agent",
+                        "tunnelMode": "off",
+                        "tunnelUrl": "",
+                        "apiUrl": api_url,
+                        "tenantCode": tenant,
+                        "faceAgent": True,
+                        "autoHeal": False,
+                        "message": (
+                            f"Tunnel kutilyapti (Cloudflare limithi ~{mins} daqiqa). "
+                            "Faqat LAN face sync — avtomatik qayta urinish o‘chirilgan."
+                        ),
+                    },
+                )
             time.sleep(min(60, max(5, cool_left)))
             continue
 

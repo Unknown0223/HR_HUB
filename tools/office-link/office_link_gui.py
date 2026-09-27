@@ -13,7 +13,7 @@ from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
 from paths import find_root, read_link_key, read_pairing_token
 from session import RECONNECT_STEPS, OfficeLinkSession, SubmitResult
 
-TITLE = "HR HUB Link — sozlash asbobi"
+TITLE = "HR HUB Link"
 
 _RECONNECT_STEP_LABELS = {
     "web": "Веб",
@@ -29,24 +29,24 @@ _STATE_LABELS_RU = {
     "unknown": "Неизвестно",
 }
 
-# Fluent-inspired palette matching app icon (purple gears).
+# Windows 11-style calm palette (setup tool, not marketing purple).
 C = {
     "bg": "#f3f3f3",
     "surface": "#ffffff",
     "border": "#e5e5e5",
     "text": "#1a1a1a",
     "muted": "#605e5c",
-    "accent": "#7c3aed",
-    "accent_hover": "#6d28d9",
-    "accent_soft": "#f5f3ff",
+    "accent": "#2563eb",
+    "accent_hover": "#1d4ed8",
+    "accent_soft": "#eff6ff",
     "ok": "#0f7b3a",
     "ok_bg": "#dff6dd",
     "warn": "#9a6700",
     "warn_bg": "#fff4ce",
     "danger": "#c42b1c",
     "danger_bg": "#fde7e9",
-    "header": "#5b21b6",
-    "header2": "#7c3aed",
+    "header": "#1e3a5f",
+    "header2": "#2563eb",
 }
 
 
@@ -314,7 +314,7 @@ class OfficeLinkApp:
         ttk.Label(head_inner, text="HR HUB Link", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             head_inner,
-            text="Привязка офисного Face ID к платформе",
+            text="Одноразовая привязка терминала · дальше отметки идут без этой программы",
             style="Subtitle.TLabel",
         ).pack(anchor="w", pady=(2, 0))
         try:
@@ -2299,7 +2299,37 @@ class OfficeLinkApp:
         self._set_tun_ind("tun_http", "Туннель URL", False)
         self._set_tun_ind("gw_proc", "Процесс GW", None)
         self._set_tun_ind("tun_proc", "Процесс tunnel", None)
+        if not self._tunnel_alert_needed(msg):
+            self._hide_alert()
+            return
         self._show_alert(f"Туннель: {msg}", kind="danger")
+
+    def _is_local_api(self) -> bool:
+        try:
+            api = (self.session.api_url or "").lower()
+        except Exception:
+            api = ""
+        return any(x in api for x in ("127.0.0.1", "localhost", "[::1]"))
+
+    def _tunnel_alert_needed(self, msg: str = "") -> bool:
+        """Skip noisy startup banners when Cloudflare is not required."""
+        if self._is_local_api():
+            return False
+        low = (msg or "").lower()
+        if any(
+            t in low
+            for t in (
+                "cloudflared",
+                "процесс",
+                "process",
+                "отсутств",
+                "limithi",
+                "429",
+                "kutilmoqda",
+            )
+        ):
+            return False
+        return True
 
     def _set_tun_ind(self, key: str, title: str, ok: bool | None) -> None:
         var = getattr(self, "_tun_ind_vars", {}).get(key)
@@ -2379,14 +2409,19 @@ class OfficeLinkApp:
                 f"KUTILMOQDA · Cloudflare limithi ~{mins} daqiqa — avtomatik o‘chirilgan"
             )
             # Do not flash a new alert every poll while cooling down.
+            self._hide_alert()
         elif msg and not self._tunnel_busy:
-            self._show_alert(f"Туннель: {msg}", kind="warn")
+            if self._tunnel_alert_needed(msg):
+                self._show_alert(f"Туннель: {msg}", kind="warn")
+            else:
+                self._hide_alert()
         if (
             ok
             or self._tunnel_busy
             or self.busy
             or not self.tunnel_auto_var.get()
             or cool_left > 0
+            or self._is_local_api()
         ):
             return
         # Only auto-heal when handoff / credentials already exist.
@@ -2482,9 +2517,46 @@ class OfficeLinkApp:
         self.root.destroy()
 
 
+def _single_instance_or_focus() -> bool:
+    """Return True if this process should run; False if another Link is already open."""
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        # Named mutex — standard Windows single-instance pattern.
+        handle = kernel32.CreateMutexW(None, False, "Local\\HRHUB.OfficeLink.SingleInstance")
+        last = kernel32.GetLastError()
+        # ERROR_ALREADY_EXISTS = 183
+        if last == 183:
+            try:
+                user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+                hwnd = user32.FindWindowW(None, TITLE)
+                if hwnd:
+                    user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                    user32.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
+            return False
+        # Keep mutex alive for process lifetime (store on module).
+        globals()["_HRHUB_INSTANCE_MUTEX"] = handle
+        return True
+    except Exception:
+        return True
+
+
 def run_app() -> None:
     _set_app_user_model_id()
     _hide_console()
+    if not _single_instance_or_focus():
+        return
+    try:
+        from auto_resume import ensure_background_worker
+
+        ensure_background_worker()
+    except Exception:
+        pass
     root = tk.Tk()
     try:
         root.call("tk", "scaling", 1.15)
