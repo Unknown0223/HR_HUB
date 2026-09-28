@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/api/me_repository.dart';
 import '../../core/biometrics/biometric_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets.dart';
 import '../home/home_screen.dart';
 
 class QrPunchScreen extends ConsumerStatefulWidget {
@@ -46,7 +47,7 @@ class _QrPunchScreenState extends ConsumerState<QrPunchScreen> {
       ref.invalidate(todayProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('QR belgi: ${res['direction'] ?? 'OK'}')),
+        SnackBar(content: Text('QR: ${punchAcceptedText(res)}')),
       );
       Navigator.of(context).pop();
     } catch (e) {

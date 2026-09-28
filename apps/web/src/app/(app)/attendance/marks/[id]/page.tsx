@@ -37,6 +37,10 @@ type Mark = {
   latitude?: number | null;
   longitude?: number | null;
   accuracyM?: number | null;
+  outsideGeofence?: boolean;
+  geofenceComment?: string | null;
+  distanceM?: number | null;
+  radiusM?: number | null;
   createdByLabel?: string | null;
   updatedByLabel?: string | null;
   createdAt?: string | null;
@@ -206,6 +210,12 @@ function MarkDetailInner() {
                 {mark.note.length > 60 ? `${mark.note.slice(0, 60)}…` : mark.note}
               </span>
             ) : null}
+            {mark.outsideGeofence ? (
+              <span className={styles.badgeWarn} title={mark.geofenceComment || undefined}>
+                Вне территории
+                {mark.distanceM != null ? ` · ${mark.distanceM} м` : ''}
+              </span>
+            ) : null}
           </div>
           <nav className={styles.sideNav}>
             <button
@@ -245,6 +255,22 @@ function MarkDetailInner() {
                   <span>Локация</span>
                   <b>{mark.locationName || '—'}</b>
                 </label>
+                {mark.distanceM != null ? (
+                  <label>
+                    <span>Территория</span>
+                    <b className={mark.outsideGeofence ? styles.warnText : undefined}>
+                      {mark.outsideGeofence ? 'Вне территории' : 'В пределах'} ·{' '}
+                      {mark.distanceM} м
+                      {mark.radiusM != null ? ` (радиус ${mark.radiusM} м)` : ''}
+                    </b>
+                  </label>
+                ) : null}
+                {mark.geofenceComment ? (
+                  <label className={styles.full}>
+                    <span>Комментарий сотрудника</span>
+                    <b>{mark.geofenceComment}</b>
+                  </label>
+                ) : null}
                 <label>
                   <span>Серийный номер устройства</span>
                   <b>{mark.deviceSerial || '—'}</b>

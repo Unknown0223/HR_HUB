@@ -102,6 +102,7 @@
 .badgeInfo,
 .badgeType,
 .badgeOk,
+.badgeWarn,
 .badgeBad {
   display: inline-block;
   width: fit-content;
@@ -125,6 +126,15 @@
 .badgeBad {
   background: #ffe2e5;
   color: #f1416c;
+}
+
+.badgeWarn {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.warnText {
+  color: #c2410c;
 }
 
 .sideNav {

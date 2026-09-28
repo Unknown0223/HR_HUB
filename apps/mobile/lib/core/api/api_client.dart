@@ -125,10 +125,28 @@ class ApiClient {
     return {'data': data};
   }
 
+  static const _knownMessages = <String, String>{
+    'User is not linked to an active employee (email must match)':
+        'Hisobingiz faol xodim kartasiga bog‘lanmagan. HR bo‘limidan xodim '
+            'kartasiga login emailingizni kiritishni so‘rang.',
+    'Tenant required': 'Kompaniya tanlanmagan — qaytadan kiring.',
+    'Unauthorized': 'Sessiya tugagan — qaytadan kiring.',
+  };
+
   ApiException _mapError(DioException e) {
     final status = e.response?.statusCode;
     final data = e.response?.data;
-    String message = e.message ?? 'Network error';
+    String message;
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        message = 'Server javob bermayapti. Internetni tekshirib, qayta urinib ko‘ring.';
+      case DioExceptionType.connectionError:
+        message = 'Serverga ulanib bo‘lmadi. Server manzili va internetni tekshiring.';
+      default:
+        message = e.message ?? 'Tarmoq xatosi';
+    }
     if (data is Map) {
       final msg = data['message'];
       if (msg is String) {
@@ -137,6 +155,11 @@ class ApiClient {
         message = msg.join(', ');
       }
     }
-    return ApiException(message, statusCode: status);
+    return ApiException(
+      _knownMessages[message] ?? message,
+      statusCode: status,
+      serverMessage: message,
+      code: data is Map ? data['code']?.toString() : null,
+    );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/auth/auth_state.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -341,18 +343,19 @@ class HelpScreen extends StatelessWidget {
   }
 }
 
-class ModulesScreen extends StatelessWidget {
+class ModulesScreen extends ConsumerWidget {
   const ModulesScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isApprover = ref.watch(authProvider).user?.isApprover == true;
     final items = [
       (Icons.face_outlined, 'Face ID', '/face-punch'),
       (Icons.directions_run, 'GPS belgi', '/gps-punch'),
       (Icons.qr_code_scanner, 'QR belgi', '/qr-punch'),
       (Icons.table_chart_outlined, 'Tabel', '/tabel'),
       (Icons.assignment_outlined, 'So\'rovlar', '/requests'),
-      (Icons.groups_outlined, 'Jamoa', '/team-today'),
+      if (isApprover) (Icons.groups_outlined, 'Jamoa', '/team-today'),
       (Icons.payments_outlined, 'To\'lov', '/payroll'),
       (Icons.note_alt_outlined, 'Qaydlar', '/marks'),
     ];

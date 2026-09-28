@@ -54,6 +54,7 @@ type Mark = {
   deviceName?: string | null;
   isValid?: boolean;
   clockTamper?: boolean;
+  outsideGeofence?: boolean;
   note?: string | null;
   photoUrl?: string | null;
   employee?: Emp | null;
@@ -815,6 +816,14 @@ function MarksInner() {
                               {rejected ? (
                                 <span className={styles.rejectedBadge}>недейств.</span>
                               ) : null}
+                              {m.outsideGeofence ? (
+                                <span
+                                  className={styles.outsideBadge}
+                                  title={m.note || 'Отметка вне территории'}
+                                >
+                                  вне терр.
+                                </span>
+                              ) : null}
                             </td>
                           );
                         }
@@ -843,7 +852,13 @@ function MarksInner() {
                           return (
                             <td
                               key={key}
-                              className={rejected ? styles.invalid : undefined}
+                              className={
+                                rejected
+                                  ? styles.invalid
+                                  : m.outsideGeofence
+                                    ? styles.outsideNote
+                                    : undefined
+                              }
                             >
                               {m.note || (rejected ? 'Недействительная' : '—')}
                             </td>

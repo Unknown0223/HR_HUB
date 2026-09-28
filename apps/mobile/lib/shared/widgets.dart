@@ -1,6 +1,86 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 
+/// API date-only fields arrive as `YYYY-MM-DDT00:00:00.000Z`; keep the calendar
+/// day as-is instead of shifting it into local time.
+String formatApiDate(dynamic value) {
+  final raw = value?.toString() ?? '';
+  final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(raw);
+  if (m == null) return raw;
+  return '${m[3]}.${m[2]}.${m[1]}';
+}
+
+String formatApiTime(dynamic value) {
+  final dt = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+  if (dt == null) return '';
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(dt.hour)}:${two(dt.minute)}';
+}
+
+String punchDirectionLabel(dynamic direction) {
+  switch (direction?.toString().toUpperCase()) {
+    case 'IN':
+      return 'Kirish';
+    case 'OUT':
+      return 'Chiqish';
+    default:
+      return 'Belgi';
+  }
+}
+
+dynamic markField(Map m, String key) {
+  final payload = m['rawPayload'];
+  return m[key] ?? (payload is Map ? payload[key] : null);
+}
+
+String markKindLabel(Map m) {
+  switch (markField(m, 'markType')?.toString()) {
+    case 'in':
+      return 'Kirish';
+    case 'out':
+      return 'Chiqish';
+    case 'estimated_out':
+      return 'Taxminiy chiqish';
+    case 'break_out':
+      return 'Tanaffusga chiqish';
+    case 'break_in':
+      return 'Tanaffusdan qaytish';
+  }
+  return punchDirectionLabel(m['direction']);
+}
+
+bool markIsEntry(Map m) {
+  final type = markField(m, 'markType')?.toString();
+  if (type != null && type.isNotEmpty) return type == 'in' || type == 'break_in';
+  return m['direction']?.toString().toUpperCase() == 'IN';
+}
+
+bool markOutsideGeofence(Map m) => markField(m, 'outsideGeofence') == true;
+
+String punchSourceLabel(dynamic source) {
+  final s = source?.toString().toLowerCase() ?? '';
+  if (s.isEmpty) return '';
+  if (s == 'gps') return 'GPS';
+  if (s == 'qr') return 'QR';
+  if (s.contains('face')) return 'Face ID';
+  if (s == 'manual') return 'Qo\'lda';
+  if (s == 'import') return 'Import';
+  return 'Terminal';
+}
+
+String punchAcceptedText(Map res) {
+  final time = formatApiTime(res['occurredAt']);
+  final label = '${punchDirectionLabel(res['direction'])} qayd etildi';
+  return time.isEmpty ? label : '$label · $time';
+}
+
+String formatApiDateRange(dynamic from, dynamic to) {
+  final a = formatApiDate(from);
+  final b = formatApiDate(to);
+  if (b.isEmpty || a == b) return a;
+  return '$a – $b';
+}
+
 class StatusChip extends StatelessWidget {
   const StatusChip({super.key, required this.status});
 
@@ -33,6 +113,8 @@ class StatusChip extends StatelessWidget {
         return ('Dam olish kuni', AppColors.inkMuted);
       case 'not_started':
         return ('Boshlanmagan', AppColors.inkMuted);
+      case 'draft':
+        return ('Qoralama', AppColors.inkMuted);
       case 'pending':
         return ('Kutilmoqda', AppColors.warn);
       case 'approved':

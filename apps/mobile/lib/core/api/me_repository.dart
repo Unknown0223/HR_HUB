@@ -58,12 +58,25 @@ class MeRepository {
     required double longitude,
     double? accuracy,
     String? direction,
+    String? comment,
   }) =>
       _api.post('/me/punches/gps', data: {
         'latitude': latitude,
         'longitude': longitude,
         if (accuracy != null) 'accuracy': accuracy,
         if (direction != null) 'direction': direction,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      });
+
+  /// `{configured, inside, commentRequired, distanceM, radiusM, locationName}`
+  Future<Map<String, dynamic>> checkGps({
+    required double latitude,
+    required double longitude,
+  }) =>
+      _api.post('/me/punches/gps/check', data: {
+        'latitude': latitude,
+        'longitude': longitude,
       });
 
   Future<Map<String, dynamic>> punchQr({

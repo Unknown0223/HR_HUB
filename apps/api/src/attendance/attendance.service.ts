@@ -92,6 +92,8 @@ import {
   ymdInTz,
 } from './attendance-day';
 
+const GPS_OUTSIDE_COMMENT_MIN = 3;
+
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
@@ -5363,21 +5365,61 @@ export class AttendanceService {
     });
   }
 
-  async punchGps(tenantId: string, dto: GpsPunchDto) {
-    let location = dto.locationId
-      ? await this.prisma.location.findFirst({
-          where: { id: dto.locationId, tenantId },
-        })
-      : await this.prisma.location.findFirst({
-          where: {
-            tenantId,
-            isActive: true,
-            latitude: { not: null },
-            longitude: { not: null },
-          },
-        });
+  /**
+   * Nearest active geofence to a point. With `locationId` only that location
+   * is considered. Returns null when no location has coordinates.
+   */
+  async resolveGeofence(
+    tenantId: string,
+    latitude: number,
+    longitude: number,
+    locationId?: string,
+  ) {
+    const candidates = await this.prisma.location.findMany({
+      where: {
+        tenantId,
+        ...(locationId ? { id: locationId } : { isActive: true }),
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: { id: true, name: true, latitude: true, longitude: true, geoRadiusM: true },
+    });
 
-    if (!location || location.latitude == null || location.longitude == null) {
+    let best: {
+      locationId: string;
+      locationName: string;
+      distanceM: number;
+      radiusM: number;
+      inside: boolean;
+    } | null = null;
+    for (const loc of candidates) {
+      if (loc.latitude == null || loc.longitude == null) continue;
+      const distanceM = Math.round(
+        this.haversineM(latitude, longitude, loc.latitude, loc.longitude),
+      );
+      const radiusM = loc.geoRadiusM ?? 150;
+      const inside = distanceM <= radiusM;
+      // Prefer any fence we are inside; otherwise the closest edge.
+      const better =
+        !best ||
+        (inside && !best.inside) ||
+        (inside === best.inside && distanceM - radiusM < best.distanceM - best.radiusM);
+      if (better) {
+        best = { locationId: loc.id, locationName: loc.name, distanceM, radiusM, inside };
+      }
+    }
+    return best;
+  }
+
+  async punchGps(tenantId: string, dto: GpsPunchDto) {
+    const fence = await this.resolveGeofence(
+      tenantId,
+      dto.latitude,
+      dto.longitude,
+      dto.locationId,
+    );
+
+    if (!fence) {
       await this.prisma.problemMark.create({
         data: {
           tenantId,
@@ -5388,44 +5430,53 @@ export class AttendanceService {
       throw new BadRequestException('Lokatsiyada GPS geofence sozlanmagan');
     }
 
-    const dist = this.haversineM(
-      dto.latitude,
-      dto.longitude,
-      location.latitude,
-      location.longitude,
-    );
-    const radius = location.geoRadiusM ?? 150;
-    if (dist > radius) {
-      await this.prisma.problemMark.create({
-        data: {
-          tenantId,
-          reason: 'gps_out_of_range',
-          payload: {
-            ...dto,
-            distanceM: Math.round(dist),
-            radiusM: radius,
-            locationId: location.id,
-          } as unknown as Prisma.InputJsonValue,
-        },
+    const comment = (dto.comment ?? '').trim();
+    if (!fence.inside && comment.length < GPS_OUTSIDE_COMMENT_MIN) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'GPS_OUTSIDE_COMMENT_REQUIRED',
+        message: `Hududdan tashqaridasiz: ${fence.distanceM} m (ruxsat ${fence.radiusM} m). Izoh majburiy.`,
+        distanceM: fence.distanceM,
+        radiusM: fence.radiusM,
+        locationName: fence.locationName,
       });
-      throw new BadRequestException(
-        `GPS tashqarida: ${Math.round(dist)} m (ruxsat ${radius} m)`,
-      );
     }
 
-    return this.ingestPunch({
+    const occurredAt = new Date().toISOString();
+    const result = await this.ingestPunch({
       tenantId,
       employeeId: dto.employeeId,
       direction: dto.direction,
-      occurredAt: new Date().toISOString(),
+      occurredAt,
       source: 'gps',
       raw: {
         latitude: dto.latitude,
         longitude: dto.longitude,
-        distanceM: Math.round(dist),
-        locationId: location.id,
+        ...(dto.accuracy != null ? { accuracyM: Math.round(dto.accuracy) } : {}),
+        distanceM: fence.distanceM,
+        radiusM: fence.radiusM,
+        locationId: fence.locationId,
+        locationName: fence.locationName,
+        identificationType: 'GPS',
+        deviceType: 'Мобильное приложение',
+        outsideGeofence: !fence.inside,
+        ...(fence.inside
+          ? {}
+          : {
+              geofenceComment: comment,
+              note: `Вне территории (${fence.distanceM} м, радиус ${fence.radiusM} м): ${comment}`,
+            }),
       },
     });
+    return {
+      ...result,
+      direction: dto.direction,
+      occurredAt,
+      outsideGeofence: !fence.inside,
+      distanceM: fence.distanceM,
+      radiusM: fence.radiusM,
+      locationName: fence.locationName,
+    };
   }
 
   private haversineM(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -5598,7 +5649,10 @@ export class AttendanceService {
           .map((x) => x.trim())
           .includes('estimated_out');
       if (!wantEst) {
-        mapped = mapped.filter((m) => m.markType !== 'estimated_out');
+        // Outside-geofence marks carry an employee comment HR must review — never hide them.
+        mapped = mapped.filter(
+          (m) => m.markType !== 'estimated_out' || m.outsideGeofence,
+        );
       }
     }
 
@@ -6609,6 +6663,11 @@ export class AttendanceService {
       latitude: lat,
       longitude: lon,
       accuracyM,
+      outsideGeofence: payload.outsideGeofence === true,
+      geofenceComment:
+        typeof payload.geofenceComment === 'string' ? payload.geofenceComment : null,
+      distanceM: typeof payload.distanceM === 'number' ? payload.distanceM : null,
+      radiusM: typeof payload.radiusM === 'number' ? payload.radiusM : null,
       changeHistory,
       createdByLabel: (payload.createdByLabel as string) || 'System',
       updatedByLabel: (payload.updatedByLabel as string) || 'System',

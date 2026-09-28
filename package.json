@@ -12,6 +12,7 @@
     "dev:api": "npm run start:dev -w @hr-hub/api",
     "dev:web": "npm run dev -w @hr-hub/web",
     "dev:gw": "node scripts/run-device-gw.js",
+    "mobile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mobile-dev.ps1",
     "devices:up": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/link-devices.ps1",
     "office-link:admin": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/office-link/link.ps1 -Mode admin",
     "office-link": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/office-link/link.ps1 -Mode field",

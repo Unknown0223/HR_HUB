@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/errors/api_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -108,7 +109,27 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 error: (e, _) => SectionCard(
-                  child: Text('$e', style: const TextStyle(color: AppColors.danger)),
+                  child: e is ApiException && e.isEmployeeNotLinked
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline_rounded,
+                                color: AppColors.accent, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '$e',
+                                style: const TextStyle(
+                                  color: AppColors.inkMuted,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text('$e',
+                          style: const TextStyle(color: AppColors.danger)),
                 ),
                 data: (data) => _ScheduleCard(data: data),
               ),
@@ -163,10 +184,11 @@ class HomeScreen extends ConsumerWidget {
                           );
                         }
                         return Column(
-                          children: marks.take(5).map((raw) {
+                          children: marks.reversed.take(5).map((raw) {
                             final m = raw as Map;
-                            final dir = m['direction']?.toString() ?? '';
-                            final src = m['source']?.toString() ?? '';
+                            final entry = markIsEntry(m);
+                            final src = punchSourceLabel(m['source']);
+                            final outside = markOutsideGeofence(m);
                             final at = DateTime.tryParse(
                                   m['occurredAt']?.toString() ?? '',
                                 )?.toLocal();
@@ -174,12 +196,24 @@ class HomeScreen extends ConsumerWidget {
                               contentPadding: EdgeInsets.zero,
                               dense: true,
                               leading: Icon(
-                                dir == 'IN' ? Icons.login : Icons.logout,
-                                color: dir == 'IN'
-                                    ? AppColors.accent
-                                    : AppColors.warn,
+                                entry ? Icons.login : Icons.logout,
+                                color:
+                                    entry ? AppColors.accent : AppColors.warn,
                               ),
-                              title: Text('$dir · $src'),
+                              title: Text(
+                                src.isEmpty
+                                    ? markKindLabel(m)
+                                    : '${markKindLabel(m)} · $src',
+                              ),
+                              subtitle: outside
+                                  ? const Text(
+                                      'Hududdan tashqarida',
+                                      style: TextStyle(
+                                        color: AppColors.warn,
+                                        fontSize: 12,
+                                      ),
+                                    )
+                                  : null,
                               trailing: Text(
                                 at == null
                                     ? '—'
@@ -338,7 +372,7 @@ class HomeScreen extends ConsumerWidget {
                                       : 'Yo\'qlik',
                                 ),
                                 subtitle: Text(
-                                  '${m['startDate'] ?? ''} – ${m['endDate'] ?? ''}',
+                                  formatApiDateRange(m['startDate'], m['endDate']),
                                   style: const TextStyle(
                                     color: AppColors.inkMuted,
                                     fontSize: 12,
@@ -436,6 +470,13 @@ class _ScheduleCard extends StatelessWidget {
     final status = data['status']?.toString() ?? 'not_started';
     final firstIn = data['firstIn'];
     final lastOut = data['lastOut'];
+    final marks = ((data['marks'] as List?) ?? const [])
+        .whereType<Map>()
+        .where((m) => markField(m, 'isValid') != false)
+        .toList();
+    final estimatedOut = lastOut == null && marks.length > 1
+        ? marks.last['occurredAt']
+        : null;
     final isOff = status == 'day_off' || status == 'leave';
 
     return SectionCard(
@@ -498,12 +539,26 @@ class _ScheduleCard extends StatelessWidget {
                     const Icon(Icons.arrow_drop_up,
                         color: AppColors.danger, size: 28),
                     Text(
-                      _fmt(lastOut),
-                      style: const TextStyle(
+                      estimatedOut != null
+                          ? '~${_fmt(estimatedOut)}'
+                          : _fmt(lastOut),
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
+                        color: estimatedOut != null ? AppColors.inkMuted : null,
                       ),
                     ),
+                    if (estimatedOut != null)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 6),
+                        child: Text(
+                          'taxminiy',
+                          style: TextStyle(
+                            color: AppColors.inkMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -139,7 +139,8 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
                                         ),
                                       ),
                                       Text(
-                                        '${m['startDate'] ?? ''} – ${m['endDate'] ?? ''}',
+                                        formatApiDateRange(
+                                            m['startDate'], m['endDate']),
                                         style: const TextStyle(
                                           color: AppColors.inkMuted,
                                           fontSize: 12,

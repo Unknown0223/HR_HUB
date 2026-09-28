@@ -254,6 +254,9 @@ export class GpsPunchDto {
   @ApiProperty() @IsNumber() longitude!: number;
   @ApiProperty({ enum: PunchDirection }) @IsEnum(PunchDirection) direction!: PunchDirection;
   @ApiPropertyOptional() @IsOptional() @IsString() locationId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() accuracy?: number;
+  /** Required when the punch is outside every geofence. */
+  @ApiPropertyOptional() @IsOptional() @IsString() comment?: string;
 }
 
 export class CreateManualMarkDto {

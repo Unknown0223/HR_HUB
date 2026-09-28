@@ -27,10 +27,11 @@ class ProfileDetailsScreen extends ConsumerWidget {
         title: const Text('Profil'),
         centerTitle: true,
         actions: [
-          IconButton(
-            onPressed: () => context.push('/team-today'),
-            icon: const Icon(Icons.groups_outlined),
-          ),
+          if (user?.isApprover == true)
+            IconButton(
+              onPressed: () => context.push('/team-today'),
+              icon: const Icon(Icons.groups_outlined),
+            ),
         ],
       ),
       body: ListView(

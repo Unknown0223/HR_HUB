@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -34,6 +35,33 @@ export class MeGpsPunchDto {
   @IsOptional()
   @IsEnum(PunchDirection)
   direction?: PunchDirection;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  locationId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Mandatory when the punch is outside the location radius',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  comment?: string;
+}
+
+export class MeGpsCheckDto {
+  @ApiProperty()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number;
 
   @ApiPropertyOptional()
   @IsOptional()

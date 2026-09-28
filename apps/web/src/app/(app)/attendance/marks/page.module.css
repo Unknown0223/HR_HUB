@@ -545,6 +545,20 @@
   text-decoration: none;
   vertical-align: middle;
 }
+.outsideBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9a3412;
+  background: #ffedd5;
+  vertical-align: middle;
+}
+.outsideNote {
+  color: #c2410c;
+}
 .dotIn, .dotOut, .dotMark, .dotEst, .dotBreak {
   display: inline-flex;
   align-items: center;

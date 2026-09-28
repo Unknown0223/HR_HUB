@@ -16,6 +16,7 @@ import {
   MeCreateAbsenceDto,
   MeCreateRequestDto,
   MeFacePunchDto,
+  MeGpsCheckDto,
   MeGpsPunchDto,
   MeQrPunchDto,
   MeReviewAbsenceDto,
@@ -113,6 +114,11 @@ export class MeController {
   @Post('punches/gps')
   punchGps(@CurrentUser() user: AuthUser, @Body() dto: MeGpsPunchDto) {
     return this.me.punchGps(user, dto);
+  }
+
+  @Post('punches/gps/check')
+  checkGps(@CurrentUser() user: AuthUser, @Body() dto: MeGpsCheckDto) {
+    return this.me.checkGps(user, dto);
   }
 
   @Post('punches/qr')

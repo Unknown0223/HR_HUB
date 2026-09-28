@@ -85,11 +85,9 @@ class _FacePunchScreenState extends ConsumerState<FacePunchScreen> {
           );
       ref.invalidate(todayProvider);
       if (!mounted) return;
-      final dir = res['direction']?.toString() ?? '';
-      final mode = res['mode']?.toString() ?? '';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Face ID OK: $dir ($mode)'),
+          content: Text('Face ID: ${punchAcceptedText(res)}'),
         ),
       );
       Navigator.of(context).pop();

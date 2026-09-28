@@ -6,12 +6,18 @@ import {
 } from '@nestjs/common';
 import {
   DayStatus,
+  Prisma,
   PunchDirection,
   RequestStatus,
   Role,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
+import {
+  startOfLocalDay,
+  startOfNextLocalDay,
+  workDateOnly,
+} from '../attendance/attendance-day';
 import { HrService } from '../hr/hr.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuthUser } from '../auth/current-user.decorator';
@@ -19,6 +25,7 @@ import {
   MeCreateAbsenceDto,
   MeCreateRequestDto,
   MeFacePunchDto,
+  MeGpsCheckDto,
   MeGpsPunchDto,
   MeQrPunchDto,
   MeReviewAbsenceDto,
@@ -144,8 +151,8 @@ export class MeService {
 
   async todayAttendance(user: AuthUser) {
     const { tenantId, employee } = await this.requireEmployee(user);
-    const workDate = new Date();
-    workDate.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const workDate = workDateOnly(now);
 
     const day = await this.prisma.attendanceDay.findUnique({
       where: {
@@ -162,8 +169,8 @@ export class MeService {
         tenantId,
         employeeId: employee.id,
         occurredAt: {
-          gte: workDate,
-          lt: new Date(workDate.getTime() + 24 * 60 * 60 * 1000),
+          gte: startOfLocalDay(now),
+          lt: startOfNextLocalDay(now),
         },
       },
       orderBy: { occurredAt: 'asc' },
@@ -183,14 +190,15 @@ export class MeService {
     };
   }
 
+  /** Day roles are positional (first = приход, later = уход), so any valid mark today means the next one is OUT. */
   private inferNextDirection(
-    marks: { direction: PunchDirection }[],
+    marks: { direction: PunchDirection; rawPayload?: Prisma.JsonValue }[],
   ): PunchDirection {
-    const last = marks[marks.length - 1];
-    if (!last) return PunchDirection.IN;
-    return last.direction === PunchDirection.IN
-      ? PunchDirection.OUT
-      : PunchDirection.IN;
+    const hasValid = marks.some((m) => {
+      const p = m.rawPayload;
+      return !(p && typeof p === 'object' && !Array.isArray(p) && p.isValid === false);
+    });
+    return hasValid ? PunchDirection.OUT : PunchDirection.IN;
   }
 
   async listMarks(user: AuthUser, from?: string, to?: string) {
@@ -335,7 +343,24 @@ export class MeService {
       longitude: dto.longitude,
       direction,
       locationId: dto.locationId,
+      accuracy: dto.accuracy,
+      comment: dto.comment,
     });
+  }
+
+  /** Pre-flight for the app: is this point inside a geofence (comment needed?). */
+  async checkGps(user: AuthUser, dto: MeGpsCheckDto) {
+    const { tenantId } = await this.requireEmployee(user);
+    const fence = await this.attendance.resolveGeofence(
+      tenantId,
+      dto.latitude,
+      dto.longitude,
+      dto.locationId,
+    );
+    if (!fence) {
+      return { configured: false, inside: false, commentRequired: false };
+    }
+    return { configured: true, ...fence, commentRequired: !fence.inside };
   }
 
   async punchQr(user: AuthUser, dto: MeQrPunchDto) {

@@ -64,21 +64,23 @@ class MarksScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, i) {
                 final m = items[i] as Map;
-                final dir = m['direction']?.toString() ?? '';
+                final entry = markIsEntry(m);
                 final at = DateTime.tryParse(m['occurredAt']?.toString() ?? '')
                     ?.toLocal();
-                final source = m['source']?.toString() ?? '';
+                final source = punchSourceLabel(m['source']);
+                final outside = markOutsideGeofence(m);
+                final comment = markField(m, 'geofenceComment')?.toString();
+                final invalid = markField(m, 'isValid') == false;
                 return SectionCard(
                   child: Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: dir == 'IN'
+                        backgroundColor: entry
                             ? AppColors.accent.withValues(alpha: 0.15)
                             : AppColors.warn.withValues(alpha: 0.15),
                         child: Icon(
-                          dir == 'IN' ? Icons.login : Icons.logout,
-                          color:
-                              dir == 'IN' ? AppColors.accent : AppColors.warn,
+                          entry ? Icons.login : Icons.logout,
+                          color: entry ? AppColors.accent : AppColors.warn,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -87,7 +89,7 @@ class MarksScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              dir,
+                              markKindLabel(m),
                               style:
                                   const TextStyle(fontWeight: FontWeight.w700),
                             ),
@@ -97,6 +99,24 @@ class MarksScreen extends ConsumerWidget {
                                   : DateFormat('dd.MM.yyyy HH:mm').format(at),
                               style: const TextStyle(color: AppColors.muted),
                             ),
+                            if (outside)
+                              Text(
+                                comment == null || comment.isEmpty
+                                    ? 'Hududdan tashqarida'
+                                    : 'Hududdan tashqarida · $comment',
+                                style: const TextStyle(
+                                  color: AppColors.warn,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            if (invalid)
+                              const Text(
+                                'Yaroqsiz belgi',
+                                style: TextStyle(
+                                  color: AppColors.danger,
+                                  fontSize: 12,
+                                ),
+                              ),
                           ],
                         ),
                       ),
