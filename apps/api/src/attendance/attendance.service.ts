@@ -6958,6 +6958,7 @@ export class AttendanceService {
       divisionIds?: string;
       positionIds?: string;
       scheduleIds?: string;
+      locationIds?: string;
       q?: string;
       limit?: string | number;
     },
@@ -6990,13 +6991,41 @@ export class AttendanceService {
     const divisionIds = parseIds(opts.divisionIds);
     const positionIds = parseIds(opts.positionIds);
     const scheduleIds = parseIds(opts.scheduleIds);
+    const locationIds = parseIds(opts.locationIds);
     if (divisionIds.length) employeeWhere.divisionId = { in: divisionIds };
     if (positionIds.length) employeeWhere.positionId = { in: positionIds };
     if (scheduleIds.length) employeeWhere.scheduleId = { in: scheduleIds };
+    if (locationIds.length) {
+      const locClause: Prisma.EmployeeWhereInput = {
+        OR: [
+          { division: { locationId: { in: locationIds } } },
+          {
+            accessGrants: {
+              some: {
+                tenantId,
+                accessType: 'location',
+                resource: { in: locationIds },
+                isActive: true,
+              },
+            },
+          },
+        ],
+      };
+      const prevAnd = employeeWhere.AND;
+      employeeWhere.AND = [
+        ...(Array.isArray(prevAnd) ? prevAnd : prevAnd ? [prevAnd] : []),
+        locClause,
+      ];
+    }
     if (opts.q?.trim()) {
       const nameWhere = employeeNameSearchWhere(opts.q);
-      if (nameWhere) employeeWhere.AND = [nameWhere];
-      else {
+      if (nameWhere) {
+        const prevAnd = employeeWhere.AND;
+        employeeWhere.AND = [
+          ...(Array.isArray(prevAnd) ? prevAnd : prevAnd ? [prevAnd] : []),
+          nameWhere,
+        ];
+      } else {
         employeeWhere.OR = [
           { tabNumber: { contains: opts.q.trim(), mode: 'insensitive' } },
         ];

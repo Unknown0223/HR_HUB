@@ -25,7 +25,7 @@ import { EmploymentStatus, EmploymentType, Role } from '@prisma/client';
 import type { Response } from 'express';
 import { EmployeesService } from './employees.service';
 import { FaceService } from './face.service';
-import { CreateEmployeeDto, UpdateEmployeeDto, UpdateEmployeeFlagsDto, UpdateEmployeeLocationsDto, UpdateEmployeePersonalDto, UpdateEmployeeContactsDto, CreateEmployeeBankAccountDto, UpdateEmployeeBankAccountDto, CreateEmployeeBankCardDto, UpdateEmployeeBankCardDto, CreateEmployeePersonDocDto, UpdateEmployeePersonDocDto, CreateEmployeeRelativeDto, UpdateEmployeeRelativeDto, UpdateEmployeeMaritalStatusDto, CreateEmployeeCertificateDto, UpdateEmployeeCertificateDto, CreateEmployeeTenureDto, UpdateEmployeeTenureDto, CreateEmployeeWorkplaceDto, UpdateEmployeeWorkplaceDto, CreateEmployeeAwardDto, UpdateEmployeeAwardDto, UpdateEmployeeFileDto, CreateEmployeeInventoryDto, UpdateEmployeeInventoryDto, CreateEmployeeCarDto, UpdateEmployeeCarDto, UpdateEmployeeIdentificationDto, UpdateEmployeeExtraInfoDto, UpdateEmployeeUserSettingsDto, CreateEmployeeMarkBlockDto, UpdateEmployeeMarkBlockDto } from './dto';
+import { BulkEmployeeFlagsDto, CreateEmployeeDto, UpdateEmployeeDto, UpdateEmployeeFlagsDto, UpdateEmployeeLocationsDto, UpdateEmployeePersonalDto, UpdateEmployeeContactsDto, CreateEmployeeBankAccountDto, UpdateEmployeeBankAccountDto, CreateEmployeeBankCardDto, UpdateEmployeeBankCardDto, CreateEmployeePersonDocDto, UpdateEmployeePersonDocDto, CreateEmployeeRelativeDto, UpdateEmployeeRelativeDto, UpdateEmployeeMaritalStatusDto, CreateEmployeeCertificateDto, UpdateEmployeeCertificateDto, CreateEmployeeTenureDto, UpdateEmployeeTenureDto, CreateEmployeeWorkplaceDto, UpdateEmployeeWorkplaceDto, CreateEmployeeAwardDto, UpdateEmployeeAwardDto, UpdateEmployeeFileDto, CreateEmployeeInventoryDto, UpdateEmployeeInventoryDto, CreateEmployeeCarDto, UpdateEmployeeCarDto, UpdateEmployeeIdentificationDto, UpdateEmployeeExtraInfoDto, UpdateEmployeeUserSettingsDto, CreateEmployeeMarkBlockDto, UpdateEmployeeMarkBlockDto } from './dto';
 import { Roles } from '../auth/decorators';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
@@ -138,6 +138,20 @@ export class EmployeesController {
     this.employees.requireTenant(tenantId);
     const { buffer, filename } = await this.employees.importTemplateXlsx();
     sendExcelAttachment(res!, buffer, filename);
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Post('bulk-flags')
+  bulkUpdateFlags(
+    @CurrentTenant() tenantId: string | null,
+    @Body() dto: BulkEmployeeFlagsDto,
+  ) {
+    const { ids, ...flags } = dto;
+    return this.employees.bulkUpdateProfileFlags(
+      this.employees.requireTenant(tenantId),
+      ids,
+      flags,
+    );
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)

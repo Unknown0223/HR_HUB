@@ -38,12 +38,14 @@ import {
 
 type DivOpt = { id: string; name: string };
 type PosOpt = { id: string; name: string };
+type LocOpt = { id: string; name: string };
 type Pending = Record<string, { status: CorrectionStatus; lateMinutes: number }>;
 type DraftFilters = {
   month: string;
   q: string;
   divisionId: string;
   positionId: string;
+  locationId: string;
 };
 
 const EMPTY_DRAFT: DraftFilters = {
@@ -51,10 +53,13 @@ const EMPTY_DRAFT: DraftFilters = {
   q: '',
   divisionId: '',
   positionId: '',
+  locationId: '',
 };
 
 function filtersReady(f: DraftFilters) {
-  return Boolean(f.divisionId || f.positionId || f.q.trim());
+  return Boolean(
+    f.divisionId || f.positionId || f.locationId || f.q.trim(),
+  );
 }
 
 function effectiveStatus(
@@ -363,6 +368,7 @@ function CorrectionPageInner() {
   const [applied, setApplied] = useState<DraftFilters | null>(null);
   const [divisions, setDivisions] = useState<DivOpt[]>([]);
   const [positions, setPositions] = useState<PosOpt[]>([]);
+  const [locations, setLocations] = useState<LocOpt[]>([]);
   const [data, setData] = useState<CorrectionMatrix | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -380,16 +386,20 @@ function CorrectionPageInner() {
 
   const loadLookups = useCallback(async () => {
     try {
-      const [divs, poss] = await Promise.all([
+      const [divs, poss, locs] = await Promise.all([
         apiFetch<{ items?: DivOpt[] } | DivOpt[]>(
           '/api/organization/divisions?take=500',
         ).catch(() => []),
         apiFetch<{ items?: PosOpt[] } | PosOpt[]>(
           '/api/organization/positions?take=500',
         ).catch(() => []),
+        apiFetch<{ items?: LocOpt[] } | LocOpt[]>(
+          '/api/attendance/locations',
+        ).catch(() => []),
       ]);
       const dList = Array.isArray(divs) ? divs : divs.items || [];
       const pList = Array.isArray(poss) ? poss : poss.items || [];
+      const lList = Array.isArray(locs) ? locs : locs.items || [];
       setDivisions(
         dList.map((x: { id: string; name?: string; label?: string }) => ({
           id: x.id,
@@ -398,6 +408,12 @@ function CorrectionPageInner() {
       );
       setPositions(
         pList.map((x: { id: string; name?: string; label?: string }) => ({
+          id: x.id,
+          name: x.name || x.label || x.id,
+        })),
+      );
+      setLocations(
+        lList.map((x: { id: string; name?: string; label?: string }) => ({
           id: x.id,
           name: x.name || x.label || x.id,
         })),
@@ -419,7 +435,9 @@ function CorrectionPageInner() {
 
   const loadMatrix = useCallback(async (f: DraftFilters) => {
     if (!filtersReady(f)) {
-      setError('Выберите подразделение, должность или сотрудника');
+      setError(
+        'Выберите локацию, подразделение, должность или сотрудника',
+      );
       setData(null);
       return;
     }
@@ -430,6 +448,7 @@ function CorrectionPageInner() {
         month: f.month,
         limit: '100',
       });
+      if (f.locationId) params.set('locationIds', f.locationId);
       if (f.divisionId) params.set('divisionIds', f.divisionId);
       if (f.positionId) params.set('positionIds', f.positionId);
       if (f.q.trim()) params.set('q', f.q.trim());
@@ -451,7 +470,9 @@ function CorrectionPageInner() {
 
   const onApply = () => {
     if (!canApply) {
-      setToast('Сначала выберите фильтр (подразделение / должность / ФИО)');
+      setToast(
+        'Сначала выберите фильтр (локация / подразделение / должность / ФИО)',
+      );
       return;
     }
     void loadMatrix(draft);
@@ -713,6 +734,22 @@ function CorrectionPageInner() {
 
       <div className={styles.filters}>
         <div className={styles.field}>
+          <label>Локация</label>
+          <select
+            value={draft.locationId}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, locationId: e.target.value }))
+            }
+          >
+            <option value="">Все</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
           <label>Подразделение</label>
           <select
             value={draft.divisionId}
@@ -770,7 +807,7 @@ function CorrectionPageInner() {
           <strong>Выберите фильтры и нажмите «Применить»</strong>
           <p>
             Таблица не загружается сразу — так страница не зависает на сотнях
-            сотрудников. Укажите подразделение, должность или ФИО.
+            сотрудников. Укажите локацию, подразделение, должность или ФИО.
           </p>
         </div>
       ) : null}

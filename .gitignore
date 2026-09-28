@@ -66,6 +66,9 @@ infra/data/
 # HR HUB live dump (credentials, employee photos, large JSON)
 data/catalog-dump/
 
+# Local DB / MinIO backups (employee PII)
+backups/
+
 # Misc
 *.pem
 .turbo/

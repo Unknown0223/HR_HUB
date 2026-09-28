@@ -1026,6 +1026,7 @@ export class AttendanceController {
   @ApiQuery({ name: 'divisionIds', required: false })
   @ApiQuery({ name: 'positionIds', required: false })
   @ApiQuery({ name: 'scheduleIds', required: false })
+  @ApiQuery({ name: 'locationIds', required: false })
   @ApiQuery({ name: 'q', required: false })
   @ApiQuery({ name: 'limit', required: false })
   correctionMatrix(
@@ -1034,12 +1035,13 @@ export class AttendanceController {
     @Query('divisionIds') divisionIds?: string,
     @Query('positionIds') positionIds?: string,
     @Query('scheduleIds') scheduleIds?: string,
+    @Query('locationIds') locationIds?: string,
     @Query('q') q?: string,
     @Query('limit') limit?: string,
   ) {
     return this.attendance.correctionMatrix(
       this.attendance.requireTenant(tenantId),
-      { month, divisionIds, positionIds, scheduleIds, q, limit },
+      { month, divisionIds, positionIds, scheduleIds, locationIds, q, limit },
     );
   }
 

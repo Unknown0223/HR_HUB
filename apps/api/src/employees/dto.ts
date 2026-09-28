@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -6,6 +8,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MinLength,
   ValidateIf,
 } from 'class-validator';
@@ -211,6 +214,15 @@ export class UpdateEmployeeFlagsDto {
   @IsOptional()
   @IsBoolean()
   marksBlocked?: boolean;
+}
+
+export class BulkEmployeeFlagsDto extends UpdateEmployeeFlagsDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @IsUUID('all', { each: true })
+  ids!: string[];
 }
 
 export class EmployeeLocationAttachItemDto {

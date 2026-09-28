@@ -86,6 +86,65 @@
   border-color: var(--st-ok);
 }
 
+.actionsBtn {
+  appearance: none;
+  border: 1px solid rgba(10, 133, 226, 0.45);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  height: 36px;
+  padding: 0 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.actionsBtn:hover:not(:disabled) {
+  background: #edf6fe;
+  border-color: var(--accent);
+}
+
+.actionsBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actionsMenu {
+  min-width: 18rem;
+}
+
+.actionsMenu button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.actionsMenu button b {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.actionsMenu button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.actionsMenu .actionsDanger {
+  color: #b91c1c;
+  border-top: 1px solid var(--border);
+}
+
+.actionsMenu .actionsDanger b {
+  color: #b91c1c;
+}
+
 .importBtn {
   appearance: none;
   border: 1px solid rgba(10, 133, 226, 0.45);

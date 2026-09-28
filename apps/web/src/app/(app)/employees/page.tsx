@@ -230,6 +230,7 @@ function EmployeesPageInner() {
     'none' | 'create' | 'attach' | 'import' | 'telegram'
   >('none');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const hasActiveFilters = Boolean(q.trim() || divisionId || positionId);
   const [filtersOpen, setFiltersOpen] = useState(hasActiveFilters);
   const [exportBusy, setExportBusy] = useState(false);
@@ -254,6 +255,7 @@ function EmployeesPageInner() {
   const [rehireBusy, setRehireBusy] = useState(false);
   const photos = usePhotoLightbox();
   const menuRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const createFormRef = useRef<HTMLFormElement>(null);
   const matchSeq = useRef(0);
@@ -408,6 +410,28 @@ function EmployeesPageInner() {
     [selected],
   );
 
+  const bulkCounts = useMemo(() => {
+    const c = {
+      include: 0,
+      exclude: 0,
+      block: 0,
+      unblock: 0,
+      close: 0,
+      open: 0,
+    };
+    for (const r of rows) {
+      if (!selected[r.id]) continue;
+      const f = r.profileFlags ?? {};
+      if (f.excludeFromStats) c.include++;
+      else c.exclude++;
+      if (f.marksBlocked) c.unblock++;
+      else c.block++;
+      if (f.systemAccessClosed) c.open++;
+      else c.close++;
+    }
+    return c;
+  }, [rows, selected]);
+
   const visibleCols = prefs.columns.length
     ? prefs.columns
     : employeeListPrefs.defaultColumns;
@@ -463,6 +487,7 @@ function EmployeesPageInner() {
   useEffect(() => {
     function onDocClick(ev: MouseEvent) {
       if (!menuRef.current?.contains(ev.target as Node)) setMenuOpen(false);
+      if (!actionsRef.current?.contains(ev.target as Node)) setActionsOpen(false);
       if (!tableRef.current?.contains(ev.target as Node)) setExpandedId(null);
     }
     document.addEventListener('mousedown', onDocClick);
@@ -546,7 +571,42 @@ function EmployeesPageInner() {
     setSelected(next);
   }
 
+  async function bulkFlags(
+    patch: {
+      excludeFromStats?: boolean;
+      systemAccessClosed?: boolean;
+      marksBlocked?: boolean;
+    },
+    confirmText?: string,
+  ) {
+    setActionsOpen(false);
+    if (selectedIds.length === 0) return;
+    if (confirmText && !(await confirm(confirmText))) return;
+    const ids = selectedIds;
+    setBulkBusy(true);
+    setError('');
+    try {
+      await apiFetch('/api/employees/bulk-flags', {
+        method: 'POST',
+        body: JSON.stringify({ ids, ...patch }),
+      });
+      const idSet = new Set(ids);
+      setRows((prev) =>
+        prev.map((r) =>
+          idSet.has(r.id)
+            ? { ...r, profileFlags: { ...r.profileFlags, ...patch } }
+            : r,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Групповая операция не выполнена');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function bulkDismiss() {
+    setActionsOpen(false);
     if (selectedIds.length === 0) return;
     if (
       !(await confirm(
@@ -744,6 +804,99 @@ function EmployeesPageInner() {
               </div>
             ) : null}
           </div>
+          <div className={shared.splitBtn} ref={actionsRef}>
+            <button
+              type="button"
+              className={arena.actionsBtn}
+              disabled={selectedIds.length === 0 || bulkBusy}
+              aria-haspopup="menu"
+              aria-expanded={actionsOpen}
+              title={selectedIds.length === 0 ? 'Выберите сотрудников' : undefined}
+              onClick={() => setActionsOpen((v) => !v)}
+            >
+              {bulkBusy ? 'Выполняется…' : 'Действие'}
+              <span aria-hidden>▾</span>
+            </button>
+            {actionsOpen ? (
+              <div className={`${shared.splitMenu} ${arena.actionsMenu}`} role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={bulkCounts.include === 0}
+                  onClick={() => void bulkFlags({ excludeFromStats: false })}
+                >
+                  Включить в статистику <b>{bulkCounts.include}</b>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={bulkCounts.exclude === 0}
+                  onClick={() =>
+                    void bulkFlags(
+                      { excludeFromStats: true },
+                      `Исключить из статистики ${bulkCounts.exclude} сотрудников?`,
+                    )
+                  }
+                >
+                  Исключить из статистики <b>{bulkCounts.exclude}</b>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={bulkCounts.block === 0}
+                  onClick={() =>
+                    void bulkFlags(
+                      { marksBlocked: true },
+                      `Блокировать возможность отметки для ${bulkCounts.block} сотрудников?`,
+                    )
+                  }
+                >
+                  Блокировать возможность отметки для <b>{bulkCounts.block}</b>
+                </button>
+                {bulkCounts.unblock > 0 ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void bulkFlags({ marksBlocked: false })}
+                  >
+                    Разблокировать отметки для <b>{bulkCounts.unblock}</b>
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={bulkCounts.close === 0}
+                  onClick={() =>
+                    void bulkFlags(
+                      { systemAccessClosed: true },
+                      `Закрыть доступ к системе для ${bulkCounts.close} сотрудников?`,
+                    )
+                  }
+                >
+                  Закрыть доступ к системе <b>{bulkCounts.close}</b>
+                </button>
+                {bulkCounts.open > 0 ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void bulkFlags({ systemAccessClosed: false })}
+                  >
+                    Открыть доступ к системе <b>{bulkCounts.open}</b>
+                  </button>
+                ) : null}
+                {tab !== 'dismissed' ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={arena.actionsDanger}
+                    onClick={() => void bulkDismiss()}
+                  >
+                    Массовое увольнение <b>{selectedIds.length}</b>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className={arena.rightTools}>
@@ -857,19 +1010,11 @@ function EmployeesPageInner() {
         </div>
       ) : null}
 
-      {selectedIds.length > 0 && tab !== 'dismissed' ? (
+      {selectedIds.length > 0 ? (
         <div className={arena.bulkBar}>
           <span className={arena.bulkMeta}>
             Выбрано: <strong>{selectedIds.length}</strong>
           </span>
-          <button
-            type="button"
-            className={`${arena.bulkBtn} ${arena.bulkDanger}`}
-            disabled={bulkBusy}
-            onClick={bulkDismiss}
-          >
-            {bulkBusy ? '…' : 'Массовое увольнение'}
-          </button>
           <button
             type="button"
             className={arena.bulkGhost}

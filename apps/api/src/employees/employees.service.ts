@@ -3318,6 +3318,70 @@ export class EmployeesService {
     return this.findOne(tenantId, employeeId);
   }
 
+  async bulkUpdateProfileFlags(
+    tenantId: string,
+    ids: string[],
+    flags: {
+      excludeFromStats?: boolean;
+      systemAccessClosed?: boolean;
+      marksBlocked?: boolean;
+    },
+  ) {
+    const owned = await this.prisma.employee.findMany({
+      where: { tenantId, id: { in: [...new Set(ids)] } },
+      select: { id: true },
+    });
+    const employeeIds = owned.map((e) => e.id);
+    const changes: [string, boolean][] = [];
+    if (flags.excludeFromStats !== undefined) {
+      changes.push(['exclude_from_stats', flags.excludeFromStats]);
+    }
+    if (flags.systemAccessClosed !== undefined) {
+      changes.push(['system_access_closed', flags.systemAccessClosed]);
+    }
+    if (flags.marksBlocked !== undefined) {
+      changes.push(['marks_blocked', flags.marksBlocked]);
+    }
+    if (!employeeIds.length || !changes.length) {
+      return { updated: 0 };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const [resource, enabled] of changes) {
+        const where = {
+          tenantId,
+          employeeId: { in: employeeIds },
+          accessType: 'profile_flag',
+          resource,
+        };
+        await tx.employeeAccessGrant.updateMany({
+          where,
+          data: { isActive: enabled, note: enabled ? 'enabled' : 'disabled' },
+        });
+        if (!enabled) continue;
+        const existing = await tx.employeeAccessGrant.findMany({
+          where,
+          select: { employeeId: true },
+        });
+        const have = new Set(existing.map((g) => g.employeeId));
+        const missing = employeeIds.filter((id) => !have.has(id));
+        if (missing.length) {
+          await tx.employeeAccessGrant.createMany({
+            data: missing.map((employeeId) => ({
+              tenantId,
+              employeeId,
+              accessType: 'profile_flag',
+              resource,
+              isActive: true,
+              note: 'enabled',
+            })),
+          });
+        }
+      }
+    });
+    return { updated: employeeIds.length };
+  }
+
   async updateEmployeeLocations(
     tenantId: string,
     employeeId: string,
