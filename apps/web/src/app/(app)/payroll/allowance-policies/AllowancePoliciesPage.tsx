@@ -296,7 +296,7 @@ function AllowancePoliciesInner() {
           <i className="fas fa-hand-holding-usd" aria-hidden />
         </div>
         <div className={shared.pageHeaderText}>
-          <h1 className={shared.pageTitle}>Политики выплат</h1>
+          <h1 className={shared.pageTitle}>Политика доплат</h1>
           <p className={shared.pageSubtitle}>
             Правила доплат по времени суток, подразделениям и графикам
           </p>

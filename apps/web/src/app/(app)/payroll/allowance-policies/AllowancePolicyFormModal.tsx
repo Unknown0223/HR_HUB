@@ -134,7 +134,7 @@ export function AllowancePolicyFormModal({
   return (
     <FormModal
       open={open}
-      title="Политика выплат (создание)"
+      title="Политика доплат (создание)"
       onClose={onClose}
       width="lg"
       footer={

@@ -462,10 +462,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     }
     if (parts[0] === 'payroll' && parts[1] === 'allowance-policies') {
       if (parts[2] === 'new') {
-        return { title: 'Политики выплат (создание)', siblings: [] };
+        return { title: 'Политика доплат (создание)', siblings: [] };
       }
       if (parts[2]) {
-        return { title: 'Политики выплат (изменение)', siblings: [] };
+        return { title: 'Политика доплат (изменение)', siblings: [] };
       }
       return FORM_SIBLINGS['allowance-policies'];
     }

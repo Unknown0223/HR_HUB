@@ -688,7 +688,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     siblings: [],
   },
   'allowance-policies': {
-    title: 'Политики выплат',
+    title: 'Политика доплат',
     siblings: [],
   },
   periods: {

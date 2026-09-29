@@ -98,7 +98,7 @@ export const CATALOG_NAV: NavGroup[] = [
     label: 'Зарплата',
     items: [
       { href: '/payroll/fine-policies', label: 'Политики штрафов' },
-      { href: '/payroll/allowance-policies', label: 'Политики выплат' },
+      { href: '/payroll/allowance-policies', label: 'Политика доплат' },
       { href: '/payroll/timesheets', label: 'Табель' },
       { href: '/payroll/accruals', label: 'Все начисления' },
       { href: '/catalog/settlements', label: 'Взаиморасчеты' },

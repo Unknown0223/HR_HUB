@@ -155,7 +155,7 @@ export function AllowancePolicyForm({ policyId }: { policyId?: string }) {
     }
   }
 
-  const title = isNew ? 'Политики выплат (создание)' : 'Политики выплат (изменение)';
+  const title = isNew ? 'Политика доплат (создание)' : 'Политика доплат (изменение)';
 
   if (loading) return <p className={formStyles.muted}>Загрузка…</p>;
 

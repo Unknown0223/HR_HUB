@@ -310,7 +310,7 @@ export const MEGA_NAV: MegaSection[] = [
           },
           {
             href: '/payroll/allowance-policies',
-            label: 'Политики выплат',
+            label: 'Политика доплат',
             faIcon: 'fa-hand-holding-usd',
             iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
           },
