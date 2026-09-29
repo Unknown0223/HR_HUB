@@ -85,22 +85,10 @@ export const MEGA_NAV: MegaSection[] = [
             iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)',
           },
           {
-            href: '/employees/join-requests',
-            label: 'Заявки из Telegram',
-            faIcon: 'fa-paper-plane',
-            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #06b6d4 100%)',
-          },
-          {
             href: '/catalog/hr-documents',
             label: 'Все кадровые документы',
             faIcon: 'fa-file-alt',
             iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
-          },
-          {
-            href: '/catalog/transfers',
-            label: 'Кадровые переводы',
-            faIcon: 'fa-exchange-alt',
-            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #d946ef 100%)',
           },
           {
             href: '/catalog/absences',
@@ -125,12 +113,6 @@ export const MEGA_NAV: MegaSection[] = [
             label: 'Обходные листы',
             faIcon: 'fa-clipboard-list',
             iconAccent: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
-          },
-          {
-            href: '/catalog/wage-changes',
-            label: 'Все изменения в оплате труда',
-            faIcon: 'fa-money-bill-wave',
-            iconAccent: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           },
           {
             href: '/catalog/incidents',
@@ -168,34 +150,16 @@ export const MEGA_NAV: MegaSection[] = [
             iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
           },
           {
-            href: '/catalog/staff-positions/structure',
-            label: 'Оргструктура по позициям',
-            faIcon: 'fa-project-diagram',
-            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #d946ef 100%)',
-          },
-          {
             href: '/catalog/tariff-groups',
             label: 'Тарифные группы',
             faIcon: 'fa-percent',
             iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
           },
           {
-            href: '/catalog/tariff-approvals',
-            label: 'Утверждения тарифных групп',
-            faIcon: 'fa-clipboard-check',
-            iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0a85e2 100%)',
-          },
-          {
             href: '/catalog/grade-history',
             label: 'Повышение разрядов',
             faIcon: 'fa-chart-line',
             iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
-          },
-          {
-            href: '/catalog/career-paths',
-            label: 'Карьерный путь',
-            faIcon: 'fa-route',
-            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #d946ef 100%)',
           },
         ],
       },
@@ -245,36 +209,6 @@ export const MEGA_NAV: MegaSection[] = [
         title: '',
         items: [
           {
-            href: '/catalog/reports/attendance-overview',
-            label: 'Отчет по посещениям сотрудников',
-            faIcon: 'fa-clock',
-            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)',
-          },
-          {
-            href: '/catalog/reports/attendance-t13',
-            label: 'Отчет по посещениям сотрудников (Т-13)',
-            faIcon: 'fa-table',
-            iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0a85e2 100%)',
-          },
-          {
-            href: '/catalog/reports/marks-detail',
-            label: 'Детальный отчет по отметкам',
-            faIcon: 'fa-list-alt',
-            iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)',
-          },
-          {
-            href: '/catalog/reports/discipline',
-            label: 'Отчет по дисциплине посещений',
-            faIcon: 'fa-balance-scale',
-            iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
-          },
-          {
-            href: '/catalog/reports/division-mode?period=1',
-            label: 'Отчет по режиму работы подразделения (период)',
-            faIcon: 'fa-building',
-            iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #0a85e2 100%)',
-          },
-          {
             href: '/catalog/work-schedules',
             label: 'Графики работы',
             faIcon: 'fa-calendar-alt',
@@ -304,11 +238,6 @@ export const MEGA_NAV: MegaSection[] = [
             faIcon: 'fa-map-marker-alt',
             iconAccent: 'linear-gradient(135deg, #e11d48 0%, #f59e0b 100%)',
           },
-        ],
-      },
-      {
-        title: '',
-        items: [
           {
             href: '/catalog/overtime-requests',
             label: 'Запросы на сверхурочные',
@@ -327,6 +256,11 @@ export const MEGA_NAV: MegaSection[] = [
             faIcon: 'fa-tablet-alt',
             iconAccent: 'linear-gradient(135deg, #64748b 0%, #0a85e2 100%)',
           },
+        ],
+      },
+      {
+        title: '',
+        items: [
           {
             href: '/attendance/marks',
             label: 'Отметки',
@@ -492,7 +426,6 @@ export const MEGA_NAV: MegaSection[] = [
           { href: '/catalog/dynamic-fields', label: 'Динамические поля', faIcon: 'fa-puzzle-piece', iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #7c3aed 100%)' },
           { href: '/catalog/dynamic-objects', label: 'Объекты', faIcon: 'fa-cube', iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #6366f1 100%)' },
           { href: '/catalog/dynamic-facts', label: 'Факты (метаданные)', faIcon: 'fa-project-diagram', iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #0a85e2 100%)' },
-          { href: '/news', label: 'Новостная лента', faIcon: 'fa-newspaper', iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)' },
         ],
       },
       {
@@ -628,7 +561,7 @@ export function findSectionByPath(pathname: string, search = ''): string | null 
     }
   }
   if (pathname === '/dashboard') return 'home';
-  if (pathname === '/news' || pathname.startsWith('/news/')) return 'settings';
+  if (pathname === '/news' || pathname.startsWith('/news/')) return 'home';
   if (
     pathname.startsWith('/catalog/work-schedules') ||
     pathname.startsWith('/catalog/production-calendars') ||
