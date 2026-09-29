@@ -203,7 +203,6 @@ export const MEGA_NAV: MegaSection[] = [
   {
     id: 'attendance',
     label: 'Посещения',
-    // Two side-by-side columns (empty titles → megaGrid, not flyout).
     columns: [
       {
         title: '',
@@ -256,22 +255,11 @@ export const MEGA_NAV: MegaSection[] = [
             faIcon: 'fa-tablet-alt',
             iconAccent: 'linear-gradient(135deg, #64748b 0%, #0a85e2 100%)',
           },
-        ],
-      },
-      {
-        title: '',
-        items: [
           {
             href: '/attendance/marks',
             label: 'Отметки',
             faIcon: 'fa-check-double',
             iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #6366f1 100%)',
-          },
-          {
-            href: '/attendance/correction',
-            label: 'Корректировка табеля',
-            faIcon: 'fa-th',
-            iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #0e9f6e 100%)',
           },
           {
             href: '/catalog/schedule-overrides',

@@ -551,6 +551,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
       { label: 'GPS отслеживание', href: '/attendance/gps-tracking' },
       { label: 'Список проблемных отметок', href: '/attendance/problems' },
       { label: 'Отображение последних отметок', href: '/attendance/latest' },
+      { label: 'Корректировка табеля', href: '/attendance/correction' },
     ],
   },
   schedules: {
@@ -599,7 +600,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
   },
   'timesheet-adjustments': {
     title: 'Корректировки табеля',
-    siblings: [],
+    siblings: [{ label: 'Корректировка табеля (сетка)', href: '/attendance/correction' }],
   },
   'hr-requests': {
     title: 'Заявки на кадровые изменения',
