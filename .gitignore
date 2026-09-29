@@ -69,6 +69,14 @@ data/catalog-dump/
 # Local DB / MinIO backups (employee PII)
 backups/
 
+# Scratch: Google Form exports, passport/face photos, Railway snippets (PII)
+/tmp/
+
+# tsc emitted next to sources by mistake
+packages/shared/src/*.js
+packages/shared/src/*.js.map
+packages/shared/src/*.d.ts
+
 # Misc
 *.pem
 .turbo/
