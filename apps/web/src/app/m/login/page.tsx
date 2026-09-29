@@ -7,8 +7,8 @@ import styles from '../mobile.module.css';
 
 export default function MobileLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('employee@demo.local');
-  const [password, setPassword] = useState('Demo1234!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [reveal, setReveal] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -102,10 +102,6 @@ export default function MobileLoginPage() {
         <a className={styles.secondaryBtn} href="/">
           Veb versiyaga o‘tish
         </a>
-
-        <p className={styles.hint}>
-          Demo: <code>employee@demo.local</code> / <code>Demo1234!</code>
-        </p>
       </form>
     </div>
   );

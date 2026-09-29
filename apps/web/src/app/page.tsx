@@ -8,8 +8,8 @@ import styles from './login.module.css';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@demo.local');
-  const [password, setPassword] = useState('Demo1234!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
@@ -32,12 +32,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function fillDemo() {
-    setEmail('admin@demo.local');
-    setPassword('Demo1234!');
-    setError('');
   }
 
   return (
@@ -287,17 +281,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          <div className={styles.demoHintBox}>
-            <div className={styles.demoHintText}>
-              Демо-доступ:{' '}
-              <span className={styles.demoCredentials}>admin@demo.local</span> /{' '}
-              <span className={styles.demoCredentials}>Demo1234!</span>
-            </div>
-            <button type="button" className={styles.demoAutoFillBtn} onClick={fillDemo}>
-              Заполнить
-            </button>
-          </div>
 
           <div className={styles.mobilePortalRow}>
             <Link href="/m" className={styles.mobilePortalLink}>

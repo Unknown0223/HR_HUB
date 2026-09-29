@@ -456,48 +456,6 @@
   animation: loginSpin 0.65s linear infinite;
 }
 
-.demoHintBox {
-  margin-top: 24px;
-  padding: 12px 14px;
-  background-color: var(--login-surface-subtle);
-  border: 1px dashed var(--login-border);
-  border-radius: var(--login-radius);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 0.8125rem;
-}
-
-.demoHintText {
-  color: var(--login-ink-muted);
-  line-height: 1.4;
-}
-
-.demoCredentials {
-  font-family: var(--login-mono);
-  color: var(--login-ink-secondary);
-  font-weight: 600;
-}
-
-.demoAutoFillBtn {
-  background-color: #ffffff;
-  border: 1px solid var(--login-border);
-  color: var(--login-accent);
-  padding: 4px 10px;
-  border-radius: var(--login-radius-sm);
-  font-size: 0.75rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.demoAutoFillBtn:hover {
-  background-color: var(--login-accent-tint);
-  border-color: var(--login-accent);
-}
-
 .mobilePortalRow {
   margin-top: 28px;
   padding-top: 20px;
