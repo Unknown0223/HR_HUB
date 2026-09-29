@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx, XLSX_COLORS, type XlsxCell } from '@/lib/xlsx-download';
+import { EmployeeLink, DayMarksLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -26,6 +27,7 @@ type DayMeta = { iso: string; dd: string; weekday: string };
 type DayCell = { text: string; off: boolean };
 type Row = {
   n: number;
+  employeeId?: string;
   employee: string;
   position: string;
   division: string;
@@ -937,13 +939,17 @@ export default function SchedulesReportPage() {
                       report.rows.map((r) => (
                         <tr key={r.n}>
                           <td>{r.n}</td>
-                          <td className={s.name}>{r.employee}</td>
+                          <td className={s.name}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           <td>{r.position}</td>
                           <td>{r.division}</td>
                           <td className={s.sched}>{r.schedule}</td>
                           {r.days.map((d, i) => (
                             <td key={`${r.n}-${i}`} className={d.off ? s.off : undefined}>
-                              {d.text}
+                              <DayMarksLink employeeId={r.employeeId} date={report.days[i]?.iso || ''}>
+                                {d.text}
+                              </DayMarksLink>
                             </td>
                           ))}
                           <td>{totalText(r.total)}</td>

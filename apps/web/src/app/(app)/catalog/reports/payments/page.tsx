@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -798,7 +799,9 @@ th{background:#eef0f4}
                     ) : (
                       report.rows.map((r) => (
                         <tr key={r.employeeId}>
-                          <td className={local.name}>{r.employee}</td>
+                          <td className={local.name}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           <td className={local.name}>{r.position}</td>
                           <td className={local.name}>{r.division}</td>
                           <td className={local.num}>{money(r.cash)}</td>

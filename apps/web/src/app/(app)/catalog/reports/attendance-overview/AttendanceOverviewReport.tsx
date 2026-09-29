@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { DayMarksLink, EmployeeLink } from '@/components/reports/ReportLinks';
 import { downloadAttendanceLikeXlsx, XLSX_COLORS, type XlsxCell } from '@/lib/xlsx-download';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
@@ -39,6 +40,7 @@ type DayCol = { iso: string; day: string; weekday: string; sunday: boolean };
 type Cell = { iso: string; text: string; kind: CellKind; hours: number };
 type Row = {
   n: number;
+  employeeId?: string;
   employee: string;
   tabNumber: string;
   position: string;
@@ -1320,12 +1322,18 @@ th{background:#eef0f4}
                       viewRows.map((r) => (
                         <tr key={`${r.n}-${r.employee}`}>
                           <td>{r.n}</td>
-                          <td className={local.name}>{r.employee}</td>
+                          <td className={local.name}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           {extras.map((c) => (
                             <td key={c.key}>{colText(r, c.key)}</td>
                           ))}
                           {r.cells.map((c) => (
-                            <td key={c.iso} className={`${cellClass(c.kind)}${settings.checkMarks || settings.markSchedule || settings.infoByRows || settings.markDetails || settings.dayMarkDetails ? ` ${local.cellPre}` : ''}`}>{displayCell(c, settings)}</td>
+                            <td key={c.iso} className={`${cellClass(c.kind)}${settings.checkMarks || settings.markSchedule || settings.infoByRows || settings.markDetails || settings.dayMarkDetails ? ` ${local.cellPre}` : ''}`}>
+                              <DayMarksLink employeeId={r.employeeId} date={c.iso}>
+                                {displayCell(c, settings)}
+                              </DayMarksLink>
+                            </td>
                           ))}
                           <td className={local.sum}>{sumText(r.planned)}</td>
                           <td className={local.sum}>{sumText(r.onTime)}</td>

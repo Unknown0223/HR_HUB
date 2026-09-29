@@ -1825,6 +1825,7 @@ ORDER BY pp.month;`,
 
     type Row = {
       n: number;
+      employeeId: string;
       employee: string;
       division: string;
       position: string;
@@ -1843,6 +1844,7 @@ ORDER BY pp.month;`,
       const prev = hist.length > 1 ? hist[hist.length - 2] : null;
       rows.push({
         n: 0,
+        employeeId: e.id,
         employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
         division: e.division?.name || '',
         position: e.position?.name || '',
@@ -2476,6 +2478,7 @@ ORDER BY pp.month;`,
 
     const rows: {
       n: number;
+      employeeId: string;
       employee: string;
       division: string;
       position: string;
@@ -2518,6 +2521,7 @@ ORDER BY pp.month;`,
       }
       rows.push({
         n: 0,
+        employeeId: e.id,
         employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
         division: e.division?.name || '',
         position: e.position?.name || '',
@@ -2724,6 +2728,7 @@ ORDER BY pp.month;`,
 
     type OutRow = {
       n: number;
+      employeeId: string;
       employee: string;
       relativesCount: number | '';
       relation: string;
@@ -2773,6 +2778,7 @@ ORDER BY pp.month;`,
         n += 1;
         rows.push({
           n,
+          employeeId: emp.id,
           employee,
           relativesCount: i === 0 ? list.length : '',
           relation: relationLabel(rel.relation),
@@ -2891,6 +2897,7 @@ ORDER BY pp.month;`,
     };
 
     type OutRow = {
+      employeeId: string;
       employee: string;
       fullAccess: string;
       userAccess: string;
@@ -2932,6 +2939,7 @@ ORDER BY pp.month;`,
         .toUpperCase();
       if (!subordinates.length) {
         rows.push({
+          employeeId: e.id,
           employee: name,
           fullAccess,
           userAccess: custom.join(', '),
@@ -2942,6 +2950,7 @@ ORDER BY pp.month;`,
       }
       subordinates.forEach((div, i) => {
         rows.push({
+          employeeId: e.id,
           employee: i === 0 ? name : '',
           fullAccess: i === 0 ? fullAccess : '',
           userAccess: i === 0 ? custom.join(', ') : '',
@@ -3112,6 +3121,7 @@ ORDER BY pp.month;`,
       const otherKm = km2(otherM);
       return {
         n: i + 1,
+        employeeId: e.id,
         employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
         tabNumber: e.tabNumber || '',
         division: (e.division?.name || '').toUpperCase(),
@@ -4104,6 +4114,7 @@ ORDER BY pp.month;`,
         spStatus === 'vacant' || spStatus === 'reserved' ? 'Свободный' : 'Занятый';
       return {
         n: i + 1,
+        employeeId: e.id,
         employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
         division: e.division?.name || '',
         position: e.position?.name || '',
@@ -4314,6 +4325,7 @@ ORDER BY pp.month;`,
 
     type Row = {
       n: number;
+      employeeId: string;
       fullName: string;
       hiredAt: string;
       code: string;
@@ -4360,6 +4372,7 @@ ORDER BY pp.month;`,
       const rel = e.relatives[0];
       rows.push({
         n: 0,
+        employeeId: e.id,
         fullName: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
         hiredAt: fmtRu(e.hiredAt),
         code: hideStaffCode(e.staffPosition?.code) || hideStaffCode(e.tabNumber),
@@ -5072,6 +5085,7 @@ ORDER BY pp.month;`,
     const posNeedles = positionIds.map((x) => x.toLowerCase());
     const rows: Array<{
       n: number;
+      employeeId: string;
       employee: string;
       division: string;
       position: string;
@@ -5099,6 +5113,7 @@ ORDER BY pp.month;`,
         if (dayDate < from || dayDate > to) continue;
         rows.push({
           n: 0,
+          employeeId: line.employeeId,
           employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
           division: (e.division?.name || '').toUpperCase(),
           position: (e.position?.name || '').toUpperCase(),
@@ -5133,6 +5148,7 @@ ORDER BY pp.month;`,
             ...(employeeIds.length ? { employeeId: { in: employeeIds } } : {}),
           },
           select: {
+            employeeId: true,
             type: true,
             amount: true,
             description: true,
@@ -5163,6 +5179,7 @@ ORDER BY pp.month;`,
           const isDed = l.type === 'deduction' || l.type === 'penalty';
           rows.push({
             n: 0,
+            employeeId: l.employeeId,
             employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
             division: (e.division?.name || '').toUpperCase(),
             position: (e.position?.name || '').toUpperCase(),
@@ -5497,6 +5514,7 @@ ORDER BY pp.month;`,
     // Дополнительный: same employees, empty worked-division detail (no transfer data)
     const additional = detailed.map((r) => ({
       n: r.n,
+      employeeId: r.employeeId,
       workedDivision: '',
       employee: r.employee,
       position: r.position,
@@ -6675,6 +6693,7 @@ ORDER BY pp.month;`,
 
     const byEmpLocation = byEmployee.map((r, i) => ({
       n: i + 1,
+      employeeId: r.employeeId,
       location: r.location,
       employee: r.employee,
       division: r.division,
@@ -8810,6 +8829,7 @@ ORDER BY pp.month;`,
         : firstMark?.device?.name || '';
       return {
         n: i + 1,
+        employeeId: e.id,
         employee: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ').toUpperCase(),
         tabNumber: e.tabNumber || '',
         division: (e.division?.name || '').toUpperCase(),
@@ -9312,6 +9332,7 @@ ORDER BY pp.month;`,
       const fineTime = round2(fineLateH + fineEarlyH + fineAbsentH);
       return {
         n: i + 1,
+        employeeId: e.id,
         employee: name,
         tabNumber: e.tabNumber,
         position: e.position?.name || '',

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx, XLSX_COLORS } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -939,7 +940,9 @@ th{background:#eef0f4}
                                   </Link>
                                 </td>
                                 <td rowSpan={lines.length}>{r.tabNumber}</td>
-                                <td rowSpan={lines.length} className={local.name}>{r.employee}</td>
+                                <td rowSpan={lines.length} className={local.name}>
+                                  <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                                </td>
                                 <td rowSpan={lines.length} className={night ? local.night : undefined}>{r.shiftType}</td>
                                 <td rowSpan={lines.length} className={night ? local.nightPlan : undefined}>{r.planIn}</td>
                                 <td rowSpan={lines.length} className={night ? local.nightPlan : undefined}>{r.planOut}</td>

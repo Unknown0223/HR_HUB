@@ -2157,7 +2157,7 @@ export class CatalogService {
         const flatRows = rawRows.map((r) => flattenExportRow(r));
         const columns =
           flatRows.length > 0
-            ? Object.keys(flatRows[0]).slice(0, 24)
+            ? Object.keys(flatRows[0]).filter((k) => k !== 'employeeId').slice(0, 24)
             : ['empty'];
         const title =
           data && typeof data === 'object' && 'title' in (data as object)

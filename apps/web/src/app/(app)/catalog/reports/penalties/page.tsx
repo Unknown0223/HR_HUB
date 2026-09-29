@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink, DayMarksLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -930,7 +931,9 @@ th{background:#eef0f4}
                     ) : (
                       report.rows.map((r) => (
                         <tr key={r.employeeId}>
-                          <td className={`${local.name} ${local.sticky}`}>{r.employee}</td>
+                          <td className={`${local.name} ${local.sticky}`}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           <td className={local.name}>{r.position}</td>
                           <td className={local.name}>{r.division}</td>
                           <td className={local.name}>{r.schedule}</td>
@@ -939,7 +942,9 @@ th{background:#eef0f4}
                               key={`${r.employeeId}-${report.days[i]?.iso || i}`}
                               className={`${local.num}${report.days[i]?.weekend ? ` ${local.weekend}` : ''}`}
                             >
-                              {money(a)}
+                              <DayMarksLink employeeId={r.employeeId} date={report.days[i]?.iso || ''}>
+                                {money(a)}
+                              </DayMarksLink>
                             </td>
                           ))}
                           <td className={local.num}>{money(r.total)}</td>

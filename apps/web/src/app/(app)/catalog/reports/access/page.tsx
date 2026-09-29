@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx, type XlsxCell } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -21,6 +22,7 @@ type Opt = {
 };
 type TreeNode = { id: string; name: string; children?: TreeNode[] };
 type Row = {
+  employeeId?: string;
   employee: string;
   fullAccess: string;
   userAccess: string;
@@ -694,7 +696,9 @@ export default function AccessReportPage() {
                     ) : (
                       report.rows.map((r, i) => (
                         <tr key={`${i}-${r.employee}-${r.subordinate}`} className={i % 2 ? yesNo.zebra : undefined}>
-                          <td className={yesNo.rowName}>{r.employee}</td>
+                          <td className={yesNo.rowName}>
+                            {r.employee ? <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink> : null}
+                          </td>
                           <td className={ynClass(r.fullAccess)}>{r.fullAccess}</td>
                           <td>{r.userAccess}</td>
                           <td>{r.subordinate}</td>

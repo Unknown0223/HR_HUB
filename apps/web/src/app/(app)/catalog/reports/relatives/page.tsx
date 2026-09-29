@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -22,6 +23,7 @@ type Opt = {
 type TreeNode = { id: string; name: string; children?: TreeNode[] };
 type Row = {
   n: number;
+  employeeId?: string;
   employee: string;
   relativesCount: number | '';
   relation: string;
@@ -722,7 +724,9 @@ export default function RelativesReportPage() {
                       report.rows.map((r, i) => (
                         <tr key={`${r.n}-${r.relativeName}`} className={i % 2 ? s.zebra : undefined}>
                           <td className={s.num}>{r.n}</td>
-                          <td className={s.rowName}>{r.employee}</td>
+                          <td className={s.rowName}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           <td>{r.relativesCount}</td>
                           <td>{r.relation}</td>
                           <td className={s.rowName}>{r.relativeName}</td>

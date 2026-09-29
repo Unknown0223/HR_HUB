@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -35,6 +36,7 @@ type Opt = {
 type TreeNode = { id: string; name: string; children?: TreeNode[] };
 type Row = {
   n: number;
+  employeeId?: string;
   employee: string;
   divisionGroup: string;
   divisionCode: string;
@@ -1139,7 +1141,11 @@ th{background:#eef0f4}
                         <tr key={String(r.n ?? idx)}>
                           {activeCols.map((c, i) => (
                             <td key={`${c.key}-${i}`} className={c.name ? s.name : c.money ? s.num : undefined}>
-                              {cellValue(r, c)}
+                              {c.key === 'employee' ? (
+                                <EmployeeLink employeeId={r.employeeId as string | undefined}>{cellValue(r, c)}</EmployeeLink>
+                              ) : (
+                                cellValue(r, c)
+                              )}
                             </td>
                           ))}
                         </tr>

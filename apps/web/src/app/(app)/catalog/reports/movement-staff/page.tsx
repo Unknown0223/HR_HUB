@@ -6,6 +6,7 @@ import { pickSearchText, toPickItem, type EmployeePickItem } from '@/components/
 import pick from '@/components/employee-pick.module.css';
 import { apiFetch } from '@/lib/api';
 import { downloadSectionedXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -1158,7 +1159,9 @@ export default function MovementStaffReportPage() {
                             <td>{r.position}</td>
                             <td>{r.positionGroup}</td>
                             <td>{r.slot}</td>
-                            <td>{r.employee}</td>
+                            <td>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td>{fmtRu(r.date)}</td>
                             <td>{extraValue(sec, r)}</td>
                           </tr>

@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadAttendanceLikeXlsx, type XlsxCell } from '@/lib/xlsx-download';
+import { EmployeeLink, DayMarksLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -29,6 +30,7 @@ type Settings = {
 };
 type Row = {
   n: number;
+  employeeId?: string;
   employee: string;
   tabNumber: string;
   division: string;
@@ -1024,7 +1026,9 @@ th{background:#eef0f4}
                       report.rows.map((r) => (
                         <tr key={`${r.n}-${r.employee}`}>
                           <td>{r.n}</td>
-                          <td className={local.name}>{r.employee}</td>
+                          <td className={local.name}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           {extras.map((c) => (
                             <td key={c.key}>{r[c.key] || ''}</td>
                           ))}
@@ -1036,8 +1040,16 @@ th{background:#eef0f4}
                           <td>{hours(r.worked)}</td>
                           <td>{r.marksPlan}</td>
                           <td>{r.marksFact}</td>
-                          <td>{r.markStart}</td>
-                          <td>{r.markEnd}</td>
+                          <td>
+                            <DayMarksLink employeeId={r.employeeId} date={report.date}>
+                              {r.markStart}
+                            </DayMarksLink>
+                          </td>
+                          <td>
+                            <DayMarksLink employeeId={r.employeeId} date={report.date}>
+                              {r.markEnd}
+                            </DayMarksLink>
+                          </td>
                           <td className={local.name}>{r.markedBy}</td>
                           <td>{r.markLocation}</td>
                         </tr>

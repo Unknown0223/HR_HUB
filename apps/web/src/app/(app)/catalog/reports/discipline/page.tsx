@@ -12,6 +12,7 @@ import {
   type DisciplineRow,
   type DisciplineTab,
 } from '@/components/DisciplineReportSheet';
+import { EmployeeLink, DayMarksLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -1227,7 +1228,7 @@ ${rows}
               <div className={arena.viewMeta}>
                 <span className={arena.metaPill}>
                   <i className="fas fa-user" aria-hidden />
-                  {detail.employee.fullName}
+                  <EmployeeLink employeeId={detail.employee.id}>{detail.employee.fullName}</EmployeeLink>
                 </span>
                 <span className={arena.metaPill}>
                   <i className="fas fa-calendar-day" aria-hidden />
@@ -1265,7 +1266,11 @@ ${rows}
                     {detail.days.map((r) =>
                       r.dayOff ? (
                         <tr key={r.iso} className={local.off}>
-                          <td>{r.date}</td>
+                          <td>
+                            <DayMarksLink employeeId={detail.employee.id} date={r.iso}>
+                              {r.date}
+                            </DayMarksLink>
+                          </td>
                           <td>{r.weekday}</td>
                           <td colSpan={6}>Выходной день</td>
                           <td />
@@ -1276,7 +1281,11 @@ ${rows}
                         </tr>
                       ) : (
                         <tr key={r.iso}>
-                          <td>{r.date}</td>
+                          <td>
+                            <DayMarksLink employeeId={detail.employee.id} date={r.iso}>
+                              {r.date}
+                            </DayMarksLink>
+                          </td>
                           <td>{r.weekday}</td>
                           <td>{r.planIn}</td>
                           <td>{r.planOut}</td>

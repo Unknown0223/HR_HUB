@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx, type XlsxCell } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -24,6 +25,7 @@ type Opt = {
 type TreeNode = { id: string; name: string; children?: TreeNode[] };
 type Row = {
   n: number;
+  employeeId?: string;
   tabNumber: string;
   employee: string;
   pinfl: string;
@@ -717,7 +719,7 @@ export default function PayrollBookReportPage() {
           const text = typeof v === 'number' && i >= 9 && i !== 11 && i !== 12 ? money(v) : String(v ?? '');
           return (
             <td key={i} className={cls}>
-              {text}
+              {i === 2 ? <EmployeeLink employeeId={r.employeeId}>{text}</EmployeeLink> : text}
             </td>
           );
         })}

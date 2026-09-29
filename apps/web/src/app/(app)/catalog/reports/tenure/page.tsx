@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -22,6 +23,7 @@ type Opt = {
 type TreeNode = { id: string; name: string; children?: TreeNode[] };
 type Row = {
   n: number;
+  employeeId?: string;
   employee: string;
   division: string;
   position: string;
@@ -718,7 +720,9 @@ export default function TenureReportPage() {
                       report.rows.map((r, i) => (
                         <tr key={`${r.n}-${r.employee}`} className={i % 2 ? s.zebra : undefined}>
                           <td className={s.num}>{r.n}</td>
-                          <td className={s.rowName}>{r.employee}</td>
+                          <td className={s.rowName}>
+                            <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                          </td>
                           <td>{r.division}</td>
                           <td>{r.position}</td>
                           <td>{r.tenure}</td>

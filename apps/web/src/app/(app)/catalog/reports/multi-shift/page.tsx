@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -952,7 +953,9 @@ th{background:#eef0f4}
                               </Link>
                             </td>
                             <td>{r.tabNumber}</td>
-                            <td className={local.name}>{r.employee}</td>
+                            <td className={local.name}>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td className={r.night ? local.night : undefined}>{r.shift}</td>
                             <td className={r.night ? local.nightPlan : undefined}>{r.planIn}</td>
                             <td className={r.night ? local.nightPlan : undefined}>{r.planOut}</td>
@@ -988,7 +991,9 @@ th{background:#eef0f4}
                           <tr key={r.employeeId}>
                             <td>{r.n}</td>
                             <td>{r.tabNumber}</td>
-                            <td className={local.name}>{r.employee}</td>
+                            <td className={local.name}>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td className={local.name}>{r.schedule}</td>
                             <td>{r.shifts}</td>
                             <td>{r.plan}</td>

@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink, DayMarksLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -18,6 +19,7 @@ type Settings = { showUserPlanFact: boolean };
 type DayMeta = { iso: string; dd: string; weekday: string; weekend: boolean };
 type DetailedRow = {
   n: number;
+  employeeId?: string;
   division: string;
   employee: string;
   position: string;
@@ -33,6 +35,7 @@ type DetailedRow = {
 };
 type AdditionalRow = {
   n: number;
+  employeeId?: string;
   workedDivision: string;
   employee: string;
   position: string;
@@ -1200,19 +1203,25 @@ th{background:#eef0f4}
                           <tr key={`det-${r.n}-${r.employee}`}>
                             <td>{r.n}</td>
                             <td className={local.name}>{r.division}</td>
-                            <td className={local.name}>{r.employee}</td>
+                            <td className={local.name}>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td className={local.name}>{r.position}</td>
                             <td className={local.num}>{money(r.salary)}</td>
                             {(r.hours || []).map((h, i) => (
                               <td key={`h-${r.n}-${i}`} className={`${local.num}${report.days[i]?.weekend ? ` ${local.weekend}` : ''}`}>
-                                {hours(h)}
+                                <DayMarksLink employeeId={r.employeeId} date={report.days[i]?.iso || ''}>
+                                  {hours(h)}
+                                </DayMarksLink>
                               </td>
                             ))}
                             <td className={local.num}>{hours(r.totalHours)}</td>
                             <td className={local.num}>{money(r.accrued)}</td>
                             {(r.extraHours || []).map((h, i) => (
                               <td key={`eh-${r.n}-${i}`} className={`${local.num}${report.days[i]?.weekend ? ` ${local.weekend}` : ''}`}>
-                                {hours(h)}
+                                <DayMarksLink employeeId={r.employeeId} date={report.days[i]?.iso || ''}>
+                                  {hours(h)}
+                                </DayMarksLink>
                               </td>
                             ))}
                             <td className={local.num}>{hours(r.extraTotalHours)}</td>
@@ -1265,7 +1274,9 @@ th{background:#eef0f4}
                           <tr key={`add-${r.n}-${r.employee}`}>
                             <td>{r.n}</td>
                             <td className={local.name}>{r.workedDivision}</td>
-                            <td className={local.name}>{r.employee}</td>
+                            <td className={local.name}>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td className={local.name}>{r.position}</td>
                             <td className={local.num}>{money(r.salary)}</td>
                             <td className={local.name}>{r.homeDivision}</td>

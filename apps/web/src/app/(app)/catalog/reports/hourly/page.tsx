@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx, XLSX_COLORS, type XlsxCell } from '@/lib/xlsx-download';
+import { EmployeeLink, DayMarksLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -989,7 +990,7 @@ th{background:#eef0f4}
               <div className={arena.viewMeta}>
                 <span className={arena.metaPill}>
                   <i className="fas fa-user" aria-hidden />
-                  {selectedRow.employee}
+                  <EmployeeLink employeeId={selectedRow.employeeId}>{selectedRow.employee}</EmployeeLink>
                 </span>
                 <span className={arena.metaPill}>
                   <i className="fas fa-calendar-day" aria-hidden />
@@ -1109,7 +1110,9 @@ th{background:#eef0f4}
                           ))}
                           {report.days.map((d, i) => (
                             <td key={d.iso} className={d.weekend ? local.weekend : undefined}>
-                              {fmtHours(r.hours[i], settings)}
+                              <DayMarksLink employeeId={r.employeeId} date={d.iso}>
+                                {fmtHours(r.hours[i], settings)}
+                              </DayMarksLink>
                             </td>
                           ))}
                           <td className={local.num}>{fmtHours(r.total, settings)}</td>

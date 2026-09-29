@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -1028,7 +1029,7 @@ th{background:#eef0f4}
               <div className={arena.viewMeta}>
                 <span className={arena.metaPill}>
                   <i className="fas fa-user" aria-hidden />
-                  {selectedRow.employee}
+                  <EmployeeLink employeeId={selectedRow.employeeId}>{selectedRow.employee}</EmployeeLink>
                 </span>
                 <span className={arena.metaPill}>
                   <i className="fas fa-calendar-day" aria-hidden />

@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
+import { EmployeeLink } from '@/components/reports/ReportLinks';
 import shared from '../../../../page-shared.module.css';
 import arena from '../report-arena.module.css';
 import extra from '../movement-divisions/page.module.css';
@@ -29,6 +30,7 @@ type Settings = {
 };
 type EmpRow = {
   n: number;
+  employeeId?: string;
   employee: string;
   division: string;
   position: string;
@@ -39,6 +41,7 @@ type EmpRow = {
 };
 type EmpLocRow = {
   n: number;
+  employeeId?: string;
   location: string;
   employee: string;
   division: string;
@@ -1236,7 +1239,9 @@ tbody tr:nth-child(even){background:#fafbfc}
                         report.byEmployee.map((r) => (
                           <tr key={`emp-${r.n}-${r.employee}`}>
                             <td>{r.n}</td>
-                            <td className={local.name}>{r.employee}</td>
+                            <td className={local.name}>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td className={local.name}>{r.division}</td>
                             <td className={local.name}>{r.position}</td>
                             <td className={local.name}>{r.grade}</td>
@@ -1278,7 +1283,9 @@ tbody tr:nth-child(even){background:#fafbfc}
                           <tr key={`el-${r.n}-${r.employee}-${r.location}`}>
                             <td>{r.n}</td>
                             <td className={local.name}>{r.location}</td>
-                            <td className={local.name}>{r.employee}</td>
+                            <td className={local.name}>
+                              <EmployeeLink employeeId={r.employeeId}>{r.employee}</EmployeeLink>
+                            </td>
                             <td className={local.name}>{r.division}</td>
                             <td>{r.hiredAt || ''}</td>
                             <td className={local.name}>{r.position}</td>
