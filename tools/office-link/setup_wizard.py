@@ -16,7 +16,7 @@ from tkinter import ttk
 
 APP_NAME = "HR HUB Link"
 APP_PUBLISHER = "HR HUB"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 APP_GUID = "{8F3C2A1B-9D4E-4B6A-A7C1-HRHUB-LINK-01}"
 DEFAULT_DIR = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "HRHUB-Link"
 
@@ -31,10 +31,7 @@ def _bundle_root() -> Path:
         return Path(sys.executable).resolve().parent
     here = Path(__file__).resolve().parent
     rel = here / "release" / "HRHUB-Link"
-    if rel.is_dir():
-        return rel
-    dist = here / "dist" / "HRHUB-Qurilma"
-    return dist if dist.is_dir() else here
+    return rel if rel.is_dir() else here
 
 
 def _setup_dir() -> Path:
@@ -58,65 +55,34 @@ def _read_license() -> str:
     )
 
 
-def _find_exe(dest: Path) -> Path | None:
-    for cand in (dest / "ilova" / "HRHUB-Qurilma.exe", dest / "HRHUB-Qurilma.exe"):
-        if cand.is_file():
-            return cand
-    return None
+def _find_pythonw(dest: Path) -> Path | None:
+    """Bundled PSF-signed interpreter — Smart App Control allows it, unlike unsigned EXEs."""
+    cand = dest / "runtime" / "python" / "pythonw.exe"
+    return cand if cand.is_file() else None
 
 
-def _write_boshlash(dest: Path, exe: Path | None) -> Path:
-    """
-    Start Menu / Desktop shortcut target.
-
-    Smart App Control blocks unsigned PyInstaller EXEs; prefer system/runtime
-    pythonw + office_link_app.py, fall back to EXE only if no Python.
-    """
-    path = dest / "BOSHLASH.bat"
-    exe_rel = ""
-    if exe is not None:
-        try:
-            exe_rel = str(exe.relative_to(dest)).replace("/", "\\")
-        except ValueError:
-            exe_rel = "ilova\\HRHUB-Qurilma.exe"
-    lines = [
-        "@echo off",
-        "REM HR HUB Link — SAC imzosiz EXE ni bloklaydi; avvalo pythonw.",
-        'cd /d "%~dp0"',
-        'if exist "%~dp0runtime\\python\\pythonw.exe" if exist "%~dp0office_link_app.py" (',
-        '  start "" /D "%~dp0" "%~dp0runtime\\python\\pythonw.exe" "%~dp0office_link_app.py"',
-        "  exit /b 0",
-        ")",
-        "where pythonw >nul 2>&1",
-        "if %ERRORLEVEL%==0 if exist \"%~dp0office_link_app.py\" (",
-        '  start "" /D "%~dp0" pythonw "%~dp0office_link_app.py"',
-        "  exit /b 0",
-        ")",
-    ]
-    if exe_rel:
-        work = str(Path(exe_rel).parent).replace("/", "\\")
-        if work in (".", ""):
-            work = "."
-        lines += [
-            f'if exist "%~dp0{exe_rel}" (',
-            f'  start "" /D "%~dp0{work}" "%~dp0{exe_rel}"',
-            "  exit /b 0",
-            ")",
-        ]
-    lines += [
-        "echo.",
-        "echo [XATO] pythonw yoki HRHUB-Qurilma.exe topilmadi.",
-        "echo Smart App Control EXE ni bloklasa: Python o'rnating yoki SAC ni o'chiring.",
-        "echo.",
-        "pause",
-        "exit /b 1",
-        "",
-    ]
-    path.write_text("\r\n".join(lines), encoding="utf-8")
-    return path
+def _stop_ps(dest: Path) -> str:
+    """PowerShell one-liner that kills app processes running from ``dest`` (files stay locked otherwise)."""
+    return (
+        "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '"
+        + str(dest).replace("'", "''")
+        + "\\*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+    )
 
 
-def _write_uninstall_script(dest: Path, exe: Path) -> Path:
+def _stop_running(dest: Path) -> None:
+    import subprocess
+
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", _stop_ps(dest)],
+        check=False,
+        capture_output=True,
+        creationflags=0x08000000,
+        timeout=30,
+    )
+
+
+def _write_uninstall_script(dest: Path) -> Path:
     script = dest / "Uninstall-HRHUB-Link.bat"
     # Delayed delete so the bat can exit before its own folder is removed.
     script.write_text(
@@ -127,7 +93,9 @@ def _write_uninstall_script(dest: Path, exe: Path) -> Path:
                 f'title {APP_NAME} — o‘chirish',
                 "echo HR HUB Link o‘chirilmoqda...",
                 f'if exist "{dest}\\uninstall-service.bat" call "{dest}\\uninstall-service.bat"',
+                r'schtasks /Delete /TN "HRHUB-OfficeLink" /F >nul 2>&1',
                 r'schtasks /Delete /TN "HRHUB-OfficeLink-Tunnel" /F >nul 2>&1',
+                f'powershell -NoProfile -Command "{_stop_ps(dest)}" >nul 2>&1',
                 rf'del /F /Q "%ProgramData%\Microsoft\Windows\Start Menu\Programs\{APP_NAME}.lnk" >nul 2>&1',
                 rf'del /F /Q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\{APP_NAME}.lnk" >nul 2>&1',
                 rf'del /F /Q "%USERPROFILE%\Desktop\{APP_NAME}.lnk" >nul 2>&1',
@@ -147,11 +115,9 @@ def _write_uninstall_script(dest: Path, exe: Path) -> Path:
     return script
 
 
-def _register_apps_list(dest: Path, exe: Path, uninstall: Path) -> None:
-    icon = dest / "ilova" / "hrhub-link.ico"
-    if not icon.is_file():
-        icon = dest / "hrhub-link.ico"
-    display_icon = f"{exe},0" if not icon.is_file() else str(icon)
+def _register_apps_list(dest: Path, pythonw: Path, uninstall: Path) -> None:
+    icon = dest / "hrhub-link.ico"
+    display_icon = str(icon) if icon.is_file() else f"{pythonw},0"
     estimated = 0
     try:
         for p in dest.rglob("*"):
@@ -188,17 +154,17 @@ def _register_apps_list(dest: Path, exe: Path, uninstall: Path) -> None:
             continue
 
 
-def _shortcuts(dest: Path, target: Path, desktop: bool) -> None:
+def _shortcuts(dest: Path, target: Path, args: str, desktop: bool) -> None:
     def write_lnk(path: Path, workdir: Path) -> None:
-        icon = dest / "ilova" / "hrhub-link.ico"
-        if not icon.is_file():
-            icon = dest / "hrhub-link.ico"
+        icon = dest / "hrhub-link.ico"
         icon_line = f'l.IconLocation="{icon}"\n' if icon.is_file() else ""
+        vbs_args = args.replace('"', '""')
         vbs = dest / "_mkshortcut.vbs"
         vbs.write_text(
             "Set s=CreateObject(\"WScript.Shell\")\n"
             f'Set l=s.CreateShortcut("{path}")\n'
             f'l.TargetPath="{target}"\n'
+            f'l.Arguments="{vbs_args}"\n'
             f'l.WorkingDirectory="{workdir}"\n'
             f'l.Description="{APP_NAME}"\n'
             f"{icon_line}"
@@ -217,20 +183,20 @@ def _shortcuts(dest: Path, target: Path, desktop: bool) -> None:
         r"Microsoft\Windows\Start Menu\Programs"
     )
     programs.mkdir(parents=True, exist_ok=True)
-    write_lnk(programs / f"{APP_NAME}.lnk", target.parent)
+    write_lnk(programs / f"{APP_NAME}.lnk", dest)
     user_programs = (
         Path(os.environ["APPDATA"]) / r"Microsoft\Windows\Start Menu\Programs"
     )
     try:
         user_programs.mkdir(parents=True, exist_ok=True)
-        write_lnk(user_programs / f"{APP_NAME}.lnk", target.parent)
+        write_lnk(user_programs / f"{APP_NAME}.lnk", dest)
     except OSError:
         pass
     if desktop:
         # One desktop icon only (user Desktop) — Public\Desktop duplicates the icon.
         desk = Path.home() / "Desktop"
         if desk.is_dir():
-            write_lnk(desk / f"{APP_NAME}.lnk", target.parent)
+            write_lnk(desk / f"{APP_NAME}.lnk", dest)
         # Clean leftover Public shortcut from older installers.
         try:
             pub = Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop" / f"{APP_NAME}.lnk"
@@ -341,6 +307,10 @@ class SetupWizard(tk.Tk):
             self.status.set("Nusxalanmoqda…")
             self.update_idletasks()
             dest.mkdir(parents=True, exist_ok=True)
+            _stop_running(dest)
+            # Leftovers of the old frozen-EXE layout (data\ is kept).
+            shutil.rmtree(dest / "ilova", ignore_errors=True)
+            (dest / "HRHUB-Qurilma.bat").unlink(missing_ok=True)
             for item in src.iterdir():
                 target = dest / item.name
                 if item.is_dir():
@@ -355,28 +325,26 @@ class SetupWizard(tk.Tk):
                 side = setup_dir / name
                 if side.is_file():
                     shutil.copy2(side, dest / name)
-                    ilova = dest / "ilova"
-                    if ilova.is_dir() and name != "OQISH.txt":
-                        shutil.copy2(side, ilova / name)
 
-            exe = _find_exe(dest)
-            if exe is None:
-                raise FileNotFoundError("HRHUB-Qurilma.exe topilmadi")
+            pythonw = _find_pythonw(dest)
+            if pythonw is None:
+                raise FileNotFoundError("runtime\\python\\pythonw.exe topilmadi — paket to‘liq emas")
+            app = dest / "office_link_app.py"
 
-            boshlash = _write_boshlash(dest, exe)
-            uninstall = _write_uninstall_script(dest, exe)
-            _register_apps_list(dest, exe, uninstall)
-            # Shortcut → BOSHLASH.bat (Python first); never point .lnk at unsigned EXE.
-            _shortcuts(dest, boshlash, self.desktop.get())
+            uninstall = _write_uninstall_script(dest)
+            _register_apps_list(dest, pythonw, uninstall)
+            _shortcuts(dest, pythonw, f'"{app}"', self.desktop.get())
             self.status.set("Tayyor.")
             messagebox.showinfo(
                 APP_NAME,
                 f"O‘rnatildi:\n{dest}\n\n"
                 "Ilova Start Menu va Windows «Ilovalar» ro‘yxatida ko‘rinadi.\n"
-                "Smart App Control uchun ochish Python orqali (BOSHLASH.bat).",
+                "Qo‘shimcha dastur (Python va h.k.) kerak emas — hammasi ilova ichida.",
             )
             if self.launch.get():
-                os.startfile(str(boshlash))  # noqa: S606
+                import subprocess
+
+                subprocess.Popen([str(pythonw), str(app)], cwd=str(dest), close_fds=True)
             self.destroy()
         except Exception as e:
             messagebox.showerror(APP_NAME, f"O‘rnatish xatosi:\n{e}")

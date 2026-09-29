@@ -112,12 +112,23 @@ def _popen_hidden(
     )
 
 
+def bundled_python(root: Path | None = None) -> Path | None:
+    """Python shipped inside the package (build_bundle.py); read-only install dirs are fine."""
+    py = (root or find_root()) / "runtime" / "python" / "python.exe"
+    return py if py.is_file() else None
+
+
 def portable_python(root: Path | None = None) -> Path:
-    return runtime_dir(root) / "python" / "python.exe"
+    return bundled_python(root) or runtime_dir(root) / "python" / "python.exe"
+
+
+def portable_pythonw(root: Path | None = None) -> Path:
+    return portable_python(root).with_name("pythonw.exe")
 
 
 def cloudflared_exe(root: Path | None = None) -> Path:
-    return runtime_dir(root) / "cloudflared.exe"
+    bundled = (root or find_root()) / "runtime" / "cloudflared.exe"
+    return bundled if bundled.is_file() else runtime_dir(root) / "cloudflared.exe"
 
 
 def _copy_gw_tree(src: Path, dest: Path, cb: StatusFn | None = None) -> None:
@@ -288,6 +299,10 @@ def install_gw_deps(root: Path | None = None, cb: StatusFn | None = None) -> Non
     if _gw_deps_ready(py):
         _status(cb, "Kutubxonalar tayyor — o‘tkazib yuborildi")
         return
+    if bundled_python(root) is not None:
+        raise RuntimeError(
+            "Ilova ichidagi kutubxonalar shikastlangan. HR HUB Link ni qayta o‘rnating."
+        )
     _status(cb, "Kerakli kutubxonalar o‘rnatilmoqda… (1–2 daqiqa)")
     try:
         r = _run_hidden(

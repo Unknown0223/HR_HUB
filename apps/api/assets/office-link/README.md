@@ -2,8 +2,8 @@
 
 | File | Purpose |
 |------|---------|
-| `HRHUB-Link-portable.zip` | Generic Windows package (EXE + scripts) |
-| `HRHUB-Link-Setup.exe` | Windows installer |
+| `HRHUB-Link-portable.zip` | Self-contained Windows package (bundled Python + libraries, gw, cloudflared) |
+| `HRHUB-Link-Setup.exe` | Windows installer (same package + EULA, Start Menu, Apps list) |
 | `HRHUB-Link-Android.apk` | Android office-link app |
 
 API:
@@ -13,14 +13,19 @@ API:
 Windows tunnel: GUI «Internet tunnel» card + `service_worker.py` auto-heal
 restart cloudflared and re-announce when quick tunnels die.
 
-**Smart App Control:** unsigned `HRHUB-Qurilma.exe` may be blocked
-(“publisher could not be verified”). Prefer Web Setup/ZIP, or run
-`BOSHLASH.bat` (pythonw), or turn Smart App Control **Off** on that PC.
+**Nothing to install on the office PC.** The package ships the python.org
+embeddable runtime (`runtime\python`, signed by the Python Software Foundation,
+so Smart App Control allows it) with every library preinstalled. `BOSHLASH.bat`
+and the installer shortcuts start `runtime\python\pythonw.exe office_link_app.py`.
+The UI needs Microsoft Edge WebView2 Runtime (built into Windows 10/11).
+
+**Smart App Control:** the unsigned `HRHUB-Link-Setup.exe` may still be blocked
+on PCs with SAC on — use the portable ZIP there (unpack → `BOSHLASH.bat`).
 
 Rebuild Windows:
 ```
-tools\office-link\BUILD-EXE.bat
 set NOPAUSE=1 && tools\office-link\pack-release.bat
+set NOPAUSE=1 && tools\office-link\pack-setup.bat
 copy tools\office-link\release\HRHUB-Link-portable.zip apps\api\assets\office-link\
 ```
 

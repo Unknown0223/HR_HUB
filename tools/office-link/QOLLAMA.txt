@@ -8,10 +8,10 @@ ADMIN (5 qadam)
 3) Ofis PCga dasturni bering:
      • tayyor paket: tools/office-link/release/HRHUB-Link/
        (yoki release/HRHUB-Link-portable.zip)
-     • qayta yig‘ish: BUILD-EXE.bat → pack-release.bat
-     • agar «Скачать .exe» bor → yuklab oling
-     • Python bilan: BOSHLASH.bat (manba papkada)
-     • eski ZIP: pack-installer.bat / Setup: INSTALL.iss
+     • qayta yig‘ish: pack-release.bat → pack-setup.bat
+     • Web dan HRHUB-Link-Setup.exe yoki portable ZIP yuklab oling
+     • Ofis PCga Python yoki boshqa dastur o‘rnatish SHART EMAS —
+       hammasi paket ichida (runtime\python, gw, cloudflared)
 4) Env (Railway): DEVICE_LINK_KEY = PUNCH_INGEST_API_KEY
    (ixtiyoriy: DEVICE_CREDENTIAL_VAULT_KEY, OFFICE_LINK_DOWNLOAD_URL)
 5) Sessiyalar jadvalida progressni kuzating (har 2 s)
@@ -19,7 +19,7 @@ ADMIN (5 qadam)
 OPERATOR (7 qadam)
 ------------------
 1) PC va Face ID terminal BIR tarmoqda (WiFi yoki LAN)
-2) BOSHLASH.bat yoki HRHUB-Qurilma.exe ni oching (Tkinter — Windows ilova)
+2) «HR HUB Link» yorlig‘i yoki BOSHLASH.bat ni oching
 3) Bo‘lim «1. Подключение»: pairing token → «Saqlash»
 4) Lokatsiyani tanlang (majburiy)
 5) Qurilma topilmasa IP yozing → «Qidirish»
@@ -77,13 +77,11 @@ Tez-tez uchraydigan xatolar
 • Otmetka kelmaydi         → terminal HttpHost yoki ofis PC GW+tunnel yoqilgan
   bo‘lishi kerak. data\service_status.json da tunnelMode=off bo‘lsa —
   Link ochib tunnelni tiklang (trycloudflare 429 bo‘lsa 10–15 daqiqa kutib).
-• Windows «Smart App Control» EXE ni bloklaydi (nashriyot tekshirilmadi):
-  1) Web dan HRHUB-Link-Setup.exe / portable ZIP yuklab oling
-  2) yoki manbadan: BOSHLASH.bat (pythonw — EXE emas)
-  3) yoki Sozlamalar → Maxfiylik va xavfsizlik → Windows xavfsizligi
-     → Ilova va brauzer nazorati → Smart App Control → O‘chirish
-     (Evaluation/On dan Off — qaytarib bo‘lmaydi; faqat ofis PCda).
-  Kod imzosi (Authenticode) bo‘lmasa SAC noma’lum nashriyotni bloklaydi.
+• Windows «Smart App Control» Setup.exe ni bloklaydi (nashriyot tekshirilmadi):
+  portable ZIP ni yuklab oling → oching → BOSHLASH.bat. Ilova o‘zi imzolangan
+  Python (Python Software Foundation) orqali ishlaydi — SAC uni bloklamaydi.
+• Oyna ochilmadi (WebView2) → Microsoft Edge WebView2 Runtime o‘rnatilganini
+  tekshiring (Windows 10/11 da odatda bor).
 
 Muhim (parol / guvoh)
 ---------------------

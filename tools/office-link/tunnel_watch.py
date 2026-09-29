@@ -34,6 +34,7 @@ from runtime_setup import (
     ServiceBundle,
     ensure_runtime,
     ensure_tunnel_tools,
+    portable_pythonw,
     start_gateway,
     start_tunnel,
 )
@@ -487,6 +488,18 @@ def restore_tunnel(
     return bundle, url
 
 
+def _worker_pythonw(root: Path) -> str:
+    """Bundled runtime first — the package must not depend on a system Python."""
+    for cand in (
+        portable_pythonw(root),
+        user_data_root() / "runtime" / "python" / "pythonw.exe",
+        Path(sys.executable).with_name("pythonw.exe"),
+    ):
+        if cand.is_file():
+            return str(cand)
+    return sys.executable
+
+
 def install_startup_task(root: Path | None = None) -> bool:
     """Register ONLOGON scheduled task so tunnel stays up without opening the GUI.
 
@@ -501,14 +514,7 @@ def install_startup_task(root: Path | None = None) -> bool:
     if not worker.is_file():
         return False
 
-    py = sys.executable
-    portable = runtime_dir(root) / "python" / "pythonw.exe"
-    if portable.is_file():
-        py = str(portable)
-    elif Path(sys.executable).with_name("pythonw.exe").is_file():
-        py = str(Path(sys.executable).with_name("pythonw.exe"))
-
-    tr = f'"{py}" "{worker}"'
+    tr = f'"{_worker_pythonw(root)}" "{worker}"'
     cmd = [
         "schtasks",
         "/Create",
@@ -528,6 +534,8 @@ def install_startup_task(root: Path | None = None) -> bool:
             cwd=str(root),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             creationflags=CREATE_NO_WINDOW,
         )
         return proc.returncode == 0
@@ -546,10 +554,16 @@ def _worker_already_running(*script_names: str) -> bool:
             f"Where-Object {{ $_.CommandLine -match '{pattern}' }} | "
             "Measure-Object | Select-Object -ExpandProperty Count"
         )
+        powershell = (
+            Path(os.environ.get("SystemRoot", r"C:\Windows"))
+            / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        )
         proc = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps],
+            [str(powershell) if powershell.is_file() else "powershell", "-NoProfile", "-Command", ps],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             creationflags=CREATE_NO_WINDOW,
             timeout=8,
         )
@@ -578,16 +592,7 @@ def spawn_detached_worker(root: Path | None = None) -> bool:
     if _worker_already_running("service_worker.py", "face_worker.py"):
         return True
 
-    py = sys.executable
-    portable = runtime_dir(root) / "python" / "pythonw.exe"
-    if not portable.is_file():
-        portable = user_data_root() / "runtime" / "python" / "pythonw.exe"
-    if portable.is_file():
-        py = str(portable)
-    elif sys.platform == "win32":
-        pyw = Path(sys.executable).with_name("pythonw.exe")
-        if pyw.is_file():
-            py = str(pyw)
+    py = _worker_pythonw(root)
 
     flags = 0
     if sys.platform == "win32":

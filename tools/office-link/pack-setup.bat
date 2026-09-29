@@ -1,5 +1,5 @@
 @echo off
-REM Bitta Windows Setup.exe (EULA + o'rnatish). Avval: BUILD-EXE.bat + pack-release.bat
+REM Bitta Windows Setup.exe (EULA + o'rnatish). Avval: pack-release.bat
 setlocal EnableExtensions
 cd /d "%~dp0"
 
@@ -7,12 +7,10 @@ set "REL=%CD%\release\HRHUB-Link"
 set "OUT=%CD%\release\HRHUB-Link-Setup.exe"
 set "ASSET_DIR=%CD%\..\..\apps\api\assets\office-link"
 
-if not exist "%REL%\ilova\HRHUB-Qurilma.exe" (
-  if not exist "%REL%\HRHUB-Qurilma.exe" (
-    echo [XATO] release\HRHUB-Link yo'q. Avval pack-release.bat
-    if not defined NOPAUSE pause
-    exit /b 1
-  )
+if not exist "%REL%\runtime\python\pythonw.exe" (
+  echo [XATO] release\HRHUB-Link to'liq emas. Avval pack-release.bat
+  if not defined NOPAUSE pause
+  exit /b 1
 )
 
 echo === HR HUB Link — Setup.exe ===

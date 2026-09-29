@@ -16,7 +16,7 @@ Auto-heal
 Tayyorgarlik
 ------------
 1. Web → Устройства → Связь с офисом — pairing token
-2. HRHUB-Qurilma.exe — token, lokatsiya, «Ulash» (muvaffaqiyatli)
+2. HR HUB Link (BOSHLASH.bat) — token, lokatsiya, «Ulash» (muvaffaqiyatli)
 3. data\service.json avtomatik yoziladi; data\link.key bo‘lishi kerak
 
 O‘rnatish
@@ -33,7 +33,7 @@ Muqobil: Task Scheduler
 2. Create Basic Task → HRHUB-OfficeLink
 3. Trigger: At startup (yoki At log on)
 4. Action: Start a program
-   Program: pythonw.exe (yoki runtime\python\pythonw.exe)
+   Program: C:\...\HRHUB-Link\runtime\python\pythonw.exe
    Arguments: "C:\...\HRHUB-Link\service_worker.py"
    Start in: C:\...\HRHUB-Link
 5. Run with highest privileges

@@ -26,19 +26,13 @@ if not exist "%CD%\data\service.json" (
 
 set "SVC_NAME=HRHUB-OfficeLink"
 set "PYTHONW="
-where pythonw >nul 2>&1 && set "PYTHONW=pythonw"
+if exist "%CD%\runtime\python\pythonw.exe" set "PYTHONW=%CD%\runtime\python\pythonw.exe"
 if not defined PYTHONW (
-  where python >nul 2>&1 && set "PYTHONW=python"
+  where pythonw >nul 2>&1 && set "PYTHONW=pythonw"
 )
 if not defined PYTHONW (
-  if exist "%CD%\runtime\python\pythonw.exe" set "PYTHONW=%CD%\runtime\python\pythonw.exe"
-)
-if not defined PYTHONW (
-  if exist "%CD%\runtime\python\python.exe" set "PYTHONW=%CD%\runtime\python\python.exe"
-)
-if not defined PYTHONW (
-  echo [XATO] pythonw/python topilmadi.
-  echo Python o'rnating yoki avval GUI «Ulash» / ensure_runtime ishga tushiring.
+  echo [XATO] runtime\python\pythonw.exe topilmadi.
+  echo HR HUB Link ni qayta o'rnating yoki paketni qayta oching.
   pause
   exit /b 1
 )
