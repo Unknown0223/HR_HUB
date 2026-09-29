@@ -348,14 +348,13 @@ class ModulesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isApprover = ref.watch(authProvider).user?.isApprover == true;
+    final hasTeam = ref.watch(authProvider).user?.hasTeam == true;
     final items = [
-      (Icons.face_outlined, 'Face ID', '/face-punch'),
-      (Icons.directions_run, 'GPS belgi', '/gps-punch'),
-      (Icons.qr_code_scanner, 'QR belgi', '/qr-punch'),
+      (Icons.login_rounded, 'Kirish', '/punch/in'),
+      (Icons.logout_rounded, 'Chiqish', '/punch/out'),
       (Icons.table_chart_outlined, 'Tabel', '/tabel'),
       (Icons.assignment_outlined, 'So\'rovlar', '/requests'),
-      if (isApprover) (Icons.groups_outlined, 'Jamoa', '/team-today'),
+      if (hasTeam) (Icons.groups_outlined, 'Jamoa', '/team'),
       (Icons.payments_outlined, 'To\'lov', '/payroll'),
       (Icons.note_alt_outlined, 'Qaydlar', '/marks'),
     ];
@@ -395,123 +394,3 @@ class ModulesScreen extends ConsumerWidget {
   }
 }
 
-class GpsTrackScreen extends StatefulWidget {
-  const GpsTrackScreen({super.key});
-
-  @override
-  State<GpsTrackScreen> createState() => _GpsTrackScreenState();
-}
-
-class _GpsTrackScreenState extends State<GpsTrackScreen> {
-  DateTime _date = DateTime.now();
-
-  Future<void> _pickDate() async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2C344E),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'SANANI TANLANG',
-                style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
-              ),
-              Text(
-                'Yak, ${_date.day}-iyl',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 320,
-            height: 280,
-            child: CalendarDatePicker(
-              initialDate: _date,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2035),
-              onDateChanged: (d) => _date = d,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('BEKOR QILISH'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {});
-                Navigator.pop(ctx);
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBackBar(
-        title: 'GPS kuzatuv',
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _pickDate,
-            icon: const Icon(Icons.calendar_month_outlined),
-          ),
-        ],
-      ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFAED6F1), Color(0xFFF4F4F4)],
-          ),
-        ),
-        child: CustomPaint(painter: _SimpleMapPainter()),
-      ),
-    );
-  }
-}
-
-class _SimpleMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final land = Paint()..color = const Color(0xFFE8E4DC);
-    final water = Paint()..color = const Color(0xFFAED6F1);
-    canvas.drawRect(Offset.zero & size, water);
-    // stylized continents blobs
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.12, size.height * 0.18, size.width * 0.35, size.height * 0.45),
-        const Radius.circular(40),
-      ),
-      land,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.48, size.height * 0.22, size.width * 0.4, size.height * 0.4),
-        const Radius.circular(50),
-      ),
-      land,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.55, size.height * 0.62, size.width * 0.25, size.height * 0.18),
-        const Radius.circular(30),
-      ),
-      land,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

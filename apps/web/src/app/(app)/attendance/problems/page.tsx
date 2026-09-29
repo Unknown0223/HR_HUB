@@ -50,6 +50,9 @@ function reasonLabel(reason: string) {
   if (reason === 'unknown_employee') return 'Неизвестный сотрудник';
   if (reason === 'device_admin_login') return 'Пароль администратора на терминале';
   if (reason === 'missing_capture_photo') return 'Нет фото отметки';
+  if (reason === 'mock_location') return 'Фиктивная геолокация (Fake GPS)';
+  if (reason === 'gps_jump') return 'Невозможное перемещение по GPS';
+  if (reason === 'gps_no_geofence') return 'GPS-отметка без геозоны';
   return reason;
 }
 

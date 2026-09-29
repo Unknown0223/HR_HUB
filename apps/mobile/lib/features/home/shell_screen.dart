@@ -16,14 +16,14 @@ class ShellScreen extends ConsumerWidget {
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.line, width: 0.5)),
-          color: AppColors.bg,
+          color: AppColors.card,
         ),
         child: SafeArea(
           top: false,
           child: BottomNavigationBar(
             currentIndex: navigationShell.currentIndex,
             onTap: navigationShell.goBranch,
-            backgroundColor: AppColors.bg,
+            backgroundColor: AppColors.card,
             selectedItemColor: AppColors.accent,
             unselectedItemColor: AppColors.inkMuted,
             type: BottomNavigationBarType.fixed,

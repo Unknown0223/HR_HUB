@@ -27,9 +27,9 @@ class ProfileDetailsScreen extends ConsumerWidget {
         title: const Text('Profil'),
         centerTitle: true,
         actions: [
-          if (user?.isApprover == true)
+          if (user?.hasTeam == true)
             IconButton(
-              onPressed: () => context.push('/team-today'),
+              onPressed: () => context.push('/team'),
               icon: const Icon(Icons.groups_outlined),
             ),
         ],

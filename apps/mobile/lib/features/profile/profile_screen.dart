@@ -13,365 +13,367 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _subordinatesOnly = false;
-  String _lang = 'O\'zbekcha';
+  @override
+  void initState() {
+    super.initState();
+    // Team membership changes on the server (org chart); refresh on open.
+    Future.microtask(() => ref.read(authProvider.notifier).refreshMe().catchError((_) {}));
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final name = (user?.displayName ?? '').toUpperCase();
-    final tenant = user?.tenant?['name']?.toString() ?? 'HR HUB';
 
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            const Text(
-              'Profil',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
-              ),
-            ),
-            const SizedBox(height: 14),
-            SectionCard(
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      AvatarCircle(name: user?.displayName, radius: 32),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          name.isEmpty ? '—' : name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionChipBtn(
-                          icon: Icons.badge_outlined,
-                          label: 'Ma\'lumotlar',
-                          onTap: () => context.push('/profile/details'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ActionChipBtn(
-                          icon: Icons.chevron_right,
-                          label: 'O\'zgartirish',
-                          highlighted: true,
-                          onTap: () => _showAccountsSheet(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            SectionCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  const Icon(Icons.apartment_outlined, color: AppColors.ink),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tenant,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const Text(
-                          'Joriy filial',
-                          style: TextStyle(
-                            color: AppColors.inkMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            SectionCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  MenuTile(
-                    icon: Icons.settings_outlined,
-                    label: 'Sozlamalar',
-                    onTap: () => context.push('/settings'),
-                  ),
-                  const Divider(height: 1, color: AppColors.line),
-                  MenuTile(
-                    icon: Icons.lock_outline,
-                    label: 'Xavfsizlik',
-                    onTap: () => context.push('/security'),
-                  ),
-                  const Divider(height: 1, color: AppColors.line),
-                  MenuTile(
-                    icon: Icons.timeline,
-                    label: 'Mening kuzatuvlarim',
-                    onTap: () => context.push('/gps-track'),
-                  ),
-                  const Divider(height: 1, color: AppColors.line),
-                  MenuTile(
-                    icon: Icons.groups_outlined,
-                    label: 'Faqat bo\'ysunuvchilarni',
-                    showChevron: false,
-                    trailing: Switch(
-                      value: _subordinatesOnly,
-                      onChanged: (v) => setState(() => _subordinatesOnly = v),
-                    ),
-                  ),
-                  const Divider(height: 1, color: AppColors.line),
-                  MenuTile(
-                    icon: Icons.text_fields,
-                    label: 'Til',
-                    showChevron: false,
-                    trailing: Text(
-                      _lang,
-                      style: const TextStyle(color: AppColors.inkMuted),
-                    ),
-                    onTap: () => _showLanguageSheet(context),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            SectionCard(
-              padding: EdgeInsets.zero,
-              child: MenuTile(
-                icon: Icons.headset_mic_outlined,
-                label: 'Yordam',
-                onTap: () => context.push('/help'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 50,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.logout,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+        child: RefreshIndicator(
+          color: AppColors.accent,
+          onRefresh: () => ref.read(authProvider.notifier).refreshMe(),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 4, bottom: 12),
+                child: Text(
+                  'Profil',
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.ink),
                 ),
-                onPressed: () async {
-                  await ref.read(authProvider.notifier).logout();
-                },
-                child: const Text('Chiqish'),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showLanguageSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.cardAlt,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final langs = ['Русский', 'English', 'O\'zbekcha'];
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Til',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.inkMuted,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...langs.map(
-                  (l) => ListTile(
-                    title: Text(l),
-                    trailing: _lang == l
-                        ? const Icon(Icons.check, color: AppColors.ink)
-                        : null,
-                    onTap: () {
-                      setState(() => _lang = l);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 50,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Yopish'),
-                  ),
-                ),
+              _HeaderCard(user: user),
+              if (user?.hasTeam == true) ...[
+                const SizedBox(height: 14),
+                _TeamCard(size: user!.teamSize, onTap: () => context.push('/team')),
               ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showAccountsSheet(BuildContext context) {
-    final user = ref.read(authProvider).user;
-    final tenant = user?.tenant?['name']?.toString() ?? 'HR HUB';
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.cardAlt,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Текущий профиль',
-                  style: TextStyle(color: AppColors.inkMuted),
-                ),
-                const SizedBox(height: 12),
-                Row(
+              const SizedBox(height: 14),
+              SectionCard(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
                   children: [
-                    const CircleAvatar(
-                      backgroundColor: AppColors.accent,
-                      child: Icon(Icons.person, color: Colors.white),
+                    _MenuRow(
+                      icon: Icons.person_outline_rounded,
+                      color: const Color(0xFF3B82F6),
+                      label: 'Shaxsiy ma’lumotlar',
+                      onTap: () => context.push('/profile/details'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            (user?.displayName ?? '').toUpperCase(),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          Text(
-                            tenant,
-                            style: const TextStyle(
-                              color: AppColors.inkMuted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                    _MenuRow(
+                      icon: Icons.my_location_rounded,
+                      color: AppColors.accent,
+                      label: 'GPS kuzatuv',
+                      subtitle: 'Fon xizmati holati',
+                      onTap: () => context.push('/gps-track'),
                     ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.delete_outline),
+                    _MenuRow(
+                      icon: Icons.settings_outlined,
+                      color: const Color(0xFF6B7280),
+                      label: 'Sozlamalar',
+                      onTap: () => context.push('/settings'),
+                    ),
+                    _MenuRow(
+                      icon: Icons.lock_outline_rounded,
+                      color: const Color(0xFFE39B0B),
+                      label: 'Xavfsizlik',
+                      subtitle: 'Parol, PIN-kod',
+                      onTap: () => context.push('/security'),
+                    ),
+                    _MenuRow(
+                      icon: Icons.support_agent_rounded,
+                      color: const Color(0xFF8E6BD8),
+                      label: 'Yordam',
+                      onTap: () => context.push('/help'),
+                      last: true,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                PrimaryButton(
-                  label: 'QO\'SHISH',
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    context.push('/login');
-                  },
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 50,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('YOPISH'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ActionChipBtn extends StatelessWidget {
-  const _ActionChipBtn({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.highlighted = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: highlighted ? const Color(0xFF24304A) : AppColors.bgSoft,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (!highlighted) ...[
-                Icon(icon, size: 18, color: AppColors.ink),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
-              if (highlighted) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right, size: 18),
-              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 54,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.logout,
+                    backgroundColor: AppColors.logout.withValues(alpha: 0.06),
+                    side: BorderSide(color: AppColors.logout.withValues(alpha: 0.4)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Hisobdan chiqish'),
+                  onPressed: () => _confirmLogout(context),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Center(
+                child: Text(
+                  'HR HUB · v1.0.0',
+                  style: TextStyle(color: AppColors.inkFaint, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hisobdan chiqish'),
+        content: const Text(
+          'Chiqqaningizdan so‘ng GPS kuzatuv to‘xtaydi. Davom etasizmi?',
+          style: TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor qilish')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.logout),
+            child: const Text('Chiqish'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await ref.read(authProvider.notifier).logout();
+  }
+}
+
+class _HeaderCard extends StatelessWidget {
+  const _HeaderCard({required this.user});
+
+  final AuthUser? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final emp = user?.employee;
+    final position = (emp?['position'] as Map?)?['name']?.toString();
+    final division = (emp?['division'] as Map?)?['name']?.toString();
+    final schedule = emp?['schedule'] as Map?;
+    final tab = emp?['tabNumber']?.toString();
+    final tenant = user?.tenant?['name']?.toString();
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.headerTop, AppColors.headerBottom],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: AvatarCircle(name: user?.displayName, radius: 34),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.displayName ?? '—',
+                      style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800),
+                    ),
+                    if (position != null && position.isNotEmpty)
+                      Text(
+                        position,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (tenant != null) _Chip(icon: Icons.business_rounded, text: tenant),
+              if (division != null) _Chip(icon: Icons.apartment_rounded, text: division),
+              if (schedule != null)
+                _Chip(
+                  icon: Icons.schedule_rounded,
+                  text: '${schedule['startTime'] ?? '09:00'} – ${schedule['endTime'] ?? '18:00'}',
+                ),
+              if (tab != null && tab.isNotEmpty) _Chip(icon: Icons.badge_outlined, text: '№ $tab'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 5),
+          Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamCard extends StatelessWidget {
+  const _TeamCard({required this.size, required this.onTap});
+
+  final int size;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.45), width: 1.5),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.accentTint,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 30),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('Mening jamoam', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$size',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    const Text(
+                      'Tabel, statistika va jonli joylashuv',
+                      style: TextStyle(color: AppColors.inkMuted, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.accent, size: 28),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+    this.last = false,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(icon, color: color, size: 23),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      if (subtitle != null)
+                        Text(subtitle!, style: const TextStyle(color: AppColors.inkMuted, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.inkFaint),
+              ],
+            ),
+          ),
+        ),
+        if (!last) const Divider(height: 1, indent: 72, endIndent: 16),
+      ],
     );
   }
 }

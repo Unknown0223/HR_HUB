@@ -38,6 +38,8 @@ type Mark = {
   longitude?: number | null;
   accuracyM?: number | null;
   outsideGeofence?: boolean;
+  photoReport?: boolean;
+  livenessSteps?: number | null;
   geofenceComment?: string | null;
   distanceM?: number | null;
   radiusM?: number | null;
@@ -214,6 +216,12 @@ function MarkDetailInner() {
               <span className={styles.badgeWarn} title={mark.geofenceComment || undefined}>
                 Вне территории
                 {mark.distanceM != null ? ` · ${mark.distanceM} м` : ''}
+              </span>
+            ) : null}
+            {mark.photoReport ? (
+              <span className={styles.badgeInfo}>
+                Фотоотчёт
+                {mark.livenessSteps ? ` · живость: ${mark.livenessSteps} движ.` : ''}
               </span>
             ) : null}
           </div>

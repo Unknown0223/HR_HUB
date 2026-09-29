@@ -60,6 +60,7 @@ bool markOutsideGeofence(Map m) => markField(m, 'outsideGeofence') == true;
 String punchSourceLabel(dynamic source) {
   final s = source?.toString().toLowerCase() ?? '';
   if (s.isEmpty) return '';
+  if (s == 'mobile_app') return 'Telefon';
   if (s == 'gps') return 'GPS';
   if (s == 'qr') return 'QR';
   if (s.contains('face')) return 'Face ID';
@@ -88,7 +89,7 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = _map(status);
+    final (label, color) = statusStyle(status);
     return Text(
       label,
       style: TextStyle(
@@ -98,19 +99,24 @@ class StatusChip extends StatelessWidget {
       ),
     );
   }
+}
 
-  (String, Color) _map(String s) {
+(String, Color) statusStyle(String s) {
     switch (s) {
       case 'on_time':
         return ('Vaqtida', AppColors.success);
       case 'late':
         return ('Kech', AppColors.warn);
       case 'absent':
-        return ('Yo‘q', AppColors.danger);
+        return ('Kelmagan', AppColors.danger);
       case 'leave':
         return ('Ta’til', AppColors.accentSoft);
       case 'day_off':
         return ('Dam olish kuni', AppColors.inkMuted);
+      case 'holiday':
+        return ('Bayram', Color(0xFF8E6BD8));
+      case 'planned':
+        return ('Reja', AppColors.inkFaint);
       case 'not_started':
         return ('Boshlanmagan', AppColors.inkMuted);
       case 'draft':
@@ -126,7 +132,6 @@ class StatusChip extends StatelessWidget {
       default:
         return (s, AppColors.inkMuted);
     }
-  }
 }
 
 class EmptyState extends StatelessWidget {
@@ -175,7 +180,15 @@ class SectionCard extends StatelessWidget {
       padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color ?? AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F2FA350),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );

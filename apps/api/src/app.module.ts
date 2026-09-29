@@ -26,6 +26,8 @@ import { MobileModule } from './mobile/mobile.module';
 import { NewsModule } from './news/news.module';
 import { HireDocumentExceptionsModule } from './hire-document-exceptions/hire-document-exceptions.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { TrackingModule } from './tracking/tracking.module';
+import { TeamModule } from './team/team.module';
 
 @Module({
   imports: [
@@ -58,6 +60,8 @@ import { TelegramModule } from './telegram/telegram.module';
     NewsModule,
     HireDocumentExceptionsModule,
     TelegramModule,
+    TrackingModule,
+    TeamModule,
   ],
 })
 export class AppModule implements NestModule {

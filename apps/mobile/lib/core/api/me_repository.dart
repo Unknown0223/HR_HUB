@@ -53,22 +53,6 @@ class MeRepository {
         if (reviewNote != null) 'reviewNote': reviewNote,
       });
 
-  Future<Map<String, dynamic>> punchGps({
-    required double latitude,
-    required double longitude,
-    double? accuracy,
-    String? direction,
-    String? comment,
-  }) =>
-      _api.post('/me/punches/gps', data: {
-        'latitude': latitude,
-        'longitude': longitude,
-        if (accuracy != null) 'accuracy': accuracy,
-        if (direction != null) 'direction': direction,
-        if (comment != null && comment.trim().isNotEmpty)
-          'comment': comment.trim(),
-      });
-
   /// `{configured, inside, commentRequired, distanceM, radiusM, locationName}`
   Future<Map<String, dynamic>> checkGps({
     required double latitude,
@@ -79,25 +63,44 @@ class MeRepository {
         'longitude': longitude,
       });
 
-  Future<Map<String, dynamic>> punchQr({
-    required String qrCode,
-    String? direction,
+  /// Phone punch: explicit IN/OUT, composite photo report, liveness steps.
+  Future<Map<String, dynamic>> punchMobile({
+    required String direction,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String photoBase64,
+    required List<String> livenessSteps,
+    required int livenessDurationMs,
+    required Map<String, dynamic> integrity,
+    String? comment,
   }) =>
-      _api.post('/me/punches/qr', data: {
-        'qrCode': qrCode,
-        if (direction != null) 'direction': direction,
+      _api.post('/me/punches/mobile', data: {
+        'direction': direction,
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+        'photoBase64': photoBase64,
+        'liveness': {
+          'passed': true,
+          'steps': livenessSteps,
+          'durationMs': livenessDurationMs,
+        },
+        'integrity': integrity,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
       });
 
-  Future<Map<String, dynamic>> punchFace({
-    String? faceImageBase64,
-    String? direction,
-    bool mock = false,
+  /// `{ok, blocked, message}` — message is the warning to show the employee.
+  Future<Map<String, dynamic>> reportMockLocation({
+    required Map<String, dynamic> integrity,
+    double? latitude,
+    double? longitude,
   }) =>
-      _api.post('/me/punches/face', data: {
-        if (faceImageBase64 != null && faceImageBase64.isNotEmpty)
-          'faceImageBase64': faceImageBase64,
-        if (direction != null) 'direction': direction,
-        if (mock) 'mock': true,
+      _api.post('/me/security/mock-location', data: {
+        'integrity': integrity,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
       });
 
   /// Prefer versioned mobile facade for tabel (days + marks + summary).
@@ -112,8 +115,6 @@ class MeRepository {
         if (year != null) 'year': '$year',
         if (month != null) 'month': '$month',
       });
-
-  Future<Map<String, dynamic>> teamToday() => _api.get('/me/team/today');
 
   Future<List<dynamic>> notifications({bool unreadOnly = false}) async {
     final data = await _api.getDynamic(

@@ -18,6 +18,8 @@ import {
   MeFacePunchDto,
   MeGpsCheckDto,
   MeGpsPunchDto,
+  MeMobilePunchDto,
+  MeMockLocationReportDto,
   MeQrPunchDto,
   MeReviewAbsenceDto,
   MeReviewRequestDto,
@@ -119,6 +121,19 @@ export class MeController {
   @Post('punches/gps/check')
   checkGps(@CurrentUser() user: AuthUser, @Body() dto: MeGpsCheckDto) {
     return this.me.checkGps(user, dto);
+  }
+
+  @Post('punches/mobile')
+  punchMobile(@CurrentUser() user: AuthUser, @Body() dto: MeMobilePunchDto) {
+    return this.me.punchMobile(user, dto);
+  }
+
+  @Post('security/mock-location')
+  reportMockLocation(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: MeMockLocationReportDto,
+  ) {
+    return this.me.reportMockLocation(user, dto);
   }
 
   @Post('punches/qr')

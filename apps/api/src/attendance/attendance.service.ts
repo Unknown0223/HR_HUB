@@ -5479,6 +5479,108 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * Phone check-in/out: liveness-verified composite photo report + GPS.
+   * The fence is optional here — without one the punch is accepted as-is.
+   */
+  async punchMobile(
+    tenantId: string,
+    dto: {
+      employeeId: string;
+      direction: PunchDirection;
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      photoBase64: string;
+      liveness: { steps: string[]; durationMs?: number };
+      comment?: string;
+      integrity?: Record<string, unknown>;
+    },
+  ) {
+    const fence = await this.resolveGeofence(tenantId, dto.latitude, dto.longitude);
+    const outside = fence ? !fence.inside : false;
+    const comment = (dto.comment ?? '').trim();
+    if (fence && outside && comment.length < GPS_OUTSIDE_COMMENT_MIN) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'GPS_OUTSIDE_COMMENT_REQUIRED',
+        message: `Hududdan tashqaridasiz: ${fence.distanceM} m (ruxsat ${fence.radiusM} m). Izoh majburiy.`,
+        distanceM: fence.distanceM,
+        radiusM: fence.radiusM,
+        locationName: fence.locationName,
+      });
+    }
+
+    const stored = await this.storeCapturePhoto(tenantId, dto.photoBase64, {
+      maxEdge: 1600,
+      quality: 80,
+    });
+    if (!stored) {
+      throw new BadRequestException('Foto-hisobot saqlanmadi — qayta urinib ko‘ring');
+    }
+
+    const occurredAt = new Date().toISOString();
+    const result = await this.ingestPunch({
+      tenantId,
+      employeeId: dto.employeeId,
+      direction: dto.direction,
+      occurredAt,
+      source: 'mobile_app',
+      raw: {
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        accuracyM: Math.round(dto.accuracy),
+        identificationType: 'Телефон: лицо + фотоотчёт',
+        deviceType: 'Мобильное приложение',
+        requestedDirection: dto.direction,
+        photoReport: true,
+        photoUrl: stored.url,
+        photoKey: stored.key,
+        liveness: {
+          passed: true,
+          steps: dto.liveness.steps,
+          ...(dto.liveness.durationMs != null
+            ? { durationMs: Math.round(dto.liveness.durationMs) }
+            : {}),
+        },
+        outsideGeofence: outside,
+        ...(fence
+          ? {
+              distanceM: fence.distanceM,
+              radiusM: fence.radiusM,
+              locationId: fence.locationId,
+              locationName: fence.locationName,
+            }
+          : { geofenceConfigured: false }),
+        ...(outside && fence
+          ? {
+              geofenceComment: comment,
+              note: `Вне территории (${fence.distanceM} м, радиус ${fence.radiusM} м): ${comment}`,
+            }
+          : {}),
+        ...(dto.integrity ? { locationIntegrity: dto.integrity } : {}),
+      },
+    });
+
+    if ((result as { deduped?: boolean }).deduped) {
+      await this.storage.deleteObject(stored.key).catch(() => undefined);
+      throw new BadRequestException(
+        'Oxirgi belgidan beri 1 daqiqa o‘tmadi — birozdan so‘ng qayta urinib ko‘ring',
+      );
+    }
+
+    return {
+      ...result,
+      direction: dto.direction,
+      occurredAt,
+      outsideGeofence: outside,
+      distanceM: fence?.distanceM ?? null,
+      radiusM: fence?.radiusM ?? null,
+      locationName: fence?.locationName ?? null,
+      photoUrl: this.storage.mediaUrl(stored.key, stored.url),
+    };
+  }
+
   private haversineM(lat1: number, lon1: number, lat2: number, lon2: number) {
     const R = 6371000;
     const toRad = (d: number) => (d * Math.PI) / 180;
@@ -5639,7 +5741,7 @@ export class AttendanceService {
         });
       }
       mapped = mapped.map((m) =>
-        m.markType === 'estimated_out' ? { ...m, photoUrl: null } : m,
+        m.markType === 'estimated_out' && !m.photoReport ? { ...m, photoUrl: null } : m,
       );
       const wantEst =
         Boolean(opts.employeeId) ||
@@ -5649,9 +5751,9 @@ export class AttendanceService {
           .map((x) => x.trim())
           .includes('estimated_out');
       if (!wantEst) {
-        // Outside-geofence marks carry an employee comment HR must review — never hide them.
+        // Outside-geofence marks and phone photo reports are evidence HR must review — never hide them.
         mapped = mapped.filter(
-          (m) => m.markType !== 'estimated_out' || m.outsideGeofence,
+          (m) => m.markType !== 'estimated_out' || m.outsideGeofence || m.photoReport,
         );
       }
     }
@@ -6668,6 +6770,11 @@ export class AttendanceService {
         typeof payload.geofenceComment === 'string' ? payload.geofenceComment : null,
       distanceM: typeof payload.distanceM === 'number' ? payload.distanceM : null,
       radiusM: typeof payload.radiusM === 'number' ? payload.radiusM : null,
+      photoReport: payload.photoReport === true,
+      livenessSteps:
+        payload.liveness && typeof payload.liveness === 'object' && !Array.isArray(payload.liveness)
+          ? ((payload.liveness as Record<string, unknown>).steps as unknown[] | undefined)?.length ?? 0
+          : 0,
       changeHistory,
       createdByLabel: (payload.createdByLabel as string) || 'System',
       updatedByLabel: (payload.updatedByLabel as string) || 'System',
@@ -7376,6 +7483,8 @@ export class AttendanceService {
     tenantId: string,
     payload: Record<string, unknown>,
   ) {
+    // Phone photo reports are evidence of the punch itself, not a terminal snapshot.
+    if (payload.photoReport === true) return;
     const policy = await this.getEstimatedOutPhotoPolicy(tenantId);
     if (policy.enabled) return;
     const key = typeof payload.photoKey === 'string' ? payload.photoKey.trim() : '';
@@ -7437,7 +7546,7 @@ export class AttendanceService {
         String(payload.markTypeLabel || '')
           .toLowerCase()
           .includes('примерн');
-      if (!isEst) continue;
+      if (!isEst || payload.photoReport === true) continue;
       const photoKey =
         typeof payload.photoKey === 'string' ? payload.photoKey.trim() : '';
       if (!photoKey && !payload.photoUrl) continue;
@@ -7585,7 +7694,11 @@ export class AttendanceService {
     return { scanned, purged, errors };
   }
 
-  private async storeCapturePhoto(tenantId: string, jpegB64: string) {
+  private async storeCapturePhoto(
+    tenantId: string,
+    jpegB64: string,
+    compressOverride?: { maxEdge: number; quality: number },
+  ) {
     try {
       const raw = Buffer.from(jpegB64, 'base64');
       if (raw.length < 100) {
@@ -7604,6 +7717,9 @@ export class AttendanceService {
         }
       } catch {
         /* use defaults */
+      }
+      if (compressOverride) {
+        compressOpts = { ...compressOpts, enabled: true, ...compressOverride };
       }
       const { buffer, compressed, bytesIn, bytesOut } =
         await compressMarkCaptureJpeg(raw, compressOpts);

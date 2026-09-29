@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../features/attendance/face_punch_screen.dart';
-import '../../features/attendance/gps_punch_screen.dart';
 import '../../features/attendance/marks_screen.dart';
-import '../../features/attendance/qr_punch_screen.dart';
+import '../../features/attendance/mobile_punch_screen.dart';
 import '../../features/attendance/tabel_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/permissions_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/calendar/calendar_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -21,23 +20,30 @@ import '../../features/requests/inbox_screen.dart';
 import '../../features/requests/requests_screen.dart';
 import '../../features/settings/more_screens.dart';
 import '../../features/settings/settings_screens.dart';
-import '../../features/team/team_today_screen.dart';
+import '../../features/team/team_member_screen.dart';
+import '../../features/team/team_screen.dart';
+import '../../features/tracking/gps_track_screen.dart';
 import '../auth/auth_state.dart';
+import '../security/app_permissions.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
-
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     refreshListenable: GoRouterRefreshStream(ref),
     redirect: (context, state) {
       final loc = state.matchedLocation;
-      if (auth.loading) {
+      final auth = ref.read(authProvider);
+      final perms = ref.read(permissionsProvider);
+      if (auth.loading || !perms.checked) {
         return loc == '/splash' ? null : '/splash';
       }
+      if (!perms.allGranted) {
+        return loc == '/permissions' ? null : '/permissions';
+      }
+      if (loc == '/permissions') return auth.isAuthenticated ? '/home' : '/login';
       if (!auth.isAuthenticated) {
         return loc == '/login' ? null : '/login';
       }
@@ -47,6 +53,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(path: '/permissions', builder: (_, _) => const PermissionsScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return ShellScreen(navigationShell: navigationShell);
@@ -80,9 +87,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(path: '/gps-punch', builder: (_, __) => const GpsPunchScreen()),
-      GoRoute(path: '/qr-punch', builder: (_, __) => const QrPunchScreen()),
-      GoRoute(path: '/face-punch', builder: (_, __) => const FacePunchScreen()),
+      GoRoute(
+        path: '/punch/in',
+        builder: (_, __) => const MobilePunchScreen(direction: 'IN'),
+      ),
+      GoRoute(
+        path: '/punch/out',
+        builder: (_, __) => const MobilePunchScreen(direction: 'OUT'),
+      ),
       GoRoute(path: '/tabel', builder: (_, __) => const TabelScreen()),
       GoRoute(path: '/marks', builder: (_, __) => const MarksScreen()),
       GoRoute(
@@ -91,7 +103,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/requests', builder: (_, __) => const RequestsScreen()),
       GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
-      GoRoute(path: '/team-today', builder: (_, __) => const TeamTodayScreen()),
+      GoRoute(path: '/team', builder: (_, _) => const TeamScreen()),
+      GoRoute(
+        path: '/team/:id',
+        builder: (_, state) =>
+            TeamMemberScreen(employeeId: state.pathParameters['id']!),
+      ),
       GoRoute(
         path: '/payroll',
         builder: (_, __) => const PayrollSummaryScreen(),
@@ -132,7 +149,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/help', builder: (_, __) => const HelpScreen()),
       GoRoute(path: '/modules', builder: (_, __) => const ModulesScreen()),
-      GoRoute(path: '/gps-track', builder: (_, __) => const GpsTrackScreen()),
+      GoRoute(path: '/gps-track', builder: (_, _) => const GpsTrackScreen()),
     ],
   );
 });
@@ -140,6 +157,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(this._ref) {
     _ref.listen(authProvider, (_, __) => notifyListeners());
+    _ref.listen(permissionsProvider, (_, _) => notifyListeners());
   }
 
   final Ref _ref;

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
+import '../tracking/tracking_controller.dart';
 
 class AuthUser {
   AuthUser({
@@ -10,6 +11,7 @@ class AuthUser {
     required this.tenantId,
     this.tenant,
     this.employee,
+    this.teamSize = 0,
   });
 
   final String id;
@@ -19,6 +21,11 @@ class AuthUser {
   final String? tenantId;
   final Map<String, dynamic>? tenant;
   final Map<String, dynamic>? employee;
+
+  /// Active employees in the divisions this user manages (org chart).
+  final int teamSize;
+
+  bool get hasTeam => teamSize > 0;
 
   bool get isApprover =>
       role == 'manager' ||
@@ -50,6 +57,7 @@ class AuthUser {
       employee: json['employee'] is Map
           ? Map<String, dynamic>.from(json['employee'] as Map)
           : null,
+      teamSize: (json['teamSize'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -146,6 +154,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout({bool silent = false}) async {
+    await _ref.read(trackingControllerProvider).stop();
     await _storage.delete('accessToken');
     await _storage.delete('tenantId');
     if (!silent) {

@@ -2,29 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Dark Arena-style employee app tokens (from screenshots).
+/// Light green employee app tokens.
 class AppColors {
-  static const bg = Color(0xFF12141C);
-  static const bgElevated = Color(0xFF1C202B);
-  static const bgSoft = Color(0xFF242830);
-  static const card = Color(0xFF1C202B);
-  static const cardAlt = Color(0xFF1E2230);
-  static const line = Color(0xFF2A2F3C);
-  static const ink = Color(0xFFFFFFFF);
-  static const inkMuted = Color(0xFFA0A8B8);
-  static const inkFaint = Color(0xFF6B7385);
-  static const accent = Color(0xFF2E6FEA);
-  static const accentSoft = Color(0xFF3B82F6);
-  static const success = Color(0xFF1BC5BD);
-  static const warn = Color(0xFFFFD740);
-  static const danger = Color(0xFFEF476F);
-  static const logout = Color(0xFF4A2830);
-  static const toggleOn = Color(0xFF98D08C);
-  static const confirmGreen = Color(0xFF4B5E12);
-  static const callGreen = Color(0xFF7CB342);
-  static const calendarWork = Color(0xFF6B2B3A);
-  static const calendarWeekend = Color(0xFF2A3A55);
-  static const calendarEvent = Color(0xFFFFD740);
+  static const bg = Color(0xFFF1F8F1);
+  static const bgElevated = Color(0xFFFFFFFF);
+  static const bgSoft = Color(0xFFE5F3E6);
+  static const card = Color(0xFFFFFFFF);
+  static const cardAlt = Color(0xFFFFFFFF);
+  static const line = Color(0xFFDCEBDC);
+  static const ink = Color(0xFF1E2B22);
+  static const inkMuted = Color(0xFF5E6F62);
+  static const inkFaint = Color(0xFF98A89B);
+  static const accent = Color(0xFF2FA350);
+  static const accentSoft = Color(0xFF6CCB86);
+  static const accentTint = Color(0xFFE3F5E7);
+  static const headerTop = Color(0xFF7ED695);
+  static const headerBottom = Color(0xFF34A853);
+  static const success = Color(0xFF2FA350);
+  static const warn = Color(0xFFE39B0B);
+  static const danger = Color(0xFFE5484D);
+  static const logout = Color(0xFFE5484D);
+  static const toggleOn = Color(0xFF6CCB86);
+  static const confirmGreen = Color(0xFF2FA350);
+  static const callGreen = Color(0xFF2FA350);
+  static const calendarWork = Color(0xFFE5F3E6);
+  static const calendarWeekend = Color(0xFFEEF1F4);
+  static const calendarEvent = Color(0xFFFFE08A);
 
   // Legacy aliases used by older screens
   static const sidebar = bg;
@@ -46,8 +49,8 @@ class AppTheme {
     );
   }
 
-  static ThemeData get dark {
-    final scheme = const ColorScheme.dark(
+  static ThemeData get light {
+    final scheme = const ColorScheme.light(
       primary: AppColors.accent,
       secondary: AppColors.accentSoft,
       surface: AppColors.bg,
@@ -60,10 +63,10 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: Brightness.light,
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.bg,
-      textTheme: _textTheme(Brightness.dark),
+      textTheme: _textTheme(Brightness.light),
       fontFamily: GoogleFonts.nunito().fontFamily,
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.bg,
@@ -76,10 +79,15 @@ class AppTheme {
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         iconTheme: const IconThemeData(color: AppColors.ink),
       ),
       dividerColor: AppColors.line,
+      dividerTheme: const DividerThemeData(
+        color: AppColors.line,
+        thickness: 1,
+        space: 1,
+      ),
       cardTheme: CardThemeData(
         color: AppColors.card,
         elevation: 0,
@@ -87,7 +95,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.bg,
+        backgroundColor: AppColors.card,
         selectedItemColor: AppColors.accent,
         unselectedItemColor: AppColors.inkMuted,
         type: BottomNavigationBarType.fixed,
@@ -139,11 +147,12 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.all(Colors.white),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return AppColors.toggleOn;
           }
-          return AppColors.bgSoft;
+          return AppColors.inkFaint.withValues(alpha: 0.45);
         }),
       ),
       dialogTheme: DialogThemeData(
@@ -157,8 +166,10 @@ class AppTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.bgSoft,
-        contentTextStyle: GoogleFonts.nunito(color: AppColors.ink),
+        backgroundColor: AppColors.ink,
+        contentTextStyle: GoogleFonts.nunito(color: Colors.white),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.accent,
@@ -166,6 +177,6 @@ class AppTheme {
     );
   }
 
-  /// Kept for compatibility; app uses dark.
-  static ThemeData get light => dark;
+  /// Kept for compatibility; app uses light.
+  static ThemeData get dark => light;
 }

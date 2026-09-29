@@ -392,7 +392,7 @@ class _CalendarGrid extends StatelessWidget {
                   fg = Colors.black;
                 } else if (isWeekend) {
                   bg = AppColors.calendarWeekend;
-                  fg = const Color(0xFF9BB4E0);
+                  fg = AppColors.inkMuted;
                 } else {
                   bg = AppColors.calendarWork;
                 }

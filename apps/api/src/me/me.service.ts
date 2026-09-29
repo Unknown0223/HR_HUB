@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   DayStatus,
+  NotificationKind,
   Prisma,
   PunchDirection,
   RequestStatus,
@@ -27,6 +28,9 @@ import {
   MeFacePunchDto,
   MeGpsCheckDto,
   MeGpsPunchDto,
+  MeLocationIntegrityDto,
+  MeMobilePunchDto,
+  MeMockLocationReportDto,
   MeQrPunchDto,
   MeReviewAbsenceDto,
   MeReviewRequestDto,
@@ -36,8 +40,29 @@ import {
   personNameSearchWhere,
   searchTokens,
 } from '../common/name-search';
+import { runUnscoped } from '../common/data-scope';
+import { checkGpsJump } from '../tracking/gps-jump';
 
 const MAX_GPS_ACCURACY_M = 100;
+/** ~15 KB JPEG — anything smaller cannot hold a back photo plus a selfie inset. */
+const MIN_PHOTO_REPORT_B64 = 20_000;
+
+const MOCK_LOCATION_WARNING =
+  'Telefoningizda soxta lokatsiya (uchinchi tomon ilovasi yoki o‘zgartirilgan GPS) aniqlandi. ' +
+  'Siz ruxsatsiz tizimdan foydalanib davomat qoidalarini aylanib o‘tishga urindingiz — belgi qabul qilinmadi. ' +
+  'Bu holat HR bo‘limiga yuborildi; takrorlansa akkauntingiz qora ro‘yxatga tushirilishi va bloklanishi mumkin. ' +
+  'Soxta GPS ilovasini o‘chirib, «Dasturchi sozlamalari»dagi mock lokatsiyani bekor qiling.';
+
+function integrityFlagged(i?: MeLocationIntegrityDto): boolean {
+  return !!i && (i.mockLocation === true || !!i.activeMockApp?.trim());
+}
+
+function stripDataUrl(b64: string): string {
+  const raw = (b64 ?? '').trim();
+  return raw.startsWith('data:') && raw.includes(',')
+    ? raw.slice(raw.indexOf(',') + 1)
+    : raw;
+}
 
 function faceMobileMockEnabled(): boolean {
   const v = (process.env.FACE_MOBILE_MOCK ?? '1').trim().toLowerCase();
@@ -66,7 +91,8 @@ export class MeService {
     });
     if (!dbUser) throw new UnauthorizedException();
 
-    const employee = await this.prisma.employee.findFirst({
+    // The caller's own card must resolve even when their branch scope does not cover it.
+    const employee = await runUnscoped(() => this.prisma.employee.findFirst({
       where: {
         tenantId,
         email: { equals: dbUser.email, mode: 'insensitive' },
@@ -86,8 +112,48 @@ export class MeService {
           },
         },
       },
-    });
+    }));
     return { tenantId, dbUser, employee };
+  }
+
+  /**
+   * Employees the given employee leads: everyone active in the divisions they
+   * manage and all nested sub-divisions. Based on the org chart, so it ignores
+   * the caller's branch scope.
+   */
+  async subordinateIds(tenantId: string, managerEmployeeId: string): Promise<string[]> {
+    return runUnscoped(async () => {
+      const divisions = await this.prisma.division.findMany({
+        where: { tenantId, isActive: true },
+        select: { id: true, parentId: true, managerId: true },
+      });
+      const children = new Map<string, string[]>();
+      for (const d of divisions) {
+        if (!d.parentId) continue;
+        const list = children.get(d.parentId) ?? [];
+        list.push(d.id);
+        children.set(d.parentId, list);
+      }
+      const led = new Set<string>();
+      const queue = divisions.filter((d) => d.managerId === managerEmployeeId).map((d) => d.id);
+      while (queue.length) {
+        const id = queue.pop()!;
+        if (led.has(id)) continue;
+        led.add(id);
+        queue.push(...(children.get(id) ?? []));
+      }
+      if (!led.size) return [];
+      const rows = await this.prisma.employee.findMany({
+        where: {
+          tenantId,
+          status: 'active',
+          divisionId: { in: [...led] },
+          NOT: { id: managerEmployeeId },
+        },
+        select: { id: true },
+      });
+      return rows.map((r) => r.id);
+    });
   }
 
   async requireEmployee(user: AuthUser) {
@@ -119,9 +185,10 @@ export class MeService {
 
   async getProfile(user: AuthUser) {
     const { tenantId, dbUser, employee } = await this.resolveEmployee(user);
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
+    const [tenant, team] = await Promise.all([
+      this.prisma.tenant.findUnique({ where: { id: tenantId } }),
+      employee ? this.subordinateIds(tenantId, employee.id) : Promise.resolve([]),
+    ]);
 
     return {
       id: dbUser.id,
@@ -146,6 +213,7 @@ export class MeService {
             schedule: employee.schedule,
           }
         : null,
+      teamSize: team.length,
     };
   }
 
@@ -337,7 +405,7 @@ export class MeService {
     const today = await this.todayAttendance(user);
     const direction = dto.direction ?? today.nextDirection;
 
-    return this.attendance.punchGps(tenantId, {
+    const result = await this.attendance.punchGps(tenantId, {
       employeeId: employee.id,
       latitude: dto.latitude,
       longitude: dto.longitude,
@@ -346,6 +414,157 @@ export class MeService {
       accuracy: dto.accuracy,
       comment: dto.comment,
     });
+    void this.checkPunchJump(tenantId, employee, dto, result);
+    return result;
+  }
+
+  /** A punch far from where background tracking saw the phone minutes ago is flagged for HR. */
+  private checkPunchJump(
+    tenantId: string,
+    employee: { id: string; lastName: string; firstName: string },
+    at: { latitude: number; longitude: number; accuracy?: number },
+    result: object,
+  ) {
+    return checkGpsJump(
+      { prisma: this.prisma, notifications: this.notificationsService },
+      {
+        tenantId,
+        employeeId: employee.id,
+        employeeName: [employee.lastName, employee.firstName].filter(Boolean).join(' '),
+        source: 'punch',
+        markId: 'markId' in result && typeof result.markId === 'string' ? result.markId : undefined,
+        points: [
+          { lat: at.latitude, lng: at.longitude, at: Date.now(), accuracy: at.accuracy ?? null, speed: null },
+        ],
+      },
+    );
+  }
+
+  /** Phone check-in / check-out with liveness + composite photo report. */
+  async punchMobile(user: AuthUser, dto: MeMobilePunchDto) {
+    const { tenantId, employee } = await this.requireEmployee(user);
+    await this.assertMarksAllowed(tenantId, employee.id);
+
+    if (integrityFlagged(dto.integrity)) {
+      await this.reportMockLocation(user, {
+        integrity: dto.integrity!,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+      });
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'MOCK_LOCATION_DETECTED',
+        message: MOCK_LOCATION_WARNING,
+      });
+    }
+
+    const steps = dto.liveness?.steps ?? [];
+    if (!dto.liveness?.passed || new Set(steps).size !== steps.length) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'LIVENESS_FAILED',
+        message: 'Yuz harakati tekshiruvidan o‘tilmadi — qayta urinib ko‘ring',
+      });
+    }
+
+    if (dto.accuracy > MAX_GPS_ACCURACY_M) {
+      throw new BadRequestException(
+        `GPS aniqligi past: ${Math.round(dto.accuracy)} m (max ${MAX_GPS_ACCURACY_M} m)`,
+      );
+    }
+
+    const photo = stripDataUrl(dto.photoBase64);
+    if (photo.length < MIN_PHOTO_REPORT_B64) {
+      throw new BadRequestException('Foto-hisobot topilmadi yoki juda kichik');
+    }
+
+    const today = await this.todayAttendance(user);
+    const hasValidMark = today.marks.some((m) => {
+      const p = m.rawPayload;
+      return !(p && typeof p === 'object' && !Array.isArray(p) && p.isValid === false);
+    });
+    if (dto.direction === 'OUT' && !hasValidMark) {
+      throw new BadRequestException('Avval kirish belgisini qo‘ying');
+    }
+    if (dto.direction === 'IN' && hasValidMark) {
+      throw new BadRequestException('Bugun kirish allaqachon qayd etilgan');
+    }
+
+    const result = await this.attendance.punchMobile(tenantId, {
+      employeeId: employee.id,
+      direction: dto.direction === 'IN' ? PunchDirection.IN : PunchDirection.OUT,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      accuracy: dto.accuracy,
+      photoBase64: photo,
+      liveness: { steps, durationMs: dto.liveness.durationMs },
+      comment: dto.comment,
+      integrity: dto.integrity
+        ? ({ ...dto.integrity } as Record<string, unknown>)
+        : undefined,
+    });
+    void this.checkPunchJump(tenantId, employee, dto, result);
+    return result;
+  }
+
+  /**
+   * Fake-GPS detected on the phone: warn the employee and alert HR.
+   * HR alerts are throttled to one per employee per 10 minutes.
+   */
+  async reportMockLocation(user: AuthUser, dto: MeMockLocationReportDto) {
+    const { tenantId, employee } = await this.requireEmployee(user);
+    const name = [employee.lastName, employee.firstName].filter(Boolean).join(' ');
+    const apps = [dto.integrity.activeMockApp, ...(dto.integrity.mockApps ?? [])]
+      .filter((a): a is string => !!a)
+      .filter((a, i, all) => all.indexOf(a) === i);
+
+    const recent = await this.prisma.problemMark.findFirst({
+      where: {
+        tenantId,
+        reason: 'mock_location',
+        createdAt: { gte: new Date(Date.now() - 10 * 60_000) },
+        payload: { path: ['employeeId'], equals: employee.id },
+      },
+      select: { id: true },
+    });
+
+    await this.prisma.problemMark.create({
+      data: {
+        tenantId,
+        reason: 'mock_location',
+        payload: {
+          employeeId: employee.id,
+          employeeName: name,
+          userId: user.userId,
+          integrity: { ...dto.integrity },
+          latitude: dto.latitude ?? null,
+          longitude: dto.longitude ?? null,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    if (!recent) {
+      await this.prisma.notification.create({
+        data: {
+          tenantId,
+          userId: user.userId,
+          kind: NotificationKind.alert,
+          title: 'Soxta lokatsiya aniqlandi',
+          body: MOCK_LOCATION_WARNING,
+        },
+      });
+      await this.notificationsService.notifyApprovers(tenantId, {
+        kind: NotificationKind.alert,
+        title: `Soxta lokatsiya: ${name}`,
+        body:
+          `Xodim telefonda lokatsiyani soxtalashtiruvchi ilovadan foydalanib belgi qo‘yishga urindi.` +
+          (apps.length ? ` Ilova: ${apps.join(', ')}.` : ''),
+        entity: 'employee',
+        entityId: employee.id,
+      });
+    }
+
+    return { ok: true, blocked: true, message: MOCK_LOCATION_WARNING };
   }
 
   /** Pre-flight for the app: is this point inside a geofence (comment needed?). */

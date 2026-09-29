@@ -187,8 +187,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   height: 50,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
+                      backgroundColor: AppColors.bgSoft,
+                      foregroundColor: AppColors.ink,
                     ),
                     onPressed: () => Navigator.pop(ctx),
                     child: const Text('Yopish'),
