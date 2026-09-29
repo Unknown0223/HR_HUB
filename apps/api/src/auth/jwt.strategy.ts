@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AUTH_COOKIE_NAME, readCookie } from './auth-cookie';
 import { resolveJwtSecret } from './jwt-secret';
+import { SCOPED_ROLES, setRequestScope } from '../common/data-scope';
 
 interface JwtPayload {
   sub: string;
@@ -36,6 +37,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User inactive or not found');
+    }
+    if (SCOPED_ROLES.has(user.role)) {
+      const rows = await this.prisma.userAccessScope.findMany({
+        where: { userId: user.id },
+        select: { kind: true, resourceId: true },
+      });
+      setRequestScope({
+        locationIds: rows.filter((r) => r.kind === 'location').map((r) => r.resourceId),
+        employeeIds: rows.filter((r) => r.kind === 'employee').map((r) => r.resourceId),
+      });
+    } else {
+      setRequestScope(null);
     }
     return {
       userId: user.id,

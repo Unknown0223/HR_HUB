@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { runWithRequestContext } from './common/data-scope';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
@@ -59,4 +60,10 @@ import { TelegramModule } from './telegram/telegram.module';
     TelegramModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply((_req: unknown, _res: unknown, next: () => void) => runWithRequestContext(next))
+      .forRoutes('{*splat}');
+  }
+}

@@ -6,6 +6,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -37,6 +38,10 @@ export class CreateUserDto {
   @ApiPropertyOptional({ enum: Role }) @IsOptional() @IsEnum(Role) role?: Role;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsObject() meta?: Record<string, unknown>;
+  @ApiPropertyOptional({ type: [String], description: 'Филиалы (Location ids) the user may see' })
+  @IsOptional() @IsArray() @IsUUID('all', { each: true }) locationIds?: string[];
+  @ApiPropertyOptional({ type: [String], description: 'Optional: only these employees inside the locations' })
+  @IsOptional() @IsArray() @IsUUID('all', { each: true }) employeeIds?: string[];
 }
 
 export class UpdateUserDto {
@@ -46,6 +51,10 @@ export class UpdateUserDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(6) password?: string;
   @ApiPropertyOptional() @IsOptional() @IsObject() meta?: Record<string, unknown>;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional() @IsArray() @IsUUID('all', { each: true }) locationIds?: string[];
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional() @IsArray() @IsUUID('all', { each: true }) employeeIds?: string[];
 }
 
 export class CreateDictionaryDto {

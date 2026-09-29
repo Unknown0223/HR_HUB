@@ -16,6 +16,7 @@ import { CreateEmployeeDto, UpdateEmployeeDto, UpdateEmployeeContactsDto, Update
 import type { EmployeeFormIngestDto } from './employee-form.dto';
 import { pageResult, parsePagination, PageResult } from '../common/pagination';
 import { employeeNameSearchWhere } from '../common/name-search';
+import { runUnscoped } from '../common/data-scope';
 import {
   defaultReportSettings,
   normalizeReportKind,
@@ -413,9 +414,12 @@ export class EmployeesService {
           });
           continue;
         }
-        const existing = await this.prisma.employee.findFirst({
-          where: { tenantId, tabNumber },
-        });
+        const existing = await runUnscoped(() =>
+          this.prisma.employee.findFirst({
+            where: { tenantId, tabNumber },
+            select: { id: true },
+          }),
+        );
         if (existing) {
           result.skipped += 1;
           continue;

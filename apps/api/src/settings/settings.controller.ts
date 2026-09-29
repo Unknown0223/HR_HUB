@@ -147,6 +147,15 @@ export class SettingsController {
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin)
+  @Get('users/scope-options')
+  userScopeOptions(
+    @CurrentTenant() tenantId: string | null,
+    @Query('locationIds') locationIds?: string,
+  ) {
+    return this.settings.userScopeOptions(this.settings.requireTenant(tenantId), locationIds);
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin)
   @Post('users')
   createUser(
     @CurrentTenant() tenantId: string | null,

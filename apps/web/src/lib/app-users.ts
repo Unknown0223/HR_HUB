@@ -8,8 +8,6 @@ export type UserMeta = {
   photoUrl?: string;
   gender?: 'male' | 'female';
   managedBy?: 'organization' | 'self';
-  orgIds?: string[];
-  orgNames?: string[];
   managerUserId?: string;
   managerName?: string;
   timezone?: string;
@@ -32,7 +30,36 @@ export type AppUser = {
   meta?: UserMeta | null;
   createdAt: string;
   updatedAt?: string;
+  /** Филиалы the user may see (required for hr / manager). */
+  locationIds?: string[];
+  /** Optional narrowing to specific employees inside those филиалы. */
+  employeeIds?: string[];
 };
+
+export type ScopeLocation = { id: string; name: string; code: string; isActive?: boolean };
+
+export type ScopeEmployee = {
+  id: string;
+  fullName: string;
+  tabNumber: string;
+  position: string;
+  locationIds: string[];
+  locations: string[];
+};
+
+/** Roles whose employee visibility is limited to assigned филиалы. */
+export const SCOPED_AUTH_ROLES = new Set(['hr', 'manager']);
+
+/** Mirrors the API's `authRoleFromMeta`: catalog role names decide the auth role. */
+export function authRoleFromCatalogNames(names: string[], fallback = 'employee') {
+  const n = names.map((x) => x.toLowerCase());
+  if (n.some((x) => x.includes('admin'))) return 'tenant_admin';
+  if (n.some((x) => x.includes('hr') || x.includes('кадр') || x.includes('бухгалтер'))) return 'hr';
+  if (n.some((x) => x.includes('руковод') || x.includes('boshliq') || x.includes('менедж')))
+    return 'manager';
+  if (n.some((x) => x.includes('сотрудник'))) return 'employee';
+  return fallback;
+}
 
 export type RoleMeta = {
   products?: string[];

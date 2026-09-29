@@ -12,14 +12,18 @@ import { MultiLookup } from '@/app/(app)/catalog/cashboxes/MultiLookup';
 import { apiFetch, getSession } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
+  SCOPED_AUTH_ROLES,
   TIMEZONES,
   asUserMeta,
+  authRoleFromCatalogNames,
   displayRole,
   initialsOf,
   loginOf,
   type AppUser,
+  type ScopeLocation,
   type UserMeta,
 } from '@/lib/app-users';
+import { UserScopePicker } from './UserScopePicker';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import styles from '../../catalog/absence-types/page.module.css';
@@ -34,7 +38,7 @@ type Dict = { id: string; code: string; name: string; items?: { id: string; name
 
 const PATH = '/settings/users';
 const PAGE_SIZE = 50;
-const FILTER_KEYS = ['q', 'name', 'login', 'org', 'role', 'isActive'] as const;
+const FILTER_KEYS = ['q', 'name', 'login', 'location', 'role', 'isActive'] as const;
 const TZ_OPTS: Opt[] = TIMEZONES.map((t) => ({ id: t.id, label: t.label }));
 
 const SIBLINGS = {
@@ -53,7 +57,7 @@ function UsersInner() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [rows, setRows] = useState<AppUser[]>([]);
-  const [orgs, setOrgs] = useState<Opt[]>([]);
+  const [locations, setLocations] = useState<ScopeLocation[]>([]);
   const [roles, setRoles] = useState<Opt[]>([]);
   const [tenantCode, setTenantCode] = useState('demo');
   const [error, setError] = useState('');
@@ -66,7 +70,7 @@ function UsersInner() {
   const [searchDraft, setSearchDraft] = useState(q);
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(
-    Boolean(filters.name || filters.login || filters.org || filters.role || filters.isActive),
+    Boolean(filters.name || filters.login || filters.location || filters.role || filters.isActive),
   );
   const [statusOpen, setStatusOpen] = useState(false);
   const [mode, setMode] = useState<'list' | 'create' | 'edit' | 'view'>('list');
@@ -77,7 +81,10 @@ function UsersInner() {
   const [showPwd, setShowPwd] = useState(false);
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [active, setActive] = useState(true);
-  const [orgIds, setOrgIds] = useState<string[]>([]);
+  const [scope, setScope] = useState<{ locationIds: string[]; employeeIds: string[] }>({
+    locationIds: [],
+    employeeIds: [],
+  });
   const [managerId, setManagerId] = useState('');
   const [timezone, setTimezone] = useState('Asia/Tashkent');
   const [code, setCode] = useState('');
@@ -91,20 +98,19 @@ function UsersInner() {
     setLoading(true);
     setError('');
     try {
-      const [users, admin, org] = await Promise.all([
+      const [users, admin, org, scopeOpts] = await Promise.all([
         apiFetch<AppUser[]>('/api/settings/users'),
         apiFetch<Dict[]>('/api/settings/dictionaries?kind=admin'),
         apiFetch<{ tenant: { code: string } }>('/api/settings/org'),
+        // Admin-only endpoint; HR can still browse the list without it.
+        apiFetch<{ locations: ScopeLocation[] }>('/api/settings/users/scope-options').catch(() => ({
+          locations: [] as ScopeLocation[],
+        })),
       ]);
       setRows(users || []);
       setTenantCode((org.tenant?.code || 'demo').toLowerCase());
-      const orgDict = (admin || []).find((d) => d.code === 'orgs');
+      setLocations(scopeOpts.locations || []);
       const roleDict = (admin || []).find((d) => d.code === 'app_roles');
-      setOrgs(
-        (orgDict?.items || [])
-          .filter((i) => i.isActive !== false)
-          .map((i) => ({ id: i.id, label: i.name })),
-      );
       setRoles(
         (roleDict?.items || [])
           .filter((i) => i.isActive !== false)
@@ -121,6 +127,13 @@ function UsersInner() {
     void load();
   }, []);
 
+  const locationName = useMemo(
+    () => new Map(locations.map((l) => [l.id, l.name])),
+    [locations],
+  );
+  const locationNamesOf = (u: AppUser) =>
+    (u.locationIds || []).map((id) => locationName.get(id) || '').filter(Boolean);
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     return rows.filter((u) => {
@@ -129,28 +142,39 @@ function UsersInner() {
         return false;
       if (filters.login && !loginOf(u).toLowerCase().includes(filters.login.toLowerCase()))
         return false;
-      if (filters.org && !(m.orgNames || []).some((n) => n.toLowerCase().includes(filters.org.toLowerCase())))
+      if (
+        filters.location &&
+        !locationNamesOf(u).some((n) => n.toLowerCase().includes(filters.location.toLowerCase()))
+      )
         return false;
       if (filters.role && !displayRole(u).toLowerCase().includes(filters.role.toLowerCase()))
         return false;
       if (filters.isActive === '1' && !u.isActive) return false;
       if (filters.isActive === '0' && u.isActive) return false;
       if (!qq) return true;
-      return [u.fullName, loginOf(u), displayRole(u), ...(m.orgNames || []), m.phone, u.email]
+      return [u.fullName, loginOf(u), displayRole(u), ...locationNamesOf(u), m.phone, u.email]
         .join(' ')
         .toLowerCase()
         .includes(qq);
     });
-  }, [rows, q, filters.name, filters.login, filters.org, filters.role, filters.isActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, locationName, q, filters.name, filters.login, filters.location, filters.role, filters.isActive]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
-  }, [q, filters.name, filters.login, filters.org, filters.role, filters.isActive]);
+  }, [q, filters.name, filters.login, filters.location, filters.role, filters.isActive]);
 
   const managerOpts: Opt[] = rows.map((u) => ({ id: u.id, label: u.fullName }));
+
+  const editingUser = editId ? rows.find((u) => u.id === editId) : undefined;
+  const effectiveRole = authRoleFromCatalogNames(
+    roles.filter((r) => roleIds.includes(r.id)).map((r) => r.label),
+    editingUser?.role || 'employee',
+  );
+  const scopeRequired = SCOPED_AUTH_ROLES.has(effectiveRole);
 
   function fill(u?: AppUser) {
     const m = asUserMeta(u?.meta);
@@ -159,7 +183,7 @@ function UsersInner() {
     setPassword('');
     setRoleIds(m.catalogRoleIds || []);
     setActive(u ? u.isActive : true);
-    setOrgIds(m.orgIds || []);
+    setScope({ locationIds: u?.locationIds || [], employeeIds: u?.employeeIds || [] });
     setManagerId(m.managerUserId || '');
     setTimezone(m.timezone || 'Asia/Tashkent');
     setCode(m.code || '');
@@ -194,7 +218,6 @@ function UsersInner() {
 
   function buildMeta(): UserMeta {
     const selectedRoles = roles.filter((r) => roleIds.includes(r.id));
-    const selectedOrgs = orgs.filter((o) => orgIds.includes(o.id));
     const mgr = rows.find((u) => u.id === managerId);
     const digits = phone.replace(/\D/g, '');
     return {
@@ -202,8 +225,6 @@ function UsersInner() {
       photoUrl: photoUrl || undefined,
       gender,
       managedBy,
-      orgIds,
-      orgNames: selectedOrgs.map((o) => o.label),
       managerUserId: managerId || undefined,
       managerName: mgr?.fullName,
       timezone,
@@ -227,6 +248,10 @@ function UsersInner() {
       setError('Пароль не менее 6 символов');
       return;
     }
+    if (scopeRequired && !scope.locationIds.length) {
+      setError('Укажите хотя бы один филиал');
+      return;
+    }
     setSaving(true);
     setError('');
     const body = {
@@ -234,6 +259,8 @@ function UsersInner() {
       email: email.trim() || undefined,
       isActive: active,
       meta: buildMeta(),
+      locationIds: scope.locationIds,
+      employeeIds: scope.employeeIds,
       ...(password.trim() ? { password: password.trim() } : {}),
     };
     try {
@@ -515,16 +542,6 @@ function UsersInner() {
                 </div>
                 <div>
                   <div className={formStyles.field}>
-                    <label>Организации</label>
-                    {locked ? (
-                      <div className={local.readonly}>
-                        {orgs.filter((o) => orgIds.includes(o.id)).map((o) => o.label).join(', ') || '—'}
-                      </div>
-                    ) : (
-                      <MultiLookup value={orgIds} options={orgs} onChange={setOrgIds} />
-                    )}
-                  </div>
-                  <div className={formStyles.field}>
                     <label>Руководитель</label>
                     {locked ? (
                       <div className={local.readonly}>
@@ -580,6 +597,13 @@ function UsersInner() {
                   </div>
                 </div>
               </div>
+              <ScopeSection
+                role={effectiveRole}
+                locations={locations}
+                scope={scope}
+                onChange={setScope}
+                readOnly={locked}
+              />
             </div>
           </div>
         </div>
@@ -620,7 +644,7 @@ function UsersInner() {
             fields={[
               { type: 'text', key: 'name', label: 'Ф.И.О.', placeholder: 'Поиск...' },
               { type: 'text', key: 'login', label: 'Логин', placeholder: 'Поиск...' },
-              { type: 'text', key: 'org', label: 'Организации', placeholder: 'Поиск...' },
+              { type: 'text', key: 'location', label: 'Филиал', placeholder: 'Поиск...' },
               { type: 'text', key: 'role', label: 'Роль', placeholder: 'Поиск...' },
               { type: 'isActive', key: 'isActive', label: 'Статус' },
             ]}
@@ -683,7 +707,8 @@ function UsersInner() {
                     'Ф.И.О.': u.fullName,
                     Логин: loginOf(u),
                     Руководитель: m.managerName || '',
-                    Организации: (m.orgNames || []).join('; '),
+                    Филиалы: locationNamesOf(u).join('; '),
+                    Сотрудники: u.employeeIds?.length ? String(u.employeeIds.length) : 'Все',
                     Роль: displayRole(u),
                     Статус: u.isActive ? 'Активный' : 'Неактивный',
                     Email: u.email,
@@ -748,7 +773,8 @@ function UsersInner() {
               <th>Ф.И.О.</th>
               <th>Логин</th>
               <th>Руководитель</th>
-              <th>Прикрепленные организации</th>
+              <th>Филиалы</th>
+              <th>Сотрудники</th>
               <th>Роль</th>
               <th>Статус</th>
             </tr>
@@ -756,14 +782,14 @@ function UsersInner() {
           <tbody>
             {loading && filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className={styles.empty}>
+                <td colSpan={9} className={styles.empty}>
                   Загрузка…
                 </td>
               </tr>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className={styles.empty}>
+                <td colSpan={9} className={styles.empty}>
                   Нет данных
                 </td>
               </tr>
@@ -853,7 +879,22 @@ function UsersInner() {
                     </td>
                     <td>@{loginOf(u)}</td>
                     <td>{m.managerName || ''}</td>
-                    <td>{(m.orgNames || []).join(', ')}</td>
+                    <td>
+                      {SCOPED_AUTH_ROLES.has(u.role)
+                        ? locationNamesOf(u).join(', ') || (
+                            <span className={extra.badgeOff}>Не назначены</span>
+                          )
+                        : '—'}
+                    </td>
+                    <td>
+                      {!SCOPED_AUTH_ROLES.has(u.role)
+                        ? 'Все'
+                        : u.locationIds?.length
+                          ? u.employeeIds?.length
+                            ? `${u.employeeIds.length} выбрано`
+                            : 'Все в филиалах'
+                          : 'Нет доступа'}
+                    </td>
                     <td>{displayRole(u)}</td>
                     <td>
                       <span className={u.isActive ? extra.badge : extra.badgeOff}>
@@ -938,10 +979,6 @@ function UsersInner() {
           <div className={modal.field}>
             <label>Роли</label>
             <MultiLookup value={roleIds} options={roles} onChange={setRoleIds} />
-          </div>
-          <div className={modal.field}>
-            <label>Организации</label>
-            <MultiLookup value={orgIds} options={orgs} onChange={setOrgIds} />
           </div>
           <div className={modal.field}>
             <label>Руководитель</label>
@@ -1032,7 +1069,50 @@ function UsersInner() {
             ) : null}
           </div>
         </div>
+        <ScopeSection
+          role={effectiveRole}
+          locations={locations}
+          scope={scope}
+          onChange={setScope}
+        />
       </FormModal>
+    </div>
+  );
+}
+
+function ScopeSection({
+  role,
+  locations,
+  scope,
+  onChange,
+  readOnly = false,
+}: {
+  role: string;
+  locations: ScopeLocation[];
+  scope: { locationIds: string[]; employeeIds: string[] };
+  onChange: (next: { locationIds: string[]; employeeIds: string[] }) => void;
+  readOnly?: boolean;
+}) {
+  const scoped = SCOPED_AUTH_ROLES.has(role);
+  return (
+    <div className={ui.scopeSection}>
+      <div className={ui.scopeTitle}>Доступ к сотрудникам</div>
+      {role === 'tenant_admin' || role === 'platform_admin' ? (
+        <p className={ui.scopeNote}>Администратор видит всех сотрудников — филиалы не требуются.</p>
+      ) : !scoped ? (
+        <p className={ui.scopeNote}>
+          Роль «Сотрудник» видит только свои данные — филиалы не требуются.
+        </p>
+      ) : (
+        <UserScopePicker
+          locations={locations}
+          locationIds={scope.locationIds}
+          employeeIds={scope.employeeIds}
+          onChange={onChange}
+          readOnly={readOnly}
+          required
+        />
+      )}
     </div>
   );
 }

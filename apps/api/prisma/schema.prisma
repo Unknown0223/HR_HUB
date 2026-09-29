@@ -310,11 +310,29 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  tenant        Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   notifications Notification[]
+  accessScopes  UserAccessScope[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+/// Which employees a non-admin user may see: kind 'location' (required, ≥1)
+/// narrows to those locations; optional kind 'employee' narrows further.
+model UserAccessScope {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  kind       String
+  resourceId String   @map("resource_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, resourceId])
+  @@index([tenantId, userId])
+  @@map("user_access_scopes")
 }
 
 model Division {

@@ -9,6 +9,11 @@ import { Prisma, Role, DocumentType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  SCOPED_ROLES,
+  scopedEmployeeWhere,
+  type EmployeeScope,
+} from '../common/data-scope';
+import {
   CreateDictionaryDto,
   CreateDictionaryItemDto,
   CreateIntegrationDto,
@@ -109,6 +114,14 @@ function authRoleFromMeta(meta: Record<string, unknown>, fallback: Role = Role.e
     return Role.manager;
   if (names.some((n) => n.includes('сотрудник'))) return Role.employee;
   return fallback;
+}
+
+const EMPTY_SCOPE: EmployeeScope = { locationIds: [], employeeIds: [] };
+
+function assertScopeForRole(role: Role, scope: EmployeeScope) {
+  if (SCOPED_ROLES.has(role) && !scope.locationIds.length) {
+    throw new BadRequestException('Укажите хотя бы один филиал');
+  }
 }
 
 @Injectable()
@@ -562,12 +575,136 @@ export class SettingsService {
     return { accountBalanceReport: next };
   }
 
-  listUsers(tenantId: string) {
-    return this.prisma.user.findMany({
+  async listUsers(tenantId: string) {
+    const users = await this.prisma.user.findMany({
       where: { tenantId },
       select: USER_PUBLIC,
       orderBy: { createdAt: 'desc' },
     });
+    const scopes = await this.loadUserScopes(users.map((u) => u.id));
+    return users.map((u) => ({ ...u, ...(scopes.get(u.id) ?? EMPTY_SCOPE) }));
+  }
+
+  private async loadUserScopes(userIds: string[]) {
+    const out = new Map<string, EmployeeScope>();
+    if (!userIds.length) return out;
+    const rows = await this.prisma.userAccessScope.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, kind: true, resourceId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    for (const r of rows) {
+      let s = out.get(r.userId);
+      if (!s) {
+        s = { locationIds: [], employeeIds: [] };
+        out.set(r.userId, s);
+      }
+      if (r.kind === 'location') s.locationIds.push(r.resourceId);
+      else if (r.kind === 'employee') s.employeeIds.push(r.resourceId);
+    }
+    return out;
+  }
+
+  /** Keeps only tenant locations, and only employees that belong to those locations. */
+  private async resolveUserScope(
+    tenantId: string,
+    locationIds: string[],
+    employeeIds: string[],
+  ): Promise<EmployeeScope> {
+    const wantedLocations = [...new Set(locationIds)];
+    const locations = wantedLocations.length
+      ? await this.prisma.location.findMany({
+          where: { tenantId, id: { in: wantedLocations } },
+          select: { id: true },
+        })
+      : [];
+    const validLocations = wantedLocations.filter((id) => locations.some((l) => l.id === id));
+    const wantedEmployees = [...new Set(employeeIds)];
+    if (!validLocations.length || !wantedEmployees.length) {
+      return { locationIds: validLocations, employeeIds: [] };
+    }
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        AND: [
+          { tenantId, id: { in: wantedEmployees } },
+          scopedEmployeeWhere({ locationIds: validLocations, employeeIds: [] }),
+        ],
+      },
+      select: { id: true },
+    });
+    return {
+      locationIds: validLocations,
+      employeeIds: wantedEmployees.filter((id) => employees.some((e) => e.id === id)),
+    };
+  }
+
+  private async saveUserScope(tenantId: string, userId: string, scope: EmployeeScope) {
+    await this.prisma.$transaction([
+      this.prisma.userAccessScope.deleteMany({ where: { userId } }),
+      this.prisma.userAccessScope.createMany({
+        data: [
+          ...scope.locationIds.map((resourceId) => ({ tenantId, userId, kind: 'location', resourceId })),
+          ...scope.employeeIds.map((resourceId) => ({ tenantId, userId, kind: 'employee', resourceId })),
+        ],
+      }),
+    ]);
+  }
+
+  /** Locations + employees (FIO, филиал, должность, таб. номер) for the user scope picker. */
+  async userScopeOptions(tenantId: string, locationIdsCsv?: string) {
+    const locations = await this.prisma.location.findMany({
+      where: { tenantId },
+      select: { id: true, name: true, code: true, isActive: true },
+      orderBy: { name: 'asc' },
+    });
+    const locationName = new Map(locations.map((l) => [l.id, l.name]));
+    const selected = String(locationIdsCsv || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((id) => locationName.has(id));
+    if (!selected.length) return { locations, employees: [] };
+    const rows = await this.prisma.employee.findMany({
+      where: {
+        AND: [
+          { tenantId, status: { not: 'dismissed' } },
+          scopedEmployeeWhere({ locationIds: selected, employeeIds: [] }),
+        ],
+      },
+      select: {
+        id: true,
+        tabNumber: true,
+        lastName: true,
+        firstName: true,
+        middleName: true,
+        position: { select: { name: true } },
+        division: { select: { locationId: true } },
+        accessGrants: {
+          where: {
+            accessType: 'location',
+            isActive: true,
+            resource: { in: selected },
+            OR: [{ note: null }, { note: { not: 'visit' } }],
+          },
+          select: { resource: true },
+        },
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
+    const employees = rows.map((e) => {
+      const ids = new Set<string>();
+      const home = e.division?.locationId;
+      if (home && selected.includes(home)) ids.add(home);
+      for (const g of e.accessGrants) ids.add(g.resource);
+      return {
+        id: e.id,
+        tabNumber: e.tabNumber,
+        fullName: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' '),
+        position: e.position?.name ?? '',
+        locationIds: [...ids],
+        locations: [...ids].map((id) => locationName.get(id) ?? '').filter(Boolean),
+      };
+    });
+    return { locations, employees };
   }
 
   async createUser(tenantId: string, dto: CreateUserDto, actor?: DictActor) {
@@ -596,6 +733,12 @@ export class SettingsService {
     const role =
       dto.role ||
       authRoleFromMeta(meta, Role.employee);
+    const scope = await this.resolveUserScope(
+      tenantId,
+      dto.locationIds ?? [],
+      dto.employeeIds ?? [],
+    );
+    assertScopeForRole(role, scope);
     try {
       const user = await this.prisma.user.create({
         data: {
@@ -609,12 +752,15 @@ export class SettingsService {
         },
         select: USER_PUBLIC,
       });
+      await this.saveUserScope(tenantId, user.id, scope);
       await this.audit(tenantId, actor?.userId || null, 'user.create', 'User', user.id, {
         email: user.email,
         role: user.role,
         userName: who,
+        locations: scope.locationIds.length,
+        employees: scope.employeeIds.length,
       });
-      return user;
+      return { ...user, ...scope };
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new BadRequestException('Пользователь с таким email уже существует');
@@ -656,15 +802,31 @@ export class SettingsService {
         data.role = authRoleFromMeta(nextMeta, existing.role);
       }
     }
+    const finalRole = (data.role as Role | undefined) ?? existing.role;
+    const current = (await this.loadUserScopes([id])).get(id) ?? EMPTY_SCOPE;
+    const scopeChanged = dto.locationIds !== undefined || dto.employeeIds !== undefined;
+    const scope = scopeChanged
+      ? await this.resolveUserScope(
+          tenantId,
+          dto.locationIds ?? current.locationIds,
+          dto.employeeIds ?? current.employeeIds,
+        )
+      : current;
+    // Plain toggles (e.g. deactivate) must still work for users not yet assigned a филиал.
+    if (scopeChanged || finalRole !== existing.role) assertScopeForRole(finalRole, scope);
     const user = await this.prisma.user.update({
       where: { id },
       data,
       select: USER_PUBLIC,
     });
+    if (scopeChanged) await this.saveUserScope(tenantId, id, scope);
     await this.audit(tenantId, actor?.userId || null, 'user.update', 'User', id, {
       userName: actorLabel(actor),
+      ...(scopeChanged
+        ? { locations: scope.locationIds.length, employees: scope.employeeIds.length }
+        : {}),
     });
-    return user;
+    return { ...user, ...scope };
   }
 
   async deleteUser(tenantId: string, id: string, actor?: DictActor) {
