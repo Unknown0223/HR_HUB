@@ -5,6 +5,7 @@ import 'core/router/app_router.dart';
 import 'core/security/app_permissions.dart';
 import 'core/theme/app_theme.dart';
 import 'core/tracking/tracking_controller.dart';
+import 'features/lock/app_lock_screens.dart';
 
 class HrHubApp extends ConsumerStatefulWidget {
   const HrHubApp({super.key});
@@ -56,7 +57,7 @@ class _HrHubAppState extends ConsumerState<HrHubApp> with WidgetsBindingObserver
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(textScaler: ReadableTextScaler(mq.textScaler)),
-          child: child ?? const SizedBox.shrink(),
+          child: AppLockGate(child: child ?? const SizedBox.shrink()),
         );
       },
     );

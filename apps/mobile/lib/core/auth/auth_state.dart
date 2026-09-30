@@ -1,6 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
+import '../errors/api_exception.dart';
+import '../security/app_lock.dart';
 import '../tracking/tracking_controller.dart';
+
+const _kMeCache = 'meCache';
 
 class AuthUser {
   AuthUser({
@@ -101,27 +108,59 @@ class AuthNotifier extends StateNotifier<AuthState> {
   FlutterSecureStorageProxy get _storage =>
       FlutterSecureStorageProxy(_ref.read(secureStorageProvider));
 
+  /// The session survives restarts and offline starts: only the server rejecting the token
+  /// (401) or an explicit logout signs the user out.
   Future<void> restore() async {
     state = state.copyWith(loading: true, clearError: true);
-    try {
-      await _restoreInner().timeout(const Duration(seconds: 6));
-    } catch (_) {
-      try {
-        await logout(silent: true);
-      } catch (_) {}
-      state = const AuthState(loading: false);
-    }
-  }
-
-  Future<void> _restoreInner() async {
     await _api.restoreBaseUrl();
     final token = await _storage.read('accessToken');
     if (token == null || token.isEmpty) {
       state = const AuthState(loading: false);
       return;
     }
-    final me = await _api.get('/me');
-    state = AuthState(user: AuthUser.fromJson(me), loading: false);
+    try {
+      final me = await _api.get('/me').timeout(const Duration(seconds: 6));
+      await _cacheMe(me);
+      state = AuthState(user: AuthUser.fromJson(me), loading: false);
+      unawaited(revalidate());
+    } catch (e) {
+      if (_isRejected(e)) {
+        await logout(silent: true);
+        state = const AuthState(loading: false);
+        return;
+      }
+      final cached = await _cachedMe();
+      state = AuthState(user: cached == null ? null : AuthUser.fromJson(cached), loading: false);
+    }
+  }
+
+  /// Exchanges the current token for a fresh one (7-day window slides while the app is used).
+  /// Signs out if the server says the account is gone or access was closed.
+  Future<void> revalidate() async {
+    try {
+      final res = await _api.post('/auth/refresh').timeout(const Duration(seconds: 10));
+      final token = res['accessToken']?.toString();
+      if (token != null && token.isNotEmpty) {
+        await _storage.write('accessToken', token);
+      }
+    } catch (e) {
+      if (_isRejected(e) && state.isAuthenticated) await logout();
+    }
+  }
+
+  bool _isRejected(Object e) => e is ApiException && e.statusCode == 401;
+
+  Future<void> _cacheMe(Map<String, dynamic> me) =>
+      _storage.write(_kMeCache, jsonEncode(me));
+
+  Future<Map<String, dynamic>?> _cachedMe() async {
+    try {
+      final raw = await _storage.read(_kMeCache);
+      if (raw == null || raw.isEmpty) return null;
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> login(String email, String password) async {
@@ -146,6 +185,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _storage.write('tenantId', tenantId);
       }
       final me = await _api.get('/me');
+      await _cacheMe(me);
       state = AuthState(user: AuthUser.fromJson(me), loading: false);
     } catch (e) {
       state = AuthState(loading: false, error: e.toString());
@@ -157,6 +197,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _ref.read(trackingControllerProvider).stop();
     await _storage.delete('accessToken');
     await _storage.delete('tenantId');
+    await _storage.delete(_kMeCache);
+    await _ref.read(appLockProvider.notifier).reset();
     if (!silent) {
       state = const AuthState(loading: false);
     }
@@ -164,6 +206,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> refreshMe() async {
     final me = await _api.get('/me');
+    await _cacheMe(me);
     state = AuthState(user: AuthUser.fromJson(me), loading: false);
   }
 }

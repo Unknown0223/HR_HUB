@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/biometrics/biometric_service.dart';
+import '../../core/security/app_lock.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -13,7 +14,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool touchId = false;
   bool _bioAvailable = false;
   String themeLabel = 'Tizimdagi kabi';
   String lang = 'O\'zbekcha';
@@ -25,27 +25,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadBio() async {
-    final bio = ref.read(biometricServiceProvider);
-    final enabled = await bio.isEnabled;
-    final available = await bio.deviceSupportsBiometrics();
-    if (!mounted) return;
-    setState(() {
-      touchId = enabled;
-      _bioAvailable = available;
-    });
+    final types = await ref.read(biometricServiceProvider).availableTypes();
+    if (mounted) setState(() => _bioAvailable = types.isNotEmpty);
   }
 
   Future<void> _toggleBio(bool v) async {
-    final bio = ref.read(biometricServiceProvider);
     if (v) {
-      final ok = await bio.authenticate(
-        reason: 'Barmoq izini yoqish uchun tasdiqlang',
-        allowSkipIfUnavailable: true,
-      );
+      final ok = await ref.read(biometricServiceProvider).authenticate(
+            reason: 'Barmoq izi bilan ochishni tasdiqlang',
+            allowSkipIfUnavailable: false,
+          );
       if (!ok) return;
     }
-    await bio.setEnabled(v);
-    setState(() => touchId = v);
+    await ref.read(appLockProvider.notifier).setBiometric(v);
   }
 
   @override
@@ -93,22 +85,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const Divider(height: 1, color: AppColors.line),
               MenuTile(
-                icon: Icons.pin_outlined,
-                label: 'PIN-kodni olib tashlash',
-                onTap: () {},
-              ),
-              const Divider(height: 1, color: AppColors.line),
-              MenuTile(
                 icon: Icons.fingerprint,
-                label: 'Barmoq izi / Touch-ID',
+                label: 'Barmoq izi bilan ochish',
                 subtitle: _bioAvailable
-                    ? 'Kirish va belgi tasdiqi'
-                    : 'Qurilmada biometrik yo\'q (emulator OK)',
+                    ? 'PIN-kod o\'rniga tezkor kirish'
+                    : 'Qurilmada barmoq izi qo\'shilmagan',
                 showChevron: false,
                 trailing: Switch(
-                  value: touchId,
-                  activeTrackColor: AppColors.logout,
-                  onChanged: _toggleBio,
+                  value: ref.watch(appLockProvider).biometric,
+                  activeTrackColor: AppColors.accent,
+                  onChanged: _bioAvailable ? _toggleBio : null,
                 ),
               ),
             ],

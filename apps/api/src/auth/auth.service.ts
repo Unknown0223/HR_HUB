@@ -75,7 +75,31 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // HR HUB: «Закрыть доступ к системе» — linked employee cannot sign in
+    await this.assertEmployeeAccess(user);
+    return this.tokenResponse(user, user.tenant);
+  }
+
+  /**
+   * Sliding session for the mobile app: a still-valid token is exchanged for a fresh one,
+   * re-checking everything login checks (dismissal, HR-closed access) except the password.
+   */
+  async refresh(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { tenant: true },
+    });
+    if (!user || !user.isActive) throw new UnauthorizedException();
+    await this.assertEmployeeAccess(user);
+    return this.tokenResponse(user, user.tenant);
+  }
+
+  /** HR HUB: «Закрыть доступ к системе» — linked employee cannot sign in. */
+  private async assertEmployeeAccess(user: {
+    tenantId: string | null;
+    role: Role;
+    email: string;
+    meta: unknown;
+  }) {
     if (user.tenantId && user.role === Role.employee) {
       const meta = user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
         ? (user.meta as Record<string, unknown>)
@@ -110,8 +134,6 @@ export class AuthService {
         }
       }
     }
-
-    return this.tokenResponse(user, user.tenant);
   }
 
   async me(userId: string) {

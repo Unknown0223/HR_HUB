@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:local_auth_android/local_auth_android.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _kBiometricEnabled = 'biometricEnabled';
@@ -60,10 +61,24 @@ class BiometricService {
         // Emulator without enrolled fingerprints.
         return true;
       }
+      // Fingerprint only: the system "Use PIN" fallback would ask for the phone's screen-lock PIN,
+      // which users confuse with the app PIN — cancelling returns them to the app keypad instead.
       return await _auth.authenticate(
         localizedReason: reason,
+        authMessages: const [
+          AndroidAuthMessages(
+            signInTitle: 'HR HUB',
+            biometricHint: 'Barmoq izingizni sensorga tekkizing',
+            biometricNotRecognized: 'Barmoq izi tanilmadi, qayta urinib ko‘ring',
+            biometricSuccess: 'Tasdiqlandi',
+            biometricRequiredTitle: 'Barmoq izi qo‘shilmagan',
+            goToSettingsButton: 'Sozlamalar',
+            goToSettingsDescription: 'Telefon sozlamalarida barmoq izini qo‘shing',
+            cancelButton: 'PIN-kod bilan kirish',
+          ),
+        ],
         options: const AuthenticationOptions(
-          biometricOnly: false,
+          biometricOnly: true,
           stickyAuth: true,
           useErrorDialogs: true,
         ),

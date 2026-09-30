@@ -59,6 +59,18 @@ export class AuthController {
 
   @ApiBearerAuth()
   @SkipTenant()
+  @Post('refresh')
+  async refresh(
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.refresh(user.userId);
+    setAuthCookie(res, result.accessToken);
+    return result;
+  }
+
+  @ApiBearerAuth()
+  @SkipTenant()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return this.auth.me(user.userId);

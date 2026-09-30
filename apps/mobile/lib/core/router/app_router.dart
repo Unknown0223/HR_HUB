@@ -10,6 +10,7 @@ import '../../features/auth/splash_screen.dart';
 import '../../features/calendar/calendar_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/home/shell_screen.dart';
+import '../../features/lock/app_lock_screens.dart';
 import '../../features/news/news_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/payroll/payroll_summary_screen.dart';
@@ -141,11 +142,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/security/pin',
-        builder: (_, __) => const PinScreen(
-          title: 'Joriy PIN-kod',
-          subtitle: 'PIN-kodni o\'zgartiring',
-          showAccounts: false,
-        ),
+        builder: (_, __) => const ChangePinScreen(),
       ),
       GoRoute(path: '/help', builder: (_, __) => const HelpScreen()),
       GoRoute(path: '/modules', builder: (_, __) => const ModulesScreen()),
