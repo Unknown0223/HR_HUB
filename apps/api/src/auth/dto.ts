@@ -25,8 +25,10 @@ export class RegisterDto {
 }
 
 export class LoginDto {
+  /** Email or `login@tenant` (resolved to `login@tenant.local`). */
   @ApiProperty({ example: 'admin@demo.local' })
-  @IsEmail()
+  @IsString()
+  @MinLength(3)
   email!: string;
 
   @ApiProperty({ example: 'Demo1234!' })

@@ -83,7 +83,7 @@ export class MeService {
     return tenantId;
   }
 
-  /** Resolve linked Employee by matching user email within tenant. */
+  /** Resolve the caller's Employee: explicit meta.employeeId link first, then email match. */
   async resolveEmployee(user: AuthUser) {
     const tenantId = this.requireTenant(user.tenantId);
     const dbUser = await this.prisma.user.findUnique({
@@ -91,28 +91,46 @@ export class MeService {
     });
     if (!dbUser) throw new UnauthorizedException();
 
-    // The caller's own card must resolve even when their branch scope does not cover it.
-    const employee = await runUnscoped(() => this.prisma.employee.findFirst({
-      where: {
-        tenantId,
-        email: { equals: dbUser.email, mode: 'insensitive' },
-        status: 'active',
-      },
-      include: {
-        division: { select: { id: true, code: true, name: true } },
-        position: { select: { id: true, code: true, name: true } },
-        schedule: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            startTime: true,
-            endTime: true,
-            graceMinutes: true,
-          },
+    const meta = dbUser.meta && typeof dbUser.meta === 'object' && !Array.isArray(dbUser.meta)
+      ? (dbUser.meta as Record<string, unknown>)
+      : {};
+    const linkedId =
+      typeof meta.employeeId === 'string' && /^[0-9a-f-]{36}$/i.test(meta.employeeId)
+        ? meta.employeeId
+        : '';
+
+    const include = {
+      division: { select: { id: true, code: true, name: true } },
+      position: { select: { id: true, code: true, name: true } },
+      schedule: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          startTime: true,
+          endTime: true,
+          graceMinutes: true,
         },
       },
-    }));
+    } satisfies Prisma.EmployeeInclude;
+
+    // The caller's own card must resolve even when their branch scope does not cover it.
+    const employee = await runUnscoped(async () =>
+      (linkedId
+        ? await this.prisma.employee.findFirst({
+            where: { tenantId, id: linkedId, status: 'active' },
+            include,
+          })
+        : null) ??
+      this.prisma.employee.findFirst({
+        where: {
+          tenantId,
+          email: { equals: dbUser.email, mode: 'insensitive' },
+          status: 'active',
+        },
+        include,
+      }),
+    );
     return { tenantId, dbUser, employee };
   }
 

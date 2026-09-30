@@ -55,10 +55,18 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+    const ident = dto.email.trim().toLowerCase();
+    let user = await this.prisma.user.findUnique({
+      where: { email: ident },
       include: { tenant: true },
     });
+    // Mobile "login@tenant" → "login@tenant.local" (Settings/employee-card convention).
+    if (!user && /^[^@\s]+@[^@.\s]+$/.test(ident)) {
+      user = await this.prisma.user.findUnique({
+        where: { email: `${ident}.local` },
+        include: { tenant: true },
+      });
+    }
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -69,14 +77,22 @@ export class AuthService {
 
     // HR HUB: «Закрыть доступ к системе» — linked employee cannot sign in
     if (user.tenantId && user.role === Role.employee) {
+      const meta = user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
+        ? (user.meta as Record<string, unknown>)
+        : {};
+      const linkedId =
+        typeof meta.employeeId === 'string' && /^[0-9a-f-]{36}$/i.test(meta.employeeId)
+          ? meta.employeeId
+          : '';
       const emp = await this.prisma.employee.findFirst({
-        where: {
-          tenantId: user.tenantId,
-          email: user.email,
-          status: 'active',
-        },
+        where: linkedId
+          ? { tenantId: user.tenantId, id: linkedId, status: 'active' }
+          : { tenantId: user.tenantId, email: user.email, status: 'active' },
         select: { id: true },
       });
+      if (linkedId && !emp) {
+        throw new UnauthorizedException('Сотрудник не активен (уволен или удалён)');
+      }
       if (emp) {
         const closed = await this.prisma.employeeAccessGrant.findFirst({
           where: {

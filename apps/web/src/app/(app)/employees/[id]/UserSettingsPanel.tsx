@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getSession } from '@/lib/api';
 import styles from './page.module.css';
 
 export type UserSettings = {
@@ -158,9 +158,14 @@ type Props = {
 export function UserSettingsPanel({
   employeeId,
   initial,
-  loginSuffix = 'lalaku',
+  loginSuffix: loginSuffixProp,
   onSaved,
 }: Props) {
+  const [tenantCode, setTenantCode] = useState('');
+  useEffect(() => {
+    setTenantCode((getSession()?.tenant?.code ?? '').toLowerCase());
+  }, []);
+  const loginSuffix = loginSuffixProp || tenantCode || 'kompaniya';
   const [form, setForm] = useState<UserSettings>(() => mergeSettings(initial));
   const [savedSnap, setSavedSnap] = useState(() => JSON.stringify(mergeSettings(initial)));
   const [password, setPassword] = useState('');
@@ -211,16 +216,29 @@ export function UserSettingsPanel({
     setErr('');
     setOkMsg('');
     try {
-      await apiFetch(`/api/employees/${employeeId}/user-settings`, {
+      const res = await apiFetch<{
+        account?: { login: string; loginName: string; created: boolean; passwordChanged: boolean } | null;
+      }>(`/api/employees/${employeeId}/user-settings`, {
         method: 'PATCH',
         body: JSON.stringify({
           settings: form,
           password: password.trim() || null,
         }),
       });
-      setSavedSnap(JSON.stringify(form));
+      const next = res.account ? { ...form, login: res.account.loginName } : form;
+      setForm(next);
+      setSavedSnap(JSON.stringify(next));
       setPassword('');
-      setOkMsg('Сохранено');
+      const acc = res.account;
+      setOkMsg(
+        !acc
+          ? 'Сохранено'
+          : acc.created
+            ? `Аккаунт создан. Вход в мобильном приложении: ${acc.login}`
+            : acc.passwordChanged
+              ? `Пароль изменён. Логин: ${acc.login}`
+              : `Сохранено. Логин: ${acc.login}`,
+      );
       onSaved?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка сохранения');

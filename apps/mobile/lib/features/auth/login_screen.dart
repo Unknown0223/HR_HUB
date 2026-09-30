@@ -16,12 +16,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _email = TextEditingController(text: 'admin@demo.local');
-  final _password = TextEditingController(text: 'Demo1234!');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   final _baseUrl = TextEditingController(text: ApiConfig.defaultBaseUrl);
   bool _obscure = true;
   bool _busy = false;
   bool _bioEnabled = false;
+  bool _showServer = false;
   String? _error;
 
   @override
@@ -36,7 +37,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final url = prefs.getString('apiBaseUrl');
     if (url != null && url.isNotEmpty) {
       _baseUrl.text = url;
+      if (url != ApiConfig.defaultBaseUrl && mounted) {
+        setState(() => _showServer = true);
+      }
     }
+  }
+
+  String? _credentialsError() {
+    if (_email.text.trim().isEmpty || _password.text.isEmpty) {
+      return 'Login va parolni kiriting';
+    }
+    return null;
   }
 
   Future<void> _loadBio() async {
@@ -53,13 +64,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    final invalid = _credentialsError();
+    if (invalid != null) {
+      setState(() => _error = invalid);
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await ref.read(apiClientProvider).setBaseUrl(_baseUrl.text.trim());
-      await ref.read(authProvider.notifier).login(_email.text, _password.text);
+      await ref.read(authProvider.notifier).login(_email.text.trim(), _password.text);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -68,6 +84,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _bioUnlock() async {
+    final invalid = _credentialsError();
+    if (invalid != null) {
+      setState(() => _error = invalid);
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -81,8 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!ok) {
         throw Exception('Biometrik rad etildi');
       }
-      // Re-login with stored demo credentials after biometric gate.
-      await ref.read(authProvider.notifier).login(_email.text, _password.text);
+      await ref.read(authProvider.notifier).login(_email.text.trim(), _password.text);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -103,18 +123,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Profil qo\'shish',
+                  'Kirish',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
                     color: AppColors.ink,
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 6),
+                const Text(
+                  'Login va parolni HR bo\'limidan oling',
+                  style: TextStyle(color: AppColors.inkFaint, fontSize: 13),
+                ),
+                const SizedBox(height: 24),
                 SoftField(
                   controller: _email,
-                  hint: 'Login@kompaniya',
-                  label: 'Login@kompaniya',
+                  hint: 'login@kompaniya',
+                  label: 'Login',
                   prefixIcon: Icons.person_outline,
                   keyboardType: TextInputType.emailAddress,
                 ),
@@ -134,17 +159,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                SoftField(
-                  controller: _baseUrl,
-                  hint: 'Server manzil',
-                  label: 'Server manzil',
-                  prefixIcon: Icons.cloud_outlined,
-                  suffixIcon: const Icon(
-                    Icons.dns_outlined,
-                    color: AppColors.ink,
+                if (_showServer) ...[
+                  const SizedBox(height: 14),
+                  SoftField(
+                    controller: _baseUrl,
+                    hint: 'Server manzil',
+                    label: 'Server manzil',
+                    prefixIcon: Icons.cloud_outlined,
+                    suffixIcon: IconButton(
+                      tooltip: 'Standart server',
+                      onPressed: () => setState(
+                        () => _baseUrl.text = ApiConfig.defaultBaseUrl,
+                      ),
+                      icon: const Icon(Icons.restart_alt, color: AppColors.ink),
+                    ),
                   ),
-                ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -167,43 +197,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 18),
                 ],
-                Row(
-                  children: const [
-                    Expanded(child: Divider(color: AppColors.line)),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'YOKI',
-                        style: TextStyle(
-                          color: AppColors.inkFaint,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _showServer = !_showServer),
+                    icon: Icon(
+                      _showServer ? Icons.expand_less : Icons.settings_outlined,
+                      size: 18,
+                      color: AppColors.inkFaint,
                     ),
-                    Expanded(child: Divider(color: AppColors.line)),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Telefon orqali kirish hozircha demo rejimida',
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('Telefon raqami bilan kirish'),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Demo: admin@demo.local / Demo1234!\n'
-                  'Xodim: employee@demo.local / Demo1234!\n'
-                  'Brand: HR HUB',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.inkFaint, fontSize: 12),
+                    label: const Text(
+                      'Server sozlamalari',
+                      style: TextStyle(color: AppColors.inkFaint, fontSize: 12),
+                    ),
+                  ),
                 ),
               ],
             ),
