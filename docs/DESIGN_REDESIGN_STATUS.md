@@ -51,7 +51,8 @@ Batafsil: [DESIGN_TEMPLATE_PLAN.md](./DESIGN_TEMPLATE_PLAN.md)
 | Посещения lists | ✅ |
 | Зарплата (14 list) | ✅ Arena + FormModal + bulk + mega-nav icons |
 | Отчетность (Кадры / Посещения / Зарплата) | ✅ Arena shell + ПРОСМОТР; tablar tepada; filter picklar ixcham |
-| Mega-nav UX | ✅ Посещения 2-col; Отчетность flyout 2-col; hover close |
+| Navigatsiya | ✅ 2026-10-01: mega-menyu o‘rniga sidebar (registr `lib/nav-registry.ts`), `/reports` hub, `/access`, `/catalog` — [STATUS.md](./STATUS.md#ia-qayta-tuzish--sidebar--hisobotlar--ruxsatlar-2026-10-01) |
+| Ranglar / mavsumiy fon | 🟡 alohida oqimda, commit qilinmagan (SeasonalBackdrop, ~250 CSS) |
 | Global FormModal / PageSubnav / dropdown / **header topRight** | ✅ standartlashtirilgan |
 | Mobile | ❌ |
 
@@ -76,8 +77,8 @@ Batafsil: [DESIGN_TEMPLATE_PLAN.md](./DESIGN_TEMPLATE_PLAN.md)
 - Месяц + Шаблоны siqilishi bartaraf (yonma-yon `1fr+220px` olib tashlandi)  
 
 ### Navigatsiya / shell
-- Mega: Посещения 2 ustun; Отчетность flyout 2 ustun (`flyItems > 6`)  
-- Mega hover leave — `scheduleMegaClose` (~160ms) + backdrop  
+- 2026-10-01: mega-menyu olib tashlandi → `SidebarNav` (desktop collapse `hrhub.sidebar.compact`, ≤1024px drawer + pastki bar). Bo‘lim/guruh/item’lar faqat `lib/nav-registry.ts` dan; `npm run check:nav`  
+- Sahifa sarlavhasi: hisobot nomi → registr item → guruh; profil menyusida «Мобильная версия» (`/m`)  
 
 ### Создать → FormModal (eski to‘liq sahifa → markaziy modal)
 - **Валюты** (rasmdagi misol) + кассы, COA, document-types, nationality, institutions, education-types, employment-sources, hire-document-exceptions, indicators, avg-salaries, specialties, persons  
@@ -101,6 +102,7 @@ Batafsil: [DESIGN_TEMPLATE_PLAN.md](./DESIGN_TEMPLATE_PLAN.md)
 | `/employees/[id]` EmployeeCard | 🟡 | ixtiyoriy pixel |
 | Mobile | ❌ | F4 — alohida sprint |
 | Web ESLint to‘liq | 🟡 | CI soft; typecheck majburiy |
+| Mavsumiy fon fokus | 🟡 | `lib/season.ts` `sectionFocus` eski `hr` id’ni kutadi; registrda `employees`, `access`, `maintenance`, `communications` |
 
 **List Arena:** `/employees` va `/positions` — ✅ (F13). Rejalashtirilgan redesign qarz yopildi.
 

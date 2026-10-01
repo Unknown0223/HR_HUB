@@ -10,6 +10,7 @@ import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { fmtDateTime } from '@/lib/currencies';
+import { migrateMovedGrantKeys } from '@/lib/role-access';
 import {
   PRODUCTS,
   accessCatalog,
@@ -100,7 +101,7 @@ function RolesInner({ section }: { section: RolesSection }) {
         ),
       );
       setUsers(userList || []);
-      setGrants(access.grants || {});
+      setGrants(migrateMovedGrantKeys(access.grants || {}));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
     } finally {

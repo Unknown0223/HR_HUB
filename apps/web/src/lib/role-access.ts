@@ -14,6 +14,25 @@ const MOVED_GRANTS: Record<string, string> = {
   '/catalog/access-grants': '/access/employees',
 };
 
+/** Rewrites grant keys (`<href>::<action>`) of moved pages to the current href. */
+export function migrateMovedGrantKeys(
+  byRole: Record<string, Record<string, boolean>>,
+): Record<string, Record<string, boolean>> {
+  const out: Record<string, Record<string, boolean>> = {};
+  for (const [role, keys] of Object.entries(byRole)) {
+    const next: Record<string, boolean> = {};
+    for (const [key, on] of Object.entries(keys || {})) {
+      const sep = key.lastIndexOf('::');
+      const href = sep < 0 ? key : key.slice(0, sep);
+      const moved = MOVED_GRANTS[href];
+      const k = moved ? `${moved}${sep < 0 ? '' : key.slice(sep)}` : key;
+      next[k] = Boolean(next[k]) || Boolean(on);
+    }
+    out[role] = next;
+  }
+  return out;
+}
+
 export type MyAccess = {
   bypass: boolean;
   /** Allowed page hrefs (without `::*` suffix) */

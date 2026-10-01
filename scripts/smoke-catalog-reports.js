@@ -602,7 +602,8 @@ async function main() {
     await evaluate(
       cdp,
       sessionId,
-      `localStorage.setItem('hrhub_session', ${JSON.stringify(JSON.stringify(login.data))}); 'ok'`,
+      `localStorage.setItem('hrhub_session', ${JSON.stringify(JSON.stringify({ user: login.data.user, tenant: login.data.tenant ?? null }))});
+       sessionStorage.setItem('hrhub_media_at', ${JSON.stringify(token)}); 'ok'`,
     );
 
     const pages = [
@@ -705,7 +706,8 @@ async function main() {
           if (snap.err) throw new Error(snap.body.slice(0, 400));
           if (
             snap.tables > 0 &&
-            (snap.body.includes(page.tableHint) || /нет данных|просмотреть/i.test(snap.body))
+            (snap.body.toLocaleLowerCase('ru').includes(page.tableHint.toLocaleLowerCase('ru')) ||
+              /нет данных|просмотреть/i.test(snap.body))
           ) {
             ok = true;
             break;
