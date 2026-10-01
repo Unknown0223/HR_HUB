@@ -55,6 +55,7 @@
     "smoke:banks": "node scripts/smoke-banks.js",
     "smoke:quickstart": "node scripts/smoke-quickstart.js",
     "check:ports": "node scripts/check-canonical-ports.js",
+    "check:nav": "node scripts/check-nav-registry.js",
     "smoke:photos": "node scripts/smoke-photos.js",
     "smoke:person-docs": "node scripts/smoke-person-docs.js",
     "smoke:fine-policies": "node scripts/smoke-fine-policies.js",

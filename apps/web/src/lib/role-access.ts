@@ -46,6 +46,18 @@ export function isHrefAllowed(
   return false;
 }
 
+export function filterNavItems<T extends { href: string; platformOnly?: boolean }>(
+  items: T[],
+  access: MyAccess | null,
+  authRole?: string | null,
+): T[] {
+  return filterMegaItems(
+    items.map((i) => ({ ...i, badge: i.platformOnly ? 'platform' : undefined })),
+    access,
+    authRole,
+  );
+}
+
 export function filterMegaItems<T extends { href: string; badge?: string }>(
   items: T[],
   access: MyAccess | null,

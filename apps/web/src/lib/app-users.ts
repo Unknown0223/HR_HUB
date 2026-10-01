@@ -1,4 +1,5 @@
-import { MEGA_NAV } from './mega-nav';
+import { NAV_ITEMS } from './nav-registry';
+import { REPORTS_NAV_FLAT } from './reports-nav';
 import { TIMEZONES } from './organizations';
 
 export { TIMEZONES };
@@ -119,12 +120,10 @@ export function initialsOf(name: string) {
 export type AccessRow = { form: string; action: string; key: string };
 
 export function accessCatalog(): AccessRow[] {
-  const items: { href: string; label: string }[] = [];
-  for (const sec of MEGA_NAV) {
-    for (const col of sec.columns) {
-      for (const it of col.items) items.push({ href: it.href, label: it.label });
-    }
-  }
+  const items: { href: string; label: string }[] = [
+    ...NAV_ITEMS.map((it) => ({ href: it.href, label: it.label })),
+    ...REPORTS_NAV_FLAT.map((it) => ({ href: it.href, label: it.label })),
+  ];
   items.push(
     { href: '/settings/organizations', label: 'Организации' },
     { href: '/settings/users', label: 'Пользователи' },

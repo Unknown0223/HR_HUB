@@ -60,7 +60,6 @@ export const CATALOG_NAV: NavGroup[] = [
       { href: '/catalog/division-stats', label: 'Статистика работы подразделений' },
       { href: '/catalog/year-summary', label: 'Итоги года' },
       { href: '/catalog/dismissal-analytics', label: 'Причины увольнений' },
-      { href: '/catalog/personnel-changes', label: 'Кадровые изменения' },
       { href: '/catalog/dismissal-reasons', label: 'Причины увольнения' },
       { href: '/catalog/relatives', label: 'Родственники' },
       { href: '/catalog/candidates', label: 'Кандидаты' },
