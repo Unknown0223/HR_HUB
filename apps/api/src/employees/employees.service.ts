@@ -18,6 +18,7 @@ import type { EmployeeFormIngestDto } from './employee-form.dto';
 import { pageResult, parsePagination, PageResult } from '../common/pagination';
 import { employeeNameSearchWhere } from '../common/name-search';
 import { runUnscoped } from '../common/data-scope';
+import { MobileAccountsService } from './mobile-accounts.service';
 import {
   defaultReportSettings,
   normalizeReportKind,
@@ -61,6 +62,7 @@ export class EmployeesService {
     private readonly storage: StorageService,
     private readonly face: FaceService,
     private readonly settings: SettingsService,
+    private readonly mobileAccounts: MobileAccountsService,
   ) {}
 
   /** Push face to devices of employee's locations (non-blocking). */
@@ -6097,7 +6099,7 @@ export class EmployeesService {
   ) {
     await this.requireEmployee(tenantId, employeeId);
     const settings = this.normalizeUserSettings(dto.settings ?? {});
-    const account = await this.syncEmployeeAccount(
+    const account = await this.mobileAccounts.sync(
       tenantId,
       employeeId,
       String(settings.login ?? ''),
@@ -6106,86 +6108,6 @@ export class EmployeesService {
     if (account) settings.login = account.loginName;
     await this.upsertProfileExtras(tenantId, employeeId, { userSettings: settings });
     return { ok: true, settings, account };
-  }
-
-  /**
-   * Mobile login for an employee: a `User` (role employee) whose meta.employeeId
-   * points at the card. Login is stored as `<login>@<tenant code>.local`, the same
-   * convention as users created in Settings, and typed as `login@tenant` in the app.
-   */
-  private async syncEmployeeAccount(
-    tenantId: string,
-    employeeId: string,
-    rawLogin: string,
-    password: string,
-  ): Promise<{ login: string; loginName: string; created: boolean; passwordChanged: boolean } | null> {
-    const loginName = rawLogin.trim().toLowerCase().split('@')[0];
-    const linked = await this.prisma.user.findFirst({
-      where: { tenantId, meta: { path: ['employeeId'], equals: employeeId } },
-    });
-    if (!loginName && !password) return null;
-    if (!loginName) throw new BadRequestException('Укажите логин');
-    if (!/^[a-z0-9._-]{3,32}$/.test(loginName)) {
-      throw new BadRequestException('Логин: 3–32 символа (латиница, цифры, . _ -)');
-    }
-    if (password && password.length < 8) {
-      throw new BadRequestException('Пароль: минимум 8 символов');
-    }
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { code: true },
-    });
-    if (!tenant) throw new NotFoundException('Tenant not found');
-    const email = `${loginName}@${tenant.code.toLowerCase()}.local`;
-    const login = `${loginName}@${tenant.code.toLowerCase()}`;
-    const emp = await runUnscoped(() =>
-      this.prisma.employee.findFirst({
-        where: { id: employeeId, tenantId },
-        select: { firstName: true, lastName: true, middleName: true },
-      }),
-    );
-    const fullName =
-      [emp?.lastName, emp?.firstName, emp?.middleName].filter(Boolean).join(' ') || loginName;
-    const now = new Date().toISOString();
-    try {
-      if (linked) {
-        if (linked.email === email && !password) {
-          return { login, loginName, created: false, passwordChanged: false };
-        }
-        const meta = (linked.meta && typeof linked.meta === 'object' && !Array.isArray(linked.meta)
-          ? linked.meta
-          : {}) as Record<string, unknown>;
-        await this.prisma.user.update({
-          where: { id: linked.id },
-          data: {
-            email,
-            fullName,
-            ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}),
-            meta: { ...meta, login: loginName, employeeId, updatedAt: now } as Prisma.InputJsonValue,
-          },
-        });
-        return { login, loginName, created: false, passwordChanged: !!password };
-      }
-      if (!password) {
-        throw new BadRequestException('Для нового аккаунта задайте пароль');
-      }
-      await this.prisma.user.create({
-        data: {
-          tenantId,
-          email,
-          fullName,
-          role: Role.employee,
-          passwordHash: await bcrypt.hash(password, 10),
-          meta: { login: loginName, employeeId, createdAt: now, updatedAt: now } as Prisma.InputJsonValue,
-        },
-      });
-      return { login, loginName, created: true, passwordChanged: true };
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException(`Логин «${login}» уже занят`);
-      }
-      throw e;
-    }
   }
 
   private mapMarkBlock(r: {

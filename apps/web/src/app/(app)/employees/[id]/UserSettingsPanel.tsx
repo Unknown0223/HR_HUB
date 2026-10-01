@@ -162,12 +162,36 @@ export function UserSettingsPanel({
   onSaved,
 }: Props) {
   const [tenantCode, setTenantCode] = useState('');
+  const [account, setAccount] = useState<{ loginName: string; isActive: boolean } | null>(null);
   useEffect(() => {
     setTenantCode((getSession()?.tenant?.code ?? '').toLowerCase());
   }, []);
   const loginSuffix = loginSuffixProp || tenantCode || 'kompaniya';
   const [form, setForm] = useState<UserSettings>(() => mergeSettings(initial));
   const [savedSnap, setSavedSnap] = useState(() => JSON.stringify(mergeSettings(initial)));
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch<{ account: { loginName: string; isActive: boolean } | null }>(
+      `/api/mobile-accounts/${employeeId}`,
+    )
+      .then((res) => {
+        if (!alive) return;
+        setAccount(res.account);
+        if (res.account) {
+          const login = res.account.loginName;
+          setForm((f) => ({ ...f, login }));
+          setSavedSnap((s) => {
+            const snap = JSON.parse(s) as UserSettings;
+            return JSON.stringify({ ...snap, login });
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [employeeId]);
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
@@ -230,14 +254,16 @@ export function UserSettingsPanel({
       setSavedSnap(JSON.stringify(next));
       setPassword('');
       const acc = res.account;
+      if (acc) setAccount((a) => ({ loginName: acc.loginName, isActive: a?.isActive ?? true }));
+      const where = `логин: ${acc?.loginName ?? ''}`;
       setOkMsg(
         !acc
           ? 'Сохранено'
           : acc.created
-            ? `Аккаунт создан. Вход в мобильном приложении: ${acc.login}`
+            ? `Аккаунт создан. Вход в мобильном приложении — ${where}`
             : acc.passwordChanged
-              ? `Пароль изменён. Логин: ${acc.login}`
-              : `Сохранено. Логин: ${acc.login}`,
+              ? `Пароль изменён. ${where}`
+              : `Сохранено. ${where}`,
       );
       onSaved?.();
     } catch (e) {
@@ -338,6 +364,11 @@ export function UserSettingsPanel({
               />
               <span className={styles.usLoginSuffix}>@{loginSuffix}</span>
             </div>
+            <small className={styles.muted}>
+              {account
+                ? `Мобильный аккаунт ${account.isActive ? 'активен' : 'заблокирован'} · в приложении вводится логин «${account.loginName}»`
+                : 'Мобильного аккаунта нет — задайте логин и пароль'}
+            </small>
           </div>
           <div className={styles.modalField}>
             <label>Пароль</label>
@@ -346,7 +377,7 @@ export function UserSettingsPanel({
                 type={showPass ? 'text' : 'password'}
                 value={password}
                 disabled={viewOnly}
-                placeholder="••••••••"
+                placeholder={account ? 'Новый пароль (текущий не показывается)' : 'Пароль для нового аккаунта'}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
               />

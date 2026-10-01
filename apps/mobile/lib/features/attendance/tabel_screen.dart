@@ -117,8 +117,8 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
                 if (!linked) {
                   return const SectionCard(
                     child: Text(
-                      'Xodim profili bog‘lanmagan — tabel bo‘sh. '
-                      'Demo uchun employee@demo.local bilan kiring.',
+                      'Akkauntingiz xodim kartasiga bog‘lanmagan — tabel bo‘sh. '
+                      'HR bo‘limiga murojaat qiling.',
                     ),
                   );
                 }

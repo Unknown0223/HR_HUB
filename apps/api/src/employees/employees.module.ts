@@ -8,12 +8,15 @@ import { FacePurgeScheduler } from './face-purge.scheduler';
 import { StorageModule } from '../storage/storage.module';
 import { DeviceGwModule } from '../device-gw/device-gw.module';
 import { SettingsModule } from '../settings/settings.module';
+import { MobileAccountsService } from './mobile-accounts.service';
+import { MobileAccountsController } from './mobile-accounts.controller';
 
 @Module({
   imports: [StorageModule, DeviceGwModule, SettingsModule],
-  controllers: [EmployeesController, EmployeeFormController],
+  controllers: [EmployeesController, EmployeeFormController, MobileAccountsController],
   providers: [
     EmployeesService,
+    MobileAccountsService,
     FaceService,
     FacePurgeScheduler,
     EmployeeFormIngestGuard,

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_config.dart';
 import '../../core/auth/auth_state.dart';
+import '../../core/errors/api_exception.dart';
 import '../../core/theme/app_theme.dart';
 import 'login_widgets.dart';
 
@@ -32,7 +33,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   );
   late final Animation<double> _brandIn = _interval(0, 0.45);
   late final Animation<double> _cardIn = _interval(0.15, 0.6);
-  /// Title, login, password, buttons, server link — revealed one after another.
+  /// Title, server, login, password, button тАФ revealed one after another.
   late final List<Animation<double>> _items = [
     for (var i = 0; i < 5; i++) _interval(0.3 + i * 0.1, 0.65 + i * 0.07),
   ];
@@ -44,51 +45,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
   final _email = TextEditingController();
   final _password = TextEditingController();
-  /// Short company name (`akfa`) or, for self-hosted/dev servers, a full URL.
+  /// Server link, pre-filled with the default server.
   final _server = TextEditingController(text: ApiConfig.displayServer(ApiConfig.defaultBaseUrl));
   bool _obscure = true;
   bool _busy = false;
-  bool _showServer = false;
   /// Set after a submit with empty fields: those fields turn red until filled.
   bool _markEmpty = false;
+  final _loginFocus = FocusNode();
   final _passwordFocus = FocusNode();
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadBaseUrl();
+    _loadServer();
   }
 
-  Future<void> _loadBaseUrl() async {
+  Future<void> _loadServer() async {
     final prefs = await SharedPreferences.getInstance();
     final url = prefs.getString('apiBaseUrl');
-    if (url != null && url.isNotEmpty) {
-      _server.text = ApiConfig.displayServer(url);
-      if (url != ApiConfig.defaultBaseUrl && mounted) {
-        setState(() => _showServer = true);
-      }
-    }
+    if (url != null && url.isNotEmpty) _server.text = ApiConfig.displayServer(url);
   }
 
   /// Points the API client at the typed server; false (with an error shown) if it is not valid.
   Future<bool> _applyServer() async {
     final url = ApiConfig.resolveServer(_server.text);
     if (url == null) {
-      setState(() => _showServer = true);
-      _fail('Server nomi noto‘g‘ri. Masalan: akfa');
+      _fail('Server silkasi notoтАШgтАШri. Masalan: ${ApiConfig.displayServer(ApiConfig.defaultBaseUrl)}');
       return false;
     }
     await ref.read(apiClientProvider).setBaseUrl(url);
     return true;
   }
 
+  /// Line under the ┬лServer┬╗ field: the host the app will connect to, or why the link is invalid.
+  (IconData, String, Color) _serverHint(String input) {
+    if (input.trim().isEmpty) {
+      return (Icons.info_outline_rounded, 'Server silkasi (HR beradi)', AppColors.inkFaint);
+    }
+    final url = ApiConfig.resolveServer(input);
+    if (url == null) {
+      return (Icons.error_outline, 'Silka notoтАШgтАШri тАФ masalan: hr-akfa.up.railway.app', AppColors.danger);
+    }
+    return (Icons.link_rounded, ApiConfig.hostOf(url), AppColors.inkFaint);
+  }
+
   String? _credentialsError() {
-    if (_email.text.trim().isEmpty || _password.text.isEmpty) {
+    if (_server.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.isEmpty) {
       _markEmpty = true;
-      return 'Login va parolni kiriting';
+      return 'Server, login va parolni kiriting';
     }
     return null;
+  }
+
+  String _humanize(Object e) {
+    if (e is ApiException) {
+      if (e.statusCode == 401) return 'Login yoki parol notoтАШgтАШri';
+      if (e.statusCode == 429) return 'Juda koтАШp urinish. 15 daqiqadan keyin qayta urinib koтАШring';
+    }
+    return e.toString();
   }
 
   void _fail(String message) {
@@ -103,6 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     _shake.dispose();
     _email.dispose();
     _password.dispose();
+    _loginFocus.dispose();
     _passwordFocus.dispose();
     _server.dispose();
     super.dispose();
@@ -122,7 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       if (!await _applyServer()) return;
       await ref.read(authProvider.notifier).login(_email.text.trim(), _password.text);
     } catch (e) {
-      if (mounted) _fail(e.toString());
+      if (mounted) _fail(_humanize(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -323,7 +339,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               ),
             ),
             Text(
-              'Davomat · GPS · Kadrlar',
+              'Davomat ┬╖ GPS ┬╖ Kadrlar',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
             ),
           ],
@@ -381,10 +397,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               const SizedBox(height: 20),
               _Reveal(
                 animation: _items[1],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AuthField(
+                      controller: _server,
+                      label: 'Server',
+                      hint: 'hr-akfa.up.railway.app',
+                      icon: Icons.apartment_rounded,
+                      error: _markEmpty,
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _loginFocus.requestFocus(),
+                    ),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _server,
+                      builder: (context, value, _) {
+                        final (icon, text, color) = _serverHint(value.text);
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                          child: Row(
+                            children: [
+                              Icon(icon, size: 14, color: color),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  text,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 11.5, color: color),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _Reveal(
+                animation: _items[2],
                 child: AuthField(
                   controller: _email,
+                  focusNode: _loginFocus,
                   label: 'Login',
-                  hint: 'login@kompaniya',
+                  hint: 'masalan: ali.valiyev',
                   icon: Icons.person_rounded,
                   error: _markEmpty,
                   keyboardType: TextInputType.emailAddress,
@@ -395,12 +453,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               ),
               const SizedBox(height: 14),
               _Reveal(
-                animation: _items[2],
+                animation: _items[3],
                 child: AuthField(
                   controller: _password,
                   focusNode: _passwordFocus,
                   label: 'Parol',
-                  hint: '••••••••',
+                  hint: 'тАвтАвтАвтАвтАвтАвтАвтАв',
                   icon: Icons.lock_rounded,
                   obscure: _obscure,
                   error: _markEmpty,
@@ -408,7 +466,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                   autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _submit(),
                   suffix: IconButton(
-                    tooltip: _obscure ? 'Parolni ko‘rsatish' : 'Parolni yashirish',
+                    tooltip: _obscure ? 'Parolni koтАШrsatish' : 'Parolni yashirish',
                     onPressed: () => setState(() => _obscure = !_obscure),
                     icon: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
@@ -424,67 +482,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                     ),
                   ),
                 ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                child: _showServer
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AuthField(
-                              controller: _server,
-                              label: 'Kompaniya (server)',
-                              hint: 'masalan: akfa',
-                              icon: Icons.apartment_rounded,
-                              keyboardType: TextInputType.url,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _submit(),
-                              suffix: IconButton(
-                                tooltip: 'Standart server',
-                                onPressed: () => setState(
-                                  () => _server.text = ApiConfig.displayServer(ApiConfig.defaultBaseUrl),
-                                ),
-                                icon: const Icon(Icons.restart_alt_rounded, color: AppColors.inkFaint),
-                              ),
-                            ),
-                            ValueListenableBuilder<TextEditingValue>(
-                              valueListenable: _server,
-                              builder: (context, value, _) {
-                                final url = ApiConfig.resolveServer(value.text);
-                                return Padding(
-                                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        url == null ? Icons.error_outline : Icons.link_rounded,
-                                        size: 14,
-                                        color: url == null ? AppColors.danger : AppColors.inkFaint,
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          url == null
-                                              ? 'Kompaniya nomini yozing, masalan: akfa'
-                                              : ApiConfig.hostOf(url),
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            color: url == null ? AppColors.danger : AppColors.inkFaint,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox(width: double.infinity),
               ),
               AnimatedSize(
                 duration: const Duration(milliseconds: 200),
@@ -513,31 +510,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               ),
               const SizedBox(height: 20),
               _Reveal(
-                animation: _items[3],
+                animation: _items[4],
                 child: GlowButton(label: 'Kirish', busy: _busy, onPressed: _submit),
               ),
-              const SizedBox(height: 6),
-              _Reveal(
-                animation: _items[4],
-                child: Center(
-                  child: TextButton.icon(
-                    onPressed: () => setState(() => _showServer = !_showServer),
-                    icon: AnimatedRotation(
-                      turns: _showServer ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 250),
-                      child: Icon(
-                        _showServer ? Icons.expand_less : Icons.settings_outlined,
-                        size: 18,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-                    label: const Text(
-                      'Server sozlamalari',
-                      style: TextStyle(color: AppColors.inkFaint, fontSize: 12),
-                    ),
-                  ),
-                ),
-              ),
+              const SizedBox(height: 12),
             ],
           ),
         ),

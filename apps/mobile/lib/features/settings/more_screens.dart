@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/api_client.dart';
 import '../../core/auth/auth_state.dart';
+import '../../core/errors/api_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -43,18 +45,67 @@ class SecurityScreen extends StatelessWidget {
   }
 }
 
-class ChangePasswordScreen extends StatefulWidget {
+class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
 
   @override
-  State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
+  ConsumerState<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
+class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   final _current = TextEditingController();
   final _next = TextEditingController();
   final _again = TextEditingController();
   bool _o1 = true, _o2 = true, _o3 = true;
+  bool _busy = false;
+  String? _error;
+
+  String? _validate() {
+    if (_current.text.isEmpty || _next.text.isEmpty || _again.text.isEmpty) {
+      return 'Barcha maydonlarni to‘ldiring';
+    }
+    if (_next.text.trim().length < 8) return 'Yangi parol kamida 8 belgidan iborat bo‘lsin';
+    if (_next.text != _again.text) return 'Yangi parollar bir xil emas';
+    if (_next.text == _current.text) return 'Yangi parol joriy paroldan farq qilishi kerak';
+    return null;
+  }
+
+  String _humanize(Object e) {
+    if (e is ApiException) {
+      if (e.statusCode == 429) return 'Juda ko‘p urinish. 15 daqiqadan keyin qayta urinib ko‘ring';
+      if (e.message.contains('Текущий пароль')) return 'Joriy parol noto‘g‘ri';
+      if (e.message.contains('совпадает')) return 'Yangi parol joriy parol bilan bir xil';
+      return e.message;
+    }
+    return e.toString();
+  }
+
+  Future<void> _submit() async {
+    final invalid = _validate();
+    if (invalid != null) {
+      setState(() => _error = invalid);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(apiClientProvider).post(
+        '/auth/change-password',
+        data: {'currentPassword': _current.text, 'newPassword': _next.text.trim()},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Parol o‘zgartirildi. Keyingi kirishda yangi paroldan foydalaning')),
+      );
+      context.pop();
+    } catch (e) {
+      if (mounted) setState(() => _error = _humanize(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -105,16 +156,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 icon: Icon(_o3 ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               ),
             ),
+            const SizedBox(height: 10),
+            const Text(
+              'Parol kamida 8 belgi. Uni hech kim, hatto administrator ham ko‘ra olmaydi.',
+              style: TextStyle(color: AppColors.inkMuted, fontSize: 12.5),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: AppColors.danger)),
+            ],
             const Spacer(),
             PrimaryButton(
               label: 'O\'zgartirish',
-              color: AppColors.bgSoft,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Parol yangilandi (demo)')),
-                );
-                context.pop();
-              },
+              busy: _busy,
+              onPressed: _submit,
             ),
           ],
         ),

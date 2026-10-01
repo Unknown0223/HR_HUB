@@ -454,6 +454,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     siblings: [
       { label: 'Пользователи', href: '/settings/users' },
       { label: 'Роли', href: '/settings/users/roles' },
+      { label: 'Мобильное приложение', href: '/settings/mobile-access' },
     ],
   },
   countries: {

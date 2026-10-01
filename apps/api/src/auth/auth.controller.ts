@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto';
+import { AuthService, WrongCurrentPasswordException } from './auth.service';
+import { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
 import { Public } from './decorators';
 import { CurrentUser, AuthUser } from './current-user.decorator';
 import { SkipTenant } from '../tenant/decorators';
@@ -44,6 +44,32 @@ export class AuthController {
     } catch (e) {
       if (e instanceof UnauthorizedException) {
         await this.loginLimit.recordFailure(req, dto.email);
+      }
+      throw e;
+    }
+  }
+
+  @ApiBearerAuth()
+  @SkipTenant()
+  @Post('change-password')
+  async changePassword(
+    @Req() req: Request,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    const limitKey = `change-password:${user.userId}`;
+    await this.loginLimit.assertAllowed(req, limitKey);
+    try {
+      const result = await this.auth.changePassword(
+        user.userId,
+        dto.currentPassword,
+        dto.newPassword,
+      );
+      await this.loginLimit.recordSuccess(req, limitKey);
+      return result;
+    } catch (e) {
+      if (e instanceof WrongCurrentPasswordException) {
+        await this.loginLimit.recordFailure(req, limitKey);
       }
       throw e;
     }

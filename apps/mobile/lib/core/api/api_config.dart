@@ -1,6 +1,7 @@
 /// API base URL configuration.
 ///
-/// Default is the production web (its `/api` proxies to the API).
+/// The «Server» field on the login screen takes the server link and is pre-filled with
+/// [defaultBaseUrl]; companies are told apart by the login, which is unique system-wide.
 /// Local dev: `--dart-define=API_BASE_URL=http://10.0.2.2:3001/api` (Android emulator)
 /// or `http://<PC LAN IP>:3001/api` on a real device.
 class ApiConfig {
@@ -9,26 +10,17 @@ class ApiConfig {
     defaultValue: 'https://hr-akfa.up.railway.app/api',
   );
 
-  /// Each company's server; `{name}` is the short company name typed on the login screen.
-  static const String serverTemplate = String.fromEnvironment(
-    'SERVER_URL_TEMPLATE',
-    defaultValue: 'https://hr-{name}.up.railway.app/api',
-  );
-
   /// Max GPS accuracy (meters) accepted client-side before calling API.
   static const double maxGpsAccuracyM = 100;
 
-  static final _shortName = RegExp(r'^[a-z0-9][a-z0-9-]{0,40}$');
   static final _plainHost = RegExp(r'^(localhost|\d{1,3}(\.\d{1,3}){3})(:\d+)?(/|$)');
 
-  /// Turns what the user typed into an API base URL: a short company name (`akfa`)
-  /// fills [serverTemplate]; a host or full URL is used as-is (for self-hosted / dev servers).
+  /// Turns the typed server link (`hr-akfa.up.railway.app`, `https://…/api`, `10.0.2.2:3001`)
+  /// into an API base URL; null when it is not a link.
   static String? resolveServer(String input) {
     final raw = input.trim();
     if (raw.isEmpty) return defaultBaseUrl;
-    final name = raw.toLowerCase();
-    if (_shortName.hasMatch(name)) return serverTemplate.replaceAll('{name}', name);
-    if (!raw.contains('.') && !raw.contains(':')) return null;
+    if (raw.contains(' ') || (!raw.contains('.') && !raw.contains(':'))) return null;
 
     var url = raw.contains('://')
         ? raw
@@ -40,14 +32,12 @@ class ApiConfig {
     return url;
   }
 
-  /// What to show in the server field for a saved base URL: the short company name when the URL
-  /// came from [serverTemplate], otherwise the URL itself.
+  /// What to show in the server field for a base URL: the bare host when the URL is the
+  /// standard `https://<host>/api`, otherwise the full URL.
   static String displayServer(String baseUrl) {
-    final parts = serverTemplate.split('{name}');
-    if (parts.length == 2 && baseUrl.startsWith(parts[0]) && baseUrl.endsWith(parts[1])) {
-      final name = baseUrl.substring(parts[0].length, baseUrl.length - parts[1].length);
-      if (_shortName.hasMatch(name)) return name;
-    }
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null || uri.host.isEmpty) return baseUrl;
+    if (uri.scheme == 'https' && !uri.hasPort && uri.path == '/api') return uri.host;
     return baseUrl;
   }
 

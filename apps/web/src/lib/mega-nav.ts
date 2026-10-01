@@ -520,6 +520,7 @@ export const MEGA_NAV: MegaSection[] = [
         items: [
           { href: '/settings/organizations', label: 'Организации', faIcon: 'fa-building', iconAccent: 'linear-gradient(135deg, #0a85e2 0%, #6366f1 100%)' },
           { href: '/settings/users', label: 'Пользователи', faIcon: 'fa-users-cog', iconAccent: 'linear-gradient(135deg, #7c3aed 0%, #0a85e2 100%)' },
+          { href: '/settings/mobile-access', label: 'Мобильное приложение', faIcon: 'fa-mobile-alt', iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)' },
           { href: '/settings/countries', label: 'Регионы', faIcon: 'fa-map-marked-alt', iconAccent: 'linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%)' },
           { href: '/settings/banks', label: 'Банки', faIcon: 'fa-university', iconAccent: 'linear-gradient(135deg, #06b6d4 0%, #0a85e2 100%)' },
           { href: '/settings/quickstart', label: 'Инструкции для быстрого запуска', faIcon: 'fa-rocket', iconAccent: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)' },

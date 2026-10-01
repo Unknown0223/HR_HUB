@@ -1,13 +1,21 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto';
+
+/** 400, not 401: clients treat 401 as an expired session and sign the user out. */
+export class WrongCurrentPasswordException extends BadRequestException {
+  constructor() {
+    super('Текущий пароль неверный');
+  }
+}
 
 @Injectable()
 export class AuthService {
@@ -55,18 +63,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const ident = dto.email.trim().toLowerCase();
-    let user = await this.prisma.user.findUnique({
-      where: { email: ident },
-      include: { tenant: true },
-    });
-    // Mobile "login@tenant" → "login@tenant.local" (Settings/employee-card convention).
-    if (!user && /^[^@\s]+@[^@.\s]+$/.test(ident)) {
-      user = await this.prisma.user.findUnique({
-        where: { email: `${ident}.local` },
-        include: { tenant: true },
-      });
-    }
+    const user = await this.findLoginUser(dto.email);
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -77,6 +74,55 @@ export class AuthService {
 
     await this.assertEmployeeAccess(user);
     return this.tokenResponse(user, user.tenant);
+  }
+
+  /**
+   * Accepted identifiers: full email; `login@<tenant code>` (stored as `login@<code>.local`);
+   * a bare `login`, which must match exactly one account across all companies — never guess
+   * between same-named accounts of different companies.
+   */
+  private async findLoginUser(rawIdent: string) {
+    const ident = rawIdent.trim().toLowerCase();
+    const byEmail = (email: string) =>
+      this.prisma.user.findUnique({ where: { email }, include: { tenant: true } });
+
+    if (ident.includes('@')) {
+      const suffix = ident.slice(ident.indexOf('@') + 1);
+      return (await byEmail(ident)) ?? (suffix && !suffix.includes('.') ? byEmail(`${ident}.local`) : null);
+    }
+    if (!ident) return null;
+    const matches = (
+      await this.prisma.user.findMany({
+        where: { email: { startsWith: `${ident}@` } },
+        include: { tenant: true },
+        take: 50,
+      })
+    ).filter((u) => u.email.toLowerCase().split('@')[0] === ident);
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive) throw new UnauthorizedException();
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) throw new WrongCurrentPasswordException();
+    const next = newPassword.trim();
+    if (next.length < 8) throw new BadRequestException('Пароль: минимум 8 символов');
+    if (await bcrypt.compare(next, user.passwordHash)) {
+      throw new BadRequestException('Новый пароль совпадает с текущим');
+    }
+    const meta =
+      user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
+        ? (user.meta as Record<string, unknown>)
+        : {};
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await bcrypt.hash(next, 10),
+        meta: { ...meta, passwordChangedAt: new Date().toISOString() } as Prisma.InputJsonValue,
+      },
+    });
+    return { ok: true };
   }
 
   /**
@@ -157,7 +203,11 @@ export class AuthService {
       tenantId: user.tenantId,
       catalogRoleIds,
       tenant: user.tenant
-        ? { id: user.tenant.id, code: user.tenant.code, name: user.tenant.name }
+        ? {
+            id: user.tenant.id,
+            code: user.tenant.code,
+            name: user.tenant.name,
+          }
         : null,
     };
   }
@@ -197,7 +247,11 @@ export class AuthService {
         catalogRoleIds,
       },
       tenant: tenant
-        ? { id: tenant.id, code: tenant.code, name: tenant.name }
+        ? {
+            id: tenant.id,
+            code: tenant.code,
+            name: tenant.name,
+          }
         : null,
     };
   }
