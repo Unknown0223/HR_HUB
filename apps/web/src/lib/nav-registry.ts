@@ -12,12 +12,19 @@ import { REPORT_CATEGORIES, reportsByCategory } from './reports-registry';
 export type NavSectionId =
   | 'home'
   | 'employees'
+  | 'hr-docs'
+  | 'org'
   | 'attendance'
+  | 'schedules'
+  | 'requests'
   | 'payroll'
+  | 'payments'
   | 'reports'
+  | 'analytics'
   | 'access'
   | 'maintenance'
   | 'communications'
+  | 'dictionaries'
   | 'settings';
 
 export type NavItem = {
@@ -63,11 +70,11 @@ export const NAV_SECTIONS: NavSection[] = [
     id: 'employees',
     label: 'Сотрудники',
     faIcon: 'fa-users',
-    prefixes: ['/employees', '/divisions', '/positions'],
+    prefixes: ['/employees'],
     groups: [
       {
         id: 'staff',
-        title: 'Сотрудники',
+        title: 'Персонал',
         items: [
           {
             id: 'employees',
@@ -82,24 +89,60 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
+        id: 'recruiting',
+        title: 'Подбор',
+        items: [
+          { id: 'candidates', label: 'Кандидаты', href: '/catalog/candidates', faIcon: 'fa-user-plus' },
+          { id: 'vacancies', label: 'Вакансии', href: '/catalog/vacancies', faIcon: 'fa-door-open' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'hr-docs',
+    label: 'Кадровые документы',
+    faIcon: 'fa-folder-open',
+    prefixes: [],
+    groups: [
+      {
         id: 'hr-docs',
-        title: 'Кадровые документы',
+        title: 'Документы',
         items: [
           { id: 'hr-documents', label: 'Все кадровые документы', href: '/catalog/hr-documents', faIcon: 'fa-file-alt' },
           { id: 'transfers', label: 'Кадровые переводы', href: '/catalog/transfers', faIcon: 'fa-random' },
           { id: 'name-changes', label: 'Изменения имени', href: '/catalog/name-changes', faIcon: 'fa-signature' },
           { id: 'wage-changes', label: 'Изменения оплаты труда', href: '/catalog/wage-changes', faIcon: 'fa-money-bill-wave' },
           { id: 'hr-requests', label: 'Заявки на кадровые изменения', href: '/catalog/hr-requests', faIcon: 'fa-file-signature' },
+        ],
+      },
+      {
+        id: 'absence-clearance',
+        title: 'Отсутствия и обходные листы',
+        items: [
           { id: 'absences', label: 'Все отсутствия сотрудников', href: '/catalog/absences', faIcon: 'fa-calendar-times' },
           { id: 'clearance-sheets', label: 'Обходные листы', href: '/catalog/clearance-sheets', faIcon: 'fa-clipboard-list' },
           { id: 'clearance-templates', label: 'Шаблоны обходных листов', href: '/catalog/clearance-templates', faIcon: 'fa-clipboard' },
+        ],
+      },
+      {
+        id: 'incidents',
+        title: 'Инциденты',
+        items: [
           { id: 'incidents', label: 'Инциденты', href: '/catalog/incidents', faIcon: 'fa-exclamation-circle' },
           { id: 'incident-types', label: 'Типы инцидента', href: '/catalog/incident-types', faIcon: 'fa-tags' },
         ],
       },
+    ],
+  },
+  {
+    id: 'org',
+    label: 'Оргструктура',
+    faIcon: 'fa-sitemap',
+    prefixes: ['/divisions', '/positions'],
+    groups: [
       {
-        id: 'org',
-        title: 'Организация',
+        id: 'structure',
+        title: 'Структура',
         items: [
           {
             id: 'divisions',
@@ -122,6 +165,12 @@ export const NAV_SECTIONS: NavSection[] = [
             faIcon: 'fa-code-branch',
             aliases: ['/catalog/staff-positions/structure'],
           },
+        ],
+      },
+      {
+        id: 'grades',
+        title: 'Разряды и карьера',
+        items: [
           { id: 'grades', label: 'Разряды', href: '/catalog/grades', faIcon: 'fa-layer-group' },
           { id: 'grade-history', label: 'Повышение разрядов', href: '/catalog/grade-history', faIcon: 'fa-chart-line' },
           { id: 'tariff-groups', label: 'Тарифные группы', href: '/catalog/tariff-groups', faIcon: 'fa-percent' },
@@ -133,14 +182,6 @@ export const NAV_SECTIONS: NavSection[] = [
             faIcon: 'fa-route',
             aliases: ['/catalog/career-steps'],
           },
-        ],
-      },
-      {
-        id: 'recruiting',
-        title: 'Подбор',
-        items: [
-          { id: 'candidates', label: 'Кандидаты', href: '/catalog/candidates', faIcon: 'fa-user-plus' },
-          { id: 'vacancies', label: 'Вакансии', href: '/catalog/vacancies', faIcon: 'fa-door-open' },
         ],
       },
     ],
@@ -164,30 +205,6 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
-        id: 'schedules',
-        title: 'Графики',
-        items: [
-          { id: 'work-schedules', label: 'Графики работы', href: '/catalog/work-schedules', faIcon: 'fa-calendar-alt' },
-          { id: 'production-calendars', label: 'Производственные календари', href: '/catalog/production-calendars', faIcon: 'fa-calendar' },
-          { id: 'schedule-overrides', label: 'Индивидуальные графики', href: '/catalog/schedule-overrides', faIcon: 'fa-user-edit' },
-          { id: 'position-schedules', label: 'Индивидуальные графики для позиций', href: '/catalog/position-schedules', faIcon: 'fa-briefcase' },
-          { id: 'rosters', label: 'Расписания', href: '/catalog/rosters', faIcon: 'fa-calendar-week' },
-          { id: 'schedule-shifts', label: 'Список смен расписания', href: '/catalog/schedule-shifts', faIcon: 'fa-clock' },
-        ],
-      },
-      {
-        id: 'requests',
-        title: 'Запросы',
-        items: [
-          { id: 'absence-requests', label: 'Запросы на отсутствие', href: '/catalog/absence-requests', faIcon: 'fa-calendar-minus' },
-          { id: 'schedule-change-requests', label: 'Запросы на изменение графика', href: '/catalog/schedule-change-requests', faIcon: 'fa-exchange-alt' },
-          { id: 'roster-change-requests', label: 'Запросы на изменение расписания', href: '/catalog/roster-change-requests', faIcon: 'fa-random' },
-          { id: 'internal-trips', label: 'Внутренние командировки', href: '/catalog/internal-trips', faIcon: 'fa-suitcase' },
-          { id: 'location-requests', label: 'Запросы на локацию', href: '/catalog/location-requests', faIcon: 'fa-map-marker-alt' },
-          { id: 'overtime-requests', label: 'Запросы на сверхурочные', href: '/catalog/overtime-requests', faIcon: 'fa-hourglass-half' },
-        ],
-      },
-      {
         id: 'locations',
         title: 'Локации и GPS',
         items: [
@@ -200,6 +217,52 @@ export const NAV_SECTIONS: NavSection[] = [
           },
           { id: 'location-tracking', label: 'Отслеживание местоположения', href: '/attendance/location-tracking', faIcon: 'fa-map-marked-alt' },
           { id: 'gps-tracking', label: 'GPS отслеживание', href: '/attendance/gps-tracking', faIcon: 'fa-satellite' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'schedules',
+    label: 'Графики работы',
+    faIcon: 'fa-calendar-alt',
+    prefixes: [],
+    groups: [
+      {
+        id: 'schedules',
+        title: 'Графики',
+        items: [
+          { id: 'work-schedules', label: 'Графики работы', href: '/catalog/work-schedules', faIcon: 'fa-calendar-alt' },
+          { id: 'production-calendars', label: 'Производственные календари', href: '/catalog/production-calendars', faIcon: 'fa-calendar' },
+          { id: 'schedule-overrides', label: 'Индивидуальные графики', href: '/catalog/schedule-overrides', faIcon: 'fa-user-edit' },
+          { id: 'position-schedules', label: 'Индивидуальные графики для позиций', href: '/catalog/position-schedules', faIcon: 'fa-briefcase' },
+        ],
+      },
+      {
+        id: 'rosters',
+        title: 'Расписания и смены',
+        items: [
+          { id: 'rosters', label: 'Расписания', href: '/catalog/rosters', faIcon: 'fa-calendar-week' },
+          { id: 'schedule-shifts', label: 'Список смен расписания', href: '/catalog/schedule-shifts', faIcon: 'fa-clock' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'requests',
+    label: 'Заявки',
+    faIcon: 'fa-inbox',
+    prefixes: [],
+    groups: [
+      {
+        id: 'requests',
+        title: 'Заявки сотрудников',
+        items: [
+          { id: 'absence-requests', label: 'Запросы на отсутствие', href: '/catalog/absence-requests', faIcon: 'fa-calendar-minus' },
+          { id: 'schedule-change-requests', label: 'Запросы на изменение графика', href: '/catalog/schedule-change-requests', faIcon: 'fa-exchange-alt' },
+          { id: 'roster-change-requests', label: 'Запросы на изменение расписания', href: '/catalog/roster-change-requests', faIcon: 'fa-random' },
+          { id: 'overtime-requests', label: 'Запросы на сверхурочные', href: '/catalog/overtime-requests', faIcon: 'fa-hourglass-half' },
+          { id: 'location-requests', label: 'Запросы на локацию', href: '/catalog/location-requests', faIcon: 'fa-map-marker-alt' },
+          { id: 'internal-trips', label: 'Внутренние командировки', href: '/catalog/internal-trips', faIcon: 'fa-suitcase' },
         ],
       },
     ],
@@ -222,26 +285,40 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
-        id: 'docs',
-        title: 'Начисления и документы',
-        items: [
-          { id: 'settlements', label: 'Взаиморасчеты', href: '/catalog/settlements', faIcon: 'fa-balance-scale' },
-          { id: 'one-time-accruals', label: 'Разовые начисления', href: '/catalog/one-time-accruals', faIcon: 'fa-bolt' },
-          { id: 'bonus-accruals', label: 'Бонусные начисления', href: '/catalog/bonus-accruals', faIcon: 'fa-gift' },
-          { id: 'sales-accruals', label: 'Начисления процентов от продаж', href: '/catalog/sales-accruals', faIcon: 'fa-chart-pie' },
-          { id: 'loans', label: 'Займы', href: '/catalog/loans', faIcon: 'fa-university' },
-          { id: 'payment-orders', label: 'Поручения', href: '/catalog/payment-orders', faIcon: 'fa-file-signature' },
-          { id: 'travel-expenses', label: 'Авансовый отчет по командировке', href: '/catalog/travel-expenses', faIcon: 'fa-plane' },
-          { id: 'gph-services', label: 'Список услуг договора ГПХ', href: '/catalog/gph-services', faIcon: 'fa-file-contract' },
-        ],
-      },
-      {
         id: 'policies',
         title: 'Политики',
         items: [
           { id: 'fine-policies', label: 'Политики штрафов', href: '/payroll/fine-policies', faIcon: 'fa-gavel' },
           { id: 'allowance-policies', label: 'Политика доплат', href: '/payroll/allowance-policies', faIcon: 'fa-hand-holding-usd' },
           { id: 'sales-policies', label: 'Проценты от продаж', href: '/catalog/sales-policies', faIcon: 'fa-percentage' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'payments',
+    label: 'Начисления и выплаты',
+    faIcon: 'fa-hand-holding-usd',
+    prefixes: [],
+    groups: [
+      {
+        id: 'accruals',
+        title: 'Начисления',
+        items: [
+          { id: 'one-time-accruals', label: 'Разовые начисления', href: '/catalog/one-time-accruals', faIcon: 'fa-bolt' },
+          { id: 'bonus-accruals', label: 'Бонусные начисления', href: '/catalog/bonus-accruals', faIcon: 'fa-gift' },
+          { id: 'sales-accruals', label: 'Начисления процентов от продаж', href: '/catalog/sales-accruals', faIcon: 'fa-chart-pie' },
+          { id: 'gph-services', label: 'Список услуг договора ГПХ', href: '/catalog/gph-services', faIcon: 'fa-file-contract' },
+        ],
+      },
+      {
+        id: 'payouts',
+        title: 'Выплаты и расчёты',
+        items: [
+          { id: 'settlements', label: 'Взаиморасчеты', href: '/catalog/settlements', faIcon: 'fa-balance-scale' },
+          { id: 'payment-orders', label: 'Поручения', href: '/catalog/payment-orders', faIcon: 'fa-file-signature' },
+          { id: 'loans', label: 'Займы', href: '/catalog/loans', faIcon: 'fa-university' },
+          { id: 'travel-expenses', label: 'Авансовый отчет по командировке', href: '/catalog/travel-expenses', faIcon: 'fa-plane' },
         ],
       },
     ],
@@ -257,7 +334,7 @@ export const NAV_SECTIONS: NavSection[] = [
         title: 'Отчёты',
         items: [
           { id: 'reports', label: 'Все отчёты', href: '/reports', faIcon: 'fa-chart-bar' },
-          ...(['hr', 'attendance', 'payroll'] as const).map((cat) => ({
+          ...(['hr', 'attendance', 'payroll', 'finance'] as const).map((cat) => ({
             id: `reports-${cat}`,
             label: REPORT_CATEGORIES.find((c) => c.id === cat)!.label,
             href: `/reports?category=${cat}`,
@@ -275,6 +352,14 @@ export const NAV_SECTIONS: NavSection[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    id: 'analytics',
+    label: 'Аналитика',
+    faIcon: 'fa-chart-line',
+    prefixes: [],
+    groups: [
       {
         id: 'analytics',
         title: 'Аналитика',
@@ -289,19 +374,6 @@ export const NAV_SECTIONS: NavSection[] = [
             href: '/catalog/personnel-changes?groupBy=position',
             faIcon: 'fa-chart-bar',
           },
-        ],
-      },
-      {
-        id: 'finance',
-        title: 'Финансы',
-        items: [
-          {
-            id: 'account-balance',
-            label: 'Оборотно-сальдовая ведомость по счету',
-            href: '/catalog/reports/account-balance',
-            faIcon: 'fa-file-invoice',
-          },
-          { id: 'trial-balance', label: 'Оборотно-сальдовая ведомость', href: '/catalog/reports/trial-balance', faIcon: 'fa-balance-scale' },
         ],
       },
     ],
@@ -341,7 +413,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: 'maintenance',
-    label: 'Техобслуживание',
+    label: 'Устройства и интеграции',
     faIcon: 'fa-tools',
     prefixes: ['/settings/artix', '/settings/iiko', '/settings/billz'],
     groups: [
@@ -376,8 +448,13 @@ export const NAV_SECTIONS: NavSection[] = [
         id: 'external',
         title: 'Внешние системы (обмен не подключён)',
         items: [
-          { id: 'integrations', label: 'Все внешние системы', href: '/settings?tab=integrations', faIcon: 'fa-network-wired' },
-          { id: 'onec', label: '1С:Предприятие', href: '/settings?tab=integrations&sys=onec', faIcon: 'fa-server' },
+          {
+            id: 'onec',
+            label: '1С:Предприятие',
+            href: '/settings?tab=integrations&sys=onec',
+            faIcon: 'fa-server',
+            aliases: ['/settings?tab=integrations'],
+          },
           { id: 'esign', label: 'Электронная подпись', href: '/settings?tab=integrations&sys=esign', faIcon: 'fa-pen' },
           { id: 'mehnat', label: 'Mehnat.gov.uz', href: '/settings?tab=integrations&sys=mehnat', faIcon: 'fa-landmark' },
         ],
@@ -407,54 +484,14 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    id: 'settings',
-    label: 'Настройки',
-    faIcon: 'fa-cog',
-    prefixes: ['/settings', '/catalog', '/tenants'],
+    id: 'dictionaries',
+    label: 'Справочники',
+    faIcon: 'fa-book',
+    prefixes: [],
     groups: [
       {
-        id: 'system',
-        title: 'Система',
-        items: [
-          {
-            id: 'system',
-            label: 'Настройки системы',
-            href: '/settings?tab=main',
-            faIcon: 'fa-cog',
-            aliases: ['/settings', '/settings?tab=admin', '/settings?tab=audit'],
-          },
-          { id: 'quickstart', label: 'Инструкции для быстрого запуска', href: '/settings/quickstart', faIcon: 'fa-rocket' },
-        ],
-      },
-      {
-        id: 'organization',
-        title: 'Организация',
-        items: [
-          { id: 'hr-accounting', label: 'Кадровый учет', href: '/settings?tab=org', faIcon: 'fa-id-badge' },
-          { id: 'organizations', label: 'Организации', href: '/settings/organizations', faIcon: 'fa-building' },
-          { id: 'countries', label: 'Регионы', href: '/settings/countries', faIcon: 'fa-map-marked-alt' },
-          { id: 'banks', label: 'Банки', href: '/settings/banks', faIcon: 'fa-university' },
-        ],
-      },
-      {
-        id: 'payroll-setup',
-        title: 'Расчёт и счета',
-        items: [
-          { id: 'payroll-calc', label: 'Расчет зарплаты', href: '/settings/payroll-calc', faIcon: 'fa-calculator' },
-          { id: 'accrual-types', label: 'Начисления', href: '/catalog/accrual-types', faIcon: 'fa-plus-circle' },
-          { id: 'deduction-types', label: 'Удержания', href: '/catalog/deduction-types', faIcon: 'fa-minus-circle' },
-          { id: 'account-settings', label: 'Настройки счетов', href: '/settings/account-settings', faIcon: 'fa-sliders-h' },
-          { id: 'account-pairs', label: 'Парные счета', href: '/catalog/account-pairs', faIcon: 'fa-link' },
-          { id: 'coa', label: 'План счетов', href: '/catalog/coa', faIcon: 'fa-list-ol', aliases: ['/catalog/coa-main'] },
-          { id: 'cashboxes', label: 'Кассы', href: '/catalog/cashboxes', faIcon: 'fa-money-bill-wave' },
-          { id: 'currencies', label: 'Валюты', href: '/catalog/currencies', faIcon: 'fa-coins' },
-          { id: 'avg-salaries', label: 'Средние зарплаты', href: '/catalog/avg-salaries', faIcon: 'fa-chart-bar' },
-          { id: 'indicators', label: 'Показатели', href: '/catalog/indicators', faIcon: 'fa-chart-line' },
-        ],
-      },
-      {
         id: 'dict-hr',
-        title: 'Кадровые справочники',
+        title: 'Кадровые',
         items: [
           { id: 'document-types', label: 'Типы документов', href: '/catalog/document-types', faIcon: 'fa-file' },
           {
@@ -517,6 +554,55 @@ export const NAV_SECTIONS: NavSection[] = [
           { id: 'cars', label: 'Список автомобилей', href: '/settings?tab=dictionaries&dict=cars', faIcon: 'fa-car' },
         ],
       },
+    ],
+  },
+  {
+    id: 'settings',
+    label: 'Настройки',
+    faIcon: 'fa-cog',
+    prefixes: ['/settings', '/catalog', '/tenants'],
+    groups: [
+      {
+        id: 'system',
+        title: 'Система',
+        items: [
+          {
+            id: 'system',
+            label: 'Настройки системы',
+            href: '/settings?tab=main',
+            faIcon: 'fa-cog',
+            aliases: ['/settings', '/settings?tab=admin', '/settings?tab=audit'],
+          },
+          { id: 'quickstart', label: 'Инструкции для быстрого запуска', href: '/settings/quickstart', faIcon: 'fa-rocket' },
+          { id: 'tenants', label: 'Tenants', href: '/tenants', faIcon: 'fa-cloud', platformOnly: true },
+        ],
+      },
+      {
+        id: 'organization',
+        title: 'Организация',
+        items: [
+          { id: 'hr-accounting', label: 'Кадровый учет', href: '/settings?tab=org', faIcon: 'fa-id-badge' },
+          { id: 'organizations', label: 'Организации', href: '/settings/organizations', faIcon: 'fa-building' },
+          { id: 'countries', label: 'Регионы', href: '/settings/countries', faIcon: 'fa-map-marked-alt' },
+          { id: 'banks', label: 'Банки', href: '/settings/banks', faIcon: 'fa-university' },
+        ],
+      },
+      {
+        id: 'payroll-setup',
+        title: 'Расчёт и счета',
+        items: [
+          { id: 'payroll-calc', label: 'Расчет зарплаты', href: '/settings/payroll-calc', faIcon: 'fa-calculator' },
+          { id: 'accrual-types', label: 'Виды начислений', href: '/catalog/accrual-types', faIcon: 'fa-plus-circle' },
+          { id: 'deduction-types', label: 'Виды удержаний', href: '/catalog/deduction-types', faIcon: 'fa-minus-circle' },
+          { id: 'account-settings', label: 'Настройки счетов', href: '/settings/account-settings', faIcon: 'fa-sliders-h' },
+          { id: 'account-pairs', label: 'Парные счета', href: '/catalog/account-pairs', faIcon: 'fa-link' },
+          { id: 'coa', label: 'План счетов', href: '/catalog/coa', faIcon: 'fa-list-ol', aliases: ['/catalog/coa-main'] },
+          { id: 'cashboxes', label: 'Кассы', href: '/catalog/cashboxes', faIcon: 'fa-money-bill-wave' },
+          { id: 'currencies', label: 'Валюты', href: '/catalog/currencies', faIcon: 'fa-coins' },
+          { id: 'avg-salaries', label: 'Средние зарплаты', href: '/catalog/avg-salaries', faIcon: 'fa-chart-bar' },
+          { id: 'indicators', label: 'Показатели', href: '/catalog/indicators', faIcon: 'fa-chart-line' },
+        ],
+      },
       {
         id: 'builder',
         title: 'Шаблоны и метаданные',
@@ -532,12 +618,10 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         id: 'import',
-        title: 'Импорт и каталог',
+        title: 'Импорт',
         items: [
           { id: 'photos', label: 'Загрузка фотографий сотрудников', href: '/settings/photos', faIcon: 'fa-camera' },
           { id: 'person-docs', label: 'Импорт персональных документов', href: '/settings/person-docs', faIcon: 'fa-upload' },
-          { id: 'catalog', label: 'Каталог (все модули)', href: '/catalog', faIcon: 'fa-th-large', exact: true },
-          { id: 'tenants', label: 'Tenants', href: '/tenants', faIcon: 'fa-cloud', platformOnly: true },
         ],
       },
     ],
@@ -584,6 +668,26 @@ export function findActiveNavItem(pathname: string, search = '') {
     }
   }
   return best;
+}
+
+/**
+ * Page-top sibling links that belong to the current page: its own tabs, aliases and
+ * child pages (same sidebar item), plus same-section pages that have no sidebar entry.
+ * Links to other sidebar items are dropped — the sidebar already offers them.
+ */
+export function relatedSiblings<T extends { href: string }>(
+  siblings: readonly T[],
+  pathname: string,
+  search = '',
+): T[] {
+  const current = findActiveNavItem(pathname, search);
+  const section = findNavSection(pathname, search);
+  return siblings.filter((s) => {
+    const [path, qs = ''] = s.href.split('?');
+    const target = findActiveNavItem(path, qs);
+    if (target) return target === current;
+    return section !== null && findNavSection(path, qs) === section;
+  });
 }
 
 /** Owning section for a URL: matching item first, then the longest section prefix. */

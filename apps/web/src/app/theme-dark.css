@@ -1,0 +1,105 @@
+/* Dark theme: overrides the light tokens from globals.css. Light stays the default. */
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0e1511;
+  --bg-deep: #0a100d;
+  --bg-elevated: #18231c;
+  --bg-hover: #1e2c23;
+  --bg-soft: #141e18;
+  --surface: #151f19;
+  --surface-muted: #1a261f;
+  --ink: #e2ebe4;
+  --ink-strong: #f3f8f4;
+  --ink-muted: #a2b2a6;
+  --ink-faint: #708275;
+  --line: #26362c;
+  --line-soft: #223128;
+  --line-table: #26362c;
+  --line-strong: #344a3c;
+
+  --accent: #3cbd61;
+  --accent-hover: #4fca72;
+  --accent-active: #2fa350;
+  --accent-soft: rgba(60, 189, 97, 0.16);
+  --accent-focus: rgba(60, 189, 97, 0.36);
+  --link: #72d68e;
+  --link-soft: #4fca72;
+
+  --ok: #4fca72;
+  --ok-soft: rgba(79, 202, 114, 0.15);
+  --warn: #f0b33c;
+  --warn-soft: rgba(240, 179, 60, 0.15);
+  --danger: #ff6b70;
+  --danger-soft: rgba(255, 107, 112, 0.15);
+  --info: #72d68e;
+  --info-soft: rgba(114, 214, 142, 0.14);
+
+  --header-top: #1d4a2b;
+  --header-bottom: #143820;
+  --header: #184126;
+  --header-elev: #112e1b;
+  --header-gradient: linear-gradient(105deg, #1f5232 0%, #173f25 46%, #10291a 100%);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -16px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 16px 44px -12px rgba(0, 0, 0, 0.7);
+  --shadow-mega: 0 24px 60px -18px rgba(0, 0, 0, 0.75);
+  --shadow-btn: 0 8px 20px -8px rgba(60, 189, 97, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  --subheader-btn: #1a261f;
+  --dash-center: #e2ebe4;
+  --dash-dayoff: #708275;
+
+  /* Dark-only stand-ins for literal light colours left in page CSS modules
+     (they are written as var(--tint-*, <light literal>) and fall back in light mode). */
+  --tint-neutral: #1a261f;
+  --tint-danger: rgba(255, 107, 112, 0.14);
+  --tint-warn: rgba(240, 179, 60, 0.14);
+  --tint-ok: rgba(79, 202, 114, 0.14);
+  --tint-info: rgba(110, 168, 255, 0.13);
+  --tint-ink: #e2ebe4;
+  --tint-ink-muted: #a2b2a6;
+  --tint-line: #26362c;
+}
+
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  background:
+    radial-gradient(ellipse 70% 42% at 8% -8%, rgba(60, 189, 97, 0.12), transparent 52%),
+    radial-gradient(ellipse 50% 36% at 100% 0%, rgba(60, 189, 97, 0.06), transparent 48%),
+    var(--bg);
+}
+
+html[data-theme='dark'] ::selection {
+  background: rgba(60, 189, 97, 0.32);
+}
+
+html[data-theme='dark'] * {
+  scrollbar-color: #33473a transparent;
+}
+
+html[data-theme='dark'] *::-webkit-scrollbar-thumb {
+  background: #33473a;
+  background-clip: padding-box;
+}
+
+html[data-theme='dark'] th {
+  background: rgba(26, 38, 31, 0.92);
+}
+
+/* Seasonal photo behind the app: darken the veil so content stays readable. */
+html[data-theme='dark'] [data-season] {
+  --veil: rgba(10, 16, 13, 0.9);
+  --orb: rgba(60, 189, 97, 0.12);
+}
+
+html[data-theme='dark'] [data-season] > :first-child {
+  filter: brightness(0.55) saturate(0.85);
+}
+
+@media print {
+  html[data-theme='dark'] {
+    color-scheme: light;
+  }
+}

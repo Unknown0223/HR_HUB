@@ -27,6 +27,7 @@ import {
   type MyAccess,
 } from '@/lib/role-access';
 import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
+import { applyTheme, storedTheme, type ThemeMode } from '@/lib/theme';
 import { SidebarNav } from './SidebarNav';
 import styles from './shell.module.css';
 import sb from './sidebar.module.css';
@@ -61,7 +62,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' });
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdBusy, setPwdBusy] = useState(false);
-  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [searchQ, setSearchQ] = useState('');
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchRes, setSearchRes] = useState<{
@@ -83,8 +84,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [access, setAccess] = useState<MyAccess | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compact, setCompact] = useState(false);
-  /** User-toggled sections; the active section is open unless explicitly closed. */
-  const [expanded, setExpanded] = useState<Partial<Record<NavSectionId, boolean>>>({});
+  /** Accordion: at most one section is expanded; it follows the current page. */
+  const [openSection, setOpenSection] = useState<NavSectionId | null>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -94,6 +95,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     } catch {
       /* storage unavailable */
     }
+    const theme = storedTheme();
+    document.documentElement.dataset.theme = theme;
+    setThemeMode(theme);
   }, []);
 
   // Sync session from localStorage before first paint — do not wait on /auth/me.
@@ -281,10 +285,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const activeSectionId = useMemo(() => findNavSection(pathname, search), [pathname, search]);
   const activeSection = NAV_SECTIONS.find((s) => s.id === activeSectionId) ?? null;
 
-  const isSectionOpen = useCallback(
-    (id: NavSectionId) => expanded[id] ?? id === activeSectionId,
-    [expanded, activeSectionId],
-  );
+  useEffect(() => {
+    setOpenSection(activeSectionId);
+  }, [activeSectionId]);
+
+  const isSectionOpen = useCallback((id: NavSectionId) => openSection === id, [openSection]);
 
   const toggleNavSection = useCallback(
     (id: NavSectionId) => {
@@ -295,12 +300,12 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         } catch {
           /* storage unavailable */
         }
-        setExpanded((prev) => ({ ...prev, [id]: true }));
+        setOpenSection(id);
         return;
       }
-      setExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? id === activeSectionId) }));
+      setOpenSection((prev) => (prev === id ? null : id));
     },
-    [compact, activeSectionId],
+    [compact],
   );
 
   function toggleCompact() {
@@ -495,9 +500,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }
 
   function toggleScreenMode() {
-    const next = themeMode === 'light' ? 'dark' : 'light';
+    const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
     setThemeMode(next);
-    document.documentElement.dataset.theme = next;
+    applyTheme(next);
     setProfileOpen(false);
   }
 
@@ -605,6 +610,16 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
           <div className={styles.topRight}>
             <div className={styles.topTools}>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              title={themeMode === 'light' ? 'Тёмная тема' : 'Светлая тема'}
+              aria-label={themeMode === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}
+              aria-pressed={themeMode === 'dark'}
+              onClick={toggleScreenMode}
+            >
+              <i className={`fas ${themeMode === 'light' ? 'fa-moon' : 'fa-sun'}`} aria-hidden />
+            </button>
             <div className={styles.menuWrap}>
               <button
                 type="button"

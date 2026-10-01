@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { DeferredIconStyles } from '@/components/DeferredIconStyles';
 import { Providers } from '@/components/Providers';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
+import './theme-dark.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin', 'latin-ext'],
@@ -29,8 +31,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="uz" className={plusJakarta.variable}>
+    <html lang="uz" className={plusJakarta.variable} suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="" />
         <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
       </head>

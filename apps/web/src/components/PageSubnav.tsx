@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { FORM_SIBLINGS, type SiblingGroup } from '@/lib/form-siblings';
+import { relatedSiblings } from '@/lib/nav-registry';
 import styles from './page-subnav.module.css';
 
 function linkActive(pathname: string, search: string, href: string) {
@@ -51,14 +52,17 @@ function PageSubnavInner({
 
   const title = (titleOverride ?? resolved.title)?.trim() ?? '';
 
-  // Keep current page in sibling pills (active state). Hide bar title when empty
-  // or when a sibling already represents this page (avoid "Устройства | Устройства").
-  const siblings = resolved.siblings;
+  // Hide bar title when empty or when a sibling already represents this page
+  // (avoid "Устройства | Устройства"). A lone pill for the current page adds nothing.
+  const related = relatedSiblings(resolved.siblings, pathname, search);
+  const siblings =
+    related.length === 1 && linkActive(pathname, search, related[0].href) ? [] : related;
   const titleCoveredBySibling = Boolean(title) && siblings.some((s) => {
     const path = s.href.split('?')[0];
     return path === pathname && s.label === title;
   });
   const showTitle = Boolean(title) && !titleCoveredBySibling;
+  if (!showTitle && siblings.length === 0) return null;
 
   return (
     <div className={styles.bar} data-no-print>

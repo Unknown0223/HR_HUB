@@ -402,5 +402,6 @@ Barcha analytics endpointlari `@Roles(platform_admin, tenant_admin, hr, manager)
 | 5 | API `access` moduli: list/summary/grant/revoke/bulk + audit; UI `/access` landing + `/access/employees`; employee kartasida deep-link | API unit test (tenant, expired, duplicate, revoke, bulk partial) |
 | 6 | Техобслуживание / Коммуникации / Настройки guruhlari registry’da; `/catalog` Настройки ichida | check script |
 | 7 | tsc, build:web, build:api, api test, smoke (lokal DB kerak bo‘lganlari shartini yozib) | natijalar STATUS.md da |
+| 8 | Sidebar 16 bo‘limga ajratildi (Главная, Сотрудники, Кадровые документы, Оргструктура, Посещаемость, Графики работы, Заявки, Зарплата, Начисления и выплаты, Отчёты, Аналитика, Доступы, Устройства и интеграции, Коммуникации, Справочники, Настройки); dublikat itemlar alias’ga aylantirildi; accordion (bitta bo‘lim ochiq); `PageSubnav` faqat joriy sahifaning o‘z ko‘rinishlarini ko‘rsatadi (`relatedSiblings`); dark/light mavzu (`lib/theme.ts`, `app/theme-dark.css`, `hrhub.theme`) | check-nav, tsc, brauzer 360/1440 light+dark |
 
 **Migration:** hozircha kerak emas (audit `AuditLog`, revoke `isActive=false`, expiry `expiresAt`).
