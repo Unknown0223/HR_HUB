@@ -361,21 +361,23 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
-        id: 'integrations',
-        title: 'Интеграции',
+        id: 'pos',
+        title: 'Кассовые и учётные системы',
         items: [
-          { id: 'artix', label: 'Настройки ARTIX', href: '/settings/artix', faIcon: 'fa-plug' },
-          { id: 'iiko', label: 'Настройки IIKO', href: '/settings/iiko', faIcon: 'fa-utensils' },
+          { id: 'artix', label: 'ARTIX', href: '/settings/artix', faIcon: 'fa-plug' },
+          { id: 'iiko', label: 'IIKO', href: '/settings/iiko', faIcon: 'fa-utensils' },
           { id: 'iiko-sales', label: 'Продажи IIKO', href: '/settings/iiko-sales', faIcon: 'fa-receipt' },
-          { id: 'billz', label: 'Настройки Billz 2.0', href: '/settings/billz', faIcon: 'fa-store' },
+          { id: 'billz', label: 'Billz 2.0', href: '/settings/billz', faIcon: 'fa-store' },
           { id: 'billz-sales', label: 'Продажи Billz 1.0', href: '/settings/billz-sales', faIcon: 'fa-shopping-bag' },
-          {
-            id: 'onec',
-            label: '1С:Предприятие',
-            href: '/settings?tab=integrations&sys=onec',
-            faIcon: 'fa-server',
-            aliases: ['/settings?tab=integrations'],
-          },
+        ],
+      },
+      {
+        // 1С / E-IMZO / Mehnat are configuration records only: the backend marks them as stubs.
+        id: 'external',
+        title: 'Внешние системы (обмен не подключён)',
+        items: [
+          { id: 'integrations', label: 'Все внешние системы', href: '/settings?tab=integrations', faIcon: 'fa-network-wired' },
+          { id: 'onec', label: '1С:Предприятие', href: '/settings?tab=integrations&sys=onec', faIcon: 'fa-server' },
           { id: 'esign', label: 'Электронная подпись', href: '/settings?tab=integrations&sys=esign', faIcon: 'fa-pen' },
           { id: 'mehnat', label: 'Mehnat.gov.uz', href: '/settings?tab=integrations&sys=mehnat', faIcon: 'fa-landmark' },
         ],
@@ -389,10 +391,14 @@ export const NAV_SECTIONS: NavSection[] = [
     prefixes: ['/news'],
     groups: [
       {
-        id: 'communications',
-        title: 'Коммуникации',
+        id: 'publications',
+        title: 'Публикации',
+        items: [{ id: 'news', label: 'Новости', href: '/news', faIcon: 'fa-newspaper' }],
+      },
+      {
+        id: 'channels',
+        title: 'Каналы и заявки',
         items: [
-          { id: 'news', label: 'Новости', href: '/news', faIcon: 'fa-newspaper' },
           { id: 'join-requests', label: 'Заявки из Telegram', href: '/employees/join-requests', faIcon: 'fa-user-clock' },
           { id: 'telegram', label: 'Telegram Bot', href: '/settings/telegram', faIcon: 'fa-paper-plane' },
           { id: 'google-form', label: 'Google Form', href: '/settings/google-form', faIcon: 'fa-wpforms' },
@@ -417,11 +423,17 @@ export const NAV_SECTIONS: NavSection[] = [
             faIcon: 'fa-cog',
             aliases: ['/settings', '/settings?tab=admin', '/settings?tab=audit'],
           },
+          { id: 'quickstart', label: 'Инструкции для быстрого запуска', href: '/settings/quickstart', faIcon: 'fa-rocket' },
+        ],
+      },
+      {
+        id: 'organization',
+        title: 'Организация',
+        items: [
           { id: 'hr-accounting', label: 'Кадровый учет', href: '/settings?tab=org', faIcon: 'fa-id-badge' },
           { id: 'organizations', label: 'Организации', href: '/settings/organizations', faIcon: 'fa-building' },
           { id: 'countries', label: 'Регионы', href: '/settings/countries', faIcon: 'fa-map-marked-alt' },
           { id: 'banks', label: 'Банки', href: '/settings/banks', faIcon: 'fa-university' },
-          { id: 'quickstart', label: 'Инструкции для быстрого запуска', href: '/settings/quickstart', faIcon: 'fa-rocket' },
         ],
       },
       {
@@ -441,14 +453,9 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
-        id: 'dictionaries',
-        title: 'Справочники',
+        id: 'dict-hr',
+        title: 'Кадровые справочники',
         items: [
-          { id: 'absence-types', label: 'Виды отсутствий', href: '/catalog/absence-types', faIcon: 'fa-calendar-times' },
-          { id: 'time-types', label: 'Виды рабочего времени', href: '/catalog/time-types', faIcon: 'fa-clock' },
-          { id: 'education-types', label: 'Виды образования', href: '/catalog/education-types', faIcon: 'fa-graduation-cap' },
-          { id: 'institutions', label: 'Учебные заведения', href: '/catalog/institutions', faIcon: 'fa-university' },
-          { id: 'specialties', label: 'Специальности', href: '/catalog/specialties', faIcon: 'fa-user-graduate' },
           { id: 'document-types', label: 'Типы документов', href: '/catalog/document-types', faIcon: 'fa-file' },
           {
             id: 'hire-document-exceptions',
@@ -466,17 +473,31 @@ export const NAV_SECTIONS: NavSection[] = [
             faIcon: 'fa-briefcase',
             aliases: ['/settings?tab=dictionaries'],
           },
-          { id: 'science', label: 'Отрасли наук', href: '/settings?tab=dictionaries&dict=science', faIcon: 'fa-flask' },
-          { id: 'languages', label: 'Языки', href: '/settings?tab=dictionaries&dict=languages', faIcon: 'fa-language' },
-          { id: 'lang-levels', label: 'Степени знания языка', href: '/settings?tab=dictionaries&dict=lang_levels', faIcon: 'fa-signal' },
           { id: 'certificates', label: 'Виды справок', href: '/settings?tab=dictionaries&dict=certificates', faIcon: 'fa-certificate' },
           { id: 'kinship', label: 'Степени родства', href: '/settings?tab=dictionaries&dict=kinship', faIcon: 'fa-home' },
           { id: 'marital', label: 'Состояния в браке', href: '/settings?tab=dictionaries&dict=marital', faIcon: 'fa-heart' },
           { id: 'tenure', label: 'Виды стажа', href: '/settings?tab=dictionaries&dict=tenure', faIcon: 'fa-hourglass-half' },
           { id: 'awards', label: 'Награды', href: '/settings?tab=dictionaries&dict=awards', faIcon: 'fa-medal' },
-          { id: 'inventory-types', label: 'Типы инвентаря', href: '/settings?tab=dictionaries&dict=inventory_types', faIcon: 'fa-tags' },
-          { id: 'inventory', label: 'Инвентари', href: '/settings?tab=dictionaries&dict=inventory', faIcon: 'fa-box' },
-          { id: 'cars', label: 'Список автомобилей', href: '/settings?tab=dictionaries&dict=cars', faIcon: 'fa-car' },
+        ],
+      },
+      {
+        id: 'dict-education',
+        title: 'Образование и квалификация',
+        items: [
+          { id: 'education-types', label: 'Виды образования', href: '/catalog/education-types', faIcon: 'fa-graduation-cap' },
+          { id: 'institutions', label: 'Учебные заведения', href: '/catalog/institutions', faIcon: 'fa-university' },
+          { id: 'specialties', label: 'Специальности', href: '/catalog/specialties', faIcon: 'fa-user-graduate' },
+          { id: 'science', label: 'Отрасли наук', href: '/settings?tab=dictionaries&dict=science', faIcon: 'fa-flask' },
+          { id: 'languages', label: 'Языки', href: '/settings?tab=dictionaries&dict=languages', faIcon: 'fa-language' },
+          { id: 'lang-levels', label: 'Степени знания языка', href: '/settings?tab=dictionaries&dict=lang_levels', faIcon: 'fa-signal' },
+        ],
+      },
+      {
+        id: 'dict-time',
+        title: 'Время и отсутствия',
+        items: [
+          { id: 'absence-types', label: 'Виды отсутствий', href: '/catalog/absence-types', faIcon: 'fa-calendar-times' },
+          { id: 'time-types', label: 'Виды рабочего времени', href: '/catalog/time-types', faIcon: 'fa-clock' },
           {
             id: 'trip-reasons',
             label: 'Причины ухода в командировку',
@@ -485,6 +506,15 @@ export const NAV_SECTIONS: NavSection[] = [
             aliases: ['/settings?tab=extra'],
           },
           { id: 'sick-reasons', label: 'Причины ухода на больничный', href: '/settings?tab=extra&dict=sick_reasons', faIcon: 'fa-briefcase-medical' },
+        ],
+      },
+      {
+        id: 'dict-assets',
+        title: 'Имущество',
+        items: [
+          { id: 'inventory-types', label: 'Типы инвентаря', href: '/settings?tab=dictionaries&dict=inventory_types', faIcon: 'fa-tags' },
+          { id: 'inventory', label: 'Инвентари', href: '/settings?tab=dictionaries&dict=inventory', faIcon: 'fa-box' },
+          { id: 'cars', label: 'Список автомобилей', href: '/settings?tab=dictionaries&dict=cars', faIcon: 'fa-car' },
         ],
       },
       {
