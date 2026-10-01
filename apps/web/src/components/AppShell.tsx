@@ -20,7 +20,7 @@ import {
   type NavSection,
   type NavSectionId,
 } from '@/lib/nav-registry';
-import { REPORTS_NAV_FLAT } from '@/lib/reports-nav';
+import { findReport, rememberRecentReport } from '@/lib/reports-registry';
 import {
   filterNavItems,
   isHrefAllowed,
@@ -273,6 +273,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }, [mobileOpen]);
 
   const activeItem = useMemo(() => findActiveNavItem(pathname, search), [pathname, search]);
+  const activeReport = useMemo(() => findReport(pathname, search), [pathname, search]);
+
+  useEffect(() => {
+    if (activeReport) rememberRecentReport(activeReport.id);
+  }, [activeReport]);
   const activeSectionId = useMemo(() => findNavSection(pathname, search), [pathname, search]);
   const activeSection = NAV_SECTIONS.find((s) => s.id === activeSectionId) ?? null;
 
@@ -449,8 +454,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/payroll/accruals') && siblingGroup?.title) {
       return siblingGroup.title;
     }
-    const report = REPORTS_NAV_FLAT.find((r) => r.href.split('?')[0] === pathname);
-    if (report) return report.label;
+    if (activeReport) return activeReport.title;
     if (activeItem) {
       const params = new URLSearchParams(search.replace(/^\?/, ''));
       const primary = hrefMatchScore(activeItem.href, pathname, params);
@@ -466,7 +470,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       return 'Обычный график работы (изменение)';
     if (pathname.startsWith('/employees/')) return 'Сотрудник';
     return 'HR HUB';
-  }, [pathname, search, activeItem, siblingGroup]);
+  }, [pathname, search, activeItem, activeReport, siblingGroup]);
 
   function logout() {
     void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);

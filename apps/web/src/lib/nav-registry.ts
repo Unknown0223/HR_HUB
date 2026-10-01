@@ -7,6 +7,8 @@
  * that every legacy grant key still exists and that each href appears once.
  */
 
+import { REPORT_CATEGORIES, reportsByCategory } from './reports-registry';
+
 export type NavSectionId =
   | 'home'
   | 'employees'
@@ -253,7 +255,25 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         id: 'hub',
         title: 'Отчёты',
-        items: [{ id: 'reports', label: 'Все отчёты', href: '/reports', faIcon: 'fa-chart-bar' }],
+        items: [
+          { id: 'reports', label: 'Все отчёты', href: '/reports', faIcon: 'fa-chart-bar' },
+          ...(['hr', 'attendance', 'payroll'] as const).map((cat) => ({
+            id: `reports-${cat}`,
+            label: REPORT_CATEGORIES.find((c) => c.id === cat)!.label,
+            href: `/reports?category=${cat}`,
+            faIcon: REPORT_CATEGORIES.find((c) => c.id === cat)!.faIcon,
+            aliases: reportsByCategory(cat).map((r) => r.href),
+          })),
+          {
+            id: 'reports-quick',
+            label: 'Быстрые отчёты',
+            href: '/reports?tab=overview',
+            faIcon: 'fa-bolt',
+            aliases: reportsByCategory('quick')
+              .map((r) => r.href)
+              .filter((h) => h !== '/reports?tab=overview'),
+          },
+        ],
       },
       {
         id: 'analytics',

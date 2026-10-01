@@ -29,7 +29,8 @@ function loadTs(file) {
 }
 
 const registry = loadTs(path.join(webLib, 'nav-registry.ts'));
-const reportHrefs = loadTs(path.join(webLib, 'reports-nav.ts')).REPORTS_NAV_FLAT.map((r) => r.href);
+const { REPORTS, REPORT_CATEGORIES } = loadTs(path.join(webLib, 'reports-registry.ts'));
+const reportHrefs = REPORTS.map((r) => r.href);
 const legacy = JSON.parse(fs.readFileSync(path.join(__dirname, 'nav-legacy-access-keys.json'), 'utf8')).hrefs;
 const catalogResources = new Set(
   [...fs.readFileSync(path.join(root, 'apps/api/src/catalog/catalog.resources.ts'), 'utf8').matchAll(/key:\s*'([^']+)'/g)].map(
@@ -103,6 +104,24 @@ for (const href of legacy) {
   if (!grantable.has(href)) errors.push(`legacy roleAccess key lost: ${href}`);
 }
 
+const reportIds = new Set();
+const reportHrefSet = new Set();
+const categoryIds = new Set(REPORT_CATEGORIES.map((c) => c.id));
+for (const r of REPORTS) {
+  if (reportIds.has(r.id)) errors.push(`duplicate report id ${r.id}`);
+  reportIds.add(r.id);
+  if (reportHrefSet.has(r.href)) errors.push(`report href listed twice: ${r.href}`);
+  reportHrefSet.add(r.href);
+  if (!categoryIds.has(r.category)) errors.push(`report ${r.id} has unknown category ${r.category}`);
+  if (!resolves(r.href)) errors.push(`broken report href ${r.href} (${r.id})`);
+  if (!r.title || !r.description) errors.push(`report ${r.id} needs title and description`);
+}
+const reportPaths = new Set(reportHrefs.map((h) => h.split('?')[0]));
+const staticReportPages = routes.filter((r) => /^\/catalog\/reports\/[^/[]+$/.test(r));
+for (const page of staticReportPages) {
+  if (!reportPaths.has(page)) errors.push(`report page missing from reports-registry: ${page}`);
+}
+
 const tenants = NAV_ITEMS.find((i) => i.href === '/tenants');
 if (!tenants || !tenants.platformOnly) errors.push('/tenants must be platformOnly');
 
@@ -115,6 +134,7 @@ for (const r of unowned) errors.push(`route without owner section: ${r}`);
 console.log(
   `nav registry: ${NAV_SECTIONS.length} sections, ${NAV_ITEMS.length} items, ${canonical.length} canonical routes, ${legacy.length} legacy keys`,
 );
+console.log(`reports registry: ${REPORTS.length} reports, ${staticReportPages.length} static report pages covered`);
 for (const line of info) console.log(`  info: ${line}`);
 if (errors.length) {
   for (const e of errors) console.error(`  ERROR: ${e}`);

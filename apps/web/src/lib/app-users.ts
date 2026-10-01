@@ -1,5 +1,5 @@
 import { NAV_ITEMS } from './nav-registry';
-import { REPORTS_NAV_FLAT } from './reports-nav';
+import { CATALOG_REPORTS } from './reports-registry';
 import { TIMEZONES } from './organizations';
 
 export { TIMEZONES };
@@ -121,8 +121,12 @@ export type AccessRow = { form: string; action: string; key: string };
 
 export function accessCatalog(): AccessRow[] {
   const items: { href: string; label: string }[] = [
-    ...NAV_ITEMS.map((it) => ({ href: it.href, label: it.label })),
-    ...REPORTS_NAV_FLAT.map((it) => ({ href: it.href, label: it.label })),
+    // `/reports?…` sidebar entries are views of the hub, covered by report and `/reports` grants.
+    ...NAV_ITEMS.filter((it) => !it.href.startsWith('/reports?')).map((it) => ({
+      href: it.href,
+      label: it.label,
+    })),
+    ...CATALOG_REPORTS.map((r) => ({ href: r.href, label: r.title })),
   ];
   items.push(
     { href: '/settings/organizations', label: 'Организации' },

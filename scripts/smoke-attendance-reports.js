@@ -53,7 +53,7 @@ async function req(method, p, { token, tenant, raw } = {}) {
 
 function checkFiles() {
   const root = path.join(__dirname, '..', 'apps', 'web', 'src');
-  const reportsNav = fs.readFileSync(path.join(root, 'lib', 'reports-nav.ts'), 'utf8');
+  const reportsNav = fs.readFileSync(path.join(root, 'lib', 'reports-registry.ts'), 'utf8');
   const catalogNav = fs.readFileSync(path.join(root, 'lib', 'catalog-nav.ts'), 'utf8');
   return REPORTS.map((r) => {
     const pagePath = path.join(root, 'app', '(app)', 'catalog', 'reports', r.page, 'page.tsx');
@@ -106,7 +106,7 @@ async function main() {
     const ok = row.hasPage && row.inReportsNav && row.inCatalog;
     if (!ok) failed += 1;
     console.log(
-      `${ok ? 'OK ' : 'FAIL'} ${row.id.padEnd(22)} page=${row.hasPage} css=${row.hasCss} reports-nav=${row.inReportsNav} catalog=${row.inCatalog}`,
+      `${ok ? 'OK ' : 'FAIL'} ${row.id.padEnd(22)} page=${row.hasPage} css=${row.hasCss} registry=${row.inReportsNav} catalog=${row.inCatalog}`,
     );
   }
 

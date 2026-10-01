@@ -1,6 +1,6 @@
 ﻿/** catalog-aligned navigation: existing app routes + catalog resources + reports. */
 
-import { REPORTS_NAV_FLAT } from './reports-nav';
+import { CATALOG_REPORTS } from './reports-registry';
 
 export type NavLink = {
   href: string;
@@ -114,7 +114,7 @@ export const CATALOG_NAV: NavGroup[] = [
   },
   {
     label: 'Отчетность',
-    items: REPORTS_NAV_FLAT,
+    items: CATALOG_REPORTS.map((r) => ({ href: r.href, label: r.title })),
   },
   {
     label: 'Настройки',

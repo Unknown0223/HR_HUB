@@ -1,7 +1,9 @@
 /**
- * Role-access helpers — mega-nav / page gating from TenantSetting.extras.roleAccess.
+ * Role-access helpers — sidebar / page gating from TenantSetting.extras.roleAccess.
  * Grant keys look like `/employees::*`, `/divisions?tab=divisions::*`.
  */
+
+import { REPORTS } from './reports-registry';
 
 export type MyAccess = {
   bypass: boolean;
@@ -43,7 +45,22 @@ export function isHrefAllowed(
     }
     if (ok) return true;
   }
-  return false;
+  return reportHubAllowed(pathname, have, allowed);
+}
+
+/**
+ * The /reports hub (and its `?category=` views) opens for anyone granted at least one
+ * report in scope; the hub itself lists only the granted reports. Quick-report tabs
+ * (`?tab=`) still need the `/reports` grant.
+ */
+function reportHubAllowed(pathname: string, have: URLSearchParams, allowed: string[]) {
+  if (pathname !== '/reports' || have.has('tab')) return false;
+  const category = have.get('category');
+  return REPORTS.some((r) => {
+    if (r.category === 'quick' || (category && r.category !== category)) return false;
+    const [path, qs] = r.href.split('?');
+    return isHrefAllowed(path, qs ? `?${qs}` : '', allowed, false);
+  });
 }
 
 export function filterNavItems<T extends { href: string; platformOnly?: boolean }>(
