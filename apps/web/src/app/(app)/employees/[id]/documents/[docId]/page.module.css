@@ -21,13 +21,19 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.75rem 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  min-width: 0;
+  color: var(--ink-strong, var(--ink));
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .actions {

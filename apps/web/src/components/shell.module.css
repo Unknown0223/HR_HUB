@@ -1099,6 +1099,12 @@
   padding: 0;
 }
 
+/* `[class*='page']` also matches every class from a page.module.css / form.module.css
+   (e.g. page_wrap__x). Zero specificity: roots that declare their own padding win. */
+:where(.main > [class*='page']) {
+  padding: 1.25rem 1.5rem 2.5rem;
+}
+
 .shell::before {
   content: '';
   pointer-events: none;
@@ -1530,6 +1536,10 @@
   }
 
   .main {
+    padding: 0.65rem 0.75rem 1.1rem;
+  }
+
+  :where(.main > [class*='page']) {
     padding: 0.65rem 0.75rem 1.1rem;
   }
 

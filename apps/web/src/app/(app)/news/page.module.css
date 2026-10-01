@@ -34,7 +34,7 @@
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 0 0 48px;
+  padding: 1.25rem 16px 48px;
   color: var(--ink);
   font-family: var(--font-sans);
   box-sizing: border-box;
@@ -51,11 +51,11 @@
   width: 100%;
   max-width: none;
   margin: 0 auto;
-  padding: 24px 16px 0;
+  padding: 0.5rem 0 0;
 }
 
 @media (min-width: 640px) {
-  .wrap {
+  .page {
     padding-left: 24px;
     padding-right: 24px;
   }
@@ -788,8 +788,8 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 620px) {
-  .wrap {
-    padding: 16px 12px 0;
+  .page {
+    padding: 0.65rem 0.75rem 32px;
   }
 
   .pageHeadLeft {

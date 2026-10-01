@@ -11,7 +11,7 @@
   max-width: none;
   margin: 0 auto;
   box-sizing: border-box;
-  padding: 0.25rem 0 2rem;
+  padding: 1.25rem 1.5rem 2rem;
   color: var(--ink);
 }
 
@@ -52,6 +52,12 @@
 @media (max-width: 960px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .wrap {
+    padding: 0.65rem 0.75rem 1.1rem;
   }
 }
 
