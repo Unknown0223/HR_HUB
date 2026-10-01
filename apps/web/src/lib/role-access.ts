@@ -3,7 +3,16 @@
  * Grant keys look like `/employees::*`, `/divisions?tab=divisions::*`.
  */
 
+import { NAV_SECTIONS } from './nav-registry';
 import { REPORTS } from './reports-registry';
+
+/** Hub grants that must not unlock the module pages nested under them. */
+const EXACT_GRANTS = new Set(['/access']);
+
+/** Stored grant keys of pages that moved; the old key keeps opening the new page. */
+const MOVED_GRANTS: Record<string, string> = {
+  '/catalog/access-grants': '/access/employees',
+};
 
 export type MyAccess = {
   bypass: boolean;
@@ -29,11 +38,10 @@ export function isHrefAllowed(
   const qs = search.startsWith('?') ? search.slice(1) : search;
   const have = new URLSearchParams(qs);
 
-  for (const href of allowed) {
+  for (const href of allowed.flatMap((h) => (MOVED_GRANTS[h] ? [h, MOVED_GRANTS[h]] : [h]))) {
     const [path, wantQs] = href.split('?');
-    if (pathname !== path && !(path !== '/' && pathname.startsWith(path + '/'))) {
-      continue;
-    }
+    const nested = path !== '/' && !EXACT_GRANTS.has(path) && pathname.startsWith(path + '/');
+    if (pathname !== path && !nested) continue;
     if (!wantQs) return true;
     const want = new URLSearchParams(wantQs);
     let ok = true;
@@ -45,7 +53,20 @@ export function isHrefAllowed(
     }
     if (ok) return true;
   }
-  return reportHubAllowed(pathname, have, allowed);
+  return reportHubAllowed(pathname, have, allowed) || accessHubAllowed(pathname, allowed);
+}
+
+/** The /access overview opens for anyone granted at least one page of the access section. */
+function accessHubAllowed(pathname: string, allowed: string[]) {
+  if (pathname !== '/access') return false;
+  const section = NAV_SECTIONS.find((s) => s.id === 'access');
+  return (section?.groups ?? []).some((g) =>
+    g.items.some((i) => {
+      if (i.href === '/access') return false;
+      const [path, qs] = i.href.split('?');
+      return isHrefAllowed(path, qs ? `?${qs}` : '', allowed, false);
+    }),
+  );
 }
 
 /**

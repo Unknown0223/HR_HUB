@@ -64,7 +64,7 @@ export const CATALOG_NAV: NavGroup[] = [
       { href: '/catalog/relatives', label: 'Родственники' },
       { href: '/catalog/candidates', label: 'Кандидаты' },
       { href: '/catalog/vacancies', label: 'Вакансии' },
-      { href: '/catalog/access-grants', label: 'Доступы сотрудников' },
+      { href: '/access/employees', label: 'Доступы сотрудников' },
     ],
   },
   {

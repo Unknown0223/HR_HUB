@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { apiFetch } from '@/lib/api';
+import { employeeAccessHref } from '@/lib/access';
 import { mediaSrc } from '@/lib/media';
 import { PhotoThumb, usePhotoLightbox } from '@/components/PhotoLightbox';
 import { downloadStyledXlsx } from '@/lib/xlsx-download';
@@ -4051,6 +4052,9 @@ export default function EmployeeDetailPage() {
                       ? 'Разблокировать отметки'
                       : 'Блокировать отметки'}
                   </button>
+                  <Link href={employeeAccessHref(row.id)} className={styles.menuItem}>
+                    Доступы и история
+                  </Link>
                   <button
                     type="button"
                     className={styles.menuItem}

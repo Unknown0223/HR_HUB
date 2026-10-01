@@ -310,13 +310,20 @@ export const NAV_SECTIONS: NavSection[] = [
     id: 'access',
     label: 'Доступы',
     faIcon: 'fa-key',
-    prefixes: ['/settings/users'],
+    prefixes: ['/access', '/settings/users'],
     groups: [
       {
         id: 'access',
         title: 'Доступы',
         items: [
-          { id: 'access-grants', label: 'Доступы сотрудников', href: '/catalog/access-grants', faIcon: 'fa-key' },
+          { id: 'overview', label: 'Обзор', href: '/access', faIcon: 'fa-th-large', exact: true },
+          {
+            id: 'access-grants',
+            label: 'Доступы сотрудников',
+            href: '/access/employees',
+            faIcon: 'fa-key',
+            aliases: ['/catalog/access-grants'],
+          },
           { id: 'users', label: 'Пользователи', href: '/settings/users', faIcon: 'fa-users-cog' },
           {
             id: 'roles',

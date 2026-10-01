@@ -28,6 +28,7 @@ import { HireDocumentExceptionsModule } from './hire-document-exceptions/hire-do
 import { TelegramModule } from './telegram/telegram.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { TeamModule } from './team/team.module';
+import { AccessModule } from './access/access.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { TeamModule } from './team/team.module';
     TelegramModule,
     TrackingModule,
     TeamModule,
+    AccessModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -12,6 +12,10 @@ export type CatalogResource = {
   fields: string[];
   /** Soft filter: only active rows when list?active=1 */
   activeField?: string;
+  /** Not readable by the `employee` role (rows describe other employees). */
+  staffOnly?: boolean;
+  /** Writes go through a dedicated module (validation, audit); generic CRUD is read-only. */
+  managedBy?: string;
 };
 
 export const CATALOG_RESOURCES: CatalogResource[] = [
@@ -979,6 +983,8 @@ export const CATALOG_RESOURCES: CatalogResource[] = [
     },
     fields: ['employeeId', 'accessType', 'resource', 'grantedAt', 'expiresAt', 'isActive', 'note'],
     activeField: 'isActive',
+    staffOnly: true,
+    managedBy: 'Доступы → Доступы сотрудников',
   },
   {
     key: 'time-types',

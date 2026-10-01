@@ -1957,6 +1957,7 @@ export class CatalogController {
   @ApiQuery({ name: 'to', required: false })
   async exportResource(
     @CurrentTenant() t: string | null,
+    @CurrentUser() user: AuthUser,
     @Param('resource') resource: string,
     @Query('active') active?: string,
     @Query('isActive') isActive?: string,
@@ -1974,6 +1975,7 @@ export class CatalogController {
         : isActive === '0' || isActive === 'false'
           ? false
           : undefined;
+    this.catalog.assertReadable(resource, user.role);
     const { buffer, filename } = await this.catalog.exportResource(
       this.catalog.requireTenant(t),
       resource,
@@ -1995,9 +1997,11 @@ export class CatalogController {
   @Get(':resource/:id')
   getOne(
     @CurrentTenant() t: string | null,
+    @CurrentUser() user: AuthUser,
     @Param('resource') resource: string,
     @Param('id') id: string,
   ) {
+    this.catalog.assertReadable(resource, user.role);
     return this.catalog.getOne(this.catalog.requireTenant(t), resource, id);
   }
 
@@ -2005,6 +2009,7 @@ export class CatalogController {
   @Get(':resource')
   list(
     @CurrentTenant() t: string | null,
+    @CurrentUser() user: AuthUser,
     @Param('resource') resource: string,
     @Query('active') active?: string,
     @Query('isActive') isActive?: string,
@@ -2025,6 +2030,7 @@ export class CatalogController {
           : undefined;
     const pageNum = page != null && page !== '' ? Number(page) : undefined;
     const limitNum = limit != null && limit !== '' ? Number(limit) : undefined;
+    this.catalog.assertReadable(resource, user.role);
     return this.catalog.list(this.catalog.requireTenant(t), resource, {
       activeOnly: active === '1' || active === 'true',
       employeeId,

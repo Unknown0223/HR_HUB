@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApprovalStatus, DayStatus, DocumentLifecycle, GradePromotionPeriodType, Prisma } from '@prisma/client';
+import { ApprovalStatus, DayStatus, DocumentLifecycle, GradePromotionPeriodType, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { buildExcelBuffer, flattenExportRow } from '../common/excel';
@@ -99,6 +100,19 @@ export class CatalogService {
       title: r.title,
       fields: r.fields,
     }));
+  }
+
+  assertReadable(key: string, role: string) {
+    const res = findResource(key);
+    if (res?.staffOnly && role === Role.employee) {
+      throw new ForbiddenException('Insufficient role');
+    }
+  }
+
+  private assertWritable(res: NonNullable<ReturnType<typeof findResource>>) {
+    if (res.managedBy) {
+      throw new BadRequestException(`Изменения выполняются в разделе «${res.managedBy}»`);
+    }
   }
 
   private delegate(model: string): any {
@@ -2179,6 +2193,7 @@ export class CatalogService {
   async create(tenantId: string, key: string, body: Record<string, unknown>) {
     const res = findResource(key);
     if (!res) throw new NotFoundException(`Resource ${key}`);
+    this.assertWritable(res);
     const data = this.pick(body, res.fields);
     const noTenant = [
       'careerPathStep',
@@ -2380,6 +2395,7 @@ export class CatalogService {
   async update(tenantId: string, key: string, id: string, body: Record<string, unknown>) {
     const res = findResource(key);
     if (!res) throw new NotFoundException(`Resource ${key}`);
+    this.assertWritable(res);
     if (key === 'timesheet-adjustments') {
       return this.updateTimesheetCorrection(tenantId, id, body);
     }
@@ -2437,6 +2453,7 @@ export class CatalogService {
   async remove(tenantId: string, key: string, id: string) {
     const res = findResource(key);
     if (!res) throw new NotFoundException(`Resource ${key}`);
+    this.assertWritable(res);
     if (key === 'timesheet-adjustments') {
       const row = await this.prisma.timesheetCorrection.findFirst({
         where: { id, tenantId },

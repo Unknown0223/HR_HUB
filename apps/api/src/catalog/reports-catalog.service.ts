@@ -2850,7 +2850,11 @@ ORDER BY pp.month;`,
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       }),
       this.prisma.employeeAccessGrant.findMany({
-        where: { tenantId, isActive: true },
+        where: {
+          tenantId,
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
         select: { employeeId: true, accessType: true, resource: true },
       }),
     ]);
