@@ -461,31 +461,125 @@ type Detail = {
     note?: string | null;
   }[];
 };
-const PRIMARY_TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'main', label: 'Основная информация', icon: '☰' },
-  { key: 'calendar', label: 'Календарь', icon: '▦' },
-  { key: 'docs', label: 'История документов', icon: '▤' },
-  { key: 'locations', label: 'Локации', icon: '⌖' },
-  { key: 'absences', label: 'Запросы на отсутствие', icon: '◷' },
+type TabGroupKey = 'work' | 'time' | 'pay' | 'personal' | 'assets' | 'access';
+const TAB_GROUPS: {
+  key: TabGroupKey;
+  label: string;
+  tabs: { key: TabKey; label: string }[];
+}[] = [
+  {
+    key: 'work',
+    label: 'Работа',
+    tabs: [
+      { key: 'main', label: 'Основная информация' },
+      { key: 'career', label: 'Трудовая деятельность' },
+      { key: 'docs', label: 'История документов' },
+      { key: 'subordinates', label: 'Подчиненные' },
+      { key: 'efficiency', label: 'Эффективность' },
+    ],
+  },
+  {
+    key: 'time',
+    label: 'Учёт времени',
+    tabs: [
+      { key: 'calendar', label: 'Календарь' },
+      { key: 'absences', label: 'Запросы на отсутствие' },
+      { key: 'schedule_req', label: 'Изменение графика' },
+      { key: 'locations', label: 'Локации' },
+    ],
+  },
+  {
+    key: 'pay',
+    label: 'Оплата',
+    tabs: [
+      { key: 'payroll', label: 'Оплата труда' },
+      { key: 'accounts', label: 'Расчетные счета' },
+    ],
+  },
+  {
+    key: 'personal',
+    label: 'Личные данные',
+    tabs: [
+      { key: 'documents', label: 'Документы' },
+      { key: 'family', label: 'Семья' },
+      { key: 'education', label: 'Образование' },
+      { key: 'certificates', label: 'Справки' },
+      { key: 'extra', label: 'Дополнительная информация' },
+    ],
+  },
+  {
+    key: 'assets',
+    label: 'Файлы и имущество',
+    tabs: [
+      { key: 'files', label: 'Файлы' },
+      { key: 'inventory', label: 'Инвентарь' },
+      { key: 'car', label: 'Автомобиль' },
+    ],
+  },
+  {
+    key: 'access',
+    label: 'Доступ',
+    tabs: [
+      { key: 'identity', label: 'Идентификация' },
+      { key: 'settings', label: 'Настройки' },
+    ],
+  },
 ];
-const MORE_ITEMS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'subordinates', label: 'Подчиненные', icon: '👥' },
-  { key: 'payroll', label: 'Оплата труда', icon: '₽' },
-  { key: 'efficiency', label: 'Эффективность', icon: '◔' },
-  { key: 'education', label: 'Образование', icon: '🎓' },
-  { key: 'schedule_req', label: 'Запросы на изменение графика', icon: '◷' },
-  { key: 'accounts', label: 'Расчетные счета', icon: '🏦' },
-  { key: 'documents', label: 'Документы', icon: '📄' },
-  { key: 'family', label: 'Семья', icon: '👪' },
-  { key: 'certificates', label: 'Справки', icon: '🧾' },
-  { key: 'career', label: 'Трудовая деятельность', icon: '⧉' },
-  { key: 'files', label: 'Файлы', icon: '📎' },
-  { key: 'inventory', label: 'Инвентарь', icon: '📦' },
-  { key: 'car', label: 'Автомобиль', icon: '🚗' },
-  { key: 'identity', label: 'Идентификация', icon: '🪪' },
-  { key: 'extra', label: 'Дополнительная информация', icon: 'ℹ' },
-  { key: 'settings', label: 'Настройки', icon: '⚙' },
-];
+function tabGroupOf(tab: TabKey) {
+  return TAB_GROUPS.find((g) => g.tabs.some((t) => t.key === tab)) ?? TAB_GROUPS[0];
+}
+const GROUP_ICON_PATHS: Record<TabGroupKey, ReactNode> = {
+  work: (
+    <>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20" />
+    </>
+  ),
+  time: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  pay: (
+    <>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20M6 15h4" />
+    </>
+  ),
+  personal: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="11" r="2.5" />
+      <path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3" />
+    </>
+  ),
+  assets: (
+    <>
+      <path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" />
+      <path d="m3 8 9 5 9-5M12 13v8" />
+    </>
+  ),
+  access: (
+    <>
+      <path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
+};
+function tenureLabel(from?: string | null, to?: string | null) {
+  if (!from) return '—';
+  const a = new Date(from);
+  const b = to ? new Date(to) : new Date();
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return '—';
+  let months =
+    (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth());
+  if (b.getUTCDate() < a.getUTCDate()) months -= 1;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0 && m === 0) return '< 1 мес.';
+  return [y ? `${y} г.` : '', m ? `${m} мес.` : ''].filter(Boolean).join(' ');
+}
 const DOC_LABELS: Record<string, string> = {
   hire: 'Приказ о работе',
   transfer: 'Приказ о переводе',
@@ -921,7 +1015,6 @@ export default function EmployeeDetailPage() {
     }
   }, [id, router]);
 
-  const moreRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [row, setRow] = useState<Detail | null>(null);
@@ -930,7 +1023,6 @@ export default function EmployeeDetailPage() {
   const [faceMsg, setFaceMsg] = useState('');
   const [externalIdDraft, setExternalIdDraft] = useState('');
   const [tab, setTab] = useState<TabKey>('calendar');
-  const [moreOpen, setMoreOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [docSub, setDocSub] = useState<'hr' | 'vac' | 'trip' | 'sick'>('hr');
@@ -1209,14 +1301,8 @@ export default function EmployeeDetailPage() {
     endDate: '',
     note: '',
   });
-  const [tabSettingsOpen, setTabSettingsOpen] = useState(false);
-  const [tabArrangeOpen, setTabArrangeOpen] = useState(false);
-  const [resetTabsOpen, setResetTabsOpen] = useState(false);
-  const tabSettingsRef = useRef<HTMLDivElement>(null);
+  const lastTabByGroup = useRef<Partial<Record<TabGroupKey, TabKey>>>({});
   const [salaryVisible, setSalaryVisible] = useState(true);
-  const [primaryTabOrder, setPrimaryTabOrder] = useState<TabKey[]>(
-    PRIMARY_TABS.map((t) => t.key),
-  );
   const [docForm, setDocForm] = useState({
     docType: 'PASSPORT',
     series: '',
@@ -1626,23 +1712,12 @@ export default function EmployeeDetailPage() {
     try {
       const sal = localStorage.getItem('hrhub.emp.salaryVisible');
       if (sal != null) setSalaryVisible(sal === '1');
-      const ord = localStorage.getItem('hrhub.emp.primaryTabs');
-      if (ord) {
-        const parsed = JSON.parse(ord) as TabKey[];
-        if (Array.isArray(parsed) && parsed.length) {
-          const known = PRIMARY_TABS.map((t) => t.key);
-          const next = parsed.filter((k) => known.includes(k));
-          for (const k of known) if (!next.includes(k)) next.push(k);
-          setPrimaryTabOrder(next);
-        }
-      }
     } catch {
       /* ignore */
     }
   }, []);
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
       if (!actionMenuRef.current?.contains(e.target as Node)) {
         setActionMenuOpen(false);
         setReportsOpen(false);
@@ -1670,9 +1745,6 @@ export default function EmployeeDetailPage() {
       }
       if (!citizenshipComboRef.current?.contains(e.target as Node)) {
         setCitizenshipListOpen(false);
-      }
-      if (!tabSettingsRef.current?.contains(e.target as Node)) {
-        setTabSettingsOpen(false);
       }
     }
     document.addEventListener('mousedown', onDoc);
@@ -3503,22 +3575,6 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  function persistPrimaryTabs(order: TabKey[]) {
-    setPrimaryTabOrder(order);
-    try {
-      localStorage.setItem('hrhub.emp.primaryTabs', JSON.stringify(order));
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function resetPrimaryTabs() {
-    const def = PRIMARY_TABS.map((t) => t.key);
-    persistPrimaryTabs(def);
-    setResetTabsOpen(false);
-    setTabSettingsOpen(false);
-  }
-
   function toggleSalaryVisible() {
     setSalaryVisible((v) => {
       const next = !v;
@@ -3530,14 +3586,6 @@ export default function EmployeeDetailPage() {
       return next;
     });
   }
-
-  const visiblePrimaryTabs = useMemo(() => {
-    const byKey = new Map(PRIMARY_TABS.map((t) => [t.key, t]));
-    return primaryTabOrder
-      .map((k) => byKey.get(k))
-      .filter(Boolean)
-      .slice(0, 5) as typeof PRIMARY_TABS;
-  }, [primaryTabOrder]);
 
   async function loadSchedules() {
     try {
@@ -3939,9 +3987,10 @@ export default function EmployeeDetailPage() {
       setBusy(false);
     }
   }
-  const moreActive = MORE_ITEMS.some((m) => m.key === tab);
-  const moreLabel =
-    MORE_ITEMS.find((m) => m.key === tab)?.label ?? 'Дополнительно';
+  const activeGroup = tabGroupOf(tab);
+  useEffect(() => {
+    lastTabByGroup.current[tabGroupOf(tab).key] = tab;
+  }, [tab]);
   if (!row && !error) return <p className={styles.muted}>Загрузка…</p>;
   return (
     <div className={styles.page}>
@@ -4161,7 +4210,17 @@ export default function EmployeeDetailPage() {
                 .join(' , ') || '—'}
             </p>
             <div className={styles.statusWrap}>
-              <span className={styles.statusPill}>{statusRu(row.status)}</span>
+              <span
+                className={`${styles.statusPill} ${
+                  row.status === 'dismissed'
+                    ? styles.statusPillOff
+                    : row.status === 'leave'
+                      ? styles.statusPillLeave
+                      : ''
+                }`}
+              >
+                {statusRu(row.status)}
+              </span>
             </div>
             {(row.profileFlags?.excludeFromStats ||
               row.profileFlags?.systemAccessClosed ||
@@ -4178,219 +4237,221 @@ export default function EmployeeDetailPage() {
                 ) : null}
               </div>
             )}
-            <ul className={styles.sideList}>
-              <li
-                className={`${styles.sideItem} ${styles.sideItemClickable}`}
-                onClick={() => void openDocModal('passport')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') void openDocModal('passport');
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                <SideIcon name="passport" />
-                <div>
-                  <span className={styles.sideLabel}>Паспортные данные</span>
-                  <span className={styles.sideValue}>
-                    {row.person?.passport ?? '—'}
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.linkBtn}
-                    style={{ display: 'block', marginTop: 4 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void openDocModal('passport').then(() => setPassportScanOpen(true));
+            <dl className={styles.quickFacts}>
+              <div className={styles.quickFact}>
+                <dt>Таб. №</dt>
+                <dd>{row.tabNumber || '—'}</dd>
+              </div>
+              <div className={styles.quickFact}>
+                <dt>{row.status === 'dismissed' ? 'Уволен' : 'Принят'}</dt>
+                <dd>
+                  {fmtDate(row.status === 'dismissed' ? row.dismissedAt : row.hiredAt)}
+                </dd>
+              </div>
+              <div className={styles.quickFact}>
+                <dt>Стаж</dt>
+                <dd>{tenureLabel(row.hiredAt, row.dismissedAt)}</dd>
+              </div>
+            </dl>
+            <div className={styles.sideGroups}>
+              <section className={styles.sideGroup}>
+                <h3 className={styles.sideGroupTitle}>Контакты</h3>
+                <ul className={styles.sideList}>
+                  <li className={styles.sideItem}>
+                    <SideIcon name="phone" />
+                    <div>
+                      <span className={styles.sideLabel}>Номер телефона</span>
+                      {row.phone || row.person?.phone ? (
+                        <a
+                          className={styles.sideLink}
+                          href={`tel:${(row.phone || row.person?.phone || '').replace(/[^\d+]/g, '')}`}
+                        >
+                          {row.phone || row.person?.phone}
+                        </a>
+                      ) : (
+                        <span className={styles.sideValue}>—</span>
+                      )}
+                    </div>
+                  </li>
+                  <li className={styles.sideItem}>
+                    <SideIcon name="user" />
+                    <div>
+                      <span className={styles.sideLabel}>Руководитель</span>
+                      {row.manager ? (
+                        <Link className={styles.sideLink} href={`/employees/${row.manager.id}`}>
+                          {fullName(row.manager)}
+                        </Link>
+                      ) : (
+                        <span className={styles.sideValue}>—</span>
+                      )}
+                    </div>
+                  </li>
+                </ul>
+              </section>
+              <section className={styles.sideGroup}>
+                <h3 className={styles.sideGroupTitle}>Документ</h3>
+                <ul className={styles.sideList}>
+                  <li
+                    className={`${styles.sideItem} ${styles.sideItemClickable}`}
+                    onClick={() => void openDocModal('passport')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') void openDocModal('passport');
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <SideIcon name="passport" />
+                    <div>
+                      <span className={styles.sideLabel}>Паспортные данные</span>
+                      <span className={styles.sideValue}>{row.person?.passport ?? '—'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.sideAction}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void openDocModal('passport').then(() => setPassportScanOpen(true));
+                      }}
+                    >
+                      Скан
+                    </button>
+                  </li>
+                </ul>
+              </section>
+              <section className={styles.sideGroup}>
+                <h3 className={styles.sideGroupTitle}>График и локации</h3>
+                <ul className={styles.sideList}>
+                  <li
+                    className={`${styles.sideItem} ${styles.sideItemClickable}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/employees/${row.id}/schedule`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        router.push(`/employees/${row.id}/schedule`);
+                      }
                     }}
                   >
-                    Скан қилиш
-                  </button>
-                </div>
-              </li>
-              <li className={styles.sideItem}>
-                <SideIcon name="phone" />
-                <div>
-                  <span className={styles.sideLabel}>Номер телефона</span>
-                  <span className={styles.sideValue}>
-                    {row.phone || row.person?.phone || '—'}
-                  </span>
-                </div>
-              </li>
-              <li className={styles.sideItem}>
-                <SideIcon name="user" />
-                <div>
-                  <span className={styles.sideLabel}>Руководитель</span>
-                  <span className={styles.sideValue}>
-                    {row.manager ? fullName(row.manager) : '—'}
-                  </span>
-                </div>
-              </li>
-              <li
-                className={`${styles.sideItem} ${styles.sideItemClickable}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => router.push(`/employees/${row.id}/schedule`)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    router.push(`/employees/${row.id}/schedule`);
-                  }
-                }}
-              >
-                <SideIcon name="cal" />
-                <div>
-                  <span className={styles.sideLabel}>График работы</span>
-                  <span className={`${styles.sideValue} ${styles.sideLink}`}>
-                    {scheduleLabel(row)}
-                  </span>
-                </div>
-              </li>
-              <li
-                className={`${styles.sideItem} ${styles.sideItemClickable}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setTab('locations');
-                  setLocSub(attached.length ? 'attached' : 'available');
-                  setMoreOpen(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setTab('locations');
-                    setLocSub(attached.length ? 'attached' : 'available');
-                    setMoreOpen(false);
-                  }
-                }}
-              >
-                <SideIcon name="pin" />
-                <div>
-                  <span className={styles.sideLabel}>Локации</span>
-                  <span className={`${styles.sideValue} ${styles.sideLink}`}>
-                    {attached.length
-                      ? `${attached
-                          .slice(0, 3)
-                          .map((l) => l.name)
-                          .join(', ')}${attached.length > 3 ? '…' : ''}`
-                      : 'Открыть локации'}
-                  </span>
-                </div>
-              </li>
-              <li className={styles.sideItem}>
-                <SideIcon name="pay" />
-                <div>
-                  <span className={styles.sideLabel}>Зарплата</span>
-                  <span className={styles.sideValue}>
-                    {salaryVisible ? fmtMoney(row.baseSalary) : '********'}
-                  </span>
-                </div>
-              </li>
-              <li className={styles.sideItem}>
-                <SideIcon name="tag" />
-                <div>
-                  <span className={styles.sideLabel}>Тип оплаты труда</span>
-                  <span className={styles.sideValue}>
-                    {row.profileExtras?.paymentType ?? '—'}
-                  </span>
-                </div>
-              </li>
-            </ul>
+                    <SideIcon name="cal" />
+                    <div>
+                      <span className={styles.sideLabel}>График работы</span>
+                      <span className={`${styles.sideValue} ${styles.sideLink}`}>
+                        {scheduleLabel(row)}
+                      </span>
+                    </div>
+                  </li>
+                  <li
+                    className={`${styles.sideItem} ${styles.sideItemClickable}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setTab('locations');
+                      setLocSub(attached.length ? 'attached' : 'available');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setTab('locations');
+                        setLocSub(attached.length ? 'attached' : 'available');
+                      }
+                    }}
+                  >
+                    <SideIcon name="pin" />
+                    <div>
+                      <span className={styles.sideLabel}>
+                        Локации{attached.length ? ` · ${attached.length}` : ''}
+                      </span>
+                      <span className={`${styles.sideValue} ${styles.sideLink}`}>
+                        {attached.length
+                          ? `${attached
+                              .slice(0, 3)
+                              .map((l) => l.name)
+                              .join(', ')}${attached.length > 3 ? '…' : ''}`
+                          : 'Открыть локации'}
+                      </span>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+              <section className={styles.sideGroup}>
+                <h3 className={styles.sideGroupTitle}>Оплата</h3>
+                <ul className={styles.sideList}>
+                  <li className={styles.sideItem}>
+                    <SideIcon name="pay" />
+                    <div>
+                      <span className={styles.sideLabel}>Зарплата</span>
+                      <span className={styles.sideValue}>
+                        {salaryVisible ? fmtMoney(row.baseSalary) : '••••••'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.sideAction}
+                      aria-pressed={salaryVisible}
+                      title={salaryVisible ? 'Скрыть зарплату' : 'Показать зарплату'}
+                      onClick={toggleSalaryVisible}
+                    >
+                      {salaryVisible ? 'Скрыть' : 'Показать'}
+                    </button>
+                  </li>
+                  <li className={styles.sideItem}>
+                    <SideIcon name="tag" />
+                    <div>
+                      <span className={styles.sideLabel}>Тип оплаты труда</span>
+                      <span className={styles.sideValue}>
+                        {row.profileExtras?.paymentType ?? '—'}
+                      </span>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+            </div>
           </aside>
           <section className={styles.main}>
-            <div className={styles.tabs}>
-              {visiblePrimaryTabs.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  className={`${styles.tab} ${tab === t.key ? styles.tabActive : ''}`}
-                  onClick={() => {
-                    setTab(t.key);
-                    setMoreOpen(false);
-                  }}
-                >
-                  <span className={styles.tabIcon} aria-hidden>
-                    {t.icon}
-                  </span>
-                  {t.label}
-                </button>
-              ))}
-              <div className={styles.moreWrap} ref={moreRef}>
-                <button
-                  type="button"
-                  className={`${styles.moreBtn} ${moreActive ? styles.moreBtnActive : ''}`}
-                  onClick={() => setMoreOpen((v) => !v)}
-                >
-                  {moreActive ? moreLabel : 'Дополнительно'} ▾
-                </button>
-                {moreOpen ? (
-                  <div className={styles.moreMenu}>
-                    {MORE_ITEMS.map((m) => (
-                      <button
-                        key={m.key}
-                        type="button"
-                        className={`${styles.moreItem} ${
-                          tab === m.key ? styles.moreItemActive : ''
-                        }`}
-                        onClick={() => {
-                          setTab(m.key);
-                          setMoreOpen(false);
-                        }}
-                      >
-                        <span className={styles.moreItemIcon} aria-hidden>
-                          {m.icon}
-                        </span>
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+            <nav className={styles.tabNav} aria-label="Разделы карточки сотрудника">
+              <div className={styles.groupTabs} role="tablist">
+                {TAB_GROUPS.map((g) => {
+                  const active = activeGroup.key === g.key;
+                  return (
+                    <button
+                      key={g.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      aria-label={g.label}
+                      title={g.label}
+                      className={`${styles.groupTab} ${active ? styles.groupTabActive : ''}`}
+                      onClick={() =>
+                        setTab(lastTabByGroup.current[g.key] ?? g.tabs[0].key)
+                      }
+                    >
+                      <svg className={styles.groupIcon} viewBox="0 0 24 24" aria-hidden>
+                        {GROUP_ICON_PATHS[g.key]}
+                      </svg>
+                      <span>{g.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <div className={styles.tabSettingsWrap} ref={tabSettingsRef}>
-                <button
-                  type="button"
-                  className={styles.tabSettingsBtn}
-                  title="Настройки вкладок"
-                  onClick={() => setTabSettingsOpen((v) => !v)}
-                >
-                  ⋮
-                </button>
-                {tabSettingsOpen ? (
-                  <div className={styles.tabSettingsMenu}>
-                    <button
-                      type="button"
-                      className={styles.tabSettingsItem}
-                      onClick={() => {
-                        setTabArrangeOpen(true);
-                        setTabSettingsOpen(false);
-                      }}
-                    >
-                      ⚙ Упорядочить вкладки
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.tabSettingsItem}
-                      onClick={() => {
-                        setResetTabsOpen(true);
-                        setTabSettingsOpen(false);
-                      }}
-                    >
-                      ↺ По умолчанию
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.tabSettingsItem}
-                      onClick={() => {
-                        toggleSalaryVisible();
-                        setTabSettingsOpen(false);
-                      }}
-                    >
-                      {salaryVisible ? '✓ ' : ''}
-                      {salaryVisible ? 'Salary visible' : 'Salary hidden'}
-                    </button>
-                  </div>
-                ) : null}
+              <div className={styles.tabs} role="tablist">
+                {activeGroup.tabs.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === t.key}
+                    className={`${styles.tab} ${tab === t.key ? styles.tabActive : ''}`}
+                    onClick={() => setTab(t.key)}
+                  >
+                    {t.label}
+                    {t.key === 'locations' && attached.length ? (
+                      <span className={styles.tabCount}>{attached.length}</span>
+                    ) : null}
+                  </button>
+                ))}
               </div>
-            </div>
+            </nav>
             <div className={styles.panelBody}>
               {tab === 'main' ? (
                 <>
@@ -5745,6 +5806,7 @@ export default function EmployeeDetailPage() {
                       }}
                     >
                       Прикрепленные
+                      <span className={styles.subTabCount}>{attached.length}</span>
                     </button>
                     <button
                       type="button"
@@ -5758,6 +5820,7 @@ export default function EmployeeDetailPage() {
                       }}
                     >
                       Доступные
+                      <span className={styles.subTabCount}>{available.length}</span>
                     </button>
                   </div>
                   {(() => {
@@ -5810,20 +5873,6 @@ export default function EmployeeDetailPage() {
                             onClick={() => void load()}
                           >
                             ↻
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.locToolBtn}
-                            title="Фильтр"
-                          >
-                            ▤
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.locToolBtn}
-                            title="Колонки"
-                          >
-                            ⚙
                           </button>
                           <div className={styles.locPager}>
                             <span>
@@ -5934,7 +5983,9 @@ export default function EmployeeDetailPage() {
                                     </td>
                                     <td>{l.regionName || '—'}</td>
                                     <td>{l.locationType?.name ?? '—'}</td>
-                                    <td>{l.address || '—'}</td>
+                                    <td className={styles.cellClip} title={l.address || undefined}>
+                                      {l.address || '—'}
+                                    </td>
                                     <td>
                                       {locSub === 'attached' ? (
                                         <button
@@ -10808,109 +10859,6 @@ export default function EmployeeDetailPage() {
             <span />
           </div>
         </div>
-      </FormModal>
-      <FormModal
-        open={tabArrangeOpen}
-        title="Первые 5 вкладок для отображения"
-        onClose={() => setTabArrangeOpen(false)}
-        width="md"
-        footer={
-          <>
-            <button
-              type="button"
-              className={fmStyles.btnPrimary}
-              onClick={() => setTabArrangeOpen(false)}
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              className={fmStyles.btnGhost}
-              onClick={resetPrimaryTabs}
-            >
-              По умолчанию
-            </button>
-            <button
-              type="button"
-              className={fmStyles.btnGhost}
-              onClick={() => setTabArrangeOpen(false)}
-            >
-              Закрыть
-            </button>
-          </>
-        }
-      >
-        <ul className={styles.tabArrangeList}>
-          {primaryTabOrder.map((key, idx) => {
-            const item = PRIMARY_TABS.find((t) => t.key === key);
-            if (!item) return null;
-            return (
-              <li key={key} className={styles.tabArrangeItem}>
-                <span className={styles.tabArrangeIcon}>{item.icon}</span>
-                <span className={styles.tabArrangeLabel}>{item.label}</span>
-                {idx < 5 ? (
-                  <span className={styles.tabArrangeBadge}>
-                    {idx === 0 ? 'Первая отображаемая вкладка' : 'Отображаемая'}
-                  </span>
-                ) : null}
-                <div className={styles.tabArrangeMoves}>
-                  <button
-                    type="button"
-                    className={styles.invIconBtn}
-                    disabled={idx === 0}
-                    onClick={() => {
-                      const next = [...primaryTabOrder];
-                      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                      persistPrimaryTabs(next);
-                    }}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.invIconBtn}
-                    disabled={idx === primaryTabOrder.length - 1}
-                    onClick={() => {
-                      const next = [...primaryTabOrder];
-                      [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
-                      persistPrimaryTabs(next);
-                    }}
-                  >
-                    ↓
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </FormModal>
-      <FormModal
-        open={resetTabsOpen}
-        title="Сбросить"
-        onClose={() => setResetTabsOpen(false)}
-        width="sm"
-        footer={
-          <>
-            <button
-              type="button"
-              className={fmStyles.btnPrimary}
-              onClick={resetPrimaryTabs}
-            >
-              Да
-            </button>
-            <button
-              type="button"
-              className={fmStyles.btnGhost}
-              onClick={() => setResetTabsOpen(false)}
-            >
-              Нет
-            </button>
-          </>
-        }
-      >
-        <p className={styles.muted}>
-          Сбросить порядок вкладок к значениям по умолчанию?
-        </p>
       </FormModal>
       {absAddOpen ? (
         <div
