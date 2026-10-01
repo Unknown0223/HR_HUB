@@ -42,10 +42,10 @@ async function main() {
     roleDict.items[0];
   assert(mgrRole?.id, 'MGR role missing');
 
-  // Collect every mega-nav href from source + critical payroll pages.
+  // Collect every sidebar registry href from source + critical payroll pages.
   const fs = require('fs');
-  const megaSrc = fs.readFileSync('apps/web/src/lib/mega-nav.ts', 'utf8');
-  const found = [...megaSrc.matchAll(/href:\s*'([^']+)'/g)].map((m) => m[1]);
+  const navSrc = fs.readFileSync('apps/web/src/lib/nav-registry.ts', 'utf8');
+  const found = [...navSrc.matchAll(/href:\s*'([^']+)'/g)].map((m) => m[1]);
   const critical = [
     '/dashboard',
     '/news',

@@ -28,6 +28,8 @@ export type NavItem = {
   aliases?: string[];
   /** Visible to platform_admin only. */
   platformOnly?: boolean;
+  /** Hub page: owns only its own path, not child routes of other modules. */
+  exact?: boolean;
 };
 
 export type NavGroup = { id: string; title: string; items: NavItem[] };
@@ -477,7 +479,7 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
           { id: 'photos', label: 'Загрузка фотографий сотрудников', href: '/settings/photos', faIcon: 'fa-camera' },
           { id: 'person-docs', label: 'Импорт персональных документов', href: '/settings/person-docs', faIcon: 'fa-upload' },
-          { id: 'catalog', label: 'Каталог (все модули)', href: '/catalog', faIcon: 'fa-th-large' },
+          { id: 'catalog', label: 'Каталог (все модули)', href: '/catalog', faIcon: 'fa-th-large', exact: true },
           { id: 'tenants', label: 'Tenants', href: '/tenants', faIcon: 'fa-cloud', platformOnly: true },
         ],
       },
@@ -516,6 +518,7 @@ export function findActiveNavItem(pathname: string, search = '') {
   let bestScore = -1;
   for (const item of NAV_ITEMS) {
     for (const href of [item.href, ...(item.aliases ?? [])]) {
+      if (item.exact && pathname !== href.split('?')[0]) continue;
       const s = hrefMatchScore(href, pathname, params);
       if (s > bestScore) {
         bestScore = s;

@@ -12,14 +12,33 @@ import {
   useState,
 } from 'react';
 import { apiFetch, getAccessToken, getSession, setMediaAccessToken, setSession, Session } from '@/lib/api';
-import { MEGA_NAV, findSectionByPath } from '@/lib/mega-nav';
 import {
-  filterMegaItems,
+  NAV_SECTIONS,
+  findActiveNavItem,
+  findNavSection,
+  hrefMatchScore,
+  type NavSection,
+  type NavSectionId,
+} from '@/lib/nav-registry';
+import { REPORTS_NAV_FLAT } from '@/lib/reports-nav';
+import {
+  filterNavItems,
   isHrefAllowed,
   type MyAccess,
 } from '@/lib/role-access';
 import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
+import { SidebarNav } from './SidebarNav';
 import styles from './shell.module.css';
+import sb from './sidebar.module.css';
+
+const COMPACT_KEY = 'hrhub.sidebar.compact';
+
+const BOTTOM_SHORTCUTS: { section: NavSectionId; label: string }[] = [
+  { section: 'home', label: 'Главная' },
+  { section: 'employees', label: 'Сотрудники' },
+  { section: 'attendance', label: 'Посещаемость' },
+  { section: 'reports', label: 'Отчёты' },
+];
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -28,67 +47,20 @@ function initials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function linkActive(pathname: string, search: string, href: string) {
-  const [path, qs] = href.split('?');
-  // Query deep-links (`/settings?tab=…`) must not match every `/settings/*` child path.
-  if (qs) {
-    if (pathname !== path) return false;
-    const want = new URLSearchParams(qs);
-    const have = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-    for (const [k, v] of want.entries()) {
-      if (have.get(k) !== v) return false;
-    }
-    return true;
-  }
-  if (pathname === path) return true;
-  if (path !== '/' && pathname.startsWith(path + '/')) return true;
-  return false;
-}
-
-function MegaLinkContent({
-  label,
-  faIcon,
-  iconAccent,
-  iconClass,
-  iconColoredClass,
-}: {
-  label: string;
-  faIcon?: string;
-  iconAccent?: string;
-  iconClass: string;
-  iconColoredClass: string;
-}) {
-  return (
-    <>
-      {faIcon ? (
-        <span
-          className={iconAccent ? `${iconClass} ${iconColoredClass}` : iconClass}
-          style={iconAccent ? { background: iconAccent } : undefined}
-          aria-hidden
-        >
-          <i className={`fas ${faIcon}`} />
-        </span>
-      ) : null}
-      <span className={styles.megaLinkLabel}>{label}</span>
-    </>
-  );
-}
-
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams?.toString() ? `?${searchParams.toString()}` : '';
   const router = useRouter();
   const [session, setLocal] = useState<Session | null>(null);
-  const [now, setNow] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [quickOpen, setQuickOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [screenLocked, setScreenLocked] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' });
   const [pwdMsg, setPwdMsg] = useState('');
+  const [pwdBusy, setPwdBusy] = useState(false);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const [searchQ, setSearchQ] = useState('');
   const [searchBusy, setSearchBusy] = useState(false);
@@ -108,31 +80,21 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     }[]
   >([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [openId, setOpenId] = useState<string | null>(null);
-  /** Active category index inside multi-column mega (HR HUB fly-out). */
-  const [megaCatIdx, setMegaCatIdx] = useState(0);
   const [access, setAccess] = useState<MyAccess | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [megaLeft, setMegaLeft] = useState(0);
-  const [megaTop, setMegaTop] = useState(45);
-  const tabBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const megaPanelRef = useRef<HTMLDivElement>(null);
-  const megaCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [compact, setCompact] = useState(false);
+  /** User-toggled sections; the active section is open unless explicitly closed. */
+  const [expanded, setExpanded] = useState<Partial<Record<NavSectionId, boolean>>>({});
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
-  const cancelMegaClose = useCallback(() => {
-    if (megaCloseTimer.current) {
-      clearTimeout(megaCloseTimer.current);
-      megaCloseTimer.current = null;
+  useLayoutEffect(() => {
+    try {
+      setCompact(localStorage.getItem(COMPACT_KEY) === '1');
+    } catch {
+      /* storage unavailable */
     }
   }, []);
-
-  const scheduleMegaClose = useCallback(() => {
-    cancelMegaClose();
-    megaCloseTimer.current = setTimeout(() => {
-      setOpenId(null);
-      megaCloseTimer.current = null;
-    }, 160);
-  }, [cancelMegaClose]);
 
   // Sync session from localStorage before first paint — do not wait on /auth/me.
   useLayoutEffect(() => {
@@ -194,29 +156,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }, [session, access, pathname, search, router]);
 
   useEffect(() => {
-    const tick = () =>
-      setNow(
-        new Date().toLocaleString('ru-RU', {
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-      );
-    tick();
-    const id = setInterval(tick, 30_000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
     setProfileOpen(false);
     setNotifyOpen(false);
-    setQuickOpen(false);
     setSearchOpen(false);
-    cancelMegaClose();
-    setOpenId(null);
     setMobileOpen(false);
-  }, [pathname, search, cancelMegaClose]);
+  }, [pathname, search]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -302,99 +246,69 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [searchQ, searchOpen]);
 
-  const placeMega = useCallback((id: string) => {
-    const btn = tabBtnRefs.current[id];
-    if (!btn) return;
-    const r = btn.getBoundingClientRect();
-    const top = Math.round(r.bottom);
-    let left = Math.round(r.left);
-
-    requestAnimationFrame(() => {
-      const panel = megaPanelRef.current;
-      const width = panel?.offsetWidth ?? 320;
-      const maxLeft = Math.max(8, window.innerWidth - width - 8);
-      if (left > maxLeft) left = maxLeft;
-      if (left < 8) left = 8;
-      setMegaLeft(left);
-      setMegaTop(top);
-    });
-
-    setMegaLeft(left);
-    setMegaTop(top);
-  }, []);
-
-  const openMega = useCallback(
-    (id: string) => {
-      cancelMegaClose();
-      setOpenId(id);
-      placeMega(id);
-    },
-    [cancelMegaClose, placeMega],
-  );
-
   useEffect(() => {
-    return () => cancelMegaClose();
-  }, [cancelMegaClose]);
-
-  useEffect(() => {
-    if (!openId) return;
-    placeMega(openId);
-    function onResize() {
-      if (openId) placeMega(openId);
-    }
-    window.addEventListener('resize', onResize);
-    window.addEventListener('scroll', onResize, true);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('scroll', onResize, true);
-    };
-  }, [openId, megaCatIdx, placeMega]);
-
-  useEffect(() => {
-    if (!openId) {
-      setMegaCatIdx(0);
-      return;
-    }
-    const sec = MEGA_NAV.find((s) => s.id === openId);
-    if (!sec) return;
-    // Open the column that contains the current route, else first titled column.
-    let best = 0;
-    sec.columns.forEach((col, idx) => {
-      if (col.items.some((item) => linkActive(pathname, search, item.href))) best = idx;
-    });
-    setMegaCatIdx(best);
-  }, [openId, pathname, search]);
-
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      const t = e.target as Node;
-      const header = document.querySelector(`.${styles.topNav}`);
-      const inHeader = header?.contains(t);
-      const inMega = megaPanelRef.current?.contains(t);
-      if (!inHeader && !inMega) setOpenId(null);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        setOpenId(null);
         setMobileOpen(false);
         setProfileOpen(false);
         setNotifyOpen(false);
-        setQuickOpen(false);
         setSearchOpen(false);
       }
     }
-    document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const activeSectionId = useMemo(
-    () => findSectionByPath(pathname, search),
-    [pathname, search],
+  // Drawer: move focus in on open, back to the menu button on close; lock page scroll.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    drawerCloseRef.current?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const menuBtn = menuBtnRef.current;
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      menuBtn?.focus();
+    };
+  }, [mobileOpen]);
+
+  const activeItem = useMemo(() => findActiveNavItem(pathname, search), [pathname, search]);
+  const activeSectionId = useMemo(() => findNavSection(pathname, search), [pathname, search]);
+  const activeSection = NAV_SECTIONS.find((s) => s.id === activeSectionId) ?? null;
+
+  const isSectionOpen = useCallback(
+    (id: NavSectionId) => expanded[id] ?? id === activeSectionId,
+    [expanded, activeSectionId],
   );
+
+  const toggleNavSection = useCallback(
+    (id: NavSectionId) => {
+      if (compact) {
+        setCompact(false);
+        try {
+          localStorage.setItem(COMPACT_KEY, '0');
+        } catch {
+          /* storage unavailable */
+        }
+        setExpanded((prev) => ({ ...prev, [id]: true }));
+        return;
+      }
+      setExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? id === activeSectionId) }));
+    },
+    [compact, activeSectionId],
+  );
+
+  function toggleCompact() {
+    setCompact((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COMPACT_KEY, next ? '1' : '0');
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }
 
   const siblingGroup = useMemo(() => {
     const parts = pathname.split('/').filter(Boolean);
@@ -535,12 +449,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/payroll/accruals') && siblingGroup?.title) {
       return siblingGroup.title;
     }
-    for (const sec of MEGA_NAV) {
-      for (const col of sec.columns) {
-        for (const item of col.items) {
-          if (linkActive(pathname, search, item.href)) return item.label;
-        }
-      }
+    const report = REPORTS_NAV_FLAT.find((r) => r.href.split('?')[0] === pathname);
+    if (report) return report.label;
+    if (activeItem) {
+      const params = new URLSearchParams(search.replace(/^\?/, ''));
+      const primary = hrefMatchScore(activeItem.href, pathname, params);
+      const viaAlias = (activeItem.aliases ?? []).some(
+        (a) => hrefMatchScore(a, pathname, params) > primary,
+      );
+      if (!viaAlias || !siblingGroup?.title) return activeItem.label;
     }
     if (siblingGroup?.title) return siblingGroup.title;
     if (pathname.includes('/reports/')) return 'Отчёт по сотруднику';
@@ -549,7 +466,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       return 'Обычный график работы (изменение)';
     if (pathname.startsWith('/employees/')) return 'Сотрудник';
     return 'HR HUB';
-  }, [pathname, search, siblingGroup]);
+  }, [pathname, search, activeItem, siblingGroup]);
 
   function logout() {
     void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -580,49 +497,59 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     setProfileOpen(false);
   }
 
-  function submitPasswordChange(e: React.FormEvent) {
-    e.preventDefault();
+  function closePasswordModal() {
+    setPwdOpen(false);
+    setPwdForm({ current: '', next: '', confirm: '' });
     setPwdMsg('');
-    if (pwdForm.next.length < 6) {
-      setPwdMsg('Новый пароль должен быть не короче 6 символов');
+  }
+
+  async function submitPasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (pwdBusy) return;
+    setPwdMsg('');
+    if (!pwdForm.current) {
+      setPwdMsg('Введите текущий пароль');
+      return;
+    }
+    if (pwdForm.next.length < 8) {
+      setPwdMsg('Новый пароль должен быть не короче 8 символов');
       return;
     }
     if (pwdForm.next !== pwdForm.confirm) {
       setPwdMsg('Пароли не совпадают');
       return;
     }
-    setPwdMsg('Пароль обновлён (демо)');
-    setTimeout(() => {
-      setPwdOpen(false);
+    setPwdBusy(true);
+    try {
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword: pwdForm.current, newPassword: pwdForm.next }),
+      });
       setPwdForm({ current: '', next: '', confirm: '' });
-      setPwdMsg('');
-    }, 900);
-  }
-
-  function toggleSection(id: string) {
-    cancelMegaClose();
-    setOpenId((prev) => {
-      const next = prev === id ? null : id;
-      if (next) placeMega(next);
-      return next;
-    });
+      setPwdMsg('Пароль обновлён');
+      setTimeout(closePasswordModal, 900);
+    } catch (err) {
+      setPwdMsg(err instanceof Error && err.message ? err.message : 'Не удалось изменить пароль');
+    } finally {
+      setPwdBusy(false);
+    }
   }
 
   if (!session) {
     return <div className={styles.loading}>Загрузка…</div>;
   }
 
-  const visibleSections = MEGA_NAV.map((sec) => {
-    const columns = sec.columns
-      .map((col) => ({
-        ...col,
-        items: filterMegaItems(col.items, access, session.user.role),
-      }))
-      .filter((col) => col.items.length > 0);
-    return { ...sec, columns };
-  }).filter((sec) => sec.columns.some((c) => c.items.length > 0));
+  const visibleSections: NavSection[] = NAV_SECTIONS.map((sec) => ({
+    ...sec,
+    groups: sec.groups
+      .map((g) => ({ ...g, items: filterNavItems(g.items, access, session.user.role) }))
+      .filter((g) => g.items.length > 0),
+  })).filter((sec) => sec.groups.length > 0);
 
-  const openSection = visibleSections.find((s) => s.id === openId) ?? null;
+  const bottomShortcuts = BOTTOM_SHORTCUTS.flatMap((s) => {
+    const first = visibleSections.find((v) => v.id === s.section)?.groups[0]?.items[0];
+    return first ? [{ ...s, href: first.href }] : [];
+  });
 
   return (
     <div className={styles.shell}>
@@ -632,21 +559,18 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <header className={styles.topNav} data-no-print>
         <div className={styles.topNavInner}>
           <button
+            ref={menuBtnRef}
             type="button"
-            className={styles.burger}
+            className={sb.menuBtn}
             aria-label="Меню"
             aria-expanded={mobileOpen}
-            onClick={() => {
-              setMobileOpen((v) => !v);
-              setOpenId(null);
-            }}
+            aria-controls="app-nav-drawer"
+            onClick={() => setMobileOpen((v) => !v)}
           >
-            <span />
-            <span />
-            <span />
+            <i className="fas fa-bars" aria-hidden />
           </button>
 
-          <Link href="/dashboard" className={styles.brandLink} onClick={() => setOpenId(null)}>
+          <Link href="/dashboard" className={styles.brandLink}>
             <span className={styles.brandMark} aria-hidden>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 10h.01" />
@@ -661,44 +585,21 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <nav className={styles.topTabs} aria-label="Основные разделы">
-            {visibleSections.map((sec) => {
-              const isOpen = openId === sec.id;
-              const isRoute = !openId && activeSectionId === sec.id;
-              return (
-                <div
-                  key={sec.id}
-                  className={styles.tabWrap}
-                  onMouseEnter={() => openMega(sec.id)}
-                  onMouseLeave={scheduleMegaClose}
-                >
-                  <button
-                    type="button"
-                    ref={(el) => {
-                      tabBtnRefs.current[sec.id] = el;
-                    }}
-                    className={
-                      isOpen
-                        ? styles.topTabOpen
-                        : isRoute
-                          ? styles.topTabActive
-                          : styles.topTab
-                    }
-                    aria-expanded={isOpen}
-                    onClick={() => toggleSection(sec.id)}
-                  >
-                    {sec.label}
-                  </button>
-                </div>
-              );
-            })}
+          <nav className={sb.crumbs} aria-label="Хлебные крошки">
+            {activeSection ? (
+              <>
+                <span className={sb.crumbSection}>{activeSection.label}</span>
+                <span className={sb.crumbSep} aria-hidden>
+                  /
+                </span>
+              </>
+            ) : null}
+            <span className={sb.crumbPage} aria-current="page">
+              {pageTitle}
+            </span>
           </nav>
 
           <div className={styles.topRight}>
-            <span className={styles.pill} title={session.tenant?.code ?? ''}>
-              {now || '…'}
-            </span>
-
             <div className={styles.topTools}>
             <div className={styles.menuWrap}>
               <button
@@ -710,7 +611,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                 onClick={() => {
                   setSearchOpen((v) => !v);
                   setNotifyOpen(false);
-                  setQuickOpen(false);
                   setProfileOpen(false);
                 }}
               >
@@ -801,66 +701,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 className={styles.iconBtn}
-                title="Быстрые действия"
-                aria-label="Быстрые действия"
-                aria-expanded={quickOpen}
-                onClick={() => {
-                  setQuickOpen((v) => !v);
-                  setNotifyOpen(false);
-                  setSearchOpen(false);
-                  setProfileOpen(false);
-                }}
-              >
-                <i className="fas fa-th" aria-hidden />
-              </button>
-              {quickOpen ? (
-                <div className={styles.dropMenu} role="menu">
-                  <Link
-                    href="/catalog/hr-documents?action=create"
-                    className={styles.dropItemLink}
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    <i className="fas fa-file-alt" aria-hidden />
-                    Кадровый документ
-                  </Link>
-                  <Link
-                    href="/employees?action=create"
-                    className={styles.dropItemLink}
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    <i className="fas fa-user-plus" aria-hidden />
-                    Новый сотрудник
-                  </Link>
-                  <Link
-                    href="/attendance?tab=requests&scope=to_me"
-                    className={styles.dropItemLink}
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    <i className="fas fa-tasks" aria-hidden />
-                    Заявки на согласование
-                  </Link>
-                  <Link
-                    href="/m"
-                    className={styles.dropItemLink}
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    <i className="fas fa-mobile-alt" aria-hidden />
-                    Мобильная версия
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-
-            <div className={styles.menuWrap}>
-              <button
-                type="button"
-                className={styles.iconBtn}
                 title="Уведомления"
                 aria-label="Уведомления"
                 aria-expanded={notifyOpen}
                 onClick={() => {
                   setNotifyOpen((v) => !v);
-                  setQuickOpen(false);
                   setSearchOpen(false);
                   setProfileOpen(false);
                   if (!notifyOpen) void loadNotifications();
@@ -991,7 +836,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                 onClick={() => {
                   setProfileOpen((v) => !v);
                   setNotifyOpen(false);
-                  setQuickOpen(false);
                   setSearchOpen(false);
                 }}
                 aria-expanded={profileOpen}
@@ -1043,12 +887,12 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     Изменить пароль
                   </button>
                   <Link
-                    href="/catalog"
+                    href="/m"
                     className={styles.dropItemLink}
                     onClick={() => setProfileOpen(false)}
                   >
-                    <i className="fas fa-folder" aria-hidden />
-                    Файлы
+                    <i className="fas fa-mobile-alt" aria-hidden />
+                    Мобильная версия
                   </Link>
                   <button
                     type="button"
@@ -1063,17 +907,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     <span className={styles.dropHint}>
                       {themeMode === 'light' ? 'Светлый' : 'Тёмный'}
                     </span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.dropItem}
-                    onClick={() => {
-                      setProfileOpen(false);
-                      setQuickOpen(true);
-                    }}
-                  >
-                    <i className="fas fa-th" aria-hidden />
-                    Панель быстрого доступа
                   </button>
                   <button
                     type="button"
@@ -1127,7 +960,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         <div
           className={styles.pwdBackdrop}
           role="presentation"
-          onClick={() => setPwdOpen(false)}
+          onClick={closePasswordModal}
         >
           <form
             className={styles.pwdModal}
@@ -1143,7 +976,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                 type="button"
                 className={styles.pwdClose}
                 aria-label="Закрыть"
-                onClick={() => setPwdOpen(false)}
+                onClick={closePasswordModal}
               >
                 ×
               </button>
@@ -1183,10 +1016,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             </label>
             {pwdMsg ? <p className={styles.pwdMsg}>{pwdMsg}</p> : null}
             <div className={styles.pwdActions}>
-              <button type="button" onClick={() => setPwdOpen(false)}>
+              <button type="button" onClick={closePasswordModal}>
                 Отмена
               </button>
-              <button type="submit" className={styles.pwdSave}>
+              <button type="submit" className={styles.pwdSave} disabled={pwdBusy}>
                 Сохранить
               </button>
             </div>
@@ -1198,278 +1031,117 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         <>
           <button
             type="button"
-            className={styles.mobileBackdrop}
-            aria-label="Закрыть"
+            className={sb.backdrop}
+            aria-label="Закрыть меню"
+            tabIndex={-1}
             onClick={() => setMobileOpen(false)}
           />
-          <aside className={styles.mobileDrawer} data-no-print>
-            <div className={styles.mobileDrawerHead}>
-              <strong>HR HUB</strong>
+          <aside
+            id="app-nav-drawer"
+            className={sb.drawer}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Навигация"
+            data-no-print
+          >
+            <div className={sb.drawerHead}>
+              <div>
+                <strong>HR HUB</strong>
+                <small>{session.tenant?.name ?? 'Platform'}</small>
+              </div>
               <button
+                ref={drawerCloseRef}
                 type="button"
-                className={styles.mobileClose}
-                aria-label="Закрыть"
+                className={sb.drawerClose}
+                aria-label="Закрыть меню"
                 onClick={() => setMobileOpen(false)}
               >
-                ×
+                <i className="fas fa-times" aria-hidden />
               </button>
             </div>
-            <nav className={styles.mobileNav}>
-              {visibleSections.map((sec) => (
-                <div key={sec.id} className={styles.mobileSec}>
-                  <div className={styles.mobileSecTitle}>{sec.label}</div>
-                  {sec.columns.map((col, idx) => {
-                    const items = col.items;
-                    return (
-                      <div key={col.title || `mcol-${idx}`}>
-                        {col.title ? (
-                          <div className={styles.mobileColTitle}>{col.title}</div>
-                        ) : null}
-                        <ul className={styles.mobileList}>
-                          {items.map((item) => {
-                            const active = linkActive(pathname, search, item.href);
-                            return (
-                              <li key={item.href + item.label}>
-                                <Link
-                                  href={item.href}
-                                  className={
-                                    active ? styles.mobileLinkActive : styles.mobileLink
-                                  }
-                                  onClick={() => setMobileOpen(false)}
-                                >
-                                  <MegaLinkContent
-                                    label={item.label}
-                                    faIcon={item.faIcon}
-                                    iconAccent={item.iconAccent}
-                                    iconClass={styles.megaLinkIcon}
-                                    iconColoredClass={styles.megaLinkIconColored}
-                                  />
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+            <nav className={sb.navScroll} aria-label="Основная навигация">
+              <SidebarNav
+                idPrefix="drawer-nav"
+                sections={visibleSections}
+                activeSectionId={activeSectionId}
+                activeItemId={activeItem?.id ?? null}
+                isOpen={isSectionOpen}
+                onToggle={toggleNavSection}
+                onNavigate={() => setMobileOpen(false)}
+              />
             </nav>
           </aside>
         </>
       ) : null}
 
-      {openSection ? (
-        <div
-          ref={megaPanelRef}
-          className={styles.megaOpen}
-          style={{ left: megaLeft, top: megaTop }}
-          role="menu"
-          onMouseEnter={cancelMegaClose}
-          onMouseLeave={scheduleMegaClose}
-        >
-          <div className={styles.megaInner}>
-            {(() => {
-              const titled = openSection.columns.filter((c) => c.title);
-              const useFlyout = titled.length >= 2;
-              const columns = openSection.columns;
-              const catIdx = Math.min(megaCatIdx, Math.max(0, columns.length - 1));
-              const activeCol = columns[catIdx] ?? columns[0];
-              const flyItems = activeCol?.items ?? [];
-
-              if (useFlyout) {
-                return (
-                  <div className={styles.megaFlyout}>
-                    <ul className={styles.megaCats} role="menu">
-                      {columns.map((col, idx) => {
-                        const isActive = idx === catIdx;
-                        return (
-                          <li key={col.title || `cat-${idx}`}>
-                            <button
-                              type="button"
-                              className={
-                                isActive ? styles.megaCatActive : styles.megaCat
-                              }
-                              onMouseEnter={() => setMegaCatIdx(idx)}
-                              onFocus={() => setMegaCatIdx(idx)}
-                            >
-                              <span>{col.title || openSection.label}</span>
-                              <span className={styles.megaCatChevron} aria-hidden>
-                                ›
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <div className={styles.megaFlyPanel}>
-                      <ul
-                        className={
-                          flyItems.length > 6
-                            ? `${styles.megaList} ${styles.megaListCols}`
-                            : styles.megaList
-                        }
-                      >
-                        {flyItems.map((item) => {
-                          const active = linkActive(pathname, search, item.href);
-                          return (
-                            <li key={item.href + item.label}>
-                              <Link
-                                href={item.href}
-                                className={
-                                  active ? styles.megaLinkActive : styles.megaLink
-                                }
-                                onClick={() => setOpenId(null)}
-                              >
-                                <MegaLinkContent
-                                  label={item.label}
-                                  faIcon={item.faIcon}
-                                  iconAccent={item.iconAccent}
-                                  iconClass={styles.megaLinkIcon}
-                                  iconColoredClass={styles.megaLinkIconColored}
-                                />
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div className={styles.megaGrid}>
-                  {openSection.id === 'home' ? (
-                    <div className={styles.homeMega}>
-                      <div className={styles.homeMegaHead}>Раздел «Главная»</div>
-                      <div className={styles.homeMegaList}>
-                        {columns.flatMap((col) =>
-                          col.items.map((item) => {
-                              const active = linkActive(pathname, search, item.href);
-                              const iconCls =
-                                item.icon === 'news'
-                                  ? styles.homeMegaIconNews
-                                  : item.icon === 'devices'
-                                    ? styles.homeMegaIconDevices
-                                    : styles.homeMegaIconChart;
-                              return (
-                                <Link
-                                  key={item.href + item.label}
-                                  href={item.href}
-                                  className={
-                                    active
-                                      ? `${styles.homeMegaItem} ${styles.homeMegaItemActive}`
-                                      : styles.homeMegaItem
-                                  }
-                                  onClick={() => setOpenId(null)}
-                                >
-                                  <span className={`${styles.homeMegaIcon} ${iconCls}`}>
-                                    {item.icon === 'news' ? (
-                                      <i className="fas fa-newspaper" aria-hidden />
-                                    ) : item.icon === 'devices' ? (
-                                      <i className="fas fa-desktop" aria-hidden />
-                                    ) : (
-                                      <i className="fas fa-chart-pie" aria-hidden />
-                                    )}
-                                  </span>
-                                  <span className={styles.homeMegaText}>
-                                    <span className={styles.homeMegaLabel}>{item.label}</span>
-                                    {item.description ? (
-                                      <span className={styles.homeMegaDesc}>
-                                        {item.description}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                  <i
-                                    className={`fas fa-arrow-right ${styles.homeMegaArrow}`}
-                                    aria-hidden
-                                  />
-                                </Link>
-                              );
-                            }),
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    columns.map((col, idx) => {
-                      const items = col.items;
-                      return (
-                        <div key={col.title || `col-${idx}`} className={styles.megaCol}>
-                          {col.title ? (
-                            <div className={styles.megaColTitle}>{col.title}</div>
-                          ) : null}
-                          <ul className={styles.megaList}>
-                            {items.map((item) => {
-                              const active = linkActive(pathname, search, item.href);
-                              return (
-                                <li key={item.href + item.label}>
-                                  <Link
-                                    href={item.href}
-                                    className={
-                                      active ? styles.megaLinkActive : styles.megaLink
-                                    }
-                                    onClick={() => setOpenId(null)}
-                                  >
-                                    <MegaLinkContent
-                                      label={item.label}
-                                      faIcon={item.faIcon}
-                                      iconAccent={item.iconAccent}
-                                      iconClass={styles.megaLinkIcon}
-                                      iconColoredClass={styles.megaLinkIconColored}
-                                    />
-                                  </Link>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              );
-            })()}
+      <div className={sb.body}>
+        <aside className={compact ? sb.sidebarCompact : sb.sidebar} data-no-print>
+          <nav className={sb.navScroll} aria-label="Основная навигация">
+            <SidebarNav
+              idPrefix="side-nav"
+              sections={visibleSections}
+              activeSectionId={activeSectionId}
+              activeItemId={activeItem?.id ?? null}
+              isOpen={isSectionOpen}
+              onToggle={toggleNavSection}
+              compact={compact}
+            />
+          </nav>
+          <div className={sb.sidebarFoot}>
+            <button
+              type="button"
+              className={sb.collapseBtn}
+              aria-pressed={compact}
+              title={compact ? 'Развернуть меню' : 'Свернуть меню'}
+              onClick={toggleCompact}
+            >
+              <i className={`fas ${compact ? 'fa-angle-double-right' : 'fa-angle-double-left'}`} aria-hidden />
+              <span>Свернуть меню</span>
+            </button>
           </div>
-        </div>
-      ) : null}
+        </aside>
 
-      {openId ? (
+        <div className={sb.content}>
+          <main
+            id="main-content"
+            className={styles.main}
+            onClick={() => {
+              setProfileOpen(false);
+              setNotifyOpen(false);
+              setSearchOpen(false);
+            }}
+          >
+            {children}
+          </main>
+        </div>
+      </div>
+
+      <nav className={sb.bottomBar} aria-label="Быстрые разделы" data-no-print>
+        {bottomShortcuts.map((s) => {
+          const active = !mobileOpen && activeSectionId === s.section;
+          return (
+            <Link
+              key={s.section}
+              href={s.href}
+              className={active ? sb.bottomActive : sb.bottomItem}
+              aria-current={active ? 'page' : undefined}
+            >
+              <i className={`fas ${NAV_SECTIONS.find((n) => n.id === s.section)?.faIcon ?? 'fa-circle'}`} aria-hidden />
+              <span>{s.label}</span>
+            </Link>
+          );
+        })}
         <button
           type="button"
-          className={styles.megaBackdrop}
-          aria-label="Закрыть меню"
-          onClick={() => {
-            cancelMegaClose();
-            setOpenId(null);
-          }}
-        />
-      ) : null}
-
-      {pathname.startsWith('/settings') &&
-      (!search.includes('tab=') ||
-        search.includes('tab=main') ||
-        /(?:^|[?&])tab=main(?:&|$)/.test(search.replace(/^\?/, ''))) ? null : (
-        <div className={styles.crumbBar} data-no-print>
-          <span className={styles.crumbSection}>
-            {MEGA_NAV.find((s) => s.id === activeSectionId)?.label ?? 'HR HUB'}
-          </span>
-          <span className={styles.crumbSep}>/</span>
-          <span className={styles.crumbPage}>{pageTitle}</span>
-        </div>
-      )}
-      <main
-        id="main-content"
-        className={styles.main}
-        onClick={() => {
-          setProfileOpen(false);
-          setNotifyOpen(false);
-          setQuickOpen(false);
-          setSearchOpen(false);
-        }}
-      >
-        {children}
-      </main>
+          className={mobileOpen ? sb.bottomActive : sb.bottomItem}
+          aria-expanded={mobileOpen}
+          aria-controls="app-nav-drawer"
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          <i className="fas fa-ellipsis-h" aria-hidden />
+          <span>Ещё</span>
+        </button>
+      </nav>
     </div>
   );
 }

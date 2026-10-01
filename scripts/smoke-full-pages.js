@@ -55,7 +55,8 @@ function objectKeys(source, name) {
 }
 
 function discoverRoutes() {
-  const megaNav = readSrc('lib', 'mega-nav.ts');
+  const navRegistry = readSrc('lib', 'nav-registry.ts');
+  const reportsNav = readSrc('lib', 'reports-nav.ts');
   const catalogNav = readSrc('lib', 'catalog-nav.ts');
   const siblings = readSrc('lib', 'form-siblings.ts');
 
@@ -66,7 +67,8 @@ function discoverRoutes() {
     routes.get(href).add(from);
   };
 
-  hrefsIn(megaNav).forEach((h) => add(h, 'mega-nav'));
+  hrefsIn(navRegistry).forEach((h) => add(h, 'nav-registry'));
+  hrefsIn(reportsNav).forEach((h) => add(h, 'reports-nav'));
   hrefsIn(catalogNav).forEach((h) => add(h, 'catalog-nav'));
   hrefsIn(siblings).forEach((h) => add(h, 'form-siblings'));
 

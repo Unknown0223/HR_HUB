@@ -55,7 +55,6 @@ function checkFiles() {
   const root = path.join(__dirname, '..', 'apps', 'web', 'src');
   const reportsNav = fs.readFileSync(path.join(root, 'lib', 'reports-nav.ts'), 'utf8');
   const catalogNav = fs.readFileSync(path.join(root, 'lib', 'catalog-nav.ts'), 'utf8');
-  const megaNav = fs.readFileSync(path.join(root, 'lib', 'mega-nav.ts'), 'utf8');
   return REPORTS.map((r) => {
     const pagePath = path.join(root, 'app', '(app)', 'catalog', 'reports', r.page, 'page.tsx');
     const cssPath = path.join(root, 'app', '(app)', 'catalog', 'reports', r.page, 'page.module.css');
@@ -65,7 +64,6 @@ function checkFiles() {
       hasCss: fs.existsSync(cssPath),
       inReportsNav: reportsNav.includes(`/catalog/reports/${r.page}`),
       inCatalog: catalogNav.includes(r.api) || catalogNav.includes(`'${r.id}'`) || catalogNav.includes(`"${r.id}"`),
-      inMega: megaNav.includes(`/reports/${r.page}`),
     };
   });
 }
@@ -108,7 +106,7 @@ async function main() {
     const ok = row.hasPage && row.inReportsNav && row.inCatalog;
     if (!ok) failed += 1;
     console.log(
-      `${ok ? 'OK ' : 'FAIL'} ${row.id.padEnd(22)} page=${row.hasPage} css=${row.hasCss} reports-nav=${row.inReportsNav} catalog=${row.inCatalog} mega=${row.inMega}`,
+      `${ok ? 'OK ' : 'FAIL'} ${row.id.padEnd(22)} page=${row.hasPage} css=${row.hasCss} reports-nav=${row.inReportsNav} catalog=${row.inCatalog}`,
     );
   }
 
