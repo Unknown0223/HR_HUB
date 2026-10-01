@@ -61,7 +61,7 @@
   position: relative;
   z-index: 52;
   overflow: visible;
-  max-width: 1760px;
+  max-width: none;
   margin: 0 auto;
   width: 100%;
 }
@@ -1084,6 +1084,12 @@
   animation: fadeIn 0.16s ease both;
   flex: 1 0 auto;
   scroll-margin-top: calc(var(--header-height) + 8px);
+}
+
+/* Page roots use `margin: 0 auto`, which shrink-wraps them inside this flex column.
+   Zero specificity so a page's own width/max-width still wins. */
+:where(.main > *) {
+  width: 100%;
 }
 
 /* Pages that own their canvas padding (Arena .page / .pageShell).

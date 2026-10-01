@@ -40,4 +40,15 @@ export type AttRowLike = {
   accessLevel?: string | null;
   arrivalLocation?: string | null;
   distanceKm?: number | null;
+  shiftStart?: string | null;
+  shiftEnd?: string | null;
+  /** Minutes; null when not applicable (no marks yet). */
+  lateMin?: number | null;
+  earlyLeaveMin?: number | null;
+  workedMin?: number | null;
+  overtimeMin?: number | null;
+  /** Came in today and has not left yet. */
+  onSite?: boolean;
+  marksCount?: number;
+  departureLocation?: string | null;
 };

@@ -11,7 +11,7 @@
   justify-content: flex-start;
   flex-wrap: wrap;
   gap: 0.5rem 0.75rem;
-  max-width: 1760px;
+  max-width: none;
   margin: 0 auto;
 }
 

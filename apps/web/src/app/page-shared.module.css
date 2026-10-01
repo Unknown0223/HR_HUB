@@ -39,7 +39,7 @@
 .wrap {
   animation: fadeUp 0.22s ease both;
   width: 100%;
-  max-width: 1760px;
+  max-width: none;
   margin: 0 auto;
   box-sizing: border-box;
   padding: 1.25rem 1.5rem 2.5rem;
@@ -47,7 +47,7 @@
 
 .pageShell {
   padding: 22px 24px 56px;
-  max-width: 1760px;
+  max-width: none;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;

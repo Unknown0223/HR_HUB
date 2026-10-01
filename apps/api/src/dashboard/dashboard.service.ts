@@ -3,6 +3,7 @@ import { DayStatus, EmploymentStatus, Prisma, RequestStatus } from '@prisma/clie
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { minutesOfDay } from '../attendance/attendance-day';
+import { dayMetrics } from './day-metrics';
 
 /** Railway/API often runs in UTC — always show org local time (Tashkent). */
 const APP_TZ = 'Asia/Tashkent';
@@ -241,6 +242,18 @@ export class DashboardService {
       accessLevel: string | null;
       arrivalLocation: string | null;
       distanceKm: number | null;
+      /** Planned shift from the employee's work schedule, "HH:MM". */
+      shiftStart: string | null;
+      shiftEnd: string | null;
+      /** Minutes; null when the metric does not apply (no marks yet). */
+      lateMin: number | null;
+      earlyLeaveMin: number | null;
+      workedMin: number | null;
+      overtimeMin: number | null;
+      /** Came in today and has not left yet — workedMin is counted up to now. */
+      onSite: boolean;
+      marksCount: number;
+      departureLocation: string | null;
     };
 
     const onTime: Row[] = [];
@@ -264,7 +277,7 @@ export class DashboardService {
         status: true,
         employmentType: true,
         hiredAt: true,
-        schedule: { select: { name: true, endTime: true } },
+        schedule: { select: { name: true, startTime: true, endTime: true } },
         position: { select: { name: true } },
         division: {
           select: {
@@ -294,6 +307,31 @@ export class DashboardService {
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
+    const dayMarkWhere: Prisma.AttendanceMarkWhereInput = {
+      tenantId,
+      occurredAt: { gte: markFrom, lt: markTo },
+      employeeId: { in: employees.map((e) => e.id) },
+    };
+    const [markCounts, lastMarks] = employees.length
+      ? await Promise.all([
+          this.prisma.attendanceMark.groupBy({
+            by: ['employeeId'],
+            where: dayMarkWhere,
+            _count: { _all: true },
+          }),
+          this.prisma.attendanceMark.findMany({
+            where: dayMarkWhere,
+            orderBy: [{ employeeId: 'asc' }, { occurredAt: 'desc' }],
+            distinct: ['employeeId'],
+            select: {
+              employeeId: true,
+              device: { select: { location: { select: { name: true } } } },
+            },
+          }),
+        ])
+      : [[], []];
+    const marksByEmp = new Map(markCounts.map((m) => [m.employeeId, m._count._all]));
+    const lastMarkByEmp = new Map(lastMarks.map((m) => [m.employeeId, m]));
     const dayByEmp = new Map(days.map((d) => [d.employeeId, d]));
     const now = new Date();
     const viewingToday = toLocalYmd(today) === toLocalYmd(now);
@@ -305,6 +343,7 @@ export class DashboardService {
     }).formatToParts(now);
     const nowH = Number(nowParts.find((p) => p.type === 'hour')?.value || 0);
     const nowM = Number(nowParts.find((p) => p.type === 'minute')?.value || 0);
+    const nowMin = nowH * 60 + nowM;
     const workdayOpen = nowH > 9 || (nowH === 9 && nowM > 0);
     const missingStatus =
       viewingToday && !workdayOpen ? DayStatus.not_started : DayStatus.absent;
@@ -385,17 +424,42 @@ export class DashboardService {
         accessLevel: null,
         arrivalLocation: firstMark?.device?.location?.name || null,
         distanceKm: null,
+        shiftStart: emp.schedule?.startTime ?? null,
+        shiftEnd: emp.schedule?.endTime ?? null,
+        lateMin: null,
+        earlyLeaveMin: null,
+        workedMin: null,
+        overtimeMin: null,
+        onSite: false,
+        marksCount: marksByEmp.get(emp.id) ?? 0,
+        departureLocation: null,
       };
 
       const endHm = emp.schedule?.endTime ?? d?.employee.schedule?.endTime ?? '18:00';
-      const endMin = parseHm(endHm);
-      let earlyOut = false;
+      const metrics = dayMetrics({
+        startMin: parseHm(emp.schedule?.startTime ?? '09:00'),
+        endMin: parseHm(endHm),
+        inMin: d?.firstInAt ? minutesOfDay(d.firstInAt) : null,
+        outMin: d?.lastOutAt ? minutesOfDay(d.lastOutAt) : null,
+        firstInAt: d?.firstInAt ?? null,
+        lastOutAt: d?.lastOutAt ?? null,
+        isLate: status === DayStatus.late,
+        lateMinutes: d?.lateMinutes ?? 0,
+        earlyLeaveMinutes: d?.earlyLeaveMinutes ?? 0,
+        workedHours: d?.workedHours == null ? null : Number(d.workedHours),
+        overtimeHours: d?.overtimeHours == null ? null : Number(d.overtimeHours),
+        viewingToday,
+        nowMin,
+      });
+      const earlyOut = metrics.earlyOut;
+      if (earlyOut) row.note = 'Ertaroq chiqdi';
+      row.lateMin = metrics.lateMin;
+      row.earlyLeaveMin = metrics.earlyLeaveMin;
+      row.workedMin = metrics.workedMin;
+      row.overtimeMin = metrics.overtimeMin;
+      row.onSite = metrics.onSite;
       if (d?.lastOutAt) {
-        const outMin = minutesOfDay(d.lastOutAt);
-        if (outMin + 5 < endMin) {
-          earlyOut = true;
-          row.note = 'Ertaroq chiqdi';
-        }
+        row.departureLocation = lastMarkByEmp.get(emp.id)?.device?.location?.name || null;
       }
 
       byStatus[status] = (byStatus[status] ?? 0) + 1;

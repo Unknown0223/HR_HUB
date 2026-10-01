@@ -9,6 +9,38 @@ import {
 export { EMPLOYEE_FIELD_LABELS };
 export type { EmployeeFieldKey, SortDir, SortRule };
 
+/** 0 → "0 мин", 65 → "1 ч 05 мин", 120 → "2 ч". */
+export function formatMinutes(min: number): string {
+  if (min < 60) return `${min} мин`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} ч ${String(m).padStart(2, '0')} мин` : `${h} ч`;
+}
+
+/** Numeric value used for sorting duration/count columns; null sorts last. */
+export function numericField(r: AttRowLike, key: EmployeeFieldKey): number | null | undefined {
+  switch (key) {
+    case 'lateMinutes':
+      return r.lateMin;
+    case 'earlyLeaveMinutes':
+      return r.earlyLeaveMin;
+    case 'workedTime':
+      return r.workedMin;
+    case 'overtime':
+      return r.overtimeMin;
+    case 'marksCount':
+      return r.marksCount;
+    case 'distanceKm':
+      return r.distanceKm;
+    default:
+      return undefined;
+  }
+}
+
+function minutesCell(v: number | null | undefined): string {
+  return v == null ? '' : formatMinutes(v);
+}
+
 /** Resolve a HR HUB table field value from an attendance/employee row. */
 export function cellValue(
   r: AttRowLike,
@@ -90,6 +122,20 @@ export function cellValue(
       return r.fax || '';
     case 'lastName':
       return r.lastName || '';
+    case 'shift':
+      return r.shiftStart && r.shiftEnd ? `${r.shiftStart}–${r.shiftEnd}` : '';
+    case 'lateMinutes':
+      return minutesCell(r.lateMin);
+    case 'earlyLeaveMinutes':
+      return minutesCell(r.earlyLeaveMin);
+    case 'workedTime':
+      return minutesCell(r.workedMin);
+    case 'overtime':
+      return minutesCell(r.overtimeMin);
+    case 'marksCount':
+      return r.marksCount != null ? String(r.marksCount) : '';
+    case 'departureLocation':
+      return r.departureLocation || '';
     default:
       return '';
   }
@@ -102,6 +148,12 @@ export function compareField(
   dir: Exclude<SortDir, 'none'>,
   statusLabel?: (status: string) => string,
 ): number {
+  const an = numericField(a, key);
+  if (an !== undefined) {
+    const bn = numericField(b, key);
+    if (an == null || bn == null) return an == null ? (bn == null ? 0 : 1) : -1;
+    return dir === 'desc' ? bn - an : an - bn;
+  }
   const av = cellValue(a, key, statusLabel);
   const bv = cellValue(b, key, statusLabel);
   const cmp = av.localeCompare(bv, 'ru', { numeric: true, sensitivity: 'base' });

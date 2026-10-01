@@ -31,7 +31,7 @@
   --dash-center: var(--ink-strong);
 
   padding: 22px 24px 56px;
-  max-width: 1760px;
+  max-width: none;
   margin: 0 auto;
   color: var(--ink);
   font-family: var(--font-sans);
@@ -1059,6 +1059,19 @@
 
 .timeEmpty {
   color: var(--ink-subtle);
+}
+
+.onSiteTag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  vertical-align: 1px;
 }
 
 /* Status chips — ids frozen: on_time | late | early_leave | absent | not_started | day_off | excused */

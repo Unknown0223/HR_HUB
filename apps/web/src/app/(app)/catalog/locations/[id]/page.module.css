@@ -12,7 +12,7 @@
   --st-offline: #e5484d;
   --st-offline-bg: #fdecef;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
-  max-width: 1760px;
+  max-width: none;
   margin: 0 auto;
   padding: 8px 0 48px;
   color: var(--ink-900);

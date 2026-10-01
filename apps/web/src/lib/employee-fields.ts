@@ -40,7 +40,14 @@ export type EmployeeFieldKey =
   | 'accessLevel'
   | 'departure'
   | 'fax'
-  | 'lastName';
+  | 'lastName'
+  | 'shift'
+  | 'lateMinutes'
+  | 'earlyLeaveMinutes'
+  | 'workedTime'
+  | 'overtime'
+  | 'marksCount'
+  | 'departureLocation';
 
 export type EmployeeFieldDef = {
   key: EmployeeFieldKey;
@@ -94,6 +101,21 @@ export const EMPLOYEE_FIELDS: EmployeeFieldDef[] = [
   { key: 'departure', label: 'Уход', column: true, sortable: true, searchable: false, attendance: true },
   { key: 'fax', label: 'Факс', column: true, sortable: true, searchable: false },
   { key: 'lastName', label: 'Фамилия', column: true, sortable: true, searchable: false },
+  { key: 'shift', label: 'Смена по графику', column: true, sortable: true, searchable: false, attendance: true },
+  { key: 'lateMinutes', label: 'Опоздание', column: true, sortable: true, searchable: false, attendance: true },
+  { key: 'earlyLeaveMinutes', label: 'Ранний уход', column: true, sortable: true, searchable: false, attendance: true },
+  { key: 'workedTime', label: 'Отработано', column: true, sortable: true, searchable: false, attendance: true },
+  { key: 'overtime', label: 'Переработка', column: true, sortable: true, searchable: false, attendance: true },
+  { key: 'marksCount', label: 'Отметок за день', column: true, sortable: true, searchable: false, attendance: true },
+  { key: 'departureLocation', label: 'Локация ухода', column: true, sortable: true, searchable: false, attendance: true },
+];
+
+/** Previous default set — saved column settings equal to it are upgraded to the new default. */
+export const ATTENDANCE_LEGACY_DEFAULT_COLUMNS: EmployeeFieldKey[] = [
+  'fullName',
+  'arrival',
+  'departure',
+  'dayState',
 ];
 
 export const EMPLOYEE_FIELD_LABELS: Record<EmployeeFieldKey, string> = Object.fromEntries(
@@ -103,8 +125,11 @@ export const EMPLOYEE_FIELD_LABELS: Record<EmployeeFieldKey, string> = Object.fr
 /** Default visible columns for «Статистика посещений сотрудников». */
 export const ATTENDANCE_DEFAULT_COLUMNS: EmployeeFieldKey[] = [
   'fullName',
+  'shift',
   'arrival',
   'departure',
+  'lateMinutes',
+  'workedTime',
   'dayState',
 ];
 

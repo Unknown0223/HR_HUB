@@ -12,6 +12,7 @@ import {
 import {
   ATTENDANCE_DEFAULT_COLUMNS,
   ATTENDANCE_DEFAULT_SEARCH,
+  ATTENDANCE_LEGACY_DEFAULT_COLUMNS,
   ATTENDANCE_SEARCH_FIELDS,
   EMPLOYEE_FIELDS,
   EMPLOYEE_FIELD_LABELS,
@@ -20,7 +21,7 @@ import {
   type SortDir,
   type SortRule,
 } from '@/lib/employee-fields';
-import { applySortRules, cellValue } from '@/lib/dashboard-fields';
+import { applySortRules, cellValue, formatMinutes } from '@/lib/dashboard-fields';
 import type { AttRowLike } from '@/lib/dashboard-row';
 import css from './page.module.css';
 
@@ -288,6 +289,13 @@ function saveJSON(key: string, value: unknown) {
 
 function loadColumns(): EmployeeFieldKey[] {
   const raw = loadJSON<string[]>(TABLE_COLS_KEY, [...ATTENDANCE_DEFAULT_COLUMNS]);
+  if (
+    Array.isArray(raw) &&
+    raw.length === ATTENDANCE_LEGACY_DEFAULT_COLUMNS.length &&
+    raw.every((k, i) => k === ATTENDANCE_LEGACY_DEFAULT_COLUMNS[i])
+  ) {
+    return [...ATTENDANCE_DEFAULT_COLUMNS];
+  }
   const allowed = new Set(EMPLOYEE_FIELDS.map((f) => f.key));
   const cols = (Array.isArray(raw) ? raw : []).filter((k): k is EmployeeFieldKey =>
     allowed.has(k as EmployeeFieldKey),
@@ -1787,6 +1795,43 @@ export default function DashboardPage() {
                               return (
                                 <td key={key} className={`${css.tableTd} ${css.tabCell}`}>
                                   {emp.tabNumber || '—'}
+                                </td>
+                              );
+                            }
+                            if (
+                              key === 'lateMinutes' ||
+                              key === 'earlyLeaveMinutes' ||
+                              key === 'overtime'
+                            ) {
+                              const v =
+                                key === 'lateMinutes'
+                                  ? emp.lateMin
+                                  : key === 'earlyLeaveMinutes'
+                                    ? emp.earlyLeaveMin
+                                    : emp.overtimeMin;
+                              const tone =
+                                !v ? css.timeEmpty : key === 'overtime' ? css.timeOk : css.timeLate;
+                              return (
+                                <td key={key} className={`${css.tableTd} ${css.timeCell}`}>
+                                  <span className={tone}>
+                                    {v == null ? '—' : v === 0 ? '0' : formatMinutes(v)}
+                                  </span>
+                                </td>
+                              );
+                            }
+                            if (key === 'workedTime') {
+                              return (
+                                <td key={key} className={`${css.tableTd} ${css.timeCell}`}>
+                                  {emp.workedMin == null ? (
+                                    <span className={css.timeEmpty}>—</span>
+                                  ) : (
+                                    <span className={css.timeOk}>
+                                      {formatMinutes(emp.workedMin)}
+                                      {emp.onSite ? (
+                                        <span className={css.onSiteTag}>на работе</span>
+                                      ) : null}
+                                    </span>
+                                  )}
                                 </td>
                               );
                             }
