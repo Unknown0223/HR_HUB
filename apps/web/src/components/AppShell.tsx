@@ -147,7 +147,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         setAccess(myAccess);
         if (media?.accessToken) setMediaAccessToken(media.accessToken);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        // Network errors and 5xx (e.g. API redeploy) keep the local session.
+        const status = (e as { status?: number } | null)?.status;
+        if (status !== 401 && status !== 403) return;
         setSession(null);
         router.replace('/');
       });

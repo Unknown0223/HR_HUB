@@ -390,6 +390,11 @@ async function runBrowserSuite(routes, session, platformSession) {
   await cdp.send('Page.navigate', { url: `${WEB}/` }, sessionId);
   await sleep(1500);
   await cdp.send(
+    'Network.setCookie',
+    { name: 'hrhub_at', value: session.accessToken, url: WEB, httpOnly: true },
+    sessionId,
+  );
+  await cdp.send(
     'Runtime.evaluate',
     {
       expression: `localStorage.setItem('hrhub_session', ${JSON.stringify(JSON.stringify(session))}); 'ok'`,
@@ -511,8 +516,13 @@ async function runBrowserSuite(routes, session, platformSession) {
   // —— Platform-admin only route ——
   if (platformSession) {
     try {
+      await cdp.send(
+        'Network.setCookie',
+        { name: 'hrhub_at', value: platformSession.accessToken, url: WEB, httpOnly: true },
+        sessionId,
+      );
       await evaluate(
-        `localStorage.setItem('hrhub_session', ${JSON.stringify(JSON.stringify(platformSession))}); 'ok'`,
+        `sessionStorage.clear(); localStorage.setItem('hrhub_session', ${JSON.stringify(JSON.stringify(platformSession))}); 'ok'`,
       );
       await cdp.send('Page.navigate', { url: `${WEB}/tenants` }, sessionId);
       await sleep(3500);

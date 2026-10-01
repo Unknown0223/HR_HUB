@@ -210,7 +210,7 @@ export class SettingsController {
     @CurrentTenant() tenantId: string | null,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.settings.getMyAccess(this.settings.requireTenant(tenantId), user);
+    return this.settings.getMyAccess(tenantId, user);
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin)

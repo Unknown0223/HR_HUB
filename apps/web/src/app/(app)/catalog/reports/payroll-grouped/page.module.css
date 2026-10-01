@@ -301,7 +301,7 @@
   border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   padding: 1rem 1.1rem 1.25rem;
-  max-width: 1280px;
+  max-width: none;
   overflow: visible;
 }
 

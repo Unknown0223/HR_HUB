@@ -8,6 +8,7 @@ import { ModuleRef } from '@nestjs/core';
 import { Prisma, Role, DocumentType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import {
   SCOPED_ROLES,
   scopedEmployeeWhere,
@@ -131,7 +132,13 @@ export class SettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly moduleRef: ModuleRef,
+    private readonly redis: RedisService,
   ) {}
+
+  /** Dictionary items feed `/catalog/lookups`, which is cached per tenant. */
+  private async invalidateLookups(tenantId: string) {
+    await this.redis.del(`lookups:${tenantId}`);
+  }
 
   requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
@@ -868,12 +875,13 @@ export class SettingsService {
    * grants keep legacy full access (bypass) so existing tenants stay usable.
    */
   async getMyAccess(
-    tenantId: string,
+    tenantIdOrNull: string | null,
     user: { userId: string; role: string },
   ) {
     if (user.role === 'platform_admin' || user.role === 'tenant_admin') {
       return { bypass: true, allowed: [] as string[] };
     }
+    const tenantId = this.requireTenant(tenantIdOrNull);
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.userId },
       select: { meta: true },
@@ -1078,6 +1086,7 @@ export class SettingsService {
       name: row.name,
       userName: who,
     });
+    await this.invalidateLookups(tenantId);
     return row;
   }
 
@@ -1174,6 +1183,7 @@ export class SettingsService {
       dictionaryId,
       { created, updated, skipped, userName: who },
     );
+    await this.invalidateLookups(tenantId);
     return { created, updated, skipped, errors: errors.slice(0, 50) };
   }
 
@@ -1222,6 +1232,7 @@ export class SettingsService {
       name: row.name,
       userName: who,
     });
+    await this.invalidateLookups(tenantId);
     return row;
   }
 
@@ -1252,6 +1263,7 @@ export class SettingsService {
         userName: actorLabel(actor),
       },
     );
+    await this.invalidateLookups(tenantId);
     return { ok: true };
   }
 

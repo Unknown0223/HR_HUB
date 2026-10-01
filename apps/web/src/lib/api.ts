@@ -185,7 +185,10 @@ export async function apiFetch<T>(
       } catch {
         /* ignore */
       }
-      throw new Error(sanitizeApiErrorMessage(String(message), res.statusText || 'Ошибка'));
+      throw Object.assign(
+        new Error(sanitizeApiErrorMessage(String(message), res.statusText || 'Ошибка')),
+        { status: res.status },
+      );
     }
 
     if (res.status === 204) return undefined as T;

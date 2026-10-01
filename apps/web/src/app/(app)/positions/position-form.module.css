@@ -33,7 +33,7 @@
   border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1rem 1.25rem 1.25rem;
-  max-width: 1100px;
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;

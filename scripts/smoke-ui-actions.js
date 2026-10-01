@@ -110,15 +110,22 @@ async function main() {
     const list = await req('/catalog/tariff-approvals', auth);
     assert(list.ok && Array.isArray(list.data), 'list tariff-approvals');
     let row =
-      (list.data || []).find((r) => r.status === 'pending' || r.status === 'draft') ||
-      null;
+      (list.data || []).find(
+        (r) =>
+          (r.status === 'pending' || r.status === 'draft') && r.tariffGroupId && r.effectiveAt,
+      ) || null;
     if (!row) {
       const groups = await req('/catalog/tariff-groups', auth);
       assert(groups.ok && groups.data?.length, 'need tariff group');
       const created = await req('/catalog/tariff-approvals', {
         ...auth,
         method: 'POST',
-        body: { tariffGroupId: groups.data[0].id, status: 'pending', note: 'smoke' },
+        body: {
+          tariffGroupId: groups.data[0].id,
+          status: 'pending',
+          effectiveAt: new Date().toISOString().slice(0, 10),
+          note: 'smoke',
+        },
       });
       assert(created.ok, `create approval ${created.status} ${JSON.stringify(created.data)}`);
       row = created.data;

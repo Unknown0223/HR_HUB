@@ -309,6 +309,11 @@ async function main() {
     await cdp.send('Runtime.enable', {}, sessionId);
     await cdp.send('Page.navigate', { url: `${WEB}/` }, sessionId);
     await sleep(1200);
+    await cdp.send(
+      'Network.setCookie',
+      { name: 'hrhub_at', value: session.accessToken, url: WEB, httpOnly: true },
+      sessionId,
+    );
     await evaluate(
       cdp,
       sessionId,
