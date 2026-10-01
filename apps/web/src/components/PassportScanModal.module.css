@@ -24,7 +24,7 @@
   flex-direction: column;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: #334155;
+  color: var(--tint-ink, #334155);
 }
 
 .upload input {
@@ -32,9 +32,9 @@
 }
 
 .preview {
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--tint-line, #dbe3ef);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--tint-neutral, #f8fafc);
   min-height: 280px;
   max-height: 420px;
   overflow: auto;
@@ -67,7 +67,7 @@
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.35;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
 }
 
 @media (max-width: 900px) {

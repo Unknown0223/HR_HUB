@@ -16,7 +16,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }
 
 .actions {
@@ -27,7 +27,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -63,9 +63,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #5e6278;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink-muted, #5e6278);
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -78,7 +78,7 @@
 
 .btnCancel {
   border: 1px solid #f1416c;
-  background: #fff;
+  background: var(--surface);
   color: #f1416c;
   font: inherit;
   font-size: 0.72rem;
@@ -94,7 +94,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
@@ -111,8 +111,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.1rem 1.2rem;
 }
@@ -130,7 +130,7 @@
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.22rem;
 }
 
@@ -143,13 +143,13 @@
 .field textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input,
@@ -169,26 +169,26 @@
 }
 
 .sumAcc {
-  background: #e8f8fb;
+  background: var(--tint-info, #e8f8fb);
   border-radius: 6px;
   padding: 0.85rem 1rem;
 }
 
 .sumDed {
-  background: #fdecec;
+  background: var(--tint-danger, #fdecec);
   border-radius: 6px;
   padding: 0.85rem 1rem;
 }
 
 .sumLabel {
   font-size: 0.78rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .sumVal {
   font-size: 1.35rem;
   font-weight: 700;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .taxRow {
@@ -199,17 +199,17 @@
 }
 
 .taxBox {
-  background: #f4f6f8;
+  background: var(--tint-neutral, #f4f6f8);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
   font-size: 0.78rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .taxBox b {
   display: block;
   font-size: 0.95rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   margin-top: 0.15rem;
 }
 
@@ -220,7 +220,7 @@
   gap: 0.6rem;
   margin-top: 0.85rem;
   font-size: 0.85rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .switch {
@@ -236,14 +236,14 @@
 
 .drop {
   margin-top: 0.85rem;
-  border: 1px dashed #cfd4dc;
+  border: 1px dashed var(--tint-line, #cfd4dc);
   border-radius: 6px;
   padding: 1.4rem 0.8rem;
   text-align: center;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.82rem;
   cursor: pointer;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .drop input {
@@ -253,7 +253,7 @@
 .tabs {
   display: flex;
   gap: 1.4rem;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   margin: 0 0 0.65rem;
 }
 
@@ -266,12 +266,12 @@
   font-size: 0.9rem;
   padding: 0.4rem 0 0.5rem;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .tabOn {
-  color: #0a85e2;
-  box-shadow: inset 0 -2px 0 #0a85e2;
+  color: #2fa350;
+  box-shadow: inset 0 -2px 0 #2fa350;
 }
 
 .lineBar {
@@ -293,9 +293,9 @@
 
 .btnGhost {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -319,7 +319,7 @@
 
 .search {
   height: 32px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
@@ -328,7 +328,7 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #eef0f4;
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 4px;
 }
 
@@ -340,14 +340,14 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.35rem 0.45rem;
   text-align: left;
 }
 
 .table th {
-  background: #f8f9fb;
-  color: #5e6278;
+  background: var(--tint-neutral, #f8f9fb);
+  color: var(--tint-ink-muted, #5e6278);
   font-weight: 650;
 }
 
@@ -356,7 +356,7 @@
   width: 100%;
   min-width: 90px;
   height: 30px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 3px;
   padding: 0 0.35rem;
   font: inherit;
@@ -370,7 +370,7 @@
 
 .empty {
   text-align: center;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   padding: 1.4rem !important;
 }
 
@@ -391,7 +391,7 @@
   width: 100%;
   height: 34px;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 1.6rem 0 0.55rem;
   font: inherit;
@@ -406,7 +406,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .menu {
@@ -417,8 +417,8 @@
   top: calc(100% + 2px);
   max-height: 220px;
   overflow: auto;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
 }
@@ -439,12 +439,12 @@
 
 .optOn,
 .opt:hover {
-  background: #f3f6ff;
+  background: var(--tint-neutral, #f3f6ff);
 }
 
 .optEmpty {
   padding: 0.55rem 0.6rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   font-size: 0.82rem;
 }
 
@@ -462,8 +462,8 @@
 }
 
 .side {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -472,13 +472,13 @@
   padding: 0.9rem 1rem 0.55rem;
   font-size: 0.82rem;
   font-weight: 650;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .badge {
   display: inline-block;
   margin: 0 1rem 0.75rem;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
@@ -487,8 +487,8 @@
 }
 
 .badgeOff {
-  background: #e5e7eb;
-  color: #4b5563;
+  background: var(--tint-neutral, #e5e7eb);
+  color: var(--tint-ink-muted, #4b5563);
 }
 
 .sideNav button {
@@ -502,14 +502,14 @@
   padding: 0.7rem 1rem;
   font: inherit;
   font-size: 0.88rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   cursor: pointer;
 }
 
 .sideNav button[data-on='1'] {
-  background: #eef6ff;
-  border-left-color: #0a85e2;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  border-left-color: #2fa350;
+  color: #2fa350;
   font-weight: 650;
 }
 
@@ -525,7 +525,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 650;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .cardLinks {
@@ -535,7 +535,7 @@
 }
 
 .cardLinks a {
-  color: #0a85e2;
+  color: #2fa350;
   text-decoration: none;
 }
 
@@ -557,7 +557,7 @@
   gap: 1rem;
   height: 34px;
   font-size: 0.88rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .radios label,
@@ -566,7 +566,7 @@
   align-items: center;
   gap: 0.3rem;
   margin: 0;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-size: 0.88rem;
 }
 
@@ -629,13 +629,13 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.82rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .pickList {
   max-height: 360px;
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
 }
 
@@ -644,12 +644,12 @@
   align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
   font-size: 0.85rem;
 }
 
 .pct {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   font-size: 0.78rem;
 }
 
@@ -668,32 +668,32 @@
 .kpi span {
   display: block;
   font-size: 0.78rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   margin-bottom: 0.35rem;
 }
 
 .kpi strong {
   font-size: 1.45rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .kpiBlue {
-  background: #e8f3ff;
+  background: var(--tint-info, #e8f3ff);
 }
 
 .kpiPink {
-  background: #fde8e8;
+  background: var(--tint-danger, #fde8e8);
 }
 
 .kpiYellow {
-  background: #fff6d9;
+  background: var(--tint-warn, #fff6d9);
   grid-column: 1 / -1;
 }
 
 .field input:disabled,
 .field select:disabled,
 .field textarea:disabled {
-  background: #f5f6f8;
-  color: #7e8299;
+  background: var(--tint-neutral, #f5f6f8);
+  color: var(--tint-ink-muted, #7e8299);
 }

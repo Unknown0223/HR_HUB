@@ -8,7 +8,7 @@
   max-width: none;
   background: transparent;
   font-size: 13px;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 @keyframes fadeUp {
@@ -85,7 +85,7 @@
 
 .sidebar,
 .main {
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   box-shadow: 0 0 20px 0 rgba(76, 87, 125, 0.06);
   min-width: 0;
@@ -112,7 +112,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-decoration: none;
   border-radius: 4px;
   font-size: 1.05rem;
@@ -121,7 +121,7 @@
 
 .sideBack:hover {
   color: var(--accent);
-  background: #f3f4f6;
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .menuBtn {
@@ -147,7 +147,7 @@
   right: 0;
   z-index: 30;
   min-width: 240px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
@@ -180,7 +180,7 @@
 }
 
 .menuDanger:hover {
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
 }
 
 .menuSub {
@@ -222,7 +222,7 @@
 
 .menuGear:hover {
   background: var(--surface-muted);
-  color: #0a85e2;
+  color: #2fa350;
 }
 
 .nameRow {
@@ -258,7 +258,7 @@
   display: inline-flex;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
-  background: #fef3c7;
+  background: var(--tint-warn, #fef3c7);
   color: #b45309;
   font-size: 0.68rem;
   font-weight: 600;
@@ -319,8 +319,8 @@
   height: 120px;
   border-radius: 999px;
   object-fit: cover;
-  background: #f3f6f9;
-  border: 4px solid #fff;
+  background: var(--tint-neutral, #f3f6f9);
+  border: 4px solid var(--tint-line, #fff);
   box-shadow: 0 0 0 1px #e4e6ef;
   cursor: pointer;
 }
@@ -341,7 +341,7 @@
   line-height: 1.3;
   text-transform: uppercase;
   letter-spacing: 0.01em;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   max-width: 100%;
   word-break: break-word;
 }
@@ -349,7 +349,7 @@
 .roleLine {
   margin: 0.3rem 0 0.55rem;
   text-align: center;
-  color: #0a85e2;
+  color: #2fa350;
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.35;
@@ -360,7 +360,7 @@
   margin: 0 auto 0.95rem;
   padding: 0.22rem 0.85rem;
   border-radius: 999px;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font-size: 0.72rem;
   font-weight: 600;
@@ -382,14 +382,14 @@
 }
 
 .sideIcon {
-  color: #0a85e2;
+  color: #2fa350;
   width: 26px;
   height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: #e1f0ff;
+  background: var(--tint-info, #e1f0ff);
   border-radius: 6px;
 }
 
@@ -413,7 +413,7 @@
 }
 
 .sideValue {
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   word-break: break-word;
   font-size: 0.8rem;
   line-height: 1.35;
@@ -422,7 +422,7 @@
 
 .sideLink {
   display: block;
-  color: #0a85e2;
+  color: #2fa350;
   cursor: pointer;
   text-decoration: none;
   background: none;
@@ -457,7 +457,7 @@
 }
 
 .sideItemClickable:hover {
-  background: #f3f6f9;
+  background: var(--tint-neutral, #f3f6f9);
 }
 
 .main {
@@ -471,9 +471,9 @@
   flex-wrap: wrap;
   gap: 0;
   padding: 0.35rem 1rem 0;
-  border-bottom: 1px solid #ebedf3;
+  border-bottom: 1px solid var(--tint-line, #ebedf3);
   position: relative;
-  background: #fff;
+  background: var(--surface);
 }
 
 .tab,
@@ -481,7 +481,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 500;
@@ -503,14 +503,14 @@
 
 .tabActive,
 .moreBtnActive {
-  color: #0a85e2;
-  border-bottom-color: #0a85e2;
+  color: #2fa350;
+  border-bottom-color: #2fa350;
   font-weight: 600;
 }
 
 .tabActive .tabIcon {
   opacity: 1;
-  color: #0a85e2;
+  color: #2fa350;
 }
 
 .moreWrap {
@@ -525,7 +525,7 @@
   min-width: 260px;
   max-height: min(70vh, 480px);
   overflow: auto;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
@@ -604,23 +604,23 @@
 }
 
 .btnGhost {
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .btnGhost:hover {
-  background: #f3f6f9;
+  background: var(--tint-neutral, #f3f6f9);
 }
 
 .btn {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .btn:hover {
-  background: #187de4;
+  background: #268a42;
 }
 
 .btn:disabled {
@@ -640,7 +640,7 @@
   width: 32px;
   height: 32px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   border-radius: 4px;
   font: inherit;
@@ -654,7 +654,7 @@
 }
 
 .calNavBtn:hover {
-  background: #f3f4f6;
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .btn:disabled,
@@ -708,14 +708,14 @@
   flex-wrap: wrap;
   gap: 0;
   margin: 0 0 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--tint-line, #e5e7eb);
 }
 
 .subTab {
   appearance: none;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   border-radius: 0;
   padding: 0.6rem 0.9rem;
   font: inherit;
@@ -734,10 +734,10 @@
 
 .calCell {
   min-height: 118px;
-  border-right: 1px solid #e8eaed;
-  border-bottom: 1px solid #e8eaed;
+  border-right: 1px solid var(--tint-line, #e8eaed);
+  border-bottom: 1px solid var(--tint-line, #e8eaed);
   padding: 0.3rem 0.35rem 0.4rem;
-  background: #fff;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -755,7 +755,7 @@ button.calCell {
 }
 
 .calCellClickable:hover {
-  background: #f8fbff;
+  background: var(--tint-neutral, #f8fbff);
 }
 
 .calCellTall {
@@ -763,20 +763,20 @@ button.calCell {
 }
 
 .calCellToday {
-  box-shadow: inset 0 0 0 1px #0a85e2;
+  box-shadow: inset 0 0 0 1px #2fa350;
 }
 
 .calDayNum {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   text-align: right;
   align-self: flex-end;
   line-height: 1.2;
 }
 
 .calDayNumToday {
-  color: #0a85e2;
+  color: #2fa350;
   font-weight: 700;
 }
 
@@ -817,11 +817,11 @@ button.calCell {
 
 .calFact {
   background: #7dce82;
-  color: #1f3d20;
+  color: var(--tint-ink, #1f3d20);
 }
 
 .calFactEmpty {
-  background: #eef2f6;
+  background: var(--tint-neutral, #eef2f6);
   color: #a1a5b7;
 }
 
@@ -858,15 +858,15 @@ button.calCell {
   font-weight: 700;
   line-height: 1.2;
   text-align: center;
-  background: #fff5f6;
+  background: var(--tint-neutral, #fff5f6);
   min-height: 1.55rem;
 }
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #ebedf3;
+  border: 1px solid var(--tint-line, #ebedf3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .table {
@@ -878,14 +878,14 @@ button.calCell {
 .table th,
 .table td {
   padding: 0.7rem 0.85rem;
-  border-bottom: 1px solid #ebedf3;
+  border-bottom: 1px solid var(--tint-line, #ebedf3);
   text-align: left;
   white-space: nowrap;
   vertical-align: middle;
 }
 
 .table th {
-  background: #f3f6f9;
+  background: var(--tint-neutral, #f3f6f9);
   color: #b5b5c3;
   font-weight: 600;
   font-size: 0.72rem;
@@ -898,7 +898,7 @@ button.calCell {
 }
 
 .table tbody tr:hover td {
-  background: #fafbfd;
+  background: var(--tint-neutral, #fafbfd);
 }
 
 .empty {
@@ -912,30 +912,30 @@ button.calCell {
   align-items: center;
   padding: 0.2rem 0.55rem;
   border-radius: 4px;
-  background: #e1f0ff;
-  color: #0a85e2;
+  background: var(--tint-info, #e1f0ff);
+  color: #2fa350;
   font-size: 0.68rem;
   font-weight: 600;
 }
 
 .badgeOk {
-  background: #dff7f4;
+  background: var(--tint-ok, #dff7f4);
   color: #0f766e;
 }
 
 .badgeWarn {
-  background: #fef3c7;
+  background: var(--tint-warn, #fef3c7);
   color: #b45309;
 }
 
 .badgeDanger {
-  background: #fee2e2;
+  background: var(--tint-danger, #fee2e2);
   color: #b91c1c;
 }
 
 .badgeMuted {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .muted {
@@ -961,7 +961,7 @@ button.calCell {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 500;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   text-transform: none;
   letter-spacing: 0.01em;
 }
@@ -970,7 +970,7 @@ button.calCell {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -978,11 +978,11 @@ button.calCell {
 .calDow {
   text-align: center;
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   padding: 0.55rem 0.25rem;
   font-weight: 600;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--tint-neutral, #f9fafb);
+  border-bottom: 1px solid var(--tint-line, #e5e7eb);
 }
 
 .calDow:nth-child(7) {
@@ -994,7 +994,7 @@ button.calCell {
 }
 
 .calCellMuted {
-  background: #fafafa;
+  background: var(--tint-neutral, #fafafa);
   color: #9ca3af;
 }
 
@@ -1017,18 +1017,18 @@ button.calCell {
 
 .visitPeriodBtn {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #fff;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
   border-radius: 6px;
   padding: 0.4rem 0.7rem;
   font: inherit;
   font-size: 0.82rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
 }
 
 .visitPeriodBtn:hover {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
 }
 
 .visitPeriodMenu {
@@ -1036,8 +1036,8 @@ button.calCell {
   right: 0;
   top: calc(100% + 4px);
   min-width: 220px;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
   z-index: 40;
@@ -1054,11 +1054,11 @@ button.calCell {
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .visitPeriodItem:hover {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
 }
 
 .profileEditModal {
@@ -1092,11 +1092,11 @@ button.calCell {
 .historyMeta strong {
   display: block;
   font-size: 0.88rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .historyMeta small {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.78rem;
 }
 
@@ -1109,7 +1109,7 @@ button.calCell {
 
 .historySearch {
   flex: 1;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   padding: 0.45rem 0.65rem;
   font: inherit;
@@ -1134,7 +1134,7 @@ button.calCell {
 }
 
 .historyDotEdit {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .statsBox {
@@ -1145,7 +1145,7 @@ button.calCell {
   place-items: center;
   color: var(--ink-muted);
   font-size: 0.84rem;
-  background: #fafafa;
+  background: var(--tint-neutral, #fafafa);
   padding: 1rem;
 }
 
@@ -1199,10 +1199,10 @@ button.calCell {
   background: var(--ok);
 }
 .statsSegLate {
-  background: #8ca0b8;
+  background: var(--ink-faint);
 }
 .statsSegEarly {
-  background: #64788f;
+  background: var(--ink-muted);
 }
 .statsSegAbsent {
   background: #cbd5e1;
@@ -1241,10 +1241,10 @@ button.calCell {
   background: var(--ok);
 }
 .dotLate {
-  background: #8ca0b8;
+  background: var(--ink-faint);
 }
 .dotEarly {
-  background: #64788f;
+  background: var(--ink-muted);
 }
 .dotAbsent {
   background: #cbd5e1;
@@ -1252,9 +1252,9 @@ button.calCell {
 
 .viewBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #f3f4f6;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink, #374151);
   border-radius: 4px;
   font: inherit;
   font-size: 0.72rem;
@@ -1265,7 +1265,7 @@ button.calCell {
 }
 
 .viewBtn:hover {
-  background: #e5e7eb;
+  background: var(--tint-neutral, #e5e7eb);
 }
 
 .dateCell {
@@ -1319,7 +1319,7 @@ button.calCell {
   width: min(520px, 100%);
   max-height: min(92vh, 760px);
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   box-shadow: 0 0 50px 0 rgba(82, 63, 105, 0.15);
   display: flex;
@@ -1332,14 +1332,14 @@ button.calCell {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 1rem 1.35rem;
-  border-bottom: 1px solid #ebedf3;
+  border-bottom: 1px solid var(--tint-line, #ebedf3);
 }
 
 .modalTitle {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 500;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .modalClose {
@@ -1355,8 +1355,8 @@ button.calCell {
 }
 
 .modalClose:hover {
-  color: #374151;
-  background: #f3f4f6;
+  color: var(--tint-ink, #374151);
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .modalBody {
@@ -1374,7 +1374,7 @@ button.calCell {
   display: flex;
   justify-content: flex-end;
   gap: 0.55rem;
-  border-top: 1px solid #ebedf3;
+  border-top: 1px solid var(--tint-line, #ebedf3);
   margin-top: 0.35rem;
 }
 
@@ -1398,9 +1398,9 @@ button.calCell {
 .dayMarksChip,
 .dayMarksChipActive {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #f5f8fa;
-  color: #7e8299;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--tint-neutral, #f5f8fa);
+  color: var(--tint-ink-muted, #7e8299);
   border-radius: 6px;
   padding: 0.45rem 0.75rem;
   font: inherit;
@@ -1410,12 +1410,12 @@ button.calCell {
 }
 
 .dayMarksChip:hover {
-  background: #eef3f7;
+  background: var(--tint-info, #eef3f7);
 }
 
 .dayMarksChipActive {
-  background: #0a85e2;
-  border-color: #0a85e2;
+  background: #2fa350;
+  border-color: #2fa350;
   color: #fff;
 }
 
@@ -1434,9 +1434,9 @@ button.calCell {
 
 .dayMarkAct {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #7e8299;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink-muted, #7e8299);
   width: 30px;
   height: 30px;
   border-radius: 6px;
@@ -1448,7 +1448,7 @@ button.calCell {
 .dayMarkAct:hover {
   color: #f64e60;
   border-color: #f64e60;
-  background: #fff5f8;
+  background: var(--tint-neutral, #fff5f8);
 }
 
 .dayMarkAct:disabled {
@@ -1462,14 +1462,14 @@ button.calCell {
   border-radius: 50%;
   object-fit: cover;
   display: block;
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
 }
 
 .markThumbEmpty {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
   display: inline-block;
 }
 
@@ -1498,7 +1498,7 @@ button.calCell {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .dayKindBadge {
@@ -1511,17 +1511,17 @@ button.calCell {
 }
 
 .dayKindWork {
-  background: #e8f3ff;
-  color: #0a85e2;
+  background: var(--tint-info, #e8f3ff);
+  color: #2fa350;
 }
 
 .dayKindOff {
-  background: #ffe2e5;
+  background: var(--tint-danger, #ffe2e5);
   color: #f64e60;
 }
 
 .dayKindLeave {
-  background: #fff4de;
+  background: var(--tint-warn, #fff4de);
   color: #ffa800;
 }
 
@@ -1529,7 +1529,7 @@ button.calCell {
   display: flex;
   gap: 0;
   padding: 0 1.15rem;
-  border-bottom: 1px solid #eef0f2;
+  border-bottom: 1px solid var(--tint-line, #eef0f2);
 }
 
 .dayModalTab,
@@ -1548,8 +1548,8 @@ button.calCell {
 }
 
 .dayModalTabActive {
-  color: #0a85e2;
-  border-bottom-color: #0a85e2;
+  color: #2fa350;
+  border-bottom-color: #2fa350;
 }
 
 .dayWarn {
@@ -1558,7 +1558,7 @@ button.calCell {
 }
 
 .dayOutMissing {
-  background: #fff3cd !important;
+  background: var(--tint-warn, #fff3cd) !important;
 }
 
 .dayTotals {
@@ -1569,7 +1569,7 @@ button.calCell {
   margin: 0 0 0.55rem;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .dayTotals dl {
@@ -1583,18 +1583,18 @@ button.calCell {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.35rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
   font-size: 0.9rem;
 }
 
 .dayTotals dt {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .dayTotals dd {
   margin: 0;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .dayTotalsNeg {
@@ -1604,7 +1604,7 @@ button.calCell {
 .modalField label {
   display: block;
   font-size: 0.78rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-weight: 500;
   margin-bottom: 0.35rem;
 }
@@ -1616,25 +1616,25 @@ button.calCell {
   box-sizing: border-box;
   min-height: 40px;
   padding: 0.45rem 0.75rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   font: inherit;
   font-size: 0.84rem;
   transition: border-color 0.15s ease;
 }
 
 .modalField select option {
-  color: #181c32;
-  background: #fff;
+  color: var(--tint-ink, #181c32);
+  background: var(--surface);
 }
 
 .modalField input:focus,
 .modalField textarea:focus,
 .modalField select:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .modalField textarea {
@@ -1666,7 +1666,7 @@ button.calCell {
   align-items: center;
   gap: 0.65rem;
   font-size: 0.84rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
 }
 
 .toggle {
@@ -1683,7 +1683,7 @@ button.calCell {
 }
 
 .toggleOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .toggle::after {
@@ -1694,7 +1694,7 @@ button.calCell {
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 2px rgba(0,0,0,0.15);
   transition: transform 0.15s ease;
 }
@@ -1709,7 +1709,7 @@ button.calCell {
   align-items: flex-start;
   gap: 0.65rem;
   font-size: 0.84rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .fileDrop {
@@ -1720,11 +1720,11 @@ button.calCell {
   gap: 0.2rem;
   width: 72px;
   height: 72px;
-  border: 1px dashed #c5c9d3;
+  border: 1px dashed var(--tint-line, #c5c9d3);
   border-radius: 6px;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   cursor: pointer;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   font-size: 0.72rem;
   font-weight: 600;
 }
@@ -1741,9 +1741,9 @@ button.calCell {
 }
 
 .fileDropPanel {
-  border: 1px dashed #c5c9d3;
+  border: 1px dashed var(--tint-line, #c5c9d3);
   border-radius: 8px;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   min-height: 120px;
   display: flex;
   align-items: center;
@@ -1753,8 +1753,8 @@ button.calCell {
 }
 
 .fileDropPanelActive {
-  border-color: #0a85e2;
-  background: #eef6ff;
+  border-color: #2fa350;
+  background: var(--tint-info, #eef6ff);
 }
 
 .fileDropPanelLabel {
@@ -1763,14 +1763,14 @@ button.calCell {
   align-items: center;
   gap: 0.35rem;
   text-align: center;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.84rem;
   cursor: pointer;
   width: 100%;
 }
 
 .fileDropPanelLabel strong {
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-weight: 600;
 }
 
@@ -1786,7 +1786,7 @@ button.calCell {
 .btnCreate {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.82rem;
@@ -1810,20 +1810,20 @@ button.calCell {
 .invSearch {
   width: 180px;
   max-width: 40vw;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
   font: inherit;
   font-size: 0.82rem;
-  color: #3f4254;
-  background: #fff;
+  color: var(--tint-ink, #3f4254);
+  background: var(--surface);
 }
 
 .invIconBtn {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #7e8299;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink-muted, #7e8299);
   width: 34px;
   height: 34px;
   border-radius: 6px;
@@ -1833,14 +1833,14 @@ button.calCell {
 
 .invIconBtn:hover,
 .invIconBtnActive {
-  border-color: #0a85e2;
-  color: #0a85e2;
-  background: #eef6ff;
+  border-color: #2fa350;
+  color: #2fa350;
+  background: var(--tint-info, #eef6ff);
 }
 
 .invPager {
   font-size: 0.78rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   padding: 0 0.25rem;
 }
 
@@ -1882,7 +1882,7 @@ button.calCell {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .identMainPhoto {
@@ -1890,9 +1890,9 @@ button.calCell {
   align-items: center;
   gap: 0.65rem;
   padding: 0.5rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .identMainPhoto img {
@@ -1909,7 +1909,7 @@ button.calCell {
   gap: 0.5rem;
   flex: 1;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .identPhotoRemove {
@@ -1941,23 +1941,23 @@ button.calCell {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
   padding: 0.55rem 0.75rem;
   font: inherit;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   text-align: left;
 }
 
 .fpFieldBtn:hover {
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .fpEditIcon {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .fpModalLayout {
@@ -1982,7 +1982,7 @@ button.calCell {
 .fpHandTitle {
   font-size: 0.84rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   margin-bottom: 0.55rem;
 }
 
@@ -1995,31 +1995,31 @@ button.calCell {
 .fpFinger {
   appearance: none;
   width: 72px;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   padding: 0.45rem 0.25rem;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .fpFinger:hover {
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .fpFingerActive {
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.15);
 }
 
 .fpFingerDone {
-  background: #e8fff3;
-  color: #0a85e2;
-  border-color: #0a85e2;
+  background: var(--tint-ok, #e8fff3);
+  color: #2fa350;
+  border-color: #2fa350;
 }
 
 .fpFingerIcon {
@@ -2049,9 +2049,9 @@ button.calCell {
 .fpScanOval {
   width: 120px;
   height: 160px;
-  border: 2px dashed #d1d5db;
+  border: 2px dashed var(--tint-line, #d1d5db);
   border-radius: 60px;
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
 }
 
 .fpSteps {
@@ -2065,9 +2065,9 @@ button.calCell {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #7e8299;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink-muted, #7e8299);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
@@ -2075,8 +2075,8 @@ button.calCell {
 }
 
 .fpStepActive {
-  background: #0a85e2;
-  border-color: #0a85e2;
+  background: #2fa350;
+  border-color: #2fa350;
   color: #fff;
 }
 
@@ -2089,7 +2089,7 @@ button.calCell {
 }
 
 .fpDriverLink {
-  color: #0a85e2;
+  color: #2fa350;
   font-size: 0.84rem;
   font-weight: 600;
   text-decoration: none;
@@ -2146,9 +2146,9 @@ button.calCell {
 .usPassWrap {
   display: flex;
   align-items: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface);
   overflow: hidden;
 }
 
@@ -2170,10 +2170,10 @@ button.calCell {
 
 .usLoginSuffix {
   padding: 0.45rem 0.65rem;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
   font-size: 0.84rem;
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--tint-line, #e5e7eb);
   white-space: nowrap;
 }
 
@@ -2183,7 +2183,7 @@ button.calCell {
   background: transparent;
   padding: 0.4rem 0.65rem;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .usRoles {
@@ -2197,9 +2197,9 @@ button.calCell {
   gap: 0.35rem;
   min-height: 38px;
   padding: 0.3rem 0.4rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .usRoleTag {
@@ -2207,7 +2207,7 @@ button.calCell {
   align-items: center;
   gap: 0.25rem;
   padding: 0.15rem 0.45rem;
-  background: #eef5ff;
+  background: var(--tint-info, #eef5ff);
   color: #1e5bb8;
   border-radius: 3px;
   font-size: 0.8rem;
@@ -2219,7 +2219,7 @@ button.calCell {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   line-height: 1;
   padding: 0;
   font-size: 1rem;
@@ -2227,13 +2227,13 @@ button.calCell {
 
 .usRoleAdd {
   appearance: none;
-  border: 1px dashed #c5c9d3;
-  background: #fafbfc;
+  border: 1px dashed var(--tint-line, #c5c9d3);
+  background: var(--tint-neutral, #fafbfc);
   width: 26px;
   height: 26px;
   border-radius: 4px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   font-size: 1rem;
   line-height: 1;
 }
@@ -2247,8 +2247,8 @@ button.calCell {
   margin: 0;
   padding: 0.25rem 0;
   list-style: none;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   max-height: 200px;
@@ -2260,7 +2260,7 @@ button.calCell {
   align-items: center;
   gap: 0.65rem;
   font-size: 0.84rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
   min-height: 28px;
 }
 
@@ -2275,7 +2275,7 @@ button.calCell {
 .usSubHead {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   margin-top: 0.35rem;
 }
 
@@ -2284,13 +2284,13 @@ button.calCell {
   align-items: flex-start;
   gap: 0.45rem;
   font-size: 0.84rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
   cursor: pointer;
 }
 
 .usCheck input {
   margin-top: 0.15rem;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .errorText {
@@ -2300,7 +2300,7 @@ button.calCell {
 }
 
 .okText {
-  color: #059669;
+  color: #2fa350;
   font-size: 0.84rem;
   margin: 0.35rem 0 0;
 }
@@ -2323,7 +2323,7 @@ button.calCell {
   appearance: none;
   border: none;
   background: transparent;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 1.2rem;
   line-height: 1;
   padding: 0.35rem 0.5rem;
@@ -2332,8 +2332,8 @@ button.calCell {
 }
 
 .tabSettingsBtn:hover {
-  background: #f3f6f9;
-  color: #0a85e2;
+  background: var(--tint-neutral, #f3f6f9);
+  color: #2fa350;
 }
 
 .tabSettingsMenu {
@@ -2342,8 +2342,8 @@ button.calCell {
   top: calc(100% + 4px);
   z-index: 30;
   min-width: 220px;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(82, 63, 105, 0.12);
   padding: 0.35rem;
@@ -2359,14 +2359,14 @@ button.calCell {
   padding: 0.55rem 0.7rem;
   font: inherit;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .tabSettingsItem:hover {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
 }
 
 .tabArrangeList {
@@ -2385,9 +2385,9 @@ button.calCell {
   align-items: center;
   gap: 0.55rem;
   padding: 0.55rem 0.65rem;
-  border: 1px solid #eef0f3;
+  border: 1px solid var(--tint-line, #eef0f3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .tabArrangeIcon {
@@ -2398,13 +2398,13 @@ button.calCell {
 .tabArrangeLabel {
   flex: 1;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .tabArrangeBadge {
   font-size: 0.72rem;
-  color: #0a85e2;
-  background: #eef6ff;
+  color: #2fa350;
+  background: var(--tint-info, #eef6ff);
   padding: 0.2rem 0.45rem;
   border-radius: 4px;
   white-space: nowrap;
@@ -2424,7 +2424,7 @@ button.calCell {
 .filterBody input[type='date'],
 .filterBody input[type='search'] {
   width: 100%;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   padding: 0.45rem 0.65rem;
   font: inherit;
@@ -2440,7 +2440,7 @@ button.calCell {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.8rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
 }
 
 .fileList li {
@@ -2461,10 +2461,10 @@ button.calCell {
   align-items: center;
   gap: 0.35rem;
   padding: 0.45rem 0.85rem;
-  border: 1px solid #0a85e2;
+  border: 1px solid #2fa350;
   border-radius: 6px;
-  background: #fff;
-  color: #0a85e2;
+  background: var(--surface);
+  color: #2fa350;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -2473,7 +2473,7 @@ button.calCell {
 }
 
 .uploadBtn:hover {
-  background: #eef6ff;
+  background: var(--tint-info, #eef6ff);
 }
 
 .uploadIcon {
@@ -2496,8 +2496,8 @@ button.calCell {
   list-style: none;
   max-height: 200px;
   overflow: auto;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(82, 63, 105, 0.12);
 }
@@ -2511,14 +2511,14 @@ button.calCell {
   padding: 0.5rem 0.65rem;
   font: inherit;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .docTypeOption:hover {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
 }
 
 .docModalFields {
@@ -2531,7 +2531,7 @@ button.calCell {
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.84rem;
   font-weight: 600;
@@ -2559,13 +2559,13 @@ button.calCell {
 
 .familyValue {
   margin: 0;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-size: 0.84rem;
   font-weight: 500;
 }
 
 .toggleHint {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.78rem;
   margin-left: -0.25rem;
 }
@@ -2588,24 +2588,24 @@ button.calCell {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 500;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .docsBadge {
   display: inline-flex;
   padding: 0.18rem 0.55rem;
   border-radius: 4px;
-  background: #f3f6f9;
-  color: #7e8299;
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.7rem;
   font-weight: 600;
 }
 
 .btnAdd {
   appearance: none;
-  border: 1px solid #0a85e2;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid #2fa350;
+  background: var(--surface);
+  color: #2fa350;
   border-radius: 6px;
   font: inherit;
   font-size: 0.8rem;
@@ -2616,12 +2616,12 @@ button.calCell {
 }
 
 .btnAdd:hover {
-  background: #c9f7f5;
+  background: var(--tint-info, #c9f7f5);
 }
 
 .badgeNew {
-  background: #f3f6f9;
-  color: #7e8299;
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink-muted, #7e8299);
   border-radius: 4px;
 }
 
@@ -2637,7 +2637,7 @@ button.calCell {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 500;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .locToolbar {
@@ -2653,7 +2653,7 @@ button.calCell {
   min-width: 160px;
   height: 32px;
   padding: 0.25rem 0.55rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   font: inherit;
   font-size: 0.8rem;
@@ -2663,11 +2663,11 @@ button.calCell {
   appearance: none;
   width: 32px;
   height: 32px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
+  border: 1px solid var(--tint-line, #e5e7eb);
+  background: var(--surface);
   border-radius: 4px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   font-size: 0.9rem;
 }
 
@@ -2676,11 +2676,11 @@ button.calCell {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .tableLink {
-  color: #0a85e2;
+  color: #2fa350;
   text-decoration: none;
   font-weight: 500;
   background: none;
@@ -2692,7 +2692,7 @@ button.calCell {
 
 .tableLink:hover {
   text-decoration: underline;
-  color: #187de4;
+  color: #268a42;
 }
 
 .badgeAuto {
@@ -2715,7 +2715,7 @@ button.calCell {
 }
 
 .locTable tbody tr:nth-child(even) {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .thSort {
@@ -2732,7 +2732,7 @@ button.calCell {
 .badgeManual {
   appearance: none;
   border: none;
-  background: #fff4de;
+  background: var(--tint-warn, #fff4de);
   color: #b45309;
   border-radius: 999px;
   padding: 0.18rem 0.65rem;
@@ -2757,8 +2757,8 @@ button.calCell {
   top: calc(100% + 4px);
   z-index: 40;
   min-width: 200px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   padding: 0.35rem 0;
@@ -2787,12 +2787,12 @@ button.calCell {
   padding: 0.45rem 0.85rem;
   font: inherit;
   font-size: 0.8rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
   cursor: pointer;
 }
 
 .absMenuItem:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .absMenuItem:disabled {
@@ -2819,7 +2819,7 @@ button.calCell {
   gap: 0.65rem;
   flex-wrap: wrap;
   padding: 0.55rem 1.1rem;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--tint-line, #eef0f3);
 }
 
 .linkBtn {
@@ -2849,7 +2849,7 @@ button.calCell {
 
 .filterLabel {
   font-size: 0.82rem;
-  color: #4b5563;
+  color: var(--tint-ink-muted, #4b5563);
   padding-top: 0.45rem;
 }
 
@@ -2890,7 +2890,7 @@ button.calCell {
   min-width: 130px;
   height: 34px;
   padding: 0.25rem 0.45rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   font: inherit;
   font-size: 0.8rem;
@@ -2908,13 +2908,13 @@ button.calCell {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
 }
 
 .multiSelect {
   width: 100%;
   min-height: 96px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   font: inherit;
   font-size: 0.8rem;
@@ -2925,7 +2925,7 @@ button.calCell {
   display: flex;
   align-items: flex-start;
   gap: 0;
-  background: #fff;
+  background: var(--surface);
 }
 
 .absMain {
@@ -2961,12 +2961,12 @@ button.calCell {
   min-width: 148px;
   height: 30px;
   padding: 0.2rem 0.5rem 0.2rem 1.55rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   font: inherit;
   font-size: 0.78rem;
-  color: #3f4254;
-  background: #fff;
+  color: var(--tint-ink, #3f4254);
+  background: var(--surface);
 }
 
 .absSearch::placeholder {
@@ -2978,11 +2978,11 @@ button.calCell {
   position: relative;
   width: 30px;
   height: 30px;
-  border: 1px solid #e4e6ef;
-  background: #fff;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
   border-radius: 4px;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2990,8 +2990,8 @@ button.calCell {
 }
 
 .absToolBtn:hover:not(:disabled) {
-  background: #f3f6f9;
-  color: #3f4254;
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink, #3f4254);
 }
 
 .absToolBtn:disabled {
@@ -3023,14 +3023,14 @@ button.calCell {
 
 .absPager {
   font-size: 0.75rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   margin: 0 0.2rem;
   white-space: nowrap;
 }
 
 .absPageNum {
   font-size: 0.78rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   min-width: 0.9rem;
   text-align: center;
 }
@@ -3038,8 +3038,8 @@ button.calCell {
 .absFilterPanel {
   width: 340px;
   flex-shrink: 0;
-  background: #fff;
-  border-left: 1px solid #e4e6ef;
+  background: var(--surface);
+  border-left: 1px solid var(--tint-line, #e4e6ef);
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 160px);
@@ -3053,14 +3053,14 @@ button.calCell {
   align-items: center;
   justify-content: space-between;
   padding: 0.7rem 0.85rem 0.55rem;
-  border-bottom: 1px solid #eff2f5;
+  border-bottom: 1px solid var(--tint-line, #eff2f5);
 }
 
 .absFilterTitle {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .absFilterHeadActions {
@@ -3075,27 +3075,27 @@ button.calCell {
   gap: 0.35rem;
   flex-wrap: wrap;
   padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid #eff2f5;
+  border-bottom: 1px solid var(--tint-line, #eff2f5);
 }
 
 .absTplBtn,
 .absParamBtn {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #fff;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
   border-radius: 4px;
   font: inherit;
   font-size: 0.76rem;
   padding: 0.28rem 0.5rem;
   cursor: pointer;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .absParamBtn {
   margin-left: auto;
   color: var(--accent);
   border-color: #d7e3ff;
-  background: #f3f6ff;
+  background: var(--tint-neutral, #f3f6ff);
   font-weight: 600;
 }
 
@@ -3107,15 +3107,15 @@ button.calCell {
   flex: 1;
   overflow: auto;
   padding: 0.65rem 0.75rem 0.85rem;
-  background: #fcfcfd;
+  background: var(--tint-neutral, #fcfcfd);
 }
 
 .absFilterCard {
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.5rem 0.55rem 0.6rem;
   margin-bottom: 0.5rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .absFilterCardTop {
@@ -3129,7 +3129,7 @@ button.calCell {
 .absFilterCardLabel {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   flex: 1;
 }
 
@@ -3137,8 +3137,8 @@ button.calCell {
   display: flex;
   gap: 0.45rem;
   padding: 0.7rem 0.85rem;
-  border-top: 1px solid #eff2f5;
-  background: #fff;
+  border-top: 1px solid var(--tint-line, #eff2f5);
+  background: var(--surface);
 }
 
 .absFilterFoot .btn {
@@ -3149,8 +3149,8 @@ button.calCell {
 .absFilterFoot .btnGhost {
   flex: 1;
   justify-content: center;
-  border: 1px solid #e4e6ef;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  color: var(--tint-ink, #3f4254);
 }
 
 .absTypePicker {
@@ -3162,12 +3162,12 @@ button.calCell {
 .absTypeSearch {
   height: 32px;
   padding: 0.25rem 0.5rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   font: inherit;
   font-size: 0.78rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .absTypeList {
@@ -3177,9 +3177,9 @@ button.calCell {
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.2rem 0.15rem;
-  border: 1px solid #eff2f5;
+  border: 1px solid var(--tint-line, #eff2f5);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .checkCol {
@@ -3204,12 +3204,12 @@ button.calCell {
   width: 100%;
   height: 32px;
   padding: 0.2rem 1.7rem 0.2rem 0.4rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   font: inherit;
   font-size: 0.75rem;
-  color: #3f4254;
-  background: #fff;
+  color: var(--tint-ink, #3f4254);
+  background: var(--surface);
 }
 
 .dateFieldCal {
@@ -3236,7 +3236,7 @@ button.calCell {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.82rem;
 }
 
@@ -3262,13 +3262,13 @@ button.calCell {
 
 .absRowAct button {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #fff;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
   border-radius: 3px;
   width: 26px;
   height: 26px;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.72rem;
   line-height: 1;
 }
@@ -3288,7 +3288,7 @@ button.calCell {
     max-height: none;
     position: static;
     border-left: none;
-    border-top: 1px solid #e4e6ef;
+    border-top: 1px solid var(--tint-line, #e4e6ef);
   }
 }
 
@@ -3300,8 +3300,8 @@ button.calCell {
 }
 
 .payCard {
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   padding: 0.85rem 1rem 1rem;
 }
@@ -3325,7 +3325,7 @@ button.calCell {
   display: inline-flex;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
-  background: #fff4de;
+  background: var(--tint-warn, #fff4de);
   color: #b45309;
   font-size: 0.7rem;
   font-weight: 600;
@@ -3334,11 +3334,11 @@ button.calCell {
 .payMonth {
   position: relative;
   font-size: 0.82rem;
-  color: #3f4254;
-  border: 1px solid #e4e6ef;
+  color: var(--tint-ink, #3f4254);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.3rem 0.55rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .payMonth input {
@@ -3350,13 +3350,13 @@ button.calCell {
 
 .payYearSelect {
   height: 30px;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   font: inherit;
   font-size: 0.8rem;
   padding: 0 0.4rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .paySummary {
@@ -3370,32 +3370,32 @@ button.calCell {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.55rem 0.7rem;
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
   border-radius: 4px;
   font-size: 0.82rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .paySumItem strong {
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   font-weight: 600;
 }
 
 .payBlockAccrued,
 .payBlockDeduct {
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 0.65rem;
 }
 
 .payBlockAccrued .payBlockHead {
-  background: #e8f8f7;
+  background: var(--tint-info, #e8f8f7);
   color: #0f766e;
 }
 
 .payBlockDeduct .payBlockHead {
-  background: #fde8e8;
+  background: var(--tint-danger, #fde8e8);
   color: #b91c1c;
 }
 
@@ -3413,7 +3413,7 @@ button.calCell {
   gap: 0.55rem;
   height: 180px;
   padding: 0.5rem 0.25rem 0;
-  border-bottom: 1px solid #eff2f5;
+  border-bottom: 1px solid var(--tint-line, #eff2f5);
 }
 
 .payChartCol {
@@ -3424,7 +3424,7 @@ button.calCell {
   gap: 0.35rem;
   height: 100%;
   font-size: 0.68rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   text-transform: capitalize;
 }
 
@@ -3457,7 +3457,7 @@ button.calCell {
   gap: 1rem;
   margin-top: 0.65rem;
   font-size: 0.75rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .payLegend span {
@@ -3498,9 +3498,9 @@ button.calCell {
   align-items: center;
   justify-content: center;
   padding: 1.25rem 1rem 1rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   min-height: 280px;
 }
 
@@ -3513,7 +3513,7 @@ button.calCell {
 .effGaugeLabel {
   margin: 0.35rem 0 0;
   font-size: 0.8125rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   text-align: center;
   line-height: 1.35;
 }
@@ -3522,9 +3522,9 @@ button.calCell {
   display: flex;
   flex-direction: column;
   min-height: 280px;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   padding: 0.75rem 1rem 1rem;
 }
 
@@ -3547,7 +3547,7 @@ button.calCell {
   gap: 0.45rem;
   min-height: 200px;
   padding: 0.5rem 0.25rem 0;
-  border-bottom: 1px solid #eff2f5;
+  border-bottom: 1px solid var(--tint-line, #eff2f5);
 }
 
 .effBarCol {
@@ -3578,7 +3578,7 @@ button.calCell {
   gap: 1.25rem;
   margin-top: 0.75rem;
   font-size: 0.75rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   justify-content: center;
 }
 
@@ -3593,7 +3593,7 @@ button.calCell {
 }
 
 .effLegExtra {
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
 }
 
 .marksToolbar {
@@ -3612,9 +3612,9 @@ button.calCell {
 
 .marksAddBtn {
   appearance: none;
-  border: 1px solid #0a85e2;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid #2fa350;
+  background: var(--surface);
+  color: #2fa350;
   border-radius: 4px;
   font: inherit;
   font-size: 0.8125rem;
@@ -3625,7 +3625,7 @@ button.calCell {
 }
 
 .marksAddBtn:hover {
-  background: #e8fffe;
+  background: var(--tint-info, #e8fffe);
   border-color: #0bb7af;
   color: #0bb7af;
 }
@@ -3645,7 +3645,7 @@ button.calCell {
 }
 
 .markDotIn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .markDotOut {
@@ -3661,7 +3661,7 @@ button.calCell {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: #f4f5f7;
+  background: var(--tint-neutral, #f4f5f7);
   overflow: auto;
   padding: 1.25rem 1.5rem 2rem;
 }
@@ -3678,7 +3678,7 @@ button.calCell {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 500;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .markCreateActions {
@@ -3690,7 +3690,7 @@ button.calCell {
 .markSaveBtn {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.78rem;
@@ -3703,7 +3703,7 @@ button.calCell {
 }
 
 .markSaveBtn:hover {
-  background: #187de4;
+  background: #268a42;
 }
 
 .markSaveBtn:disabled {
@@ -3713,9 +3713,9 @@ button.calCell {
 
 .markCloseBtn {
   appearance: none;
-  border: 1px solid #e1e3ea;
-  background: #fff;
-  color: #7e8299;
+  border: 1px solid var(--tint-line, #e1e3ea);
+  background: var(--surface);
+  color: var(--tint-ink-muted, #7e8299);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -3727,14 +3727,14 @@ button.calCell {
 }
 
 .markCloseBtn:hover {
-  color: #3f4254;
-  border-color: #cfd3df;
-  background: #fafbfc;
+  color: var(--tint-ink, #3f4254);
+  border-color: var(--tint-line, #cfd3df);
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .markCreateCard {
   width: min(720px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   box-shadow: 0 0 20px rgba(56, 71, 109, 0.06);
   padding: 1.5rem 1.6rem 1.75rem;
@@ -3751,7 +3751,7 @@ button.calCell {
 
 .markField > label {
   font-size: 0.8rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-weight: 500;
 }
 
@@ -3759,10 +3759,10 @@ button.calCell {
 .markTextarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
-  background: #fff;
-  color: #181c32;
+  background: var(--surface);
+  color: var(--tint-ink, #181c32);
   font: inherit;
   font-size: 0.875rem;
   padding: 0.55rem 0.75rem;
@@ -3773,7 +3773,7 @@ button.calCell {
 
 .markInput:focus,
 .markTextarea:focus {
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
 }
 
@@ -3803,12 +3803,12 @@ button.calCell {
 .markSelectWrap .markInput {
   appearance: none;
   padding-right: 2rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .markSelectWrap .markInput:not([value='']),
 .markSelectWrap select.markInput:valid {
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .markPersonBox {
@@ -3817,11 +3817,11 @@ button.calCell {
   justify-content: space-between;
   gap: 0.75rem;
   min-height: 40px;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.45rem 0.55rem 0.45rem 0.75rem;
-  background: #fff;
-  color: #181c32;
+  background: var(--surface);
+  color: var(--tint-ink, #181c32);
   font-size: 0.875rem;
 }
 
@@ -3841,8 +3841,8 @@ button.calCell {
 }
 
 .markPersonClear:hover {
-  background: #f3f6f9;
-  color: #3f4254;
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink, #3f4254);
 }
 
 .markRadios {
@@ -3857,7 +3857,7 @@ button.calCell {
   align-items: center;
   gap: 0.4rem;
   font-size: 0.875rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   user-select: none;
 }
@@ -3872,15 +3872,15 @@ button.calCell {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1.5px solid #d1d3e0;
-  background: #fff;
+  border: 1.5px solid var(--tint-line, #d1d3e0);
+  background: var(--surface);
   box-sizing: border-box;
   position: relative;
   flex-shrink: 0;
 }
 
 .markRadio input:checked + .markRadioDot {
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .markRadio input:checked + .markRadioDot::after {
@@ -3888,7 +3888,7 @@ button.calCell {
   position: absolute;
   inset: 3px;
   border-radius: 50%;
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .markDrop {
@@ -3896,9 +3896,9 @@ button.calCell {
   display: grid;
   place-items: center;
   min-height: 88px;
-  border: 1px dashed #c9cdd8;
+  border: 1px dashed var(--tint-line, #c9cdd8);
   border-radius: 6px;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   color: #a1a5b7;
   font-size: 0.875rem;
   text-align: center;
@@ -3908,9 +3908,9 @@ button.calCell {
 }
 
 .markDrop:hover {
-  border-color: #0a85e2;
-  color: #7e8299;
-  background: #f8fbff;
+  border-color: #2fa350;
+  color: var(--tint-ink-muted, #7e8299);
+  background: var(--tint-neutral, #f8fbff);
 }
 
 .markDrop input[type='file'] {
@@ -3930,7 +3930,7 @@ button.calCell {
 
 .markValidLabel {
   font-size: 0.8rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-weight: 500;
 }
 
@@ -3941,14 +3941,14 @@ button.calCell {
   height: 24px;
   border: none;
   border-radius: 999px;
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
   cursor: pointer;
   padding: 0;
   transition: background 0.15s ease;
 }
 
 .markSwitchOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .markSwitchKnob {
@@ -3958,7 +3958,7 @@ button.calCell {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   transition: left 0.15s ease;
 }
@@ -3981,7 +3981,7 @@ button.calCell {
 .markSwitch:not(.markSwitchOn) .markSwitchText {
   left: auto;
   right: 8px;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .req {

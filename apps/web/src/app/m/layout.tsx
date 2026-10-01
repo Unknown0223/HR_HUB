@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { SeasonalBackdrop } from '@/components/SeasonalBackdrop';
 import MobileBodyFlag from './_components/MobileBodyFlag';
 
 export const metadata: Metadata = {
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'HR HUB',
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
   },
 };
 
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0d1017',
+  themeColor: '#2fa350',
 };
 
 export default function MobileLayout({
@@ -27,6 +28,7 @@ export default function MobileLayout({
 }) {
   return (
     <>
+      <SeasonalBackdrop mode="app" section="home" />
       <MobileBodyFlag />
       {children}
     </>

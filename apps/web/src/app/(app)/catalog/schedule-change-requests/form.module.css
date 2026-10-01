@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }
 
 .actions {
@@ -41,7 +41,7 @@
 .btnStatus {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -63,9 +63,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -82,8 +82,8 @@
   left: 0;
   z-index: 20;
   min-width: 180px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   padding: 0.35rem;
@@ -104,14 +104,14 @@
 }
 
 .statusMenu button:hover {
-  background: #f3f4f6;
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .error {
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
   max-width: 560px;
 }
@@ -120,7 +120,7 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 4px;
   max-width: 560px;
 }
@@ -131,8 +131,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.25rem 1.4rem 1.5rem;
   display: flex;
@@ -159,7 +159,7 @@
   display: block;
   font-size: 0.78rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .req {
@@ -174,13 +174,13 @@
 .searchLike {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.4rem 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  color: #1f2937;
-  background: #fff;
+  color: var(--tint-ink, #1f2937);
+  background: var(--surface);
 }
 
 .field input:not([type='radio']):not([type='date']),
@@ -193,7 +193,7 @@
 .field select:focus,
 .field textarea:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
 }
 
@@ -206,7 +206,7 @@
 
 .fieldValue {
   font-size: 0.9rem;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   min-height: 1.4em;
 }
 
@@ -218,7 +218,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 36px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.4rem 0.65rem;
   font: inherit;
@@ -227,7 +227,7 @@
 
 .comboInput:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
 }
 
@@ -242,8 +242,8 @@
   list-style: none;
   max-height: 240px;
   overflow: auto;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
 }
@@ -264,13 +264,13 @@
   padding: 0.5rem 0.6rem;
   border-radius: 4px;
   cursor: pointer;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
 }
 
 .comboItem:hover,
 .comboItemActive {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
 }
 
 .comboMeta {
@@ -301,7 +301,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.9rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   cursor: pointer;
   margin: 0;
 }
@@ -309,7 +309,7 @@
 .radio input {
   width: 1rem;
   height: 1rem;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .swapList {
@@ -333,18 +333,18 @@
   min-width: 0;
   height: 36px;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.35rem 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  color: #374151;
-  background: #fff;
+  color: var(--tint-ink, #374151);
+  background: var(--surface);
 }
 
 .dateInput:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.12);
 }
 
@@ -365,15 +365,15 @@
 .addBtn,
 .ghostBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
   border-radius: 4px;
   width: 2.1rem;
   height: 2.1rem;
   cursor: pointer;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #0a85e2;
+  color: #2fa350;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -387,7 +387,7 @@
 
 .addBtn:hover,
 .ghostBtn:hover {
-  background: #f8fafc;
+  background: var(--tint-neutral, #f8fafc);
   border-color: #bfdbfe;
 }
 
@@ -435,11 +435,11 @@
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .historyEmpty {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   font-size: 0.88rem;
   padding: 1rem 0;
 }

@@ -19,12 +19,12 @@
   max-height: min(92vh, 900px);
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 16px;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.22);
   overflow: hidden;
-  color: #14213a;
+  color: var(--ink);
 }
 
 .modalHead {
@@ -33,7 +33,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e3e9f1;
+  border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
 
@@ -41,15 +41,15 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #14213a;
+  color: var(--ink);
 }
 
 .formTabs {
   display: flex;
   gap: 4px;
   padding: 0.65rem 1.25rem 0;
-  border-bottom: 1px solid #e3e9f1;
-  background: #f2f5f9;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
   flex-shrink: 0;
 }
 
@@ -61,16 +61,16 @@
   font: inherit;
   font-size: 0.84rem;
   font-weight: 650;
-  color: #64788f;
+  color: var(--ink-muted);
   padding: 0.55rem 0.85rem;
   border-radius: 8px 8px 0 0;
   cursor: pointer;
 }
 
 .formTabActive {
-  color: #0a85e2;
-  background: #fff;
-  box-shadow: inset 0 -2px 0 #0a85e2;
+  color: #2fa350;
+  background: var(--surface);
+  box-shadow: inset 0 -2px 0 #2fa350;
 }
 
 .modalBody {
@@ -88,7 +88,7 @@
   gap: 0.35rem;
   font-size: 0.78rem;
   font-weight: 650;
-  color: #64788f;
+  color: var(--ink-muted);
 }
 
 .modalBody input,
@@ -97,13 +97,13 @@
   appearance: none;
   height: 38px;
   padding: 0 0.7rem;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #14213a;
-  background: #fff;
+  color: var(--ink);
+  background: var(--surface);
   box-sizing: border-box;
   width: 100%;
 }
@@ -123,7 +123,7 @@
   margin: 0;
   font-size: 0.82rem;
   font-weight: 500;
-  color: #64788f;
+  color: var(--ink-muted);
   line-height: 1.45;
 }
 
@@ -134,8 +134,8 @@
   gap: 8px;
   flex-wrap: wrap;
   padding: 0.85rem 1.25rem;
-  border-top: 1px solid #e3e9f1;
-  background: rgba(242, 245, 249, 0.55);
+  border-top: 1px solid var(--line);
+  background: var(--tint-info, rgba(242, 245, 249, 0.55));
   flex-shrink: 0;
 }
 
@@ -167,7 +167,7 @@
 
 .btnPrimary {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
@@ -182,13 +182,13 @@
 }
 
 .btnGhost {
-  border: 1px solid #e3e9f1;
-  background: #fff;
-  color: #354862;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--tint-ink, #3d5244);
 }
 
 .btnGhost:hover {
-  background: #f2f5f9;
+  background: var(--surface-muted);
 }
 
 .checkGroup,
@@ -208,7 +208,7 @@
   gap: 0.4rem;
   font-size: 0.84rem;
   font-weight: 600;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
 }
 
 .lockBanner {
@@ -216,7 +216,7 @@
   margin: 0;
   padding: 0.7rem 0.85rem;
   border-radius: 10px;
-  background: #fff7ed;
+  background: var(--tint-warn, #fff7ed);
   border: 1px solid #fed7aa;
   color: #9a3412;
   font-size: 0.84rem;
@@ -229,16 +229,16 @@
   display: grid;
   gap: 0.75rem;
   padding: 0.85rem;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #f2f5f9;
+  background: var(--surface-muted);
 }
 
 .pwdBoxTitle {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 700;
-  color: #14213a;
+  color: var(--ink);
 }
 
 .pwdOk {
@@ -252,7 +252,7 @@
 }
 
 .pwdHint {
-  color: #64788f;
+  color: var(--ink-muted);
   font-size: 0.78rem;
 }
 

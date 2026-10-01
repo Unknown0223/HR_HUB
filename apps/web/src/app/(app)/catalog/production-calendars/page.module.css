@@ -53,10 +53,10 @@
 
 .closeBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
-  color: #0a85e2;
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -69,7 +69,7 @@
 .search {
   min-width: 180px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.65rem;
   font: inherit;
@@ -79,30 +79,30 @@
 .toolBtn {
   appearance: none;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface);
   padding: 0 0.7rem;
   cursor: pointer;
 }
 
 .pagerMeta {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .error {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 6px;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   color: #991b1b;
   font-size: 0.88rem;
 }
 
 .tableWrap {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   overflow: auto;
 }
@@ -115,7 +115,7 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.55rem 0.65rem;
   text-align: left;
 }
@@ -123,8 +123,8 @@
 .table th {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #6b7280;
-  background: #fafbfc;
+  color: var(--tint-ink-muted, #6b7280);
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .checkCol {
@@ -132,11 +132,11 @@
 }
 
 .rowSelected {
-  background: #f0f9ff;
+  background: var(--tint-info, #f0f9ff);
 }
 
 .actionsRow td {
-  background: #f8fafc;
+  background: var(--tint-neutral, #f8fafc);
   padding: 0.45rem 0.65rem 0.65rem;
 }
 
@@ -148,9 +148,9 @@
 .rowActions a,
 .rowActions button {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;

@@ -3,11 +3,11 @@
   align-items: center;
   height: 34px;
   box-sizing: border-box;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   border-radius: 5px;
   padding: 0 0.55rem;
-  background: #f2f5f9;
-  color: #14213a;
+  background: var(--surface-muted);
+  color: var(--ink);
   font-size: 0.86rem;
   font-weight: 600;
 }
@@ -17,14 +17,14 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.86rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   cursor: pointer;
 }
 
 .check input {
   width: 16px;
   height: 16px;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   margin: 0;
 }
 
@@ -38,7 +38,7 @@
 .pickMeta {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #64788f;
+  color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -46,7 +46,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #64788f;
+  color: var(--ink-muted);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -73,10 +73,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #f2f5f9;
-  color: #14213a;
+  background: var(--surface-muted);
+  color: var(--ink);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.2rem 0.35rem 0.2rem 0.6rem;
@@ -86,7 +86,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
@@ -100,5 +100,5 @@
 .hint {
   margin: 0.35rem 0 0;
   font-size: 0.78rem;
-  color: #8ca0b8;
+  color: var(--ink-faint);
 }

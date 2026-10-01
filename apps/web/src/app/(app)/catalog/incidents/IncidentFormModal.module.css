@@ -1,7 +1,7 @@
 .muted {
   margin: 0;
   padding: 1rem 0;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   font-size: 0.86rem;
 }
 
@@ -10,12 +10,12 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.86rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   cursor: pointer;
 }
 
 .check input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .fileZone {
@@ -27,7 +27,7 @@
 .fileLabel {
   font-size: 0.76rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .drop {
@@ -35,18 +35,18 @@
   place-items: center;
   min-height: 60px;
   padding: 0.65rem 0.75rem;
-  border: 1px dashed #c7d2e1;
+  border: 1px dashed var(--tint-line, #c7d2e1);
   border-radius: 8px;
-  background: #f8fafc;
-  color: #8ca0b8;
+  background: var(--tint-neutral, #f8fafc);
+  color: var(--ink-faint);
   font-size: 0.82rem;
   text-align: center;
   cursor: pointer;
 }
 
 .drop:hover {
-  border-color: #0a85e2;
-  color: #0a85e2;
+  border-color: #2fa350;
+  color: #2fa350;
 }
 
 .fileEmpty {
@@ -69,10 +69,10 @@
   justify-content: space-between;
   gap: 0.6rem;
   padding: 0.35rem 0.5rem;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 0.82rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
 }
 
 .linkBtn {

@@ -15,7 +15,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }
 
 .actions {
@@ -26,7 +26,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -44,9 +44,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -61,7 +61,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
@@ -69,18 +69,18 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 4px;
 }
 
 .muted {
   margin: 0;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1rem 1.15rem 1.2rem;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
@@ -107,7 +107,7 @@
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.22rem;
 }
 
@@ -116,19 +116,19 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -136,7 +136,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -165,7 +165,7 @@
 .schedRow select {
   flex: 1;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.45rem;
   font: inherit;
@@ -200,7 +200,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .sectionTools {
@@ -213,7 +213,7 @@
 .sectionTools select {
   min-width: 200px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.45rem;
   font: inherit;
@@ -222,9 +222,9 @@
 
 .addBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.75rem;
   font-weight: 700;
@@ -236,7 +236,7 @@
 }
 
 .addBtn:hover {
-  background: #f3f9ff;
+  background: var(--tint-neutral, #f3f9ff);
 }
 
 .table {
@@ -251,24 +251,24 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #6b7280;
-  background: #fafafa;
-  border-bottom: 1px solid #eef0f4;
+  color: var(--tint-ink-muted, #6b7280);
+  background: var(--tint-neutral, #fafafa);
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.5rem 0.55rem;
 }
 
 .table td {
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.4rem 0.55rem;
   vertical-align: middle;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .table input {
   width: 100%;
   box-sizing: border-box;
   height: 32px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.45rem;
   font: inherit;
@@ -298,7 +298,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.86rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   cursor: pointer;
   margin-top: 0.5rem;
 }
@@ -307,6 +307,6 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   cursor: pointer;
 }

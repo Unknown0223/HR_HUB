@@ -13,9 +13,9 @@
 }
 
 .btnActive {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -27,9 +27,9 @@
 }
 
 .btnBlue {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
-  border: 1px solid #0a85e2;
+  border: 1px solid #2fa350;
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -44,8 +44,8 @@
 }
 
 .btnBlue:hover:not(:disabled) {
-  background: #187de4;
-  border-color: #187de4;
+  background: #268a42;
+  border-color: #268a42;
 }
 
 .btnBlue:disabled,
@@ -82,13 +82,13 @@
 }
 
 .drop {
-  border: 1px dashed #c9d4e3;
+  border: 1px dashed var(--tint-line, #c9d4e3);
   border-radius: var(--radius);
   padding: 2.4rem 1rem;
   text-align: center;
   color: #95aac9;
   cursor: pointer;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   transition: border-color 0.15s, background 0.15s, color 0.15s;
   min-height: 160px;
   display: flex;
@@ -98,7 +98,7 @@
 
 .drop:hover,
 .dropActive {
-  border-color: #0a85e2;
+  border-color: #2fa350;
   background: rgba(27, 197, 189, 0.06);
   color: #0d8a84;
 }
@@ -151,8 +151,8 @@
 }
 
 .tableWrap th {
-  background: #f7f8fa;
-  color: #3f4254;
+  background: var(--tint-neutral, #f7f8fa);
+  color: var(--tint-ink, #3f4254);
   font-weight: 600;
   position: sticky;
   top: 0;
@@ -160,7 +160,7 @@
 }
 
 .tableWrap tr:nth-child(even) td {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .emptyCell {
@@ -200,12 +200,12 @@
 }
 
 .mapTable th {
-  background: #f7f8fa;
+  background: var(--tint-neutral, #f7f8fa);
   font-weight: 600;
 }
 
 .mapTable tr:nth-child(even) td {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .mapTable input {
@@ -262,9 +262,9 @@
 .stagingHint {
   padding: 0.55rem 0.85rem;
   border-radius: var(--radius);
-  background: #fff8e1;
+  background: var(--tint-warn, #fff8e1);
   border: 1px solid #f0ad4e;
-  color: #8a6d3b;
+  color: var(--tint-ink-muted, #8a6d3b);
   font-size: 0.85rem;
   line-height: 1.4;
 }
@@ -284,9 +284,9 @@
 
 .btnSm {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
   border-radius: 4px;
   font: inherit;
   font-size: 0.78rem;
@@ -296,7 +296,7 @@
 }
 
 .btnSm:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .btnSm:disabled {
@@ -324,29 +324,29 @@
   font-size: 0.85rem;
   padding: 0.35rem 0.4rem;
   border-radius: 3px;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .cellInput:hover,
 .cellInput:focus {
-  border-color: #0a85e2;
-  background: #fff;
+  border-color: #2fa350;
+  background: var(--surface);
   outline: none;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.15);
 }
 
 .rowError td {
-  background: #fff5f5 !important;
+  background: var(--tint-neutral, #fff5f5) !important;
 }
 
 .rowError .cellInput {
-  background: #fff5f5;
+  background: var(--tint-neutral, #fff5f5);
 }
 
 .rowDel {
   appearance: none;
   border: 1px solid #fecaca;
-  background: #fff;
+  background: var(--surface);
   color: #b91c1c;
   width: 28px;
   height: 28px;
@@ -357,6 +357,6 @@
 }
 
 .rowDel:hover {
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
 }
 

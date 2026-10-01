@@ -20,7 +20,7 @@ export type PhotoSlide = {
 /** Large SVG avatar for initials (opens cleanly in the lightbox). */
 export function initialsAvatarSrc(initials: string, bg: string) {
   const text = (initials || '?').slice(0, 3).toUpperCase();
-  const fill = bg || '#0a85e2';
+  const fill = bg || '#2fa350';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="256" fill="${fill}"/>
   <text x="256" y="276" text-anchor="middle" dominant-baseline="middle"

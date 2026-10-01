@@ -85,13 +85,13 @@ type WidgetId =
   | 'accrued'
   | 'withheld';
 
-const TEAL = '#0e9f6e';
-const RED = '#e11d48';
-const ORANGE = '#d97706';
-const BLUE = '#0a85e2';
+const TEAL = '#2fa350';
+const RED = '#e5484d';
+const ORANGE = '#e39b0b';
+const BLUE = '#2fa350';
 const PINK = '#ec4899';
 const GRID = '#eef3f9';
-const AXIS_INK = '#64788f';
+const AXIS_INK = '#5e6f62';
 
 function fmt(n: number, digits = 0) {
   if (!Number.isFinite(n)) return '0';
@@ -1074,7 +1074,7 @@ function YearSummaryInner() {
                           className={styles.hFill}
                           style={{
                             width: `${Math.max(2, (r.count / max) * 100)}%`,
-                            background: 'linear-gradient(90deg, #6366f1 0%, #93a5fd 100%)',
+                            background: 'linear-gradient(90deg, #34a853 0%, #93a5fd 100%)',
                           }}
                         />
                         <span className={styles.hCount}>{r.count}</span>
@@ -1141,7 +1141,7 @@ function YearSummaryInner() {
                 <div className={styles.kpiSub}>Сумма начислений</div>
               </div>
             ) : (
-              <EmptyKpi color="#0e9f6e" />
+              <EmptyKpi color="#2fa350" />
             )}
           </WidgetCard>
 
@@ -1171,7 +1171,7 @@ function YearSummaryInner() {
                 <div className={styles.kpiSub}>Сумма удержаний</div>
               </div>
             ) : (
-              <EmptyKpi color="#d97706" />
+              <EmptyKpi color="#e39b0b" />
             )}
           </WidgetCard>
         </div>

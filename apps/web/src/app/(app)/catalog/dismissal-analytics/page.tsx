@@ -28,12 +28,12 @@ type Dashboard = {
 
 const SKY = '#cbe6fa';
 const FLOW_COLORS = [
-  '#0a85e2',
-  '#0e9f6e',
-  '#6366f1',
+  '#2fa350',
+  '#2fa350',
+  '#34a853',
   '#7c3aed',
-  '#e11d48',
-  '#d97706',
+  '#e5484d',
+  '#e39b0b',
   '#0ea5e9',
   '#14b8a6',
   '#a855f7',

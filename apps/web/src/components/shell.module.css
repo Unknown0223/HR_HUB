@@ -27,15 +27,15 @@
   outline-offset: 2px;
 }
 
-/* —— Top nav = redesign dark header —— */
+/* —— Top nav = mobile header gradient —— */
 .topNav {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: var(--header);
+  background: var(--header-gradient, linear-gradient(105deg, #6dce90 0%, #34a853 46%, #1f6f3a 100%));
   color: var(--header-ink);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: none;
+  border-bottom: none;
+  box-shadow: 0 10px 28px -16px rgba(31, 111, 58, 0.7);
   overflow: visible;
   height: var(--header-height);
   min-height: var(--header-height);
@@ -47,7 +47,7 @@
   inset-inline: 0;
   top: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(10, 133, 226, 0.55), transparent);
+  background: linear-gradient(90deg, transparent, var(--tint-neutral, rgba(255, 255, 255, 0.55)), transparent);
   pointer-events: none;
 }
 
@@ -89,14 +89,14 @@
   border-radius: 9px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #0a85e2 0%, #6366f1 100%);
+  background: var(--surface);
   border: none;
-  color: #fff;
+  color: #1f6f3a;
   font-family: var(--font-body);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.78rem;
   margin: 0;
-  box-shadow: 0 4px 14px -4px rgba(10, 133, 226, 0.7);
+  box-shadow: 0 6px 16px -6px rgba(21, 32, 24, 0.35);
 }
 
 .brandText {
@@ -118,8 +118,8 @@
 .brandText small {
   margin-top: 3px;
   font-size: 10px;
-  font-weight: 500;
-  color: #64788f;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   max-width: 160px;
@@ -163,10 +163,10 @@
 .topTabOpen {
   border: none;
   background: transparent;
-  color: #8ca0b8;
+  color: rgba(255, 255, 255, 0.84);
   font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0;
   padding: 0.5rem 0.75rem;
   margin: 0;
@@ -185,14 +185,14 @@
 }
 
 .topTab:hover {
-  color: #f2f5f9;
-  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .topTabActive {
   color: #fff;
-  background: rgba(255, 255, 255, 0.07);
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  font-weight: 800;
 }
 
 .topTabActive::after {
@@ -203,7 +203,7 @@
   width: 28px;
   height: 2px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--surface);
   transform: translateX(-50%);
 }
 
@@ -255,9 +255,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
   border-radius: 999px;
   padding: 0.35rem 0.75rem;
   min-height: 32px;
@@ -276,14 +276,14 @@
   flex-shrink: 0;
   padding: 0.2rem;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .iconBtn {
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.88);
   width: 38px;
   height: 38px;
   min-width: 38px;
@@ -305,7 +305,7 @@
 
 .iconBtn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 0 0 2px rgba(47, 163, 80, 0.55);
 }
 
 .menuWrap {
@@ -320,12 +320,12 @@
   right: 0;
   top: calc(100% + 8px);
   min-width: 200px;
-  background: #0b1524;
+  background: #163524;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   box-shadow: var(--shadow-mega);
   z-index: 60;
-  color: #e3e9f1;
+  color: var(--line);
   overflow: hidden;
   animation: fadeIn 0.16s ease both;
 }
@@ -349,7 +349,7 @@
 .dropHeadBtn {
   border: none;
   background: transparent;
-  color: #38bdf8;
+  color: var(--tint-ink-muted, #6ccb86);
   font: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -359,7 +359,7 @@
 
 .dropHeadBtn:hover {
   text-decoration: none;
-  color: #7dd3fc;
+  color: #7ed695;
 }
 
 .dropHeadActions {
@@ -440,11 +440,11 @@
   height: 8px;
   padding: 0;
   border-radius: 999px;
-  background: #e11d48;
+  background: #e5484d;
   color: transparent;
   font-size: 0;
   line-height: 0;
-  box-shadow: 0 0 0 2px #070e18;
+  box-shadow: 0 0 0 2px #1f6f3a;
   text-align: center;
 }
 
@@ -470,12 +470,12 @@
 }
 
 .searchInput::placeholder {
-  color: #64788f;
+  color: var(--line-strong);
 }
 
 .searchInput:focus {
   outline: 0;
-  border-color: rgba(10, 133, 226, 0.5);
+  border-color: rgba(47, 163, 80, 0.5);
   box-shadow: none;
 }
 
@@ -499,7 +499,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #64788f;
+  color: var(--line-strong);
 }
 
 .searchHit {
@@ -547,7 +547,7 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -598,7 +598,7 @@
 
 .notifyItem small,
 .notifyItemUnread small {
-  color: #475569;
+  color: var(--tint-ink-muted, #475569);
   font-size: 10.5px;
 }
 
@@ -606,7 +606,7 @@
   min-height: 120px;
   display: grid;
   place-items: center;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
   font-size: 12px;
   font-weight: 600;
   padding: 1rem;
@@ -669,7 +669,7 @@
   gap: 0.1rem 0.5rem;
   width: max-content;
   padding: 0.5rem;
-  background: #0b1524;
+  background: #163524;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   box-shadow: var(--shadow-mega);
@@ -688,7 +688,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
 }
 
 .homeMegaList {
@@ -731,7 +731,7 @@
 }
 
 .homeMegaIconChart {
-  background: linear-gradient(135deg, #0a85e2, #6366f1);
+  background: linear-gradient(135deg, #2fa350, #34a853);
 }
 
 .homeMegaIconNews {
@@ -739,7 +739,7 @@
 }
 
 .homeMegaIconDevices {
-  background: linear-gradient(135deg, #0e9f6e, #0a85e2);
+  background: linear-gradient(135deg, #2fa350, #2fa350);
 }
 
 .homeMegaText {
@@ -767,7 +767,7 @@
 
 .homeMegaArrow {
   font-size: 11px;
-  color: #475569;
+  color: var(--tint-ink-muted, #475569);
   opacity: 0;
   transition: opacity 0.12s ease, transform 0.12s ease, color 0.12s ease;
   flex-shrink: 0;
@@ -802,7 +802,7 @@
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-  background: #0b1524;
+  background: #163524;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   box-shadow: var(--shadow-mega);
@@ -865,7 +865,7 @@
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  background: #0d1830;
+  background: #1a3d2a;
   box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.65);
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
@@ -882,7 +882,7 @@
   font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
-  color: #64788f;
+  color: var(--line-strong);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0;
@@ -931,7 +931,7 @@
   border-radius: 10px;
   font-size: 12.5px;
   font-weight: 700;
-  color: #e3e9f1;
+  color: var(--line);
   text-decoration: none;
   line-height: 1.35;
   letter-spacing: 0;
@@ -950,8 +950,8 @@
   height: 28px;
   flex-shrink: 0;
   border-radius: 8px;
-  background: rgba(10, 133, 226, 0.22);
-  color: #7dd3fc;
+  background: rgba(47, 163, 80, 0.22);
+  color: #7ed695;
   font-size: 12px;
   box-shadow: none;
   margin-top: 1px;
@@ -975,7 +975,7 @@
 
 .megaLink:hover .megaLinkIcon:not(.megaLinkIconColored),
 .megaLinkActive .megaLinkIcon:not(.megaLinkIconColored) {
-  background: rgba(10, 133, 226, 0.4);
+  background: rgba(47, 163, 80, 0.4);
   color: #fff;
 }
 
@@ -992,8 +992,8 @@
   height: 28px;
   flex-shrink: 0;
   border-radius: 8px;
-  background: rgba(10, 133, 226, 0.22);
-  color: #7dd3fc;
+  background: rgba(47, 163, 80, 0.22);
+  color: #7ed695;
   font-size: 12px;
   box-shadow: none;
 }
@@ -1005,7 +1005,7 @@
 
 .megaLink:hover .megaLinkIcon:not(.megaLinkIconColored),
 .megaLinkActive .megaLinkIcon:not(.megaLinkIconColored) {
-  background: rgba(10, 133, 226, 0.4);
+  background: rgba(47, 163, 80, 0.4);
   color: #fff;
 }
 
@@ -1046,7 +1046,7 @@
   padding: 0 1rem;
   height: 44px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--tint-neutral, rgba(255, 255, 255, 0.7));
   backdrop-filter: blur(8px);
   font-size: 12.5px;
   min-height: 44px;
@@ -1064,7 +1064,7 @@
 }
 
 .crumbSep {
-  color: #cbd6e4;
+  color: var(--line-strong);
 }
 
 .crumbPage {
@@ -1078,9 +1078,11 @@
 .main {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   padding: 1.25rem 1.5rem 2.5rem;
   animation: fadeIn 0.16s ease both;
-  flex: 1;
+  flex: 1 0 auto;
   scroll-margin-top: calc(var(--header-height) + 8px);
 }
 
@@ -1102,7 +1104,7 @@
   height: 480px;
   transform: translateX(-50%);
   border-radius: 999px;
-  background: rgba(10, 133, 226, 0.07);
+  background: rgba(47, 163, 80, 0.07);
   filter: blur(64px);
 }
 
@@ -1145,7 +1147,7 @@
 
 .profileBtn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 0 0 2px rgba(47, 163, 80, 0.55);
 }
 
 .avatar {
@@ -1188,7 +1190,7 @@
 
 .userRole {
   font-size: 10.5px;
-  color: #8ca0b8;
+  color: rgba(255, 255, 255, 0.82);
   text-transform: none;
   letter-spacing: 0;
   max-width: 168px;
@@ -1209,7 +1211,7 @@
   right: 0;
   top: calc(100% + 8px);
   min-width: 288px;
-  background: #0b1524;
+  background: #163524;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   box-shadow: var(--shadow-mega);
@@ -1217,14 +1219,14 @@
   display: grid;
   gap: 0;
   z-index: 60;
-  color: #e3e9f1;
+  color: var(--line);
   animation: fadeIn 0.16s ease both;
   overflow: hidden;
 }
 
 .profileMenuMeta {
   font-size: 12px;
-  color: #64788f;
+  color: var(--line-strong);
   padding: 12px 16px;
   background: transparent;
   word-break: break-all;
@@ -1250,7 +1252,7 @@
 
 .profileMenuHead span {
   font-size: 11px;
-  color: #64788f;
+  color: var(--line-strong);
 }
 
 .profileMenuSep {
@@ -1269,7 +1271,7 @@
 .logout {
   border: none;
   background: transparent;
-  color: #38bdf8;
+  color: var(--tint-ink-muted, #6ccb86);
   border-radius: 0;
   padding: 0.55rem 1rem;
   cursor: pointer;
@@ -1285,7 +1287,7 @@
 
 .logout:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: #7dd3fc;
+  color: #7ed695;
 }
 
 .logout i,
@@ -1314,14 +1316,14 @@
 
 .logoutDanger:hover {
   background: rgba(225, 29, 72, 0.08);
-  color: #e11d48;
+  color: #e5484d;
 }
 
 .lockOverlay {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: #070e18;
+  background: #1f6f3a;
   display: grid;
   place-items: center;
   padding: 1.5rem;
@@ -1356,7 +1358,7 @@
 
 .lockUnlock {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font-weight: 600;
   padding: 0.65rem 1.4rem;
@@ -1366,7 +1368,7 @@
 }
 
 .lockUnlock:hover {
-  background: #187de4;
+  background: #268a42;
 }
 
 .pwdBackdrop {
@@ -1381,7 +1383,7 @@
 
 .pwdModal {
   width: min(420px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   box-shadow: var(--shadow-lg);
   padding: 1rem 1.15rem 1.15rem;
@@ -1428,7 +1430,7 @@
 .pwdMsg {
   margin: 0;
   font-size: 0.85rem;
-  color: #0a85e2;
+  color: #2fa350;
 }
 
 .pwdActions {
@@ -1440,7 +1442,7 @@
 
 .pwdActions button {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   border-radius: 6px;
   padding: 0.5rem 0.9rem;
   cursor: pointer;
@@ -1448,8 +1450,8 @@
 }
 
 .pwdSave {
-  background: #0a85e2 !important;
-  border-color: #0a85e2 !important;
+  background: #2fa350 !important;
+  border-color: #2fa350 !important;
   color: #fff !important;
 }
 
@@ -1679,5 +1681,11 @@
     width: 32px;
     height: 32px;
     font-size: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .brandText {
+    display: none;
   }
 }

@@ -34,9 +34,9 @@ type Dashboard = {
   };
 };
 
-const ORANGE = '#d97706';
-const BEIGE = '#8ca0b8';
-const GREEN = '#0e9f6e';
+const ORANGE = '#e39b0b';
+const BEIGE = '#98a89b';
+const GREEN = '#2fa350';
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);

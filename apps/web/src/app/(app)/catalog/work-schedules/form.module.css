@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }
 
 .actions {
@@ -39,7 +39,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -57,9 +57,9 @@
 
 .btnClose {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -74,7 +74,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
   font-size: 0.85rem;
 }
@@ -83,21 +83,21 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 4px;
   font-size: 0.85rem;
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .formGrid {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.3fr);
   gap: 1.25rem 2rem;
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.1rem 1.25rem 1.25rem;
 }
@@ -117,7 +117,7 @@
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.2rem;
   font-weight: 500;
 }
@@ -132,11 +132,11 @@
   box-sizing: border-box;
   height: 34px;
   padding: 0.25rem 0.55rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .row2 {
@@ -150,7 +150,7 @@
   align-items: flex-start;
   gap: 0.4rem;
   font-size: 0.82rem;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   line-height: 1.35;
 }
 
@@ -172,14 +172,14 @@
   width: 40px;
   height: 22px;
   border-radius: 999px;
-  background: #e1e3ea;
+  background: var(--tint-neutral, #e1e3ea);
   position: relative;
   border: none;
   cursor: pointer;
 }
 
 .toggleOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .toggle::after {
@@ -190,7 +190,7 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
   transition: transform 0.15s ease;
 }
@@ -200,8 +200,8 @@
 }
 
 .gridCard {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 0.65rem 0.75rem 0.85rem;
 }
@@ -214,9 +214,9 @@
 
 .toolBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #f8f9fa;
-  color: #2c3e50;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--tint-neutral, #f8f9fa);
+  color: var(--tint-ink, #2c3e50);
   border-radius: 4px;
   font: inherit;
   font-size: 0.78rem;
@@ -226,7 +226,7 @@
 }
 
 .toolBtn:hover {
-  background: #eef2f7;
+  background: var(--tint-info, #eef2f7);
 }
 
 .yearScroll {
@@ -242,15 +242,15 @@
 
 .yearTable th,
 .yearTable td {
-  border: 1px solid #eef0f4;
+  border: 1px solid var(--tint-line, #eef0f4);
   padding: 2px;
   text-align: center;
   min-width: 28px;
 }
 
 .yearTable th {
-  background: #fafbfc;
-  color: #95a5a6;
+  background: var(--tint-neutral, #fafbfc);
+  color: var(--tint-ink-muted, #95a5a6);
   font-weight: 600;
 }
 
@@ -259,12 +259,12 @@
   padding-left: 0.45rem !important;
   white-space: nowrap;
   font-weight: 500;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   min-width: 90px !important;
 }
 
 .blank {
-  background: #fff;
+  background: var(--surface);
 }
 
 .cell {
@@ -282,11 +282,11 @@
 }
 
 .cellOff {
-  background: #f8d7da;
+  background: var(--tint-danger, #f8d7da);
   color: #842029;
 }
 
 .cellOn {
-  background: #fde2e4;
-  color: #2c3e50;
+  background: var(--tint-danger, #fde2e4);
+  color: var(--tint-ink, #2c3e50);
 }

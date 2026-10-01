@@ -22,16 +22,16 @@
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.55rem;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
 }
 
 .tabBtn,
 .tabBtnPrimary {
-  border: 1px solid #e4e6ef;
-  background: #f5f8fa;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--tint-neutral, #f5f8fa);
+  color: var(--tint-ink, #3f4254);
   border-radius: 6px;
   padding: 0.45rem 0.85rem;
   font: inherit;
@@ -43,18 +43,18 @@
 }
 
 .tabBtn:hover {
-  background: #eef3f7;
+  background: var(--tint-info, #eef3f7);
 }
 
 .tabBtnActive {
-  background: #0a85e2;
-  border-color: #0a85e2;
+  background: #2fa350;
+  border-color: #2fa350;
   color: #fff;
 }
 
 .tabBtnPrimary {
-  background: #0a85e2;
-  border-color: #0a85e2;
+  background: #2fa350;
+  border-color: #2fa350;
   color: #fff;
 }
 
@@ -67,8 +67,8 @@
 .filterPanel,
 .metaCard,
 .panel {
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -95,11 +95,11 @@
   flex-direction: column;
   gap: 0.3rem;
   font-size: 0.78rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .filterRow input {
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   padding: 0.4rem 0.55rem;
   font: inherit;
@@ -116,7 +116,7 @@
   align-items: flex-start;
   gap: 0.45rem;
   font-size: 0.82rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   line-height: 1.35;
 }
@@ -137,11 +137,11 @@
   margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .settingsGear {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 1rem;
 }
 
@@ -159,19 +159,19 @@
 }
 
 .settingsCard {
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .settingsHead {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
   padding: 0.55rem 0.75rem;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #3f4254;
-  border-bottom: 1px solid #e4e6ef;
+  color: var(--tint-ink, #3f4254);
+  border-bottom: 1px solid var(--tint-line, #e4e6ef);
 }
 
 .settingsBody {
@@ -185,7 +185,7 @@
   width: 34px;
   height: 18px;
   border-radius: 999px;
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
   position: relative;
   flex-shrink: 0;
   display: inline-block;
@@ -200,7 +200,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   transition: left 0.15s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
@@ -228,8 +228,8 @@
 
 /* —— HR HUB print/report sheet —— */
 .reportSheet {
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   padding: 1rem 1.15rem 1.35rem;
   display: flex;
@@ -242,7 +242,7 @@
   grid-template-columns: auto 1fr auto;
   gap: 0.75rem 1rem;
   align-items: center;
-  border-bottom: 1px solid #eef0f2;
+  border-bottom: 1px solid var(--tint-line, #eef0f2);
   padding-bottom: 0.75rem;
 }
 
@@ -250,14 +250,14 @@
   font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: 0.06em;
-  color: #1b2a4a;
+  color: var(--tint-ink, #1b2a4a);
 }
 
 .reportTitle {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   text-align: center;
   line-height: 1.35;
 }
@@ -268,9 +268,9 @@
 }
 
 .printBtn {
-  border: 1px solid #cfd3df;
-  background: #fff;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #cfd3df);
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   border-radius: 4px;
   padding: 0.4rem 0.7rem;
   font: inherit;
@@ -285,7 +285,7 @@
 }
 
 .printBtn:hover {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
 }
 
 .reportMeta {
@@ -293,16 +293,16 @@
   flex-wrap: wrap;
   gap: 0.35rem 1.25rem;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .reportMeta span {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .attWrap {
   overflow: auto;
-  border: 1px solid #d0d4dc;
+  border: 1px solid var(--tint-line, #d0d4dc);
 }
 
 .attTable {
@@ -314,58 +314,58 @@
 
 .attTable th,
 .attTable td {
-  border: 1px solid #d0d4dc;
+  border: 1px solid var(--tint-line, #d0d4dc);
   padding: 0.35rem 0.4rem;
   text-align: center;
   white-space: nowrap;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .attTable th {
-  background: #f7f8fa;
+  background: var(--tint-neutral, #f7f8fa);
   font-weight: 600;
   font-size: 0.72rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .factHead,
 .factCell {
-  background: #fff2cc !important;
+  background: var(--tint-warn, #fff2cc) !important;
 }
 
 .weekendRow td {
-  background: #e7f3ff;
+  background: var(--tint-info, #e7f3ff);
 }
 
 .dayOffCell {
   text-align: center !important;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .noShowCell {
-  background: #fce4ec !important;
+  background: var(--tint-danger, #fce4ec) !important;
   font-weight: 600;
   color: #c62828;
 }
 
 .dateLink {
-  color: #0a85e2 !important;
+  color: #2fa350 !important;
   font-weight: 600;
   text-align: left !important;
 }
 
 .totalRow td {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   font-weight: 600;
 }
 
 .panelHead {
   padding: 0.55rem 0.75rem;
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
   font-size: 0.8rem;
   font-weight: 600;
-  border-bottom: 1px solid #e4e6ef;
+  border-bottom: 1px solid var(--tint-line, #e4e6ef);
 }
 
 .table {
@@ -377,14 +377,14 @@
 .table th,
 .table td {
   padding: 0.55rem 0.7rem;
-  border-bottom: 1px solid #eff2f5;
+  border-bottom: 1px solid var(--tint-line, #eff2f5);
   text-align: left;
   white-space: nowrap;
 }
 
 .table th {
-  background: #fafbfc;
-  color: #7e8299;
+  background: var(--tint-neutral, #fafbfc);
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.72rem;
   font-weight: 600;
 }
@@ -398,7 +398,7 @@
 .legend {
   margin: 0;
   font-size: 0.78rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .summaryStrip {
@@ -408,8 +408,8 @@
 }
 
 .summaryStrip > div {
-  background: #f5f8fa;
-  border: 1px solid #e4e6ef;
+  background: var(--tint-neutral, #f5f8fa);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   padding: 0.55rem 0.75rem;
   min-width: 110px;
@@ -418,12 +418,12 @@
 .summaryStrip strong {
   display: block;
   font-size: 1.05rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .summaryStrip span {
   font-size: 0.72rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .muted {

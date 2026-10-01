@@ -21,6 +21,7 @@ import {
   type NavSectionId,
 } from '@/lib/nav-registry';
 import { findReport, rememberRecentReport } from '@/lib/reports-registry';
+import { SeasonalBackdrop } from '@/components/SeasonalBackdrop';
 import {
   filterNavItems,
   isHrefAllowed,
@@ -562,6 +563,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.shell}>
+      <SeasonalBackdrop mode="app" section={activeSectionId} />
       <a className={styles.skipLink} href="#main-content">
         К основному содержимому
       </a>

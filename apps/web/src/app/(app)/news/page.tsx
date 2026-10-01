@@ -28,11 +28,11 @@ type Birthday = {
 };
 
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #0a85e2, #6366f1)',
-  'linear-gradient(135deg, #0e9f6e, #0a85e2)',
+  'linear-gradient(135deg, #2fa350, #34a853)',
+  'linear-gradient(135deg, #2fa350, #2fa350)',
   'linear-gradient(135deg, #8b5cf6, #d946ef)',
   'linear-gradient(135deg, #f59e0b, #ef4444)',
-  'linear-gradient(135deg, #06b6d4, #0e9f6e)',
+  'linear-gradient(135deg, #6ccb86, #2fa350)',
   'linear-gradient(135deg, #f43f5e, #f59e0b)',
 ];
 

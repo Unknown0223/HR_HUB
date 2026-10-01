@@ -1,17 +1,14 @@
 /* Fact types list — Arena redesign */
 .wrap {
-  --canvas: #f3f6fb;
-  --surface: #ffffff;
-  --surface-subtle: #f2f5f9;
-  --ink-950: #0a1322;
-  --ink-900: #14213a;
-  --ink-700: #354862;
-  --ink-500: #64788f;
-  --ink-400: #8ca0b8;
-  --line: #e3e9f1;
-  --accent: #0a85e2;
-  --accent-soft: rgba(10, 133, 226, 0.08);
-  --st-ok: #0e9f6e;
+  --canvas: var(--bg);
+  --surface-subtle: var(--surface-muted);
+  --ink-950: var(--ink-strong);
+  --ink-900: var(--ink);
+  --ink-700: #3d5244;
+  --ink-500: var(--ink-muted);
+  --ink-400: var(--ink-faint);
+  --accent-soft: rgba(47, 163, 80, 0.08);
+  --st-ok: #2fa350;
   --st-ok-bg: #e8f7f0;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
   animation: fadeUp 0.22s ease both;
@@ -51,7 +48,7 @@
   appearance: none;
   border: 1px solid rgba(14, 159, 110, 0.5);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--st-ok);
   font: inherit;
   font-size: 12.5px;
@@ -93,15 +90,15 @@
   font: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
   outline: none;
   color: var(--ink-900);
 }
 
 .search:focus {
-  border-color: rgba(10, 133, 226, 0.5);
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: rgba(47, 163, 80, 0.5);
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .iconBtn {
@@ -112,7 +109,7 @@
   height: 36px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-500);
   cursor: pointer;
   font-size: 13px;
@@ -131,7 +128,7 @@
 
 .iconBtnActive {
   background: var(--accent-soft);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
   color: var(--accent);
 }
 
@@ -142,7 +139,7 @@
   padding: 0 10px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -157,8 +154,8 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(10, 133, 226, 0.25);
-  background: #edf6fe;
+  border: 1px solid rgba(47, 163, 80, 0.25);
+  background: var(--accent-soft);
 }
 
 .bulkMeta {
@@ -175,7 +172,7 @@
 .bulkBtn {
   appearance: none;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-700);
   font: inherit;
   font-size: 12.5px;
@@ -190,9 +187,9 @@
 }
 
 .bulkBtn:hover:not(:disabled) {
-  border-color: rgba(10, 133, 226, 0.4);
+  border-color: rgba(47, 163, 80, 0.4);
   color: var(--accent);
-  background: #fff;
+  background: var(--surface);
 }
 
 .bulkBtn:disabled {
@@ -203,7 +200,7 @@
 .bulkDanger {
   color: #b91c1c !important;
   border-color: #fecaca !important;
-  background: #fff1f2 !important;
+  background: var(--tint-danger, #fff1f2) !important;
 }
 
 .bulkGhost {
@@ -233,7 +230,7 @@
   margin: 0;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   color: #b91c1c;
   border: 1px solid #fecdd3;
   font-size: 13px;
@@ -243,7 +240,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
 }
 
@@ -261,7 +258,7 @@
 .table th,
 .table td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  border-bottom: 1px solid var(--tint-line, rgba(227, 233, 241, 0.7));
   text-align: left;
   vertical-align: middle;
 }
@@ -272,16 +269,16 @@
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--ink-400);
-  background: rgba(242, 245, 249, 0.65);
+  background: var(--tint-info, rgba(242, 245, 249, 0.65));
   white-space: nowrap;
 }
 
 .table tbody tr:hover:not(.actionsRow) td {
-  background: rgba(237, 246, 254, 0.4);
+  background: var(--tint-info, rgba(237, 246, 254, 0.4));
 }
 
 .rowSelected td {
-  background: rgba(237, 246, 254, 0.65) !important;
+  background: var(--tint-info, rgba(237, 246, 254, 0.65)) !important;
 }
 
 .checkCol {
@@ -361,7 +358,7 @@
   height: 1.55rem;
   padding: 0 0.65rem;
   border-radius: 999px;
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   color: #b91c1c;
   font-size: 11px;
   font-weight: 700;
@@ -384,7 +381,7 @@
 }
 
 .actionsRow td {
-  background: rgba(237, 246, 254, 0.55) !important;
+  background: var(--tint-info, rgba(237, 246, 254, 0.55)) !important;
   border-bottom: 1px solid var(--line) !important;
   padding: 10px 16px 14px !important;
 }
@@ -394,9 +391,9 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid rgba(10, 133, 226, 0.18);
+  border: 1px solid rgba(47, 163, 80, 0.18);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .rowActions button,
@@ -419,8 +416,8 @@
 
 .rowActions button:hover,
 .rowActions a:hover {
-  background: #edf6fe;
-  border-color: rgba(10, 133, 226, 0.35);
+  background: var(--accent-soft);
+  border-color: rgba(47, 163, 80, 0.35);
   color: var(--accent);
 }
 
@@ -432,11 +429,11 @@
 .danger {
   color: #b91c1c !important;
   border-color: #fecaca !important;
-  background: #fff1f2 !important;
+  background: var(--tint-danger, #fff1f2) !important;
 }
 
 .danger:hover {
-  background: #ffe4e6 !important;
+  background: var(--tint-danger, #ffe4e6) !important;
   color: #9f1239 !important;
 }
 
@@ -454,7 +451,7 @@
   gap: 12px;
   flex-wrap: wrap;
   border-top: 1px solid var(--line);
-  background: rgba(242, 245, 249, 0.4);
+  background: var(--tint-info, rgba(242, 245, 249, 0.4));
   padding: 12px 20px;
   font-size: 12.5px;
   color: var(--ink-500);

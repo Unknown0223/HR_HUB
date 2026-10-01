@@ -156,7 +156,7 @@ function punchBalloonHtml(p: TrackPunch, name: string) {
 export const TRACK_COLORS = [
   '#1f8f45',
   '#2563eb',
-  '#e11d48',
+  '#e5484d',
   '#475569',
   '#7c3aed',
   '#0891b2',

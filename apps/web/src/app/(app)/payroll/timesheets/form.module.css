@@ -16,7 +16,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -29,7 +29,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -47,9 +47,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -64,18 +64,18 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin: 0;
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.1rem 1.2rem;
 }
@@ -103,7 +103,7 @@
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.22rem;
 }
 
@@ -116,13 +116,13 @@
 .field textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input,
@@ -140,18 +140,18 @@
   height: 34px;
   display: flex;
   align-items: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font-size: 0.88rem;
-  color: #3f4254;
-  background: #fff;
+  color: var(--tint-ink, #3f4254);
+  background: var(--surface);
 }
 
 .tabs {
   display: flex;
   gap: 1.4rem;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   margin: 0.35rem 0 0.55rem;
 }
 
@@ -164,12 +164,12 @@
   font-size: 0.9rem;
   padding: 0.4rem 0 0.5rem;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .tabOn {
-  color: #0a85e2;
-  box-shadow: inset 0 -2px 0 #0a85e2;
+  color: #2fa350;
+  box-shadow: inset 0 -2px 0 #2fa350;
 }
 
 .lineBar {
@@ -191,9 +191,9 @@
 
 .btnGhost {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -230,7 +230,7 @@
 
 .search {
   height: 32px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
@@ -239,7 +239,7 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #eef0f4;
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 4px;
   max-height: 68vh;
 }
@@ -252,15 +252,15 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.4rem 0.5rem;
   text-align: left;
   white-space: nowrap;
 }
 
 .table th {
-  background: #f8f9fb;
-  color: #5e6278;
+  background: var(--tint-neutral, #f8f9fb);
+  color: var(--tint-ink-muted, #5e6278);
   font-weight: 650;
   position: sticky;
   top: 0;
@@ -270,27 +270,27 @@
 .sticky {
   position: sticky;
   left: 0;
-  background: #fff;
+  background: var(--surface);
   z-index: 2;
 }
 
 .weekend {
-  background: #fde8e8 !important;
+  background: var(--tint-danger, #fde8e8) !important;
 }
 
 .groupA td {
-  background: #f4f7fb;
+  background: var(--tint-info, #f4f7fb);
 }
 
 .groupB td {
-  background: #fff;
+  background: var(--surface);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   padding: 0.1rem 0.35rem;
   font-size: 0.78rem;
@@ -310,7 +310,7 @@
 .numInput {
   width: 4.2rem;
   height: 28px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 3px;
   padding: 0 0.25rem;
   font: inherit;
@@ -324,13 +324,13 @@
 
 .empty {
   text-align: center;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   padding: 2rem 1rem !important;
 }
 
 .picker {
   width: min(960px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
   max-height: 90vh;
@@ -343,7 +343,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.8rem 1rem;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
 }
 
 .pickerHead h2 {
@@ -364,7 +364,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 1.85rem 0 0.55rem;
   font: inherit;
@@ -389,8 +389,8 @@
   left: 0;
   right: 0;
   top: calc(100% + 2px);
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
   max-height: 220px;
   overflow: auto;
@@ -411,13 +411,13 @@
 }
 
 .optOn {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
 }
 
 .optEmpty {
   padding: 0.5rem 0.55rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .modalBackdrop {

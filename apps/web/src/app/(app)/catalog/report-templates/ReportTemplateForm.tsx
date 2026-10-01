@@ -419,7 +419,7 @@ export function ReportTemplateFormModal({
                     <span style={{ color: '#7e8299' }}>{`{{${v}}}`}</span>
                     <button
                       type="button"
-                      style={{ color: '#0a85e2' }}
+                      style={{ color: '#2fa350' }}
                       onClick={() => addVariable(v)}
                     >
                       Добавить

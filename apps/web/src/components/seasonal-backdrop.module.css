@@ -1,0 +1,154 @@
+.root {
+  pointer-events: none;
+  overflow: hidden;
+  --veil: rgba(241, 248, 241, 0.78);
+  --orb: rgba(47, 163, 80, 0.28);
+  --bit: #8fd4a4;
+}
+
+.login {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.spring {
+  --veil: rgba(255, 246, 250, 0.76);
+  --orb: rgba(244, 167, 193, 0.35);
+  --bit: #f4a7c1;
+}
+
+.summer {
+  --veil: rgba(241, 248, 241, 0.78);
+  --orb: rgba(47, 163, 80, 0.3);
+  --bit: #7ed695;
+}
+
+.autumn {
+  --veil: rgba(255, 247, 237, 0.76);
+  --orb: rgba(230, 150, 48, 0.32);
+  --bit: #e39b0b;
+}
+
+.winter {
+  --veil: rgba(244, 248, 252, 0.8);
+  --orb: rgba(160, 196, 220, 0.4);
+  --bit: #f7fbff;
+}
+
+.photo {
+  position: absolute;
+  inset: -28px -18px;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transform-origin: left center;
+  animation: seasonDrift 18s ease-in-out infinite alternate;
+}
+
+.orbs,
+.bits,
+.veil {
+  position: absolute;
+  inset: 0;
+}
+
+.orbs {
+  background:
+    radial-gradient(circle at 12% 70%, var(--orb), transparent 28%),
+    radial-gradient(circle at 88% 62%, var(--orb), transparent 26%),
+    radial-gradient(circle at 48% 100%, var(--orb), transparent 22%);
+  animation: orbPulse 14s ease-in-out infinite;
+}
+
+.bit {
+  position: absolute;
+  top: -12%;
+  left: calc(6% + var(--i) * 15%);
+  width: 9px;
+  height: 12px;
+  background: var(--bit);
+  border-radius: 80% 0 80% 0;
+  opacity: 0.75;
+  animation: seasonFall calc(12s + var(--i) * 1.6s) linear infinite;
+  animation-delay: calc(var(--i) * -2.1s);
+}
+
+.winter .bit {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.summer .bit {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  opacity: 0.45;
+}
+
+.login .veil {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 150px);
+}
+
+.app .veil {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--veil) 22%, transparent) 0,
+    color-mix(in srgb, var(--veil) 55%, transparent) 140px,
+    color-mix(in srgb, var(--veil) 68%, transparent) 100%
+  );
+}
+
+@keyframes seasonDrift {
+  from {
+    transform: translate(-8px, -12px) scale(1.04);
+  }
+  to {
+    transform: translate(10px, -6px) scale(1.08);
+  }
+}
+
+@keyframes orbPulse {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(12px, -10px, 0);
+  }
+}
+
+@keyframes seasonFall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate3d(28px, 110vh, 0) rotate(220deg);
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo,
+  .orbs,
+  .bit {
+    animation: none;
+  }
+}
+
+@media print {
+  .root {
+    display: none !important;
+  }
+}

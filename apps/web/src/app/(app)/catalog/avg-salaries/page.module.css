@@ -6,18 +6,18 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 1.85rem 0 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .searchInput:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -44,8 +44,8 @@
   top: calc(100% + 2px);
   max-height: 220px;
   overflow: auto;
-  background: #fff;
-  border: 1px solid #d1d5db;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
@@ -61,15 +61,15 @@
   background: transparent;
   font: inherit;
   font-size: 0.86rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   padding: 0.42rem 0.6rem;
   cursor: pointer;
 }
 
 .opt:hover,
 .optOn {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
 }
 
 .optEmpty {
@@ -85,7 +85,7 @@
 
 .sideName {
   font-weight: 650;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-size: 0.92rem;
   line-height: 1.3;
 }
@@ -97,13 +97,13 @@
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
-  background: #d1f7ea;
+  background: var(--tint-ok, #d1f7ea);
   color: #0d9488;
 }
 
 .badgeOff {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .historyTools {

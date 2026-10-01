@@ -24,12 +24,12 @@
 }
 
 .btnGhost {
-  background: #eef0f4;
-  color: #3f4254;
+  background: var(--tint-neutral, #eef0f4);
+  color: var(--tint-ink, #3f4254);
 }
 
 .btnPrimary {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
@@ -40,8 +40,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 10px;
   padding: 1.25rem 1rem;
   display: flex;
@@ -58,7 +58,7 @@
   height: 88px;
   border-radius: 50%;
   object-fit: cover;
-  background: #e5e7eb;
+  background: var(--tint-neutral, #e5e7eb);
 }
 
 .card h3 {
@@ -75,7 +75,7 @@
 .pos {
   margin: 0;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-transform: uppercase;
 }
 
@@ -90,23 +90,23 @@
 }
 
 .badgeIn {
-  background: #d7f1ff;
-  color: #187de4;
+  background: var(--tint-info, #d7f1ff);
+  color: #268a42;
 }
 
 .badgeOut {
-  background: #ffe2e5;
+  background: var(--tint-danger, #ffe2e5);
   color: #f1416c;
 }
 
 .badgeMark {
-  background: #fff4de;
+  background: var(--tint-warn, #fff4de);
   color: #b78103;
 }
 
 .card time {
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   font-variant-numeric: tabular-nums;
 }
 

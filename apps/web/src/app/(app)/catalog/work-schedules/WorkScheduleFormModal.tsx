@@ -151,7 +151,7 @@ export function WorkScheduleFormModal({
     >
       {error ? <p className={modal.error}>{error}</p> : null}
       {loading ? (
-        <p style={{ color: '#64788f', fontSize: 13 }}>Загрузка…</p>
+        <p style={{ color: '#5e6f62', fontSize: 13 }}>Загрузка…</p>
       ) : (
         <div className={modal.fields}>
           <label className={modal.field}>
@@ -223,7 +223,7 @@ export function WorkScheduleFormModal({
             </label>
           </div>
 
-          <p style={{ color: '#64788f', fontSize: 13, margin: 0 }}>
+          <p style={{ color: '#5e6f62', fontSize: 13, margin: 0 }}>
             Годовой календарь и расширенные настройки — в карточке графика («Сохранить и
             открыть»).
           </p>

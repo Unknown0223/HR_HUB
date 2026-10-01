@@ -1,24 +1,19 @@
 /* Device detail — redesign (Arena tokens) */
 .page {
-  --canvas: #f3f6fb;
-  --surface: #ffffff;
-  --surface-subtle: #f2f5f9;
-  --ink-950: #0a1322;
-  --ink-900: #14213a;
-  --ink-700: #354862;
-  --ink-500: #64788f;
-  --ink-400: #8ca0b8;
-  --line: #e3e9f1;
-  --accent: #0a85e2;
-  --accent-hover: #0770c2;
-  --st-online: #0e9f6e;
+  --canvas: var(--bg);
+  --surface-subtle: var(--surface-muted);
+  --ink-950: var(--ink-strong);
+  --ink-900: var(--ink);
+  --ink-700: #3d5244;
+  --ink-500: var(--ink-muted);
+  --ink-400: var(--ink-faint);
+  --st-online: #2fa350;
   --st-online-bg: #e8f7f0;
-  --st-offline: #e11d48;
+  --st-offline: #e5484d;
   --st-offline-bg: #fdecef;
-  --st-warn: #d97706;
+  --st-warn: #e39b0b;
   --st-warn-bg: #fcf1e1;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
-  --radius: 14px;
   max-width: 1760px;
   margin: 0 auto;
   padding: 8px 0 48px;
@@ -46,8 +41,8 @@
   height: 44px;
   border-radius: 12px;
   color: #fff;
-  background: linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%);
-  box-shadow: 0 8px 20px -6px rgba(10, 133, 226, 0.45);
+  background: linear-gradient(135deg, #2fa350 0%, #2fa350 100%);
+  box-shadow: 0 8px 20px -6px rgba(47, 163, 80, 0.45);
   flex-shrink: 0;
 }
 
@@ -81,7 +76,7 @@
 .btnPrimary {
   appearance: none;
   border: none;
-  background: linear-gradient(180deg, #0a85e2, #0770c2);
+  background: linear-gradient(180deg, #2fa350, #268a42);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
@@ -89,7 +84,7 @@
   height: 40px;
   border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 4px 14px -4px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 4px 14px -4px rgba(47, 163, 80, 0.55);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -118,7 +113,7 @@
 .btnGhost {
   appearance: none;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-700);
   font-weight: 600;
   font-size: 13px;
@@ -272,7 +267,7 @@
 }
 
 .navItemActive {
-  background: rgba(10, 133, 226, 0.1);
+  background: rgba(47, 163, 80, 0.1);
   color: var(--accent);
   font-weight: 700;
 }
@@ -297,7 +292,7 @@
 
 /* ─── Info grid ─── */
 .lockBanner {
-  background: #fffbeb;
+  background: var(--tint-warn, #fffbeb);
   border: 1px solid #fcd34d;
   color: #92400e;
   font-size: 13px;
@@ -332,7 +327,7 @@
   padding: 0 12px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 14px;
   font-weight: 650;
@@ -402,7 +397,7 @@
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: #f8fafc;
+  background: var(--tint-neutral, #f8fafc);
 }
 
 .credAuditTitle {
@@ -464,13 +459,13 @@
   border-radius: 12px;
   padding: 0 14px;
   font-size: 13px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
   outline: none;
 }
 .search:focus {
-  border-color: rgba(10, 133, 226, 0.5);
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: rgba(47, 163, 80, 0.5);
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .scopeTabs {
@@ -482,7 +477,7 @@
 .scopeTabActive {
   appearance: none;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-500);
   font-size: 13px;
   font-weight: 600;
@@ -498,7 +493,7 @@
 
 /* ─── Table ─── */
 .panel {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 14px;
   overflow: hidden;
@@ -518,7 +513,7 @@
 .table th {
   text-align: left;
   padding: 12px 16px;
-  background: rgba(242, 245, 249, 0.65);
+  background: var(--tint-info, rgba(242, 245, 249, 0.65));
   color: var(--ink-400);
   font-weight: 700;
   border-bottom: 1px solid var(--line);
@@ -530,13 +525,13 @@
 
 .table td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  border-bottom: 1px solid var(--tint-line, rgba(227, 233, 241, 0.7));
   color: var(--ink-900);
   vertical-align: middle;
 }
 
 .table tbody tr:hover td {
-  background: rgba(237, 246, 254, 0.35);
+  background: var(--tint-info, rgba(237, 246, 254, 0.35));
 }
 
 .avatar {
@@ -567,7 +562,7 @@
   font-size: 13px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   border: 1px solid #fecdd3;
 }
 
@@ -596,7 +591,7 @@
 .btnRetry {
   appearance: none;
   border: 1px solid #fecdd3;
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   color: #9f1239;
   font: inherit;
   font-size: 13px;
@@ -607,7 +602,7 @@
 }
 
 .btnRetry:hover:not(:disabled) {
-  background: #ffe4e6;
+  background: var(--tint-danger, #ffe4e6);
 }
 
 .btnRetry:disabled {
@@ -644,7 +639,7 @@
   width: 100%;
   text-align: left;
   border: 1px solid #fecdd3;
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   padding: 8px 10px;
   cursor: pointer;
@@ -654,7 +649,7 @@
 }
 
 .syncFailItemBtn:hover:not(:disabled) {
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
 }
 
 .syncFailItemBtn:disabled {
@@ -678,7 +673,7 @@
   margin: 0 0 12px;
   font-size: 12px;
   line-height: 1.4;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
 }
 
 .confirmActionsCol {
@@ -691,7 +686,7 @@
   appearance: none;
   border: 0;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -715,7 +710,7 @@
   font-size: 13px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #eef6ff;
+  background: var(--tint-info, #eef6ff);
   border: 1px solid #c7e0ff;
 }
 
@@ -723,23 +718,23 @@
   margin: 0 0 14px;
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid #dbe7f5;
-  background: #f7fbff;
+  border: 1px solid var(--tint-line, #dbe7f5);
+  background: var(--tint-neutral, #f7fbff);
 }
 
 .syncPanelActive {
   border-color: #9ec5f0;
-  background: linear-gradient(180deg, #f3f9ff 0%, #eaf3ff 100%);
+  background: linear-gradient(180deg, var(--tint-neutral, #f3f9ff) 0%, var(--tint-info, #eaf3ff) 100%);
 }
 
 .syncPanelDone {
-  border-color: #b7e4c7;
-  background: #f3fbf6;
+  border-color: var(--tint-line, #b7e4c7);
+  background: var(--tint-ok, #f3fbf6);
 }
 
 .syncPanelWarn {
   border-color: #f2d19b;
-  background: #fff8ec;
+  background: var(--tint-warn, #fff8ec);
 }
 
 .syncPanelHead {
@@ -763,28 +758,28 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #0a85e2;
-  box-shadow: 0 0 0 0 rgba(10, 133, 226, 0.55);
+  background: #2fa350;
+  box-shadow: 0 0 0 0 rgba(47, 163, 80, 0.55);
   animation: syncPulse 1.4s ease-out infinite;
 }
 
 @keyframes syncPulse {
-  0% { box-shadow: 0 0 0 0 rgba(10, 133, 226, 0.45); }
-  70% { box-shadow: 0 0 0 10px rgba(10, 133, 226, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(10, 133, 226, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(47, 163, 80, 0.45); }
+  70% { box-shadow: 0 0 0 10px rgba(47, 163, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(47, 163, 80, 0); }
 }
 
 .syncPanelMsg {
   margin-top: 4px;
   font-size: 13px;
-  color: #4a6078;
+  color: var(--tint-ink-muted, #4a6078);
   line-height: 1.35;
 }
 
 .syncPanelPct {
   font-size: 18px;
   font-weight: 700;
-  color: #0a85e2;
+  color: #2fa350;
   min-width: 52px;
   text-align: right;
 }
@@ -792,19 +787,19 @@
 .syncBar {
   height: 8px;
   border-radius: 999px;
-  background: #e4edf7;
+  background: var(--tint-info, #e4edf7);
   overflow: hidden;
 }
 
 .syncBarFill {
   height: 100%;
   border-radius: 999px;
-  background: #0a85e2;
+  background: #2fa350;
   transition: width 0.35s ease;
 }
 
 .syncBarFillActive {
-  background: linear-gradient(90deg, #0a85e2, #3aa0ef, #0a85e2);
+  background: linear-gradient(90deg, #2fa350, #3aa0ef, #2fa350);
   background-size: 200% 100%;
   animation: syncShimmer 1.6s linear infinite;
 }
@@ -820,7 +815,7 @@
   gap: 10px 18px;
   margin-top: 10px;
   font-size: 12px;
-  color: #5a7088;
+  color: var(--tint-ink-muted, #5a7088);
 }
 
 .syncStats strong {
@@ -831,7 +826,7 @@
 .syncCurrent {
   margin-top: 8px;
   font-size: 12px;
-  color: #334e68;
+  color: var(--tint-ink-muted, #334e68);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -845,7 +840,7 @@
   gap: 10px;
   padding: 12px 14px;
   border-top: 1px solid var(--line, #e6ebf2);
-  background: #fafbfd;
+  background: var(--tint-neutral, #fafbfd);
 }
 
 .listFooter p {
@@ -867,7 +862,7 @@
   padding: 0 10px;
   border-radius: 10px;
   border: 1px solid var(--line, #e6ebf2);
-  background: #fff;
+  background: var(--surface);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -883,7 +878,7 @@
   height: 36px;
   border: 1px solid var(--line, #e6ebf2);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-700, #334e68);
   cursor: pointer;
   font-size: 16px;
@@ -892,8 +887,8 @@
 }
 
 .pagerBtn:hover:not(:disabled) {
-  border-color: rgba(10, 133, 226, 0.4);
-  color: #0a85e2;
+  border-color: rgba(47, 163, 80, 0.4);
+  color: #2fa350;
 }
 
 .pagerBtn:disabled {
@@ -909,7 +904,7 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 700;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-700, #334e68);
   outline: none;
   cursor: pointer;
@@ -978,7 +973,7 @@
 }
 
 .confirmBox {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   padding: 24px 28px;
   width: min(380px, 100%);

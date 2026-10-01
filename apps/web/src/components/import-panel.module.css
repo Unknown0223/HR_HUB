@@ -8,7 +8,7 @@
 }
 
 .drop {
-  border: 1px dashed #d2ddec;
+  border: 1px dashed var(--tint-line, #d2ddec);
   border-radius: var(--radius);
   padding: 1.15rem;
   text-align: center;

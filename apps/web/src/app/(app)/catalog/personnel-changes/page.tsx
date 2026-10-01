@@ -55,9 +55,9 @@ type Dashboard = {
   tenure: DualCount[];
 };
 
-const BLUE = '#0a85e2';
+const BLUE = '#2fa350';
 const BLUE_LIGHT = '#9dc9f2';
-const ORANGE = '#d97706';
+const ORANGE = '#e39b0b';
 
 function fmt(n: number, digits = 0) {
   if (!Number.isFinite(n)) return '0';

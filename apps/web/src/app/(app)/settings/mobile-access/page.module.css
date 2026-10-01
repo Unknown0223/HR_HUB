@@ -6,45 +6,45 @@
 }
 
 .iconBadge {
-  background: linear-gradient(135deg, #0a85e2 0%, #0a85e2 100%);
+  background: linear-gradient(135deg, #2fa350 0%, #2fa350 100%);
 }
 
 .cardTitle {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--tint-ink, #0f172a);
 }
 
 .input {
   height: 36px;
   padding: 0 0.65rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--tint-line, #cbd5e1);
   border-radius: 8px;
   font-size: 0.9rem;
-  background: #fff;
+  background: var(--surface);
   min-width: 0;
   flex: 1;
 }
 
 .input:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.15);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.15);
 }
 
 .input:disabled {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--tint-info, #f1f5f9);
+  color: var(--tint-ink-muted, #475569);
 }
 
 .howTo {
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
+  background: var(--tint-neutral, #f8fafc);
+  border: 1px dashed var(--tint-line, #cbd5e1);
   border-radius: 10px;
   padding: 0.75rem 1rem;
   font-size: 0.88rem;
-  color: #334155;
+  color: var(--tint-ink, #334155);
 }
 
 .howTo ol {
@@ -57,12 +57,12 @@
 
 .howToTitle {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--tint-ink, #0f172a);
 }
 
 .muted {
   margin: 0;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
   font-size: 0.88rem;
 }
 
@@ -82,7 +82,7 @@
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border: 1px solid #a7f3d0;
   border-radius: 12px;
   padding: 0.9rem 1.1rem;
@@ -120,8 +120,8 @@
 }
 
 .tableWrap {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e2e8f0);
   border-radius: 12px;
   overflow: auto;
 }
@@ -135,27 +135,27 @@
 .table th {
   text-align: left;
   font-weight: 600;
-  color: #475569;
-  background: #f8fafc;
+  color: var(--tint-ink-muted, #475569);
+  background: var(--tint-neutral, #f8fafc);
   padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--tint-line, #e2e8f0);
   white-space: nowrap;
 }
 
 .table td {
   padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--tint-line, #f1f5f9);
   vertical-align: middle;
 }
 
 .name {
-  color: #0f172a;
+  color: var(--tint-ink, #0f172a);
   font-weight: 600;
   text-decoration: none;
 }
 
 .name:hover {
-  color: #0a85e2;
+  color: #2fa350;
 }
 
 .mono {
@@ -172,18 +172,18 @@
 }
 
 .pillOk {
-  background: #dcfce7;
+  background: var(--tint-ok, #dcfce7);
   color: #166534;
 }
 
 .pillBlocked {
-  background: #fee2e2;
+  background: var(--tint-danger, #fee2e2);
   color: #991b1b;
 }
 
 .pillNone {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--tint-info, #f1f5f9);
+  color: var(--tint-ink-muted, #64748b);
 }
 
 .actions {
@@ -209,7 +209,7 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--surface);
   border-radius: 14px;
   width: min(460px, 100%);
   padding: 1.25rem;
@@ -223,7 +223,7 @@
   margin-top: 0.6rem;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--tint-ink, #334155);
 }
 
 .modal > .input {

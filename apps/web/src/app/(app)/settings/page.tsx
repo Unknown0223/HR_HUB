@@ -1184,7 +1184,7 @@ export default function SettingsPage() {
                 {orgBusy ? 'Сохранение…' : 'Сохранить'}
               </button>
               {orgInfo ? (
-                <span style={{ color: '#0e9f6e', fontSize: '0.875rem' }}>{orgInfo}</span>
+                <span style={{ color: '#2fa350', fontSize: '0.875rem' }}>{orgInfo}</span>
               ) : null}
             </div>
           </form>

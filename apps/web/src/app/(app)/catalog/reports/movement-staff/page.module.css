@@ -13,16 +13,16 @@
   gap: 0.5rem;
   align-items: flex-start;
   padding: 0.5rem 0.6rem;
-  border: 1px solid #eef0f4;
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
   cursor: pointer;
 }
 
 .check input {
   margin-top: 0.18rem;
   flex: 0 0 auto;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .checkBody {
@@ -35,7 +35,7 @@
 .checkTitle {
   font-size: 0.86rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   line-height: 1.3;
 }
 
@@ -71,8 +71,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #fff;
-  border: 1px solid #d1d5db;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
   padding: 0.35rem 0.4rem 0.4rem;
@@ -84,18 +84,18 @@
   gap: 0.45rem;
   width: 100%;
   font-size: 0.82rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   padding: 0.32rem 0.55rem;
   cursor: pointer;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
 }
 
 .checkRow:hover {
-  background: #eef6ff;
+  background: var(--tint-info, #eef6ff);
 }
 
 .checkRow input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .dropHeadEmp,
@@ -107,29 +107,29 @@
 }
 
 .dropHeadEmp {
-  background: #f4f6f9;
+  background: var(--tint-neutral, #f4f6f9);
   font-size: 0.72rem;
   font-weight: 700;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   padding: 0.38rem 0.55rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--tint-line, #e5e7eb);
 }
 
 .checkRowEmp {
   width: 100%;
   font-size: 0.82rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   padding: 0.32rem 0.55rem;
   cursor: pointer;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
 }
 
 .checkRowEmp:hover {
-  background: #eef6ff;
+  background: var(--tint-info, #eef6ff);
 }
 
 .checkRowEmp input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 /* Not a <table> — globals.css `table { width: 100% }` must not stretch this. */
@@ -137,9 +137,9 @@
   display: table;
   width: auto;
   max-width: 100%;
-  border: 1px solid #cfd3da;
+  border: 1px solid var(--tint-line, #cfd3da);
   margin: 0 0 1.15rem;
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -154,19 +154,19 @@
   display: table-cell;
   padding: 0.4rem 1.15rem;
   font-size: 0.84rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   text-align: center;
   white-space: nowrap;
 }
 
 .kpiHead > span {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
   font-weight: 600;
-  border-bottom: 1px solid #cfd3da;
+  border-bottom: 1px solid var(--tint-line, #cfd3da);
 }
 
 .kpiVal > span {
-  background: #fff;
+  background: var(--surface);
   font-variant-numeric: tabular-nums;
 }
 
@@ -176,9 +176,9 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -187,17 +187,17 @@
   border-collapse: separate !important;
   border-spacing: 0 !important;
   font-size: 0.78rem !important;
-  background: #fff !important;
-  color: #181c32 !important;
+  background: var(--surface) !important;
+  color: var(--tint-ink, #181c32) !important;
 }
 
 .table :global(th),
 .table :global(td) {
   border: none !important;
-  border-bottom: 1px solid #e8eef5 !important;
-  border-right: 1px solid #eef2f7 !important;
+  border-bottom: 1px solid var(--tint-line, #e8eef5) !important;
+  border-right: 1px solid var(--tint-line, #eef2f7) !important;
   padding: 0.28rem 0.45rem !important;
-  color: #181c32 !important;
+  color: var(--tint-ink, #181c32) !important;
   vertical-align: middle !important;
   white-space: nowrap !important;
   word-break: normal !important;
@@ -220,14 +220,14 @@
   position: sticky !important;
   top: 0 !important;
   z-index: 2 !important;
-  background: #f2f5f9 !important;
+  background: var(--surface-muted) !important;
   font-weight: 700 !important;
-  color: #354862 !important;
-  box-shadow: 0 1px 0 #e3e9f1 !important;
+  color: var(--tint-ink, #3d5244) !important;
+  box-shadow: 0 1px 0 var(--line) !important;
 }
 
 .table :global(thead tr:first-child th) {
-  background: #edf0f5 !important;
+  background: var(--tint-neutral, #edf0f5) !important;
   font-weight: 600 !important;
   font-size: 0.84rem !important;
   text-align: left !important;
@@ -236,7 +236,7 @@
 
 .table :global(thead tr:last-child th) {
   top: 2.35rem !important;
-  background: #f2f5f9 !important;
+  background: var(--surface-muted) !important;
   font-weight: 600 !important;
   font-size: 0.78rem !important;
   text-align: center !important;
@@ -244,11 +244,11 @@
 
 .table :global(tbody tr:nth-child(odd)),
 .table :global(tbody tr:nth-child(even)) {
-  background: #fff !important;
+  background: var(--surface) !important;
 }
 
 .table :global(tbody td) {
-  background: #fff !important;
+  background: var(--surface) !important;
   text-align: left !important;
 }
 

@@ -42,9 +42,9 @@
 }
 
 .btnGhost {
-  background: #fff;
-  border: 1px solid #e2e5ec;
-  color: #3f4254;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e2e5ec);
+  color: var(--tint-ink, #3f4254);
 }
 
 .layout {
@@ -61,8 +61,8 @@
 }
 
 .sidebar {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 0.85rem;
   display: flex;
@@ -76,7 +76,7 @@
   aspect-ratio: 1;
   border-radius: 8px;
   object-fit: cover;
-  background: #e5e7eb;
+  background: var(--tint-neutral, #e5e7eb);
 }
 
 .photoEmpty {
@@ -89,7 +89,7 @@
 .sideTitle {
   font-size: 0.82rem;
   font-weight: 650;
-  color: #111827;
+  color: var(--tint-ink, #111827);
   line-height: 1.35;
 }
 
@@ -114,22 +114,22 @@
 
 .badgeInfo,
 .badgeType {
-  background: #e1f0ff;
-  color: #187de4;
+  background: var(--tint-info, #e1f0ff);
+  color: #268a42;
 }
 
 .badgeOk {
-  background: #c9f7f5;
+  background: var(--tint-info, #c9f7f5);
   color: #0d9488;
 }
 
 .badgeBad {
-  background: #ffe2e5;
+  background: var(--tint-danger, #ffe2e5);
   color: #f1416c;
 }
 
 .badgeWarn {
-  background: #ffedd5;
+  background: var(--tint-warn, #ffedd5);
   color: #c2410c;
 }
 
@@ -154,18 +154,18 @@
   font-size: 0.84rem;
   cursor: pointer;
   background: transparent;
-  color: #374151;
+  color: var(--tint-ink, #374151);
 }
 
 .sideActive {
-  background: #e1f0ff;
-  color: #187de4;
+  background: var(--tint-info, #e1f0ff);
+  color: #268a42;
   font-weight: 600;
 }
 
 .main {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1rem;
   display: flex;
@@ -184,15 +184,15 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.72rem;
-  color: #6b7280;
-  border-bottom: 1px solid #eef0f4;
+  color: var(--tint-ink-muted, #6b7280);
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding-bottom: 0.35rem;
 }
 
 .fields b,
 .fields a {
   font-size: 0.9rem;
-  color: #111827;
+  color: var(--tint-ink, #111827);
   font-weight: 600;
   text-decoration: none;
 }
@@ -202,7 +202,7 @@
 }
 
 .mapWrap {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   overflow: hidden;
   min-height: 320px;
@@ -219,12 +219,12 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 0.65rem;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .audit b {
   display: block;
-  color: #111827;
+  color: var(--tint-ink, #111827);
   font-size: 0.85rem;
   margin-top: 0.2rem;
 }
@@ -249,7 +249,7 @@
 }
 
 .histToolbar input {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
@@ -264,13 +264,13 @@
 .table th,
 .table td {
   padding: 0.55rem 0.6rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
   text-align: left;
 }
 
 .table th {
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--tint-neutral, #f9fafb);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .empty {
@@ -285,7 +285,7 @@
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .modalBackdrop {
@@ -301,7 +301,7 @@
 
 .modal {
   width: min(720px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   padding: 1rem 1.1rem;
   margin: auto;

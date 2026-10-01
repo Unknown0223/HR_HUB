@@ -3,14 +3,14 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.86rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   cursor: pointer;
 }
 
 .check input {
   width: 16px;
   height: 16px;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   margin: 0;
 }
 
@@ -18,5 +18,5 @@
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.45;
-  color: #8ca0b8;
+  color: var(--ink-faint);
 }

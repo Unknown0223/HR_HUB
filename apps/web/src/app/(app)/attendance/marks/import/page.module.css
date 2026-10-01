@@ -39,19 +39,19 @@
 }
 
 .btnPrimary {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .btnBlue {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .btnGhost {
-  background: #fff;
-  border: 1px solid #e2e5ec;
-  color: #3f4254;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e2e5ec);
+  color: var(--tint-ink, #3f4254);
 }
 
 .topGrid {
@@ -67,8 +67,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 0.85rem;
   display: flex;
@@ -89,7 +89,7 @@
 }
 
 .cardHead input {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   padding: 0.35rem 0.55rem;
   font-size: 0.85rem;
@@ -97,12 +97,12 @@
 
 .drop {
   appearance: none;
-  border: 2px dashed #cbd5e1;
-  background: #f8fafc;
+  border: 2px dashed var(--tint-line, #cbd5e1);
+  background: var(--tint-neutral, #f8fafc);
   border-radius: 8px;
   min-height: 140px;
   padding: 1rem;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -120,14 +120,14 @@
 .table th,
 .table td {
   padding: 0.45rem 0.55rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
   text-align: left;
   vertical-align: middle;
 }
 
 .table th {
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--tint-neutral, #f9fafb);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .thumb,
@@ -136,7 +136,7 @@
   height: 36px;
   border-radius: 6px;
   object-fit: cover;
-  background: #e5e7eb;
+  background: var(--tint-neutral, #e5e7eb);
   display: inline-block;
 }
 
@@ -157,7 +157,7 @@
 }
 
 .search {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   padding: 0.35rem 0.55rem;
   font-size: 0.85rem;
@@ -168,8 +168,8 @@
   display: grid;
   grid-template-columns: 1fr 240px;
   gap: 1rem;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1rem;
 }
@@ -196,7 +196,7 @@
 
 .mapRow input,
 .startRow input {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   padding: 0.4rem 0.5rem;
 }

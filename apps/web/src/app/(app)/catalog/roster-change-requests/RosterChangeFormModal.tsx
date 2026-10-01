@@ -330,7 +330,7 @@ export function RosterChangeFormModal({
                 appearance: 'none',
                 border: 'none',
                 background: 'none',
-                color: '#0a85e2',
+                color: '#2fa350',
                 cursor: 'pointer',
                 padding: 0,
                 font: 'inherit',

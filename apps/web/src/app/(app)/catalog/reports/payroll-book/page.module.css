@@ -17,10 +17,10 @@
   gap: 0.45rem;
   width: 100%;
   min-height: 36px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   font: inherit;
   font-size: 0.88rem;
   text-align: left;
@@ -31,7 +31,7 @@
 
 .monthBtn:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -45,8 +45,8 @@
   top: calc(100% + 4px);
   left: 0;
   width: 280px;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
   padding: 0.55rem;
@@ -58,14 +58,14 @@
   justify-content: space-between;
   margin-bottom: 0.45rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .monthYear button {
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font-size: 1.1rem;
   cursor: pointer;
   padding: 0.15rem 0.4rem;
@@ -80,8 +80,8 @@
 .monthCell {
   appearance: none;
   border: none;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   border-radius: 4px;
   padding: 0.45rem 0.2rem;
   font: inherit;
@@ -90,44 +90,44 @@
 }
 
 .monthCell:hover {
-  background: #f3f6f9;
+  background: var(--tint-neutral, #f3f6f9);
 }
 
 .monthOn {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .monthOn:hover {
-  background: #187de4;
+  background: #268a42;
   color: #fff;
 }
 
 .periodLine {
   margin: 0 0 0.55rem;
   font-size: 0.88rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .tableWrap {
   overflow: auto;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   max-height: calc(100vh - 220px);
 }
 
 .table {
   border-collapse: collapse;
   font-size: 0.68rem;
-  background: #fff;
+  background: var(--surface);
   min-width: 2200px;
 }
 
 .table th,
 .table td {
-  border: 1px solid #cfd3da;
+  border: 1px solid var(--tint-line, #cfd3da);
   padding: 0.2rem 0.28rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   white-space: nowrap;
   text-align: center;
   vertical-align: middle;
@@ -140,7 +140,7 @@
 }
 
 .table tbody tr:nth-child(even) td {
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
 }
 
 .name {

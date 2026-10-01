@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Nunito } from 'next/font/google';
 import { DeferredIconStyles } from '@/components/DeferredIconStyles';
 import { Providers } from '@/components/Providers';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
 import './theme-dark.css';
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ['latin', 'latin-ext'],
+const nunito = Nunito({
+  subsets: ['latin', 'latin-ext', 'cyrillic'],
   display: 'swap',
-  variable: '--font-plus-jakarta',
-  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-nunito',
+  weight: ['400', '500', '600', '700', '800', '900'],
 });
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#f3f6fb',
+  themeColor: '#f1f8f1',
 };
 
 export default function RootLayout({
@@ -31,13 +31,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="uz" className={plusJakarta.variable} suppressHydrationWarning>
+    <html lang="uz" className={nunito.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="" />
         <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
       </head>
-      <body className={plusJakarta.className}>
+      <body className={nunito.className}>
         <DeferredIconStyles />
         <Providers>{children}</Providers>
       </body>

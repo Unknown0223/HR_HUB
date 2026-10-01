@@ -20,7 +20,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }
 
 .actions {
@@ -31,7 +31,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -46,9 +46,9 @@
 
 .btnClose {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -64,28 +64,28 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
 .ok {
   margin: 0;
   padding: 0.45rem 0.7rem;
-  color: #0a85e2;
-  background: #eef6ff;
+  color: #2fa350;
+  background: var(--tint-info, #eef6ff);
   border-radius: 4px;
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .formLayout {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.1rem 1.25rem;
 }
@@ -105,7 +105,7 @@
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.2rem;
 }
 
@@ -118,7 +118,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
@@ -127,7 +127,7 @@
 
 .fieldValue {
   font-size: 0.9rem;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   min-height: 1.35em;
 }
 
@@ -137,7 +137,7 @@
   gap: 0.4rem;
   font-size: 0.85rem;
   line-height: 1.35;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   max-width: 100%;
 }
@@ -147,7 +147,7 @@
   height: 1rem;
   margin: 0.12rem 0 0;
   flex-shrink: 0;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   cursor: pointer;
 }
 
@@ -170,21 +170,21 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .radio input {
   margin: 0;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   flex-shrink: 0;
 }
 
 .fieldLabel {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.35rem;
 }
 
@@ -200,7 +200,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.85rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
 }
 
@@ -209,7 +209,7 @@
   width: 40px;
   height: 22px;
   border-radius: 999px;
-  background: #e1e3ea;
+  background: var(--tint-neutral, #e1e3ea);
   position: relative;
   border: none;
   cursor: pointer;
@@ -218,7 +218,7 @@
 }
 
 .toggleOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .toggle::after {
@@ -229,7 +229,7 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   transition: transform 0.15s ease;
 }
 
@@ -250,8 +250,8 @@
 }
 
 .side {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 0.9rem 1rem;
 }
@@ -274,24 +274,24 @@
   font-size: 0.85rem;
   padding: 0.45rem 0.55rem;
   border-radius: 4px;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-decoration: none;
 }
 
 a.sideLink:hover {
-  color: #0a85e2;
-  background: #f8fafc;
+  color: #2fa350;
+  background: var(--tint-neutral, #f8fafc);
 }
 
 .sideLinkActive {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
   font-weight: 600;
 }
 
 .main {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1rem 1.15rem;
 }
@@ -312,11 +312,11 @@ a.sideLink:hover {
 }
 
 .badgeOk {
-  background: #e1f0ff;
-  color: #0a85e2;
+  background: var(--tint-info, #e1f0ff);
+  color: #2fa350;
 }
 
 .badgeMuted {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }

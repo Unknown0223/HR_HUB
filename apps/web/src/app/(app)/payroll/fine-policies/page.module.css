@@ -1,17 +1,14 @@
 /* Политики штрафов — Arena redesign (list) + form bits kept for /[id]/edit */
 .wrap {
-  --canvas: #f3f6fb;
-  --surface: #ffffff;
-  --surface-subtle: #f2f5f9;
-  --ink-950: #0a1322;
-  --ink-900: #14213a;
-  --ink-700: #354862;
-  --ink-500: #64788f;
-  --ink-400: #8ca0b8;
-  --line: #e3e9f1;
-  --accent: #0a85e2;
-  --accent-soft: rgba(10, 133, 226, 0.08);
-  --st-ok: #0e9f6e;
+  --canvas: var(--bg);
+  --surface-subtle: var(--surface-muted);
+  --ink-950: var(--ink-strong);
+  --ink-900: var(--ink);
+  --ink-700: #3d5244;
+  --ink-500: var(--ink-muted);
+  --ink-400: var(--ink-faint);
+  --accent-soft: rgba(47, 163, 80, 0.08);
+  --st-ok: #2fa350;
   --st-ok-bg: #e8f7f0;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
   animation: fadeUp 0.22s ease both;
@@ -39,7 +36,7 @@
   padding: 4px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
 }
 
@@ -71,7 +68,7 @@
 .tabOn {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px -2px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 2px 8px -2px rgba(47, 163, 80, 0.55);
 }
 
 .sortMark {
@@ -115,7 +112,7 @@
   appearance: none;
   border: 1px solid rgba(14, 159, 110, 0.5);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--st-ok);
   font: inherit;
   font-size: 12.5px;
@@ -157,7 +154,7 @@
   font: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
   outline: none;
   color: var(--ink-900);
@@ -165,8 +162,8 @@
 }
 
 .search:focus {
-  border-color: rgba(10, 133, 226, 0.5);
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: rgba(47, 163, 80, 0.5);
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .iconBtn {
@@ -177,7 +174,7 @@
   height: 36px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-500);
   cursor: pointer;
   font-size: 13px;
@@ -196,7 +193,7 @@
 
 .iconBtnActive {
   background: var(--accent-soft);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
   color: var(--accent);
 }
 
@@ -207,7 +204,7 @@
   padding: 0 10px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -223,8 +220,8 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(10, 133, 226, 0.25);
-  background: #edf6fe;
+  border: 1px solid rgba(47, 163, 80, 0.25);
+  background: var(--accent-soft);
 }
 
 .bulkMeta {
@@ -241,7 +238,7 @@
 .bulkBtn {
   appearance: none;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-700);
   font: inherit;
   font-size: 12.5px;
@@ -256,9 +253,9 @@
 }
 
 .bulkBtn:hover:not(:disabled) {
-  border-color: rgba(10, 133, 226, 0.4);
+  border-color: rgba(47, 163, 80, 0.4);
   color: var(--accent);
-  background: #fff;
+  background: var(--surface);
 }
 
 .bulkBtn:disabled {
@@ -269,7 +266,7 @@
 .bulkDanger {
   color: #b91c1c !important;
   border-color: #fecaca !important;
-  background: #fff1f2 !important;
+  background: var(--tint-danger, #fff1f2) !important;
 }
 
 .bulkGhost {
@@ -299,7 +296,7 @@
   margin: 0;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   color: #b91c1c;
   border: 1px solid #fecdd3;
   font-size: 13px;
@@ -310,7 +307,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
 }
 
@@ -328,7 +325,7 @@
 .table th,
 .table td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  border-bottom: 1px solid var(--tint-line, rgba(227, 233, 241, 0.7));
   text-align: left;
   vertical-align: middle;
 }
@@ -339,16 +336,16 @@
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--ink-400);
-  background: rgba(242, 245, 249, 0.65);
+  background: var(--tint-info, rgba(242, 245, 249, 0.65));
   white-space: nowrap;
 }
 
 .table tbody tr:hover:not(.actionsRow) td {
-  background: rgba(237, 246, 254, 0.4);
+  background: var(--tint-info, rgba(237, 246, 254, 0.4));
 }
 
 .rowSelected td {
-  background: rgba(237, 246, 254, 0.65) !important;
+  background: var(--tint-info, rgba(237, 246, 254, 0.65)) !important;
 }
 
 .checkCol {
@@ -412,7 +409,7 @@
 }
 
 .actionsRow td {
-  background: rgba(237, 246, 254, 0.55) !important;
+  background: var(--tint-info, rgba(237, 246, 254, 0.55)) !important;
   border-bottom: 1px solid var(--line) !important;
   padding: 10px 16px 14px !important;
 }
@@ -422,9 +419,9 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid rgba(10, 133, 226, 0.18);
+  border: 1px solid rgba(47, 163, 80, 0.18);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .rowActions button,
@@ -447,8 +444,8 @@
 
 .rowActions button:hover,
 .rowActions a:hover {
-  background: #edf6fe;
-  border-color: rgba(10, 133, 226, 0.35);
+  background: var(--accent-soft);
+  border-color: rgba(47, 163, 80, 0.35);
   color: var(--accent);
 }
 
@@ -460,11 +457,11 @@
 .danger {
   color: #b91c1c !important;
   border-color: #fecaca !important;
-  background: #fff1f2 !important;
+  background: var(--tint-danger, #fff1f2) !important;
 }
 
 .danger:hover {
-  background: #ffe4e6 !important;
+  background: var(--tint-danger, #ffe4e6) !important;
   color: #9f1239 !important;
 }
 
@@ -482,7 +479,7 @@
   gap: 12px;
   flex-wrap: wrap;
   border-top: 1px solid var(--line);
-  background: rgba(242, 245, 249, 0.4);
+  background: var(--tint-info, rgba(242, 245, 249, 0.4));
   padding: 12px 20px;
   font-size: 12.5px;
   color: var(--ink-500);
@@ -511,7 +508,7 @@
   height: 30px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-500);
   cursor: pointer;
   font-size: 13px;
@@ -519,7 +516,7 @@
 
 .pagerBtn:hover:not(:disabled) {
   color: var(--accent);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
 }
 
 .pagerBtn:disabled {
@@ -539,7 +536,7 @@
 .muted {
   margin: 0;
   padding: 1rem 0;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   font-size: 0.86rem;
 }
 
@@ -548,7 +545,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.86rem;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   cursor: pointer;
   line-height: 1.3;
 }
@@ -558,7 +555,7 @@
   height: 16px;
   margin: 0;
   flex-shrink: 0;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   cursor: pointer;
 }
 
@@ -567,9 +564,9 @@
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   padding: 0.75rem 0.85rem;
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(242, 245, 249, 0.5);
+  background: var(--tint-info, rgba(242, 245, 249, 0.5));
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -589,8 +586,8 @@
 }
 
 .sideCard {
-  background: #fff;
-  border: 1px solid #e3e9f1;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
   padding: 1rem 1.1rem 1.15rem;
@@ -606,8 +603,8 @@
 }
 
 .ruleCard {
-  background: #fff;
-  border: 1px solid #e3e9f1;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
   overflow: hidden;
@@ -625,15 +622,15 @@
   margin: 0;
   font-size: 0.86rem;
   font-weight: 700;
-  color: #14213a;
+  color: var(--ink);
   letter-spacing: -0.01em;
 }
 
 .addLink {
   appearance: none;
-  border: 1px solid rgba(10, 133, 226, 0.3);
-  background: #edf6fe;
-  color: #0a85e2;
+  border: 1px solid rgba(47, 163, 80, 0.3);
+  background: var(--accent-soft);
+  color: #2fa350;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
@@ -643,7 +640,7 @@
 }
 
 .addLink:hover {
-  background: #dbeeff;
+  background: var(--tint-info, #dbeeff);
 }
 
 .ruleTable {
@@ -655,10 +652,10 @@
 .ruleTable th {
   text-align: left;
   font-weight: 700;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   padding: 0.4rem 1rem;
-  border-bottom: 1px solid #e3e9f1;
-  background: rgba(242, 245, 249, 0.65);
+  border-bottom: 1px solid var(--line);
+  background: var(--tint-info, rgba(242, 245, 249, 0.65));
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -666,8 +663,8 @@
 
 .ruleTable td {
   padding: 0.5rem 1rem;
-  color: #354862;
-  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  color: var(--tint-ink, #3d5244);
+  border-bottom: 1px solid var(--tint-line, rgba(227, 233, 241, 0.7));
 }
 
 .ruleTable tbody tr {
@@ -675,12 +672,12 @@
 }
 
 .ruleTable tbody tr:hover td {
-  background: rgba(237, 246, 254, 0.45);
+  background: var(--tint-info, rgba(237, 246, 254, 0.45));
 }
 
 .ruleEmpty {
   text-align: center;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   padding: 1rem !important;
   cursor: default !important;
   font-weight: 600;
@@ -695,7 +692,7 @@
 .rangeField label {
   display: block;
   font-size: 0.72rem;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   margin-bottom: 0.22rem;
 }
 
@@ -703,24 +700,24 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 8px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #354862;
+  background: var(--surface);
+  color: var(--tint-ink, #3d5244);
 }
 
 .rangeField input:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.16);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.16);
 }
 
 .modal {
   width: min(520px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 16px;
   padding: 0;
   box-shadow: 0 16px 44px -12px rgba(10, 22, 40, 0.3);
@@ -731,8 +728,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e3e9f1;
-  background: rgba(242, 245, 249, 0.6);
+  border-bottom: 1px solid var(--line);
+  background: var(--tint-info, rgba(242, 245, 249, 0.6));
   border-radius: 16px 16px 0 0;
 }
 
@@ -740,7 +737,7 @@
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: #0a1322;
+  color: var(--ink-strong);
 }
 
 .modalClose {
@@ -749,7 +746,7 @@
   background: none;
   font-size: 1.35rem;
   line-height: 1;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   cursor: pointer;
 }
 
@@ -765,8 +762,8 @@
   justify-content: flex-end;
   gap: 0.45rem;
   padding: 0.85rem 1.15rem 1rem;
-  border-top: 1px solid #eef0f4;
-  background: #fafbfc;
+  border-top: 1px solid var(--tint-line, #eef0f4);
+  background: var(--tint-neutral, #fafbfc);
   border-radius: 0 0 16px 16px;
 }
 

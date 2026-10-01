@@ -179,7 +179,7 @@ export function OneTimeFormModal({
           <span>Примечание</span>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
         </label>
-        <p style={{ margin: 0, fontSize: '0.78rem', color: '#8ca0b8', lineHeight: 1.45 }}>
+        <p style={{ margin: 0, fontSize: '0.78rem', color: '#98a89b', lineHeight: 1.45 }}>
           Строки сотрудников добавляются после создания — откройте документ и нажмите
           «Изменить».
         </p>

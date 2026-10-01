@@ -31,12 +31,12 @@
 
 .primary {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .primary:hover:not(:disabled) {
-  background: #187de4;
+  background: #268a42;
 }
 
 .primary:disabled {
@@ -45,28 +45,28 @@
 }
 
 .secondary {
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
 }
 
 .secondary:hover {
-  background: #f8fafc;
+  background: var(--tint-neutral, #f8fafc);
 }
 
 .error {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 6px;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   color: #991b1b;
   border: 1px solid #fecaca;
   font-size: 0.88rem;
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e3e9f1;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.9rem;
   display: flex;
@@ -80,7 +80,7 @@
   gap: 0.25rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #64788f;
+  color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -93,19 +93,19 @@
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: #14213a;
-  border: 1px solid #d1d5db;
+  color: var(--ink);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .card input:focus,
 .card select:focus,
 .card textarea:focus {
   outline: none;
-  border-color: rgba(10, 133, 226, 0.5);
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.15);
+  border-color: rgba(47, 163, 80, 0.5);
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.15);
 }
 
 .grid2 {

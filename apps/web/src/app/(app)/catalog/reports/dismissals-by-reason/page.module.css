@@ -16,19 +16,19 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8125rem;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
   cursor: pointer;
 }
 
 .radio input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .selectAll {
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;
@@ -48,9 +48,9 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -64,10 +64,10 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.45rem 0.55rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   vertical-align: middle;
 }
 
@@ -80,23 +80,23 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
   text-align: center;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .zebra td {
-  background: #f7f9fc;
+  background: var(--tint-neutral, #f7f9fc);
 }
 
 .table tbody tr:hover td {
-  background: #f5f9fd;
+  background: var(--tint-neutral, #f5f9fd);
 }
 
 .link {
-  color: #0a85e2;
+  color: #2fa350;
   text-decoration: none;
   font-weight: 650;
 }

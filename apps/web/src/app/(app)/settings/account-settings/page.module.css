@@ -13,7 +13,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 8px;
   font-size: 0.88rem;
 }
@@ -22,22 +22,22 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 8px;
   font-size: 0.88rem;
 }
 
 .muted {
   margin: 0;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem 1.25rem;
-  background: #fff;
-  border: 1px solid #e3e9f1;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
   padding: 1rem 1.15rem 1.25rem;
@@ -58,7 +58,7 @@
 
 .field label {
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .inputWrap {
@@ -71,18 +71,18 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 1.75rem 0 0.55rem;
   font: inherit;
   font-size: 0.85rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 

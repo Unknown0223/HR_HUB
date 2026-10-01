@@ -63,7 +63,7 @@
 .btnClose {
   appearance: none;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--accent);
   font: inherit;
   font-size: 11px;
@@ -152,7 +152,7 @@
   border-radius: var(--radius);
   font: inherit;
   font-size: var(--font-size);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-strong);
 }
 
@@ -219,7 +219,7 @@
   width: 40px;
   height: 22px;
   border-radius: 999px;
-  background: #e1e3ea;
+  background: var(--tint-neutral, #e1e3ea);
   position: relative;
   border: none;
   cursor: pointer;
@@ -239,7 +239,7 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
   transition: transform var(--motion);
 }
@@ -275,7 +275,7 @@
 }
 
 .toolBtn:hover:not(:disabled) {
-  background: #d7dae3;
+  background: var(--tint-neutral, #d7dae3);
 }
 
 .toolBtn:disabled {
@@ -305,7 +305,7 @@
   min-width: 26px;
   height: 26px;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
 }
 
 .grid th {
@@ -316,7 +316,7 @@
 }
 
 .grid tbody tr:nth-child(even) td:not(.offCell) {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .monthCell {
@@ -341,7 +341,7 @@
 
 .workCell {
   cursor: pointer;
-  background: #f3f6f9 !important;
+  background: var(--tint-neutral, #f3f6f9) !important;
   color: var(--ink);
   font-weight: 500;
 }

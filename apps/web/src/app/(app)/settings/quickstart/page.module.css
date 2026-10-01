@@ -1,6 +1,6 @@
 .card {
-  background: #fff;
-  border: 1px solid #e8eaef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e8eaef);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -11,7 +11,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.7rem 0.9rem;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
 }
 
 .headBtn {
@@ -20,7 +20,7 @@
   background: transparent;
   font: inherit;
   font-weight: 650;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   padding: 0;
   display: inline-flex;
@@ -38,20 +38,20 @@
 .bar {
   flex: 1;
   height: 6px;
-  background: #e8edf5;
+  background: var(--tint-info, #e8edf5);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  background: #0a85e2;
+  background: #2fa350;
   border-radius: 999px;
 }
 
 .progressText {
   font-size: 0.82rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   white-space: nowrap;
 }
 
@@ -61,7 +61,7 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.72rem 0.9rem;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   font-size: 0.9rem;
 }
 
@@ -72,21 +72,21 @@
 .row input[type='checkbox'] {
   width: 16px;
   height: 16px;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   cursor: pointer;
 }
 
 .num {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-variant-numeric: tabular-nums;
 }
 
 .tag {
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .link {
-  color: #0a85e2;
+  color: #2fa350;
   text-decoration: none;
   margin-left: 0.35rem;
 }
@@ -103,5 +103,5 @@
 }
 
 .ext:hover {
-  color: #0a85e2;
+  color: #2fa350;
 }

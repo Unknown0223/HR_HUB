@@ -8,7 +8,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;
@@ -22,9 +22,9 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -32,15 +32,15 @@
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.72rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.2rem 0.4rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   white-space: nowrap;
 }
 
@@ -53,18 +53,18 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
   text-align: center;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .name,
 .code {
   position: sticky;
   z-index: 2;
-  background: #fff;
+  background: var(--surface);
   text-align: left;
 }
 
@@ -80,7 +80,7 @@
 
 .table thead .name,
 .table thead .code {
-  background: #f2f5f9;
+  background: var(--surface-muted);
   z-index: 3;
 }
 
@@ -91,22 +91,22 @@
 }
 
 .row td {
-  background: #fde8e8;
+  background: var(--tint-danger, #fde8e8);
 }
 
 .row .name,
 .row .code {
-  background: #fde8e8;
+  background: var(--tint-danger, #fde8e8);
 }
 
 .total {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
   font-weight: 700;
 }
 
 .total .name,
 .total .code {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
 }
 
 @media print {

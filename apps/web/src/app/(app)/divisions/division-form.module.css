@@ -17,8 +17,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1rem 1.25rem 1.25rem;
   max-width: 640px;
@@ -59,12 +59,12 @@
 
 .primary {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .primary:hover:not(:disabled) {
-  background: #187de4;
+  background: #268a42;
 }
 
 .primary:disabled {
@@ -79,20 +79,20 @@
 }
 
 .secondary {
-  border: 1px solid #e4e6ef;
-  background: #f3f6f9;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink, #3f4254);
 }
 
 .secondary:hover {
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
 }
 
 .error {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 6px;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   color: #991b1b;
   border: 1px solid #fecaca;
   font-size: 0.88rem;
@@ -111,7 +111,7 @@
   gap: 0.3rem;
   font-size: 0.8rem;
   font-weight: 500;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -134,11 +134,11 @@
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: #181c32;
-  border: 1px solid #e4e6ef;
+  color: var(--tint-ink, #181c32);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.55rem 0.65rem;
-  background: #fff;
+  background: var(--surface);
   min-height: 38px;
 }
 
@@ -147,7 +147,7 @@
 .full input:focus,
 .full select:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.15);
 }
 
@@ -163,7 +163,7 @@
 .switchLabel {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .switch {
@@ -185,7 +185,7 @@
   width: 42px;
   height: 24px;
   border-radius: 999px;
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
   transition: background 0.15s;
   position: relative;
   flex-shrink: 0;
@@ -199,13 +199,13 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s;
 }
 
 .switch input:checked + .switchTrack {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .switch input:checked + .switchTrack::after {
@@ -214,7 +214,7 @@
 
 .switchText {
   font-size: 0.88rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   min-width: 4.5rem;
 }
 
@@ -238,8 +238,8 @@
 }
 
 .side {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 0.85rem;
 }
@@ -254,7 +254,7 @@
   display: inline-flex;
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
-  background: #ccfbf1;
+  background: var(--tint-ok, #ccfbf1);
   color: #0f766e;
   font-size: 0.72rem;
   font-weight: 700;
@@ -262,8 +262,8 @@
 }
 
 .badgeOff {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .sideNav {
@@ -283,18 +283,18 @@
   padding: 0.55rem 0.65rem;
   border-radius: 6px;
   cursor: pointer;
-  color: #374151;
+  color: var(--tint-ink, #374151);
 }
 
 .sideLinkActive {
-  background: #eff6ff;
+  background: var(--tint-info, #eff6ff);
   color: #1d4ed8;
   font-weight: 600;
 }
 
 .mainCard {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1rem 1.1rem;
 }
@@ -320,7 +320,7 @@
 .field span {
   font-size: 0.72rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -328,13 +328,13 @@
 .field strong {
   font-size: 0.92rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--tint-ink, #111827);
 }
 
 .audit {
   margin-top: 1.25rem;
   padding-top: 0.85rem;
-  border-top: 1px solid #eef0f3;
+  border-top: 1px solid var(--tint-line, #eef0f3);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem 1.25rem;

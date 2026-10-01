@@ -4,10 +4,10 @@
   gap: 0.45rem;
   width: 100%;
   min-height: 36px;
-  border: 1.5px solid var(--line-strong, #e3e9f1);
+  border: 1.5px solid var(--line-strong, var(--line));
   border-radius: 9px;
-  background: #fff;
-  color: #354862;
+  background: var(--surface);
+  color: var(--tint-ink, #3d5244);
   font: inherit;
   font-size: 0.8125rem;
   text-align: left;
@@ -27,19 +27,19 @@
   width: 100%;
   box-sizing: border-box;
   height: 36px;
-  border: 1.5px solid var(--line-strong, #e3e9f1);
+  border: 1.5px solid var(--line-strong, var(--line));
   border-radius: 9px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.8125rem;
-  background: #fff;
-  color: #354862;
+  background: var(--surface);
+  color: var(--tint-ink, #3d5244);
 }
 
 .pickInput:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .pickMenu {
@@ -55,7 +55,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line, #e8eef5);
   border-radius: 12px;
   box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
@@ -66,7 +66,7 @@
   box-sizing: border-box;
   height: 32px;
   border: none;
-  border-bottom: 1px solid #e4e6ef;
+  border-bottom: 1px solid var(--tint-line, #e4e6ef);
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.82rem;
@@ -78,7 +78,7 @@
 
 .pickEmpty {
   padding: 0.7rem 0.55rem;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   font-size: 0.82rem;
 }
 
@@ -89,31 +89,31 @@
   gap: 0.4rem;
   width: 100%;
   border: none;
-  background: #fff;
+  background: var(--surface);
   text-align: left;
   padding: 0.35rem 0.55rem;
   font: inherit;
   font-size: 0.82rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   cursor: pointer;
 }
 
 .pickOpt:hover,
 .pickOptOn {
-  background: #f2f5f9;
+  background: var(--surface-muted);
 }
 
 .pickOpt input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .pickAll {
   appearance: none;
   width: 100%;
   border: none;
-  border-top: 1px solid #e4e6ef;
-  background: #fff;
-  color: #0a85e2;
+  border-top: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: #2fa350;
   padding: 0.4rem;
   font: inherit;
   font-size: 0.78rem;
@@ -130,8 +130,8 @@
 .chip {
   appearance: none;
   border: 1px solid #bae6fd;
-  background: #edf6fe;
-  color: #0770c2;
+  background: var(--accent-soft);
+  color: #268a42;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 650;
@@ -141,25 +141,25 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
 .table {
   border-collapse: collapse;
   font-size: 0.72rem;
-  background: #fff;
+  background: var(--surface);
   min-width: 1280px;
   width: 100%;
 }
 
 .table th,
 .table td {
-  border: 1px solid #e3e9f1;
+  border: 1px solid var(--line);
   padding: 0.22rem 0.4rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   white-space: nowrap;
 }
 
@@ -167,14 +167,14 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 600;
   text-align: center;
-  box-shadow: 0 1px 0 #e3e9f1;
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .zebra td {
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
 }
 
 .num {
@@ -188,13 +188,13 @@
 
 .empty {
   text-align: center;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   padding: 1.5rem;
 }
 
 .saved {
   font-size: 0.82rem;
-  color: #0e9f6e;
+  color: #2fa350;
   margin: 0;
 }
 
@@ -210,12 +210,12 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.88rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   cursor: pointer;
 }
 
 .check input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 @media (max-width: 720px) {

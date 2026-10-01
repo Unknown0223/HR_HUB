@@ -69,8 +69,8 @@
 
 .btnInfo {
   border: none;
-  background: #38bdf8;
-  color: #0f172a;
+  background: #6ccb86;
+  color: var(--tint-ink, #0f172a);
 }
 
 .btnDanger {
@@ -80,9 +80,9 @@
 }
 
 .btnGhost {
-  border: 1px solid #d1d5db;
-  background: #f3f4f6;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink, #374151);
 }
 
 .layout {
@@ -100,7 +100,7 @@
 
 .side,
 .main {
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
@@ -125,7 +125,7 @@
   display: inline-flex;
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
-  background: #dbeafe;
+  background: var(--tint-info, #dbeafe);
   color: #1d4ed8;
   font-size: 0.75rem;
   font-weight: 600;
@@ -272,7 +272,7 @@
   padding: 0.4rem 0.55rem;
   border-radius: 6px;
   border: 1px solid var(--line-soft);
-  background: #fff;
+  background: var(--surface);
   font: inherit;
   font-size: 0.84rem;
 }
@@ -299,13 +299,13 @@
 }
 
 .badgeYes {
-  background: #dbeafe;
+  background: var(--tint-info, #dbeafe);
   color: #1d4ed8;
 }
 
 .badgeNo {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .modalBackdrop {
@@ -320,7 +320,7 @@
 
 .modal {
   width: min(420px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   padding: 1.1rem 1.2rem;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
@@ -354,8 +354,8 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--tint-neutral, #e5e7eb);
+  color: var(--tint-ink, #374151);
   font: inherit;
   font-weight: 700;
   padding: 0.45rem 1rem;

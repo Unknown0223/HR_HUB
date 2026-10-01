@@ -12,8 +12,8 @@
 }
 
 .side {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 8px;
   padding: 0.9rem 0.85rem 1rem;
   display: flex;
@@ -27,12 +27,12 @@
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  background: #e8eef5;
+  background: var(--tint-info, #e8eef5);
   overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   font-weight: 700;
   font-size: 1.4rem;
 }
@@ -52,7 +52,7 @@
   height: 26px;
   border-radius: 50%;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   cursor: pointer;
   font-size: 0.85rem;
@@ -65,7 +65,7 @@
   flex-direction: column;
   gap: 0.28rem;
   font-size: 0.84rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .radioCol label {
@@ -77,7 +77,7 @@
 
 .radioTitle {
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.15rem;
 }
 
@@ -96,10 +96,10 @@
   display: flex;
   align-items: center;
   padding: 0 0.55rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 0 4px 4px 0;
-  background: #f4f6f9;
-  color: #7e8299;
+  background: var(--tint-neutral, #f4f6f9);
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.84rem;
   white-space: nowrap;
 }
@@ -122,7 +122,7 @@
   border: none;
   background: none;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.95rem;
 }
 
@@ -136,11 +136,11 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0 0.55rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-right: none;
   border-radius: 4px 0 0 4px;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   font-size: 0.84rem;
 }
 
@@ -154,17 +154,17 @@
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  background: #dbe4f0;
+  background: var(--tint-info, #dbe4f0);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .products {
-  background: #eef6ff;
+  background: var(--tint-info, #eef6ff);
   border-radius: 6px;
   padding: 0.75rem 1rem;
   display: flex;
@@ -178,7 +178,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .matrix {
@@ -189,16 +189,16 @@
 
 .matrix th,
 .matrix td {
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.4rem 0.55rem;
   text-align: left;
   white-space: nowrap;
 }
 
 .matrix th {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   font-weight: 650;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -220,8 +220,8 @@
   top: calc(100% + 4px);
   left: 0;
   min-width: 160px;
-  background: #fff;
-  border: 1px solid #d1d5db;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
   padding: 0.2rem 0;
@@ -241,30 +241,30 @@
 }
 
 .dropMenu button:hover {
-  background: #eef6ff;
-  color: #0a85e2;
+  background: var(--tint-info, #eef6ff);
+  color: #2fa350;
 }
 
 .scopeSection {
   margin-top: 1rem;
   padding-top: 0.85rem;
-  border-top: 1px solid #eef0f4;
+  border-top: 1px solid var(--tint-line, #eef0f4);
 }
 
 .scopeTitle {
   font-weight: 700;
   font-size: 0.92rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .scopeNote {
   margin: 0.4rem 0 0;
   font-size: 0.82rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
 }
 
 .sideName {
   font-weight: 700;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   text-align: center;
 }

@@ -35,9 +35,9 @@
 }
 
 .btnGhost {
-  background: #fff;
-  border: 1px solid #e2e5ec;
-  color: #3f4254;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e2e5ec);
+  color: var(--tint-ink, #3f4254);
 }
 
 .btnWarn {
@@ -46,7 +46,7 @@
 }
 
 .btnLoad {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   width: 100%;
 }
@@ -66,10 +66,10 @@
 
 .mapPane {
   position: relative;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   overflow: hidden;
-  background: #eef2f7;
+  background: var(--tint-info, #eef2f7);
   min-height: 480px;
 }
 
@@ -84,15 +84,15 @@
   position: absolute;
   left: 12px;
   bottom: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--tint-neutral, rgba(255, 255, 255, 0.92));
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
   font-size: 0.8rem;
 }
 
 .side {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 0.85rem;
   display: flex;
@@ -105,7 +105,7 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .field em {
@@ -115,7 +115,7 @@
 
 .field input,
 .field select {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   padding: 0.45rem 0.55rem;
   font-size: 0.85rem;
@@ -131,7 +131,7 @@
   display: flex;
   gap: 0.75rem;
   font-size: 0.75rem;
-  color: #0a85e2;
+  color: #2fa350;
 }
 
 .switch {
@@ -139,7 +139,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.82rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
 }
 
 .tabs {
@@ -151,8 +151,8 @@
 .tab,
 .tabActive {
   appearance: none;
-  border: 1px solid #e5e7eb;
-  background: #fff;
+  border: 1px solid var(--tint-line, #e5e7eb);
+  background: var(--surface);
   border-radius: 4px;
   padding: 0.35rem 0.5rem;
   font-size: 0.75rem;
@@ -160,14 +160,14 @@
 }
 
 .tabActive {
-  background: #e1f0ff;
-  border-color: #0a85e2;
-  color: #187de4;
+  background: var(--tint-info, #e1f0ff);
+  border-color: #2fa350;
+  color: #268a42;
   font-weight: 600;
 }
 
 .tableWrap {
-  border: 1px solid #eef0f4;
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   overflow: auto;
   max-height: 220px;
@@ -182,7 +182,7 @@
 .tableWrap th,
 .tableWrap td {
   padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
   text-align: left;
 }
 
@@ -201,7 +201,7 @@
 .hint {
   margin: 0;
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-align: center;
 }
 
@@ -217,7 +217,7 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   padding: 1.2rem;
   width: min(360px, 100%);

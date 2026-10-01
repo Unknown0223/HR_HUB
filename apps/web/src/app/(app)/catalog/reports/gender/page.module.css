@@ -16,12 +16,12 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8125rem;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
   cursor: pointer;
 }
 
 .radio input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .rangeAdd {
@@ -34,19 +34,19 @@
 .rangeAdd input {
   width: 100px;
   height: 36px;
-  border: 1.5px solid #e3e9f1;
+  border: 1.5px solid var(--line);
   border-radius: 9px;
   padding: 0 0.5rem;
   font: inherit;
   font-size: 0.8125rem;
-  color: #0a1322;
-  background: #fff;
+  color: var(--ink-strong);
+  background: var(--surface);
 }
 
 .rangeAdd input:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .plus {
@@ -55,7 +55,7 @@
   height: 36px;
   border: none;
   border-radius: 9px;
-  background: linear-gradient(180deg, #0a85e2 0%, #0770c2 100%);
+  background: linear-gradient(180deg, #2fa350 0%, #268a42 100%);
   color: #fff;
   font-size: 1.15rem;
   line-height: 1;
@@ -80,22 +80,22 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.4rem 0;
-  border-bottom: 1px solid #e8eef5;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
   font-size: 0.8125rem;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
 }
 
 .trash {
   appearance: none;
   border: none;
   background: transparent;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   cursor: pointer;
   padding: 0.15rem 0.35rem;
 }
 
 .trash:hover {
-  color: #e11d48;
+  color: #e5484d;
 }
 
 .lookup > div {
@@ -104,9 +104,9 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -120,10 +120,10 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.45rem 0.55rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   vertical-align: middle;
 }
 
@@ -136,11 +136,11 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
   text-align: center;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .num {
@@ -151,16 +151,16 @@
 }
 
 .totalRow td {
-  background: #edf6fe;
+  background: var(--accent-soft);
   font-weight: 700;
 }
 
 .table tbody tr:hover td {
-  background: #f5f9fd;
+  background: var(--tint-neutral, #f5f9fd);
 }
 
 .totalRow:hover td {
-  background: #e3f0fb;
+  background: var(--tint-info, #e3f0fb);
 }
 
 @media print {

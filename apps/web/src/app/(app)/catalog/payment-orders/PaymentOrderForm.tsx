@@ -164,7 +164,7 @@ export function PaymentOrderFormModal({
       }
     >
       {error ? <p className={modal.error}>{error}</p> : null}
-      {loading ? <p className={modal.error} style={{ background: 'transparent', border: 'none', color: '#8ca0b8' }}>Загрузка…</p> : null}
+      {loading ? <p className={modal.error} style={{ background: 'transparent', border: 'none', color: '#98a89b' }}>Загрузка…</p> : null}
       <div className={modal.fields}>
         <label className={modal.field}>
           <span>

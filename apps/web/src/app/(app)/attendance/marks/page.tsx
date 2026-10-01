@@ -959,7 +959,7 @@ function MarksInner() {
           </>
         }
       >
-        <p style={{ margin: 0, color: '#64788f', fontSize: 13 }}>
+        <p style={{ margin: 0, color: '#5e6f62', fontSize: 13 }}>
           Подтвердите выполнение операции для выбранных отметок.
         </p>
       </FormModal>

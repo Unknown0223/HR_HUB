@@ -44,12 +44,12 @@
 
 .primary {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .primary:hover:not(:disabled) {
-  background: #187de4;
+  background: #268a42;
 }
 
 .primary:disabled,
@@ -69,24 +69,24 @@
 }
 
 .secondary {
-  border: 1px solid #e4e6ef;
-  background: #f3f6f9;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink, #3f4254);
 }
 
 .error {
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 6px;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   color: #991b1b;
   border: 1px solid #fecaca;
   font-size: 0.88rem;
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   display: flex;
@@ -120,7 +120,7 @@
   gap: 0.3rem;
   font-size: 0.8rem;
   font-weight: 500;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .req {
@@ -145,11 +145,11 @@
 .full textarea {
   font: inherit;
   font-size: 0.9rem;
-  color: #181c32;
-  border: 1px solid #e4e6ef;
+  color: var(--tint-ink, #181c32);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.55rem 0.65rem;
-  background: #fff;
+  background: var(--surface);
   min-height: 38px;
 }
 
@@ -162,8 +162,8 @@
 .grid input:disabled,
 .grid select:disabled,
 .grid textarea:disabled {
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--tint-neutral, #f9fafb);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .invalid {
@@ -176,7 +176,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.88rem;
-  color: #374151;
+  color: var(--tint-ink, #374151);
   grid-column: 1 / -1;
 }
 
@@ -184,7 +184,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -203,10 +203,10 @@
 
 .addBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
-  color: #374151;
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
@@ -216,7 +216,7 @@
 }
 
 .addBtn:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--tint-neutral, #f3f4f6);
 }
 
 .addBtn:disabled {
@@ -227,7 +227,7 @@
 .search {
   min-width: 180px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.65rem;
   font: inherit;
@@ -236,7 +236,7 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
 }
 
@@ -248,40 +248,40 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--tint-line, #eef0f3);
   padding: 0.4rem 0.5rem;
   text-align: left;
   vertical-align: middle;
 }
 
 .table th {
-  background: #fafafa;
+  background: var(--tint-neutral, #fafafa);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .table input,
 .table select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 3px;
   padding: 0.35rem 0.45rem;
   font: inherit;
   font-size: 0.85rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .table input:disabled,
 .table select:disabled {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .rowSelected {
-  background: #f0f9ff;
+  background: var(--tint-info, #f0f9ff);
 }
 
 .rowActions {
@@ -293,9 +293,9 @@
 
 .rowActions button {
   appearance: none;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -310,14 +310,14 @@
 }
 
 .readonly {
-  background: #f3f4f6 !important;
+  background: var(--tint-neutral, #f3f4f6) !important;
 }
 
 .title {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .grid2 {
@@ -338,7 +338,7 @@
   gap: 0.3rem;
   font-size: 0.8rem;
   font-weight: 500;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .field em {
@@ -351,10 +351,10 @@
 .field textarea {
   font: inherit;
   font-size: 0.9rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.55rem 0.65rem;
-  background: #fff;
+  background: var(--surface);
   min-height: 38px;
 }
 
@@ -370,7 +370,7 @@
 .radioGroup legend {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   margin-bottom: 0.35rem;
 }
 
@@ -379,7 +379,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.88rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .checkRow {
@@ -406,7 +406,7 @@
   margin-left: auto;
   font: inherit;
   font-size: 0.88rem;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 4px;
   padding: 0.45rem 0.65rem;
   min-width: 180px;
@@ -424,18 +424,18 @@
 
 .lineTable th,
 .lineTable td {
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--tint-line, #eef0f3);
   padding: 0.4rem 0.45rem;
   text-align: left;
   vertical-align: middle;
 }
 
 .lineTable th {
-  background: #fafafa;
+  background: var(--tint-neutral, #fafafa);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   white-space: nowrap;
 }
 
@@ -443,12 +443,12 @@
 .lineTable select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #e4e6ef;
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 3px;
   padding: 0.35rem 0.45rem;
   font: inherit;
   font-size: 0.85rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .gradePair {
@@ -476,6 +476,6 @@
 
 .empty {
   text-align: center;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   padding: 1.5rem !important;
 }

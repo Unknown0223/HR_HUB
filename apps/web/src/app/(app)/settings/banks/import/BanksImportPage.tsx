@@ -109,7 +109,7 @@ export function BanksImportPage() {
         className={imp.drop}
         style={{
           width: '100%',
-          borderColor: drag ? '#0a85e2' : undefined,
+          borderColor: drag ? '#2fa350' : undefined,
           background: drag ? '#eef6ff' : undefined,
         }}
         onClick={() => inputRef.current?.click()}

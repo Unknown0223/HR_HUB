@@ -12,7 +12,7 @@
 .modal {
   width: min(760px, 100%);
   max-height: min(82vh, 640px);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
   display: flex;
@@ -25,7 +25,7 @@
   padding: 0.95rem 1.15rem 0.7rem;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .toolbar {
@@ -41,7 +41,7 @@
   min-width: 0;
   height: 34px;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.7rem;
   font: inherit;
@@ -50,13 +50,13 @@
 
 .search:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.14);
 }
 
 .meta {
   font-size: 0.78rem;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   white-space: nowrap;
 }
 
@@ -64,8 +64,8 @@
   flex: 1;
   min-height: 220px;
   overflow: auto;
-  border-top: 1px solid #eef0f4;
-  border-bottom: 1px solid #eef0f4;
+  border-top: 1px solid var(--tint-line, #eef0f4);
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
 }
 
 .table {
@@ -78,16 +78,16 @@
 .table td {
   padding: 0.42rem 0.7rem;
   text-align: left;
-  border-bottom: 1px solid #f1f1f2;
+  border-bottom: 1px solid var(--tint-line, #f1f1f2);
   vertical-align: middle;
 }
 
 .table th {
   position: sticky;
   top: 0;
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   z-index: 1;
 }
 
@@ -98,15 +98,15 @@
 .tabCol {
   width: 140px;
   white-space: nowrap;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .table tbody tr:hover {
-  background: #f8faff;
+  background: var(--tint-neutral, #f8faff);
 }
 
 .rowOn {
-  background: #f3f8ff;
+  background: var(--tint-neutral, #f3f8ff);
 }
 
 .row {
@@ -115,7 +115,7 @@
 
 .empty {
   text-align: center;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   padding: 2.2rem 1rem !important;
 }
 
@@ -141,7 +141,7 @@
 
 .btnPrimary {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
@@ -151,9 +151,9 @@
 }
 
 .btnGhost {
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 /* Inline cell lookup (HR_HUB: tab number | name) */
@@ -166,7 +166,7 @@
   width: 100%;
   height: 32px;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 1.6rem 0 0.5rem;
   font: inherit;
@@ -175,7 +175,7 @@
 
 .lookupInput:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .lookupInvalid {
@@ -204,8 +204,8 @@
   width: min(100%, 520px);
   min-width: min(100%, 320px);
   max-width: min(520px, 92vw);
-  background: #fff;
-  border: 1px solid #d1d5db;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
   display: flex;
@@ -230,12 +230,12 @@
 }
 
 .dropHead {
-  background: #f4f6f9;
+  background: var(--tint-neutral, #f4f6f9);
   font-size: 0.72rem;
   font-weight: 700;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   padding: 0.38rem 0.55rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--tint-line, #e5e7eb);
 }
 
 .dropBody {
@@ -252,20 +252,20 @@
   text-align: left;
   font: inherit;
   font-size: 0.82rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   padding: 0.38rem 0.55rem;
   cursor: pointer;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
 }
 
 .dropOpt:hover,
 .dropOptOn {
-  background: #eef6ff;
-  color: #181c32;
+  background: var(--tint-info, #eef6ff);
+  color: var(--tint-ink, #181c32);
 }
 
 .dropTab {
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-variant-numeric: tabular-nums;
 }
 
@@ -277,7 +277,7 @@
 
 .dropEmpty {
   padding: 0.7rem 0.6rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   font-size: 0.82rem;
 }
 
@@ -286,15 +286,15 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.4rem 0.5rem;
-  border-top: 1px solid #eef0f4;
-  background: #fafbfc;
+  border-top: 1px solid var(--tint-line, #eef0f4);
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .showAll {
   appearance: none;
   border: none;
   background: none;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;
@@ -306,7 +306,7 @@
   flex: 1;
   min-width: 0;
   height: 28px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 3px;
   padding: 0 0.45rem;
   font: inherit;

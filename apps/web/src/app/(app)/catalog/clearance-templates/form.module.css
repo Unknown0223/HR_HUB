@@ -40,7 +40,7 @@
   margin: 0;
   font-size: 1.15rem;
   font-weight: 650;
-  color: #14213a;
+  color: var(--ink);
 }
 
 .docActions {
@@ -66,12 +66,12 @@
 
 .primary {
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .primary:hover:not(:disabled) {
-  background: #187de4;
+  background: #268a42;
 }
 
 .primary:disabled {
@@ -82,18 +82,18 @@
 .ghost,
 .secondary {
   border: 1px solid #93c5fd;
-  background: #fff;
+  background: var(--surface);
   color: #1d4ed8;
 }
 
 .secondary {
-  border-color: #d1d5db;
-  color: #374151;
+  border-color: var(--tint-line, #d1d5db);
+  color: var(--tint-ink, #374151);
 }
 
 .danger {
   border: 1px solid #fecaca;
-  background: #fff;
+  background: var(--surface);
   color: #b91c1c;
 }
 
@@ -101,7 +101,7 @@
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 6px;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   color: #991b1b;
   border: 1px solid #fecaca;
   font-size: 0.88rem;
@@ -111,20 +111,20 @@
   margin: 0;
   padding: 0.55rem 0.85rem;
   border-radius: 6px;
-  background: #eff6ff;
+  background: var(--tint-info, #eff6ff);
   color: #1e40af;
   border: 1px solid #bfdbfe;
   font-size: 0.86rem;
 }
 
 .muted {
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .formCard,
 .linesCard {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 0.9rem;
 }
@@ -155,7 +155,7 @@
   gap: 0.25rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -170,11 +170,11 @@
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: #111827;
-  border: 1px solid #d1d5db;
+  color: var(--tint-ink, #111827);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .col input:disabled,
@@ -182,8 +182,8 @@
 .periodRow input:disabled,
 .rowWithToggle input:disabled,
 .rowWithToggle select:disabled {
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--tint-neutral, #f9fafb);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .rowWithToggle {
@@ -213,7 +213,7 @@
   font-weight: 500 !important;
   text-transform: none !important;
   letter-spacing: 0 !important;
-  color: #374151 !important;
+  color: var(--tint-ink, #374151) !important;
   padding-top: 0.35rem;
   white-space: nowrap;
 }
@@ -223,13 +223,13 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .switchLabel input[type='checkbox'] {
   width: 1.05rem;
   height: 1.05rem;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .periodRow {
@@ -256,7 +256,7 @@
 .search {
   min-width: 180px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.65rem;
   font: inherit;
@@ -265,7 +265,7 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
 }
 
@@ -279,7 +279,7 @@
 .table th,
 .table td {
   padding: 0.45rem 0.5rem;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--tint-line, #eef0f3);
   text-align: left;
   vertical-align: middle;
 }
@@ -289,8 +289,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6b7280;
-  background: #fafafa;
+  color: var(--tint-ink-muted, #6b7280);
+  background: var(--tint-neutral, #fafafa);
   white-space: nowrap;
 }
 
@@ -304,10 +304,10 @@
   min-width: 0;
   font: inherit;
   font-size: 0.84rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.3rem 0.4rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .empSelect {
@@ -336,7 +336,7 @@
 
 .empty {
   text-align: center;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   padding: 2rem 1rem !important;
 }
 
@@ -354,7 +354,7 @@
   width: min(480px, 100%);
   max-height: min(70vh, 560px);
   overflow: auto;
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   padding: 1.1rem 1.2rem;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
@@ -383,7 +383,7 @@
 }
 
 .pickItem:hover {
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
 }
 
 .modalActions {
@@ -393,8 +393,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 0.9rem;
   display: flex;
@@ -420,7 +420,7 @@
   gap: 0.25rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -431,11 +431,11 @@
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: #111827;
-  border: 1px solid #d1d5db;
+  color: var(--tint-ink, #111827);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .checkRow {
@@ -453,13 +453,13 @@
   font-weight: 500 !important;
   text-transform: none !important;
   letter-spacing: 0 !important;
-  color: #374151 !important;
+  color: var(--tint-ink, #374151) !important;
 }
 
 .check input {
   width: 1.05rem;
   height: 1.05rem;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .linesHead {
@@ -477,7 +477,7 @@
 .lineSearch {
   min-width: 160px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.65rem;
   font: inherit;
@@ -486,13 +486,13 @@
 
 .pagerMeta {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   margin-left: auto;
 }
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
 }
 
@@ -505,7 +505,7 @@
 .table th,
 .table td {
   padding: 0.5rem 0.65rem;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--tint-line, #eef0f3);
   text-align: left;
 }
 
@@ -514,8 +514,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6b7280;
-  background: #fafafa;
+  color: var(--tint-ink-muted, #6b7280);
+  background: var(--tint-neutral, #fafafa);
 }
 
 .checkCol {
@@ -538,8 +538,8 @@
   appearance: none;
   border: none;
   border-radius: 4px;
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--tint-neutral, #e5e7eb);
+  color: var(--tint-ink, #374151);
   font: inherit;
   font-weight: 700;
   padding: 0.45rem 1rem;

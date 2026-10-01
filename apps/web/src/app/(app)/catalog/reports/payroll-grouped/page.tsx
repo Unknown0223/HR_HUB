@@ -907,7 +907,7 @@ ${activeRows.map((r) => row(cols.map((c) => cellValue(r, c)))).join('\n')}
 <style>
 body{font-family:Arial,sans-serif;margin:0;color:#181c32}
 .top{display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e4e6ef}
-.brand{color:#0a85e2;font-weight:700;margin-right:10px}
+.brand{color:#2fa350;font-weight:700;margin-right:10px}
 table{border-collapse:collapse;font-size:10px}
 th,td{border:1px solid #cfd3da;padding:2px 4px;text-align:center}
 th{background:#eef0f4}

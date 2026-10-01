@@ -22,7 +22,7 @@
   gap: 0.45rem;
   border: none;
   background: transparent;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;
@@ -35,12 +35,12 @@
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  background: #e4e6ef;
+  background: var(--tint-neutral, #e4e6ef);
   flex-shrink: 0;
 }
 
 .switchOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .knob {
@@ -50,7 +50,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
   transition: left 0.15s ease;
 }
@@ -70,19 +70,19 @@
   width: 100%;
   box-sizing: border-box;
   height: 36px;
-  border: 1.5px solid #e3e9f1;
+  border: 1.5px solid var(--line);
   border-radius: 9px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.8125rem;
-  background: #fff;
-  color: #0a1322;
+  background: var(--surface);
+  color: var(--ink-strong);
 }
 
 .pickInput:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .pickMenu {
@@ -98,8 +98,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #fff;
-  border: 1px solid #e8eef5;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e8eef5);
   border-radius: 12px;
   box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
 }
@@ -109,7 +109,7 @@
   box-sizing: border-box;
   height: 36px;
   border: none;
-  border-bottom: 1px solid #e8eef5;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
   padding: 0 0.75rem;
   font: inherit;
   font-size: 0.8125rem;
@@ -117,12 +117,12 @@
 
 .pickSearch:focus {
   outline: none;
-  background: #f2f5f9;
+  background: var(--surface-muted);
 }
 
 .pickEmpty {
   padding: 0.7rem 0.75rem;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   font-size: 0.8rem;
 }
 
@@ -133,31 +133,31 @@
   gap: 0.4rem;
   width: 100%;
   border: none;
-  background: #fff;
+  background: var(--surface);
   text-align: left;
   padding: 0.35rem 0.75rem;
   font: inherit;
   font-size: 0.8125rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   cursor: pointer;
 }
 
 .pickOpt:hover,
 .pickOptOn {
-  background: rgba(10, 133, 226, 0.08);
+  background: rgba(47, 163, 80, 0.08);
 }
 
 .pickOpt input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .pickAll {
   appearance: none;
   width: 100%;
   border: none;
-  border-top: 1px solid #e8eef5;
-  background: #fff;
-  color: #0a85e2;
+  border-top: 1px solid var(--tint-line, #e8eef5);
+  background: var(--surface);
+  color: #2fa350;
   padding: 0.38rem 0.75rem;
   font: inherit;
   font-size: 0.78rem;
@@ -175,8 +175,8 @@
 .chip {
   appearance: none;
   border: 1px solid #bae6fd;
-  background: #edf6fe;
-  color: #0770c2;
+  background: var(--accent-soft);
+  color: #268a42;
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 650;
@@ -186,9 +186,9 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -202,10 +202,10 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.4rem 0.45rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   white-space: nowrap;
   text-align: center;
   vertical-align: middle;
@@ -220,25 +220,25 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .table thead tr:nth-child(2) th {
   top: 2.1rem;
   font-weight: 600;
   font-size: 0.68rem;
-  color: #64788f;
-  background: #f7f9fc;
+  color: var(--ink-muted);
+  background: var(--tint-neutral, #f7f9fc);
 }
 
 .rowName {
   text-align: left;
   position: sticky;
   left: 32px;
-  background: #fff;
+  background: var(--surface);
   min-width: 220px;
   z-index: 1;
 }
@@ -246,7 +246,7 @@
 .num {
   position: sticky;
   left: 0;
-  background: #fff;
+  background: var(--surface);
   z-index: 1;
   min-width: 32px;
   font-variant-numeric: tabular-nums;
@@ -255,29 +255,29 @@
 
 .table th.rowName,
 .table th.num {
-  background: #f2f5f9;
+  background: var(--surface-muted);
   z-index: 3;
 }
 
 .zebra .rowName,
 .zebra .num,
 .zebra td {
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
 }
 
 .table tbody tr:hover td {
-  background: #f5f9fd;
+  background: var(--tint-neutral, #f5f9fd);
 }
 
 .empty {
   text-align: center;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   padding: 1.5rem;
 }
 
 .saved {
   font-size: 0.82rem;
-  color: #0e9f6e;
+  color: #2fa350;
   margin: 0;
   font-weight: 600;
 }
@@ -293,12 +293,12 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.875rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   cursor: pointer;
 }
 
 .check input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 @media (max-width: 720px) {

@@ -1,6 +1,6 @@
 .groupHeader td {
-  background: #f4f6f9;
-  color: #5e6278;
+  background: var(--tint-neutral, #f4f6f9);
+  color: var(--tint-ink-muted, #5e6278);
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -10,13 +10,13 @@
 
 .groupSelect {
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.5rem;
   font: inherit;
   font-size: 0.82rem;
-  color: #3f4254;
-  background: #fff;
+  color: var(--tint-ink, #3f4254);
+  background: var(--surface);
 }
 
 .badge {
@@ -26,18 +26,18 @@
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
-  background: #d1f7ea;
+  background: var(--tint-ok, #d1f7ea);
   color: #0d9488;
 }
 
 .badgeOff {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .sideName {
   font-weight: 650;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-size: 0.92rem;
   line-height: 1.3;
 }

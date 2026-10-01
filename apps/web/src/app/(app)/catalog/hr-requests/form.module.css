@@ -28,14 +28,14 @@
   margin: 0;
   font-size: 1.2rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--tint-ink, #1f2937);
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .docTitle i {
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   font-size: 0.95rem;
 }
 
@@ -72,15 +72,15 @@
 }
 
 .ghost {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
 }
 
 .secondary {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink, #374151);
   text-transform: none;
   font-weight: 600;
   letter-spacing: 0;
@@ -92,7 +92,7 @@
   margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: 6px;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   color: #991b1b;
   border: 1px solid #fecaca;
   font-size: 0.88rem;
@@ -102,19 +102,19 @@
   margin: 0;
   padding: 0.55rem 0.85rem;
   border-radius: 6px;
-  background: #eff6ff;
+  background: var(--tint-info, #eff6ff);
   color: #1e40af;
   border: 1px solid #bfdbfe;
   font-size: 0.86rem;
 }
 
 .muted {
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .formCard {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 6px;
   padding: 1.15rem 1.25rem 1.35rem;
   display: grid;
@@ -152,7 +152,7 @@
 .label {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #4b5563;
+  color: var(--tint-ink-muted, #4b5563);
 }
 
 .req {
@@ -165,11 +165,11 @@
 .textarea {
   font: inherit;
   font-size: 0.92rem;
-  color: #111827;
-  border: 1px solid #d1d5db;
+  color: var(--tint-ink, #111827);
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 3px;
   padding: 0.5rem 0.65rem;
-  background: #fff;
+  background: var(--surface);
   width: 100%;
   box-sizing: border-box;
 }
@@ -186,8 +186,8 @@
 .select:disabled,
 .textarea:disabled,
 .inputReadonly {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--tint-neutral, #f3f4f6);
+  color: var(--tint-ink-muted, #6b7280);
   cursor: default;
 }
 
@@ -200,7 +200,7 @@
   margin: 0.35rem 0 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--tint-ink, #111827);
 }
 
 .candidateRow {
@@ -229,8 +229,8 @@
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
-  border: 3px solid #fff;
+  background: linear-gradient(180deg, var(--tint-info, #e0f2fe) 0%, var(--tint-info, #bae6fd) 100%);
+  border: 3px solid var(--tint-line, #fff);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
   display: grid;
   place-items: center;
@@ -257,10 +257,10 @@
   height: 28px;
   border-radius: 50%;
   border: none;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
   cursor: pointer;
-  color: #475569;
+  color: var(--tint-ink-muted, #475569);
   font-size: 0.75rem;
   display: grid;
   place-items: center;
@@ -275,7 +275,7 @@
 
 .genderLabel {
   font-size: 0.8rem;
-  color: #4b5563;
+  color: var(--tint-ink-muted, #4b5563);
   font-weight: 500;
 }
 
@@ -290,7 +290,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.88rem;
-  color: #111827;
+  color: var(--tint-ink, #111827);
   cursor: pointer;
 }
 
@@ -302,19 +302,19 @@
 .filesLabel {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #4b5563;
+  color: var(--tint-ink-muted, #4b5563);
   margin-bottom: 0.3rem;
 }
 
 .filesZone {
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--tint-line, #cbd5e1);
   border-radius: 4px;
-  background: #f8fafc;
+  background: var(--tint-neutral, #f8fafc);
   min-height: 88px;
   display: grid;
   place-items: center;
   padding: 1rem;
-  color: #64748b;
+  color: var(--tint-ink-muted, #64748b);
   font-size: 0.9rem;
   text-align: center;
   cursor: pointer;
@@ -322,7 +322,7 @@
 
 .filesZone:hover {
   border-color: #93c5fd;
-  background: #f0f9ff;
+  background: var(--tint-info, #f0f9ff);
 }
 
 .filesMeta {
@@ -350,7 +350,7 @@
 .search {
   min-width: 180px;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 3px;
   padding: 0 0.65rem;
   font: inherit;
@@ -359,7 +359,7 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 4px;
 }
 
@@ -373,7 +373,7 @@
 .table th,
 .table td {
   padding: 0.5rem 0.55rem;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--tint-line, #eef0f3);
   text-align: left;
   vertical-align: middle;
 }
@@ -383,8 +383,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6b7280;
-  background: #fafafa;
+  color: var(--tint-ink-muted, #6b7280);
+  background: var(--tint-neutral, #fafafa);
   white-space: nowrap;
 }
 
@@ -397,10 +397,10 @@
   min-width: 140px;
   font: inherit;
   font-size: 0.84rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 3px;
   padding: 0.3rem 0.4rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .linkBtn {
@@ -420,7 +420,7 @@
 
 .empty {
   text-align: center;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
   padding: 2.25rem 1rem !important;
 }
 

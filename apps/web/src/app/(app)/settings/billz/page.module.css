@@ -1,11 +1,11 @@
 .groupSelect {
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.5rem;
   font: inherit;
   font-size: 0.84rem;
-  color: #3f4254;
-  background: #fff;
+  color: var(--tint-ink, #3f4254);
+  background: var(--surface);
   min-width: 120px;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-/** Paints the dark /m plane on <body> and restores the desktop skin on exit. */
+/** Paints the light-green /m plane on <body> and restores the desktop skin on exit. */
 export default function MobileBodyFlag() {
   useEffect(() => {
     document.body.dataset.app = 'mobile';

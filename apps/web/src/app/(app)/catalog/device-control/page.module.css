@@ -5,31 +5,27 @@
 
 
 .page {
-  --canvas: #f3f6fb;
-  --surface: #ffffff;
-  --surface-subtle: #f2f5f9;
-  --ink-950: #0a1322;
-  --ink-900: #14213a;
-  --ink-700: #354862;
-  --ink-500: #64788f;
-  --ink-400: #8ca0b8;
-  --line: #e3e9f1;
-  --accent: #0a85e2;
-  --accent-hover: #0770c2;
-  --accent-soft: rgba(10, 133, 226, 0.08);
-  --accent-50: #edf6fe;
-  --st-online: #0e9f6e;
+  --canvas: var(--bg);
+  --surface-subtle: var(--surface-muted);
+  --ink-950: var(--ink-strong);
+  --ink-900: var(--ink);
+  --ink-700: #3d5244;
+  --ink-500: var(--ink-muted);
+  --ink-400: var(--ink-faint);
+  --accent-soft: rgba(47, 163, 80, 0.08);
+  --accent-50: var(--accent-soft);
+  --st-online: #2fa350;
   --st-online-bg: #e8f7f0;
-  --st-offline: #e11d48;
+  --st-offline: #e5484d;
   --st-offline-bg: #fdecef;
-  --st-new: #d97706;
+  --st-new: #e39b0b;
   --st-new-bg: #fcf1e1;
-  --error: #e11d48;
+  --error: #e5484d;
   --error-bg: #fff1f2;
   --error-border: #fecdd3;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
-  --shadow-focus: 0 0 0 3px rgba(10, 133, 226, 0.2);
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --shadow-focus: 0 0 0 3px rgba(47, 163, 80, 0.2);
+  --font-sans: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
   max-width: 1760px;
@@ -73,8 +69,8 @@
   flex-shrink: 0;
   border-radius: 12px;
   color: #fff;
-  background: linear-gradient(135deg, #0e9f6e 0%, #0a85e2 100%);
-  box-shadow: 0 8px 20px -6px rgba(10, 133, 226, 0.45);
+  background: linear-gradient(135deg, #2fa350 0%, #2fa350 100%);
+  box-shadow: 0 8px 20px -6px rgba(47, 163, 80, 0.45);
 }
 
 .h1 {
@@ -132,7 +128,7 @@
 }
 
 .metricIconTotal {
-  background: #edf6fe;
+  background: var(--accent-soft);
   color: var(--accent);
 }
 .metricIconOnline {
@@ -239,7 +235,7 @@
 }
 
 .searchInput:focus {
-  border-color: rgba(10, 133, 226, 0.5);
+  border-color: rgba(47, 163, 80, 0.5);
   box-shadow: var(--shadow-focus);
 }
 
@@ -335,7 +331,7 @@
 
 .table th {
   padding: 12px 16px;
-  background: rgba(242, 245, 249, 0.65);
+  background: var(--tint-info, rgba(242, 245, 249, 0.65));
   border-bottom: 1px solid var(--line);
   font-size: 11px;
   font-weight: 700;
@@ -352,12 +348,12 @@
 
 .table td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  border-bottom: 1px solid var(--tint-line, rgba(227, 233, 241, 0.7));
   vertical-align: middle;
 }
 
 .table tbody tr:hover td {
-  background: rgba(237, 246, 254, 0.35);
+  background: var(--tint-info, rgba(237, 246, 254, 0.35));
 }
 
 .rowBusy td {
@@ -365,7 +361,7 @@
 }
 
 .rowOpen td {
-  background: rgba(237, 246, 254, 0.55) !important;
+  background: var(--tint-info, rgba(237, 246, 254, 0.55)) !important;
   border-bottom-color: transparent;
 }
 
@@ -386,7 +382,7 @@
 }
 
 .deviceIconOn {
-  background: linear-gradient(135deg, #0e9f6e, #0a85e2);
+  background: linear-gradient(135deg, #2fa350, #2fa350);
   color: #fff;
   box-shadow: 0 6px 14px -6px rgba(14, 159, 110, 0.55);
 }
@@ -508,27 +504,27 @@
 .expandBtn:hover {
   background: var(--accent-50);
   color: var(--accent);
-  border-color: rgba(10, 133, 226, 0.3);
+  border-color: rgba(47, 163, 80, 0.3);
 }
 
 .expandBtnOpen {
   background: var(--accent-50);
   color: var(--accent);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
   transform: rotate(180deg);
 }
 
 .expandRow td {
   padding: 0 16px 16px !important;
-  background: rgba(237, 246, 254, 0.55) !important;
+  background: var(--tint-info, rgba(237, 246, 254, 0.55)) !important;
   border-bottom: 1px solid var(--line) !important;
   vertical-align: top;
 }
 
 .expandPanel {
-  border: 1px solid rgba(10, 133, 226, 0.18);
+  border: 1px solid rgba(47, 163, 80, 0.18);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
   padding: 14px 16px 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
@@ -587,13 +583,13 @@
 
 .actionBtn:hover:not(:disabled) {
   background: var(--accent-50);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
   color: var(--accent);
 }
 
 .actionBtnDanger {
   border-color: rgba(225, 29, 72, 0.22);
-  background: #fffafb;
+  background: var(--tint-neutral, #fffafb);
   color: var(--st-offline);
 }
 
@@ -619,7 +615,7 @@
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   flex-shrink: 0;
   color: inherit;
@@ -695,12 +691,12 @@
   height: 36px;
   padding: 0 14px;
   border-radius: 10px;
-  background: linear-gradient(180deg, #0a85e2, #0770c2);
+  background: linear-gradient(180deg, #2fa350, #268a42);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 4px 14px -4px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 4px 14px -4px rgba(47, 163, 80, 0.55);
 }
 
 .emptyLink:hover {
@@ -712,7 +708,7 @@
   width: 18px;
   height: 18px;
   margin: 0 auto 10px;
-  border: 2px solid rgba(10, 133, 226, 0.2);
+  border: 2px solid rgba(47, 163, 80, 0.2);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: rotate 0.7s linear infinite;
@@ -720,7 +716,7 @@
 
 .footer {
   border-top: 1px solid var(--line);
-  background: rgba(242, 245, 249, 0.4);
+  background: var(--tint-info, rgba(242, 245, 249, 0.4));
   padding: 12px 20px;
   font-size: 12.5px;
   color: var(--ink-500);
@@ -742,7 +738,7 @@
   z-index: 90;
   transform: translateX(-50%);
   border-radius: 12px;
-  background: #0b1524;
+  background: #163524;
   padding: 12px 20px;
   font-size: 13px;
   font-weight: 600;

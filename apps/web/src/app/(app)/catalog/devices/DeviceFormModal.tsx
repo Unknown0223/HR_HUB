@@ -465,7 +465,7 @@ export function DeviceFormModal({
                               alignItems: 'center',
                               padding: '0 12px',
                               borderRadius: 8,
-                              border: '1px solid #e3e9f1',
+                              border: '1px solid #dcebdc',
                               background: '#fff',
                               fontWeight: 650,
                             }}

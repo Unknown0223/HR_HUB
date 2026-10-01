@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }
 
 .actions {
@@ -39,7 +39,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -52,9 +52,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -69,7 +69,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
@@ -77,12 +77,12 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 4px;
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .layout {
@@ -105,8 +105,8 @@
 }
 
 .section {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 0.9rem 1rem;
   display: flex;
@@ -135,7 +135,7 @@
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.2rem;
 }
 
@@ -150,7 +150,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 32px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.45rem;
   font: inherit;
@@ -172,8 +172,8 @@
 
 .toolBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #f8f9fa;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--tint-neutral, #f8f9fa);
   border-radius: 4px;
   font: inherit;
   font-size: 0.75rem;
@@ -198,18 +198,18 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   padding: 0.35rem;
   text-align: left;
 }
 
 .table th {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   font-size: 0.72rem;
 }
 
 .rowSelected {
-  background: #f0f9ff;
+  background: var(--tint-info, #f0f9ff);
 }
 
 .empty {
@@ -219,8 +219,8 @@
 }
 
 .side {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 0.9rem 1rem;
   min-height: 280px;
@@ -246,7 +246,7 @@
   justify-content: center;
   text-align: center;
   gap: 0.5rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   font-size: 0.85rem;
   padding: 2rem 0.5rem;
 }
@@ -271,11 +271,11 @@
 }
 
 .totals dt {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
 }
 
 .totals dd {
   margin: 0;
   font-weight: 700;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
 }

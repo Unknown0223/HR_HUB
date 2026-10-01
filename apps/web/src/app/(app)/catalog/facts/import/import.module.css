@@ -1,15 +1,12 @@
 .wrap {
-  --canvas: #f3f6fb;
-  --surface: #ffffff;
-  --surface-subtle: #f2f5f9;
-  --ink-950: #0a1322;
-  --ink-900: #14213a;
-  --ink-700: #354862;
-  --ink-500: #64788f;
-  --ink-400: #8ca0b8;
-  --line: #e3e9f1;
-  --accent: #0a85e2;
-  --st-ok: #0e9f6e;
+  --canvas: var(--bg);
+  --surface-subtle: var(--surface-muted);
+  --ink-950: var(--ink-strong);
+  --ink-900: var(--ink);
+  --ink-700: #3d5244;
+  --ink-500: var(--ink-muted);
+  --ink-400: var(--ink-faint);
+  --st-ok: #2fa350;
   --st-ok-bg: #e8f7f0;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
   animation: fadeUp 0.22s ease both;
@@ -46,7 +43,7 @@
 
 .btnPrimary {
   border: 1px solid rgba(14, 159, 110, 0.5);
-  background: #fff;
+  background: var(--surface);
   color: var(--st-ok);
 }
 
@@ -61,13 +58,13 @@
 
 .btnGhost {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-700);
 }
 
 .btnGhost:hover {
   color: var(--accent);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
 }
 
 .error,
@@ -79,7 +76,7 @@
 }
 
 .error {
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   color: #b91c1c;
   border: 1px solid #fecdd3;
 }
@@ -106,7 +103,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow-card);
   padding: 1rem 1.1rem 1.15rem;
   display: flex;
@@ -135,8 +132,8 @@
 
 .drop:hover,
 .dropActive {
-  border-color: rgba(10, 133, 226, 0.5);
-  background: #edf6fe;
+  border-color: rgba(47, 163, 80, 0.5);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -152,8 +149,8 @@
 }
 
 .search:focus {
-  border-color: rgba(10, 133, 226, 0.5);
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.15);
+  border-color: rgba(47, 163, 80, 0.5);
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.15);
 }
 
 .tableScroll {
@@ -170,7 +167,7 @@
 .table th,
 .table td {
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(227, 233, 241, 0.7);
+  border-bottom: 1px solid var(--tint-line, rgba(227, 233, 241, 0.7));
   text-align: left;
 }
 
@@ -180,7 +177,7 @@
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--ink-400);
-  background: rgba(242, 245, 249, 0.65);
+  background: var(--tint-info, rgba(242, 245, 249, 0.65));
   position: sticky;
   top: 0;
 }

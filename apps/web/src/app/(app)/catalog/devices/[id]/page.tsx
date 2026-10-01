@@ -775,7 +775,7 @@ function DeviceDetailInner() {
     }
   }
 
-  if (loading) return <div className={styles.page}><p style={{ padding: '2rem', color: '#64788f' }}>Загрузка…</p></div>;
+  if (loading) return <div className={styles.page}><p style={{ padding: '2rem', color: '#5e6f62' }}>Загрузка…</p></div>;
   if (!device) return <div className={styles.page}><p className={styles.error}>{error || 'Устройство не найдено'}</p></div>;
 
   return (

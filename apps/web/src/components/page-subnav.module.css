@@ -31,13 +31,13 @@
   gap: 0.4rem;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--ink-strong, #0a1322);
+  color: var(--ink-strong, var(--ink-strong));
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 .bars {
-  color: var(--accent, #0a85e2);
+  color: var(--accent, #2fa350);
   font-size: 0.95rem;
   opacity: 0.9;
 }
@@ -45,7 +45,7 @@
 .sep {
   width: 1px;
   height: 1.25rem;
-  background: var(--line, #e3e9f1);
+  background: var(--line, var(--line));
   flex-shrink: 0;
 }
 
@@ -57,7 +57,7 @@
   padding: 0.3rem;
   border-radius: 12px;
   background: var(--bg-elevated, #eef2f7);
-  border: 1px solid var(--line-soft, #e3e9f1);
+  border: 1px solid var(--line-soft, var(--line));
   max-width: 100%;
 }
 
@@ -85,21 +85,21 @@
 }
 
 .link:hover {
-  color: var(--ink-strong, #0a1322);
-  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink-strong, var(--ink-strong));
+  background: var(--tint-neutral, rgba(255, 255, 255, 0.72));
   text-decoration: none;
 }
 
 .linkActive {
   color: #fff;
-  background: var(--accent, #0a85e2);
+  background: var(--accent, #2fa350);
   border-color: transparent;
-  box-shadow: 0 2px 8px -2px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 2px 8px -2px rgba(47, 163, 80, 0.55);
 }
 
 .linkActive:hover {
   color: #fff;
-  background: var(--accent-hover, #0770c2);
+  background: var(--accent-hover, #268a42);
   text-decoration: none;
 }
 

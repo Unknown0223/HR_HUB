@@ -292,7 +292,7 @@ export function PersonDocsImportPage() {
                 type="button"
                 className={imp.drop}
                 style={{
-                  borderColor: drag ? '#0a85e2' : undefined,
+                  borderColor: drag ? '#2fa350' : undefined,
                   background: drag ? '#eef6ff' : undefined,
                 }}
                 onClick={() => inputRef.current?.click()}

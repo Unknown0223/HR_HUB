@@ -16,7 +16,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   font-size: 0.95rem;
@@ -30,7 +30,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -49,9 +49,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -66,7 +66,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
@@ -74,12 +74,12 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 4px;
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin: 0;
 }
 
@@ -97,8 +97,8 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.1rem 1.2rem;
   display: flex;
@@ -111,13 +111,13 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .field label {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.22rem;
 }
 
@@ -129,19 +129,19 @@
   width: 100%;
   box-sizing: border-box;
   min-height: 88px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   resize: vertical;
 }
 
 .field textarea:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -157,19 +157,19 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input:not([type='radio']):not([type='checkbox']):focus,
 .field select:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -183,7 +183,7 @@
   gap: 0.4rem;
   font-size: 0.85rem;
   line-height: 1.35;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   max-width: 100%;
 }
@@ -193,7 +193,7 @@
   height: 1rem;
   margin: 0.12rem 0 0;
   flex-shrink: 0;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   cursor: pointer;
 }
 
@@ -211,7 +211,7 @@
   gap: 0.4rem;
   font-size: 0.86rem;
   line-height: 1.2;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   white-space: nowrap;
   font-weight: 400;
@@ -230,7 +230,7 @@
   border: none;
   box-shadow: none;
   background: transparent;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -243,7 +243,7 @@
 .fieldLabel {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.35rem;
 }
 
@@ -256,9 +256,9 @@
 .typeBtn,
 .typeBtnOn {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #5e6278;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink-muted, #5e6278);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
@@ -271,9 +271,9 @@
 }
 
 .typeBtnOn {
-  border-color: #0a85e2;
-  background: #e8f3ff;
-  color: #0a85e2;
+  border-color: #2fa350;
+  background: var(--tint-info, #e8f3ff);
+  color: #2fa350;
 }
 
 .statusBlock {
@@ -288,7 +288,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.85rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
 }
 
@@ -297,7 +297,7 @@
   width: 40px;
   height: 22px;
   border-radius: 999px;
-  background: #e1e3ea;
+  background: var(--tint-neutral, #e1e3ea);
   position: relative;
   border: none;
   cursor: pointer;
@@ -306,7 +306,7 @@
 }
 
 .toggleOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .toggle::after {
@@ -317,7 +317,7 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   transition: transform 0.15s ease;
 }
 
@@ -326,9 +326,9 @@
 }
 
 .dropZone {
-  border: 1px dashed #c4c8d4;
+  border: 1px dashed var(--tint-line, #c4c8d4);
   border-radius: 6px;
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
   min-height: 110px;
   display: flex;
   flex-direction: column;
@@ -338,16 +338,16 @@
   padding: 1rem;
   cursor: pointer;
   text-align: center;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.85rem;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .dropZone:hover,
 .dropZoneActive {
-  border-color: #0a85e2;
-  background: #f3f9ff;
-  color: #0a85e2;
+  border-color: #2fa350;
+  background: var(--tint-neutral, #f3f9ff);
+  color: #2fa350;
 }
 
 .dropHint {
@@ -358,7 +358,7 @@
 .fileName {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .hiddenFile {
@@ -373,7 +373,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
@@ -399,9 +399,9 @@
   padding: 0.4rem 0.5rem;
   border-radius: 4px;
   font-size: 0.85rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  background: #f8f9fb;
+  background: var(--tint-neutral, #f8f9fb);
 }
 
 .varItem button {
@@ -429,7 +429,7 @@
 .addVar input {
   flex: 1;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
@@ -438,13 +438,13 @@
 
 .addVar button {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
   border-radius: 4px;
   padding: 0 0.75rem;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #0a85e2;
+  color: #2fa350;
   cursor: pointer;
 }

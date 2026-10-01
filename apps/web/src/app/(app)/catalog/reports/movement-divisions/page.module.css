@@ -6,10 +6,10 @@
   appearance: none;
   width: 100%;
   height: 36px;
-  border: 1.5px solid #e3e9f1;
+  border: 1.5px solid var(--line);
   border-radius: 9px;
-  background: #fff;
-  color: #0a1322;
+  background: var(--surface);
+  color: var(--ink-strong);
   font: inherit;
   font-size: 0.8125rem;
   text-align: left;
@@ -19,8 +19,8 @@
 
 .periodBtn:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .periodWrap {
@@ -33,8 +33,8 @@
   top: calc(100% + 4px);
   left: 0;
   display: flex;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 6px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
   min-width: 640px;
@@ -42,7 +42,7 @@
 
 .presets {
   width: 190px;
-  border-right: 1px solid #eff2f5;
+  border-right: 1px solid var(--tint-line, #eff2f5);
   padding: 0.4rem 0;
 }
 
@@ -56,15 +56,15 @@
   text-align: left;
   font: inherit;
   font-size: 0.82rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   padding: 0.4rem 0.75rem;
   cursor: pointer;
 }
 
 .preset:hover,
 .presetOn {
-  background: #f1faff;
-  color: #0a85e2;
+  background: var(--tint-info, #f1faff);
+  color: #2fa350;
 }
 
 .calendars {
@@ -83,14 +83,14 @@
   margin-bottom: 0.35rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
 }
 
 .calNav {
   appearance: none;
   border: none;
   background: transparent;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   cursor: pointer;
   width: 24px;
   height: 24px;
@@ -121,7 +121,7 @@
   height: 1.85rem;
   font: inherit;
   font-size: 0.78rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   cursor: pointer;
   border-radius: 3px;
 }
@@ -131,11 +131,11 @@
 }
 
 .dayIn {
-  background: #e1f0ff;
+  background: var(--tint-info, #e1f0ff);
 }
 
 .dayOn {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
@@ -159,13 +159,13 @@
 }
 
 .apply {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .cancel {
-  background: #f3f6f9;
-  color: #5e6278;
+  background: var(--tint-neutral, #f3f6f9);
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .inputs {
@@ -177,7 +177,7 @@
 .inputs input {
   width: 110px;
   height: 30px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.4rem;
   font: inherit;
@@ -185,9 +185,9 @@
 }
 
 .treeBox {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(200px, 30vh);
   overflow: auto;
   padding: 0.35rem 0.45rem;
@@ -196,7 +196,7 @@
 .treeSearch {
   width: 100%;
   height: 34px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
@@ -207,7 +207,7 @@
 
 .treeSearch:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .treeRow {
@@ -216,7 +216,7 @@
   gap: 0.3rem;
   min-height: 26px;
   font-size: 0.86rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .exp {
@@ -230,7 +230,7 @@
 }
 
 .treeRow input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .legend {
@@ -239,23 +239,23 @@
   gap: 0.85rem 1.25rem;
   margin: 0 0 0.65rem;
   font-size: 0.78rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .swatch {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 1px solid #d8dbe0;
+  border: 1px solid var(--tint-line, #d8dbe0);
   margin-right: 0.35rem;
   vertical-align: -2px;
 }
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -269,10 +269,10 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.4rem 0.45rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   vertical-align: middle;
 }
 
@@ -285,19 +285,19 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
   text-align: center;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .table thead tr:nth-child(2) th {
   top: 2.1rem;
   font-weight: 600;
   font-size: 0.7rem;
-  color: #64788f;
-  background: #f7f9fc;
+  color: var(--ink-muted);
+  background: var(--tint-neutral, #f7f9fc);
 }
 
 .num {
@@ -307,15 +307,15 @@
 }
 
 .min {
-  background: #d6ecff;
+  background: var(--tint-info, #d6ecff);
 }
 
 .max {
-  background: #ffdfd2;
+  background: var(--tint-danger, #ffdfd2);
 }
 
 .pct {
-  background: #e8f5e0;
+  background: var(--tint-ok, #e8f5e0);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -323,7 +323,7 @@
 .periodLine {
   margin: 0 0 0.5rem;
   font-size: 0.8125rem;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
 }
 
 /* Kept for unmigrated report pages that still import these classes */
@@ -339,7 +339,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -361,8 +361,8 @@
 .exportGhost {
   appearance: none;
   border: none;
-  background: #eef3f7;
-  color: #5e6278;
+  background: var(--tint-info, #eef3f7);
+  color: var(--tint-ink-muted, #5e6278);
   font: inherit;
   font-size: 0.68rem;
   font-weight: 700;

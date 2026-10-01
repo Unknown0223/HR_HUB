@@ -19,30 +19,30 @@
 
 .req::after {
   content: ' *';
-  color: #e11d48;
+  color: #e5484d;
 }
 
 .timeInput {
   width: 100%;
   height: 36px;
   box-sizing: border-box;
-  border: 1.5px solid #e3e9f1;
+  border: 1.5px solid var(--line);
   border-radius: 9px;
   padding: 0 0.65rem;
   font: inherit;
   font-size: 0.8125rem;
-  color: #0a1322;
-  background: #fff;
+  color: var(--ink-strong);
+  background: var(--surface);
 }
 
 .timeInput:focus {
   outline: none;
-  border-color: #0a85e2;
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  border-color: #2fa350;
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.2);
 }
 
 .timeBad {
-  border-color: #e11d48;
+  border-color: #e5484d;
   box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
 }
 
@@ -52,7 +52,7 @@
   background: none;
   padding: 0;
   margin: 0;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-weight: 650;
   text-align: left;
@@ -64,7 +64,7 @@
 }
 
 .dateLink {
-  color: #0a85e2;
+  color: #2fa350;
   text-decoration: none;
   font: inherit;
   font-weight: 650;
@@ -76,9 +76,9 @@
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -92,10 +92,10 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.35rem 0.42rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   text-align: center;
   white-space: nowrap;
   vertical-align: middle;
@@ -110,22 +110,22 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .table thead tr:nth-child(2) th {
   top: 2.1rem;
   font-weight: 600;
   font-size: 0.68rem;
-  color: #64788f;
-  background: #f7f9fc;
+  color: var(--ink-muted);
+  background: var(--tint-neutral, #f7f9fc);
 }
 
 .table tbody tr:hover td {
-  background: #f5f9fd;
+  background: var(--tint-neutral, #f5f9fd);
 }
 
 .name {
@@ -141,17 +141,17 @@
 }
 
 .weekend {
-  background: #edf6fe;
+  background: var(--accent-soft);
 }
 
 .off {
-  background: #edf6fe;
-  color: #64788f;
+  background: var(--accent-soft);
+  color: var(--ink-muted);
 }
 
 .total td {
   font-weight: 700;
-  background: #edf6fe;
+  background: var(--accent-soft);
 }
 
 .settings {
@@ -172,7 +172,7 @@
   margin: 0 0 0.15rem;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #0a1322;
+  color: var(--ink-strong);
 }
 
 .check {
@@ -182,13 +182,13 @@
   margin: 0;
   font-size: 0.86rem;
   line-height: 1.35;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
   cursor: pointer;
   user-select: none;
 }
 
 .checkOff {
-  color: #8ca0b8;
+  color: var(--ink-faint);
   cursor: default;
 }
 
@@ -206,15 +206,15 @@
   margin-top: 0.12rem;
   flex: 0 0 16px;
   box-sizing: border-box;
-  border: 1.5px solid #d1d3e0;
+  border: 1.5px solid var(--tint-line, #d1d3e0);
   border-radius: 2px;
-  background: #fff;
+  background: var(--surface);
   position: relative;
 }
 
 .check input:checked + .box {
-  background: #0a85e2;
-  border-color: #0a85e2;
+  background: #2fa350;
+  border-color: #2fa350;
 }
 
 .check input:checked + .box::after {
@@ -224,14 +224,14 @@
   top: 1px;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  border: solid var(--tint-line, #fff);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
 .check input:disabled + .box {
-  background: #f2f5f9;
-  border-color: #e8eef5;
+  background: var(--surface-muted);
+  border-color: var(--tint-line, #e8eef5);
 }
 
 @media (max-width: 860px) {

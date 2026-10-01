@@ -1,14 +1,14 @@
 /* Access report — yes/no cells, pick extras, table (shell in report-arena) */
 
 .yes {
-  background: #e3f2fd;
+  background: var(--tint-info, #e3f2fd);
   color: #1565c0;
   text-align: center;
   font-weight: 650;
 }
 
 .no {
-  background: #fccdd2;
+  background: var(--tint-danger, #fccdd2);
   color: #c62828;
   text-align: center;
   font-weight: 650;
@@ -19,7 +19,7 @@
   height: 16px;
   margin: 0;
   flex: 0 0 16px;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   cursor: pointer;
 }
 
@@ -40,7 +40,7 @@
 }
 
 .treeOn {
-  background: rgba(10, 133, 226, 0.08);
+  background: rgba(47, 163, 80, 0.08);
   border-radius: 7px;
 }
 
@@ -51,13 +51,13 @@
   padding: 0;
   font: inherit;
   font-size: 0.8125rem;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
   cursor: pointer;
   text-align: left;
 }
 
 .treeNameOn {
-  color: #0a1322;
+  color: var(--ink-strong);
   font-weight: 650;
 }
 
@@ -74,29 +74,29 @@
   gap: 0.55rem;
   width: 100%;
   border: none;
-  border-bottom: 1px solid #f1f5fa;
-  background: #fff;
+  border-bottom: 1px solid var(--tint-line, #f1f5fa);
+  background: var(--surface);
   text-align: left;
   padding: 0.35rem 0.65rem;
   font: inherit;
   font-size: 0.8125rem;
-  color: #354862;
+  color: var(--tint-ink, #3d5244);
   cursor: pointer;
 }
 
 .listRow:hover {
-  background: #f2f5f9;
-  color: #0a1322;
+  background: var(--surface-muted);
+  color: var(--ink-strong);
 }
 
 .listOn {
-  background: rgba(10, 133, 226, 0.08);
-  color: #0a1322;
+  background: rgba(47, 163, 80, 0.08);
+  color: var(--ink-strong);
   font-weight: 650;
 }
 
 .listOn:hover {
-  background: rgba(10, 133, 226, 0.12);
+  background: rgba(47, 163, 80, 0.12);
 }
 
 .empMenu {
@@ -126,8 +126,8 @@
 }
 
 .empHead {
-  background: #fbfcfe;
-  color: #64788f;
+  background: var(--tint-neutral, #fbfcfe);
+  color: var(--ink-muted);
   font-weight: 700;
   font-size: 0.6875rem;
   text-transform: uppercase;
@@ -135,46 +135,46 @@
   position: sticky;
   top: 36px;
   z-index: 1;
-  border-bottom: 1px solid #e8eef5;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
 }
 
 .empRow {
   appearance: none;
   width: 100%;
   border: none;
-  border-bottom: 1px solid #f1f5fa;
-  background: #fff;
+  border-bottom: 1px solid var(--tint-line, #f1f5fa);
+  background: var(--surface);
   text-align: left;
   cursor: pointer;
-  color: #0a1322;
+  color: var(--ink-strong);
 }
 
 .empRow:nth-child(even) {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .empRow:hover {
-  background: #f2f5f9;
+  background: var(--surface-muted);
 }
 
 .empOn,
 .empOn:nth-child(even) {
-  background: rgba(10, 133, 226, 0.08);
+  background: rgba(47, 163, 80, 0.08);
   font-weight: 650;
 }
 
 .empOn:hover {
-  background: rgba(10, 133, 226, 0.12);
+  background: rgba(47, 163, 80, 0.12);
 }
 
 .empTab {
   font-variant-numeric: tabular-nums;
-  color: #64788f;
+  color: var(--ink-muted);
 }
 
 .empOn .empTab,
 .empOn .empName {
-  color: #0a1322;
+  color: var(--ink-strong);
 }
 
 .empName {
@@ -183,15 +183,15 @@
 
 .chipCount {
   font-size: 0.7rem;
-  color: #0a85e2;
+  color: #2fa350;
   font-weight: 650;
 }
 
 .tableWrap {
   overflow: auto;
-  border: 1px solid var(--line, #e3e9f1);
+  border: 1px solid var(--line, var(--line));
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   max-height: min(70vh, 820px);
 }
 
@@ -205,10 +205,10 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid #e8eef5;
-  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--tint-line, #e8eef5);
+  border-right: 1px solid var(--tint-line, #eef2f7);
   padding: 0.45rem 0.55rem;
-  color: #0a1322;
+  color: var(--ink-strong);
   white-space: nowrap;
   text-align: center;
   vertical-align: middle;
@@ -223,10 +223,10 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   font-weight: 700;
-  color: #354862;
-  box-shadow: 0 1px 0 #e3e9f1;
+  color: var(--tint-ink, #3d5244);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .rowName {
@@ -234,16 +234,16 @@
 }
 
 .zebra td {
-  background: #f9fafb;
+  background: var(--tint-neutral, #f9fafb);
 }
 
 .table tbody tr:hover td {
-  background: #f5f9fd;
+  background: var(--tint-neutral, #f5f9fd);
 }
 
 .empty {
   text-align: center;
-  color: #8ca0b8;
+  color: var(--ink-faint);
   padding: 1.5rem;
 }
 

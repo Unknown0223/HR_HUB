@@ -2,38 +2,32 @@
   Arena shell for the «Отчетность» report pages
   (attendance-overview, attendance-t13, marks-detail, discipline, division-mode).
   Report logic, filters, tabs and exports are untouched — this only carries the
-  Arena visual language (canvas #f3f6fb, accent #0a85e2, 16px card radius).
+  Arena visual language (canvas var(--bg), accent #2fa350, 16px card radius).
 */
 
 .page {
-  --canvas: #f3f6fb;
-  --surface: #ffffff;
-  --surface-subtle: #f2f5f9;
-  --ink: #0a1322;
-  --ink-secondary: #354862;
-  --ink-muted: #64788f;
-  --ink-subtle: #8ca0b8;
-  --line: #e8eef5;
-  --line-strong: #e3e9f1;
-  --accent: #0a85e2;
-  --accent-hover: #0770c2;
-  --accent-soft: rgba(10, 133, 226, 0.08);
-  --accent-tint: #edf6fe;
-  --ok: #0e9f6e;
-  --warn: #d97706;
-  --danger: #e11d48;
+  --canvas: var(--bg);
+  --surface-subtle: var(--surface-muted);
+  --ink: var(--ink-strong);
+  --ink-secondary: #3d5244;
+  --ink-subtle: var(--ink-faint);
+  --line-strong: var(--line);
+  --accent-soft: rgba(47, 163, 80, 0.08);
+  --accent-tint: var(--accent-soft);
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.04), 0 10px 28px -16px rgba(16, 30, 54, 0.16);
-  --shadow-focus: 0 0 0 3px rgba(10, 133, 226, 0.2);
+  --shadow-focus: 0 0 0 3px rgba(47, 163, 80, 0.2);
   --radius-card: 16px;
 
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  flex: 1 0 auto;
   width: 100%;
-  max-width: 1760px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   box-sizing: border-box;
-  padding: 1.25rem 1.5rem 2.5rem;
+  min-height: calc(100dvh - var(--header-height) - 44px);
+  padding: 1.25rem 1.5rem 1.5rem;
   background: var(--canvas);
   color: var(--ink);
   animation: fadeUp 0.22s ease both;
@@ -87,13 +81,13 @@
 
 .tab:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--tint-neutral, rgba(255, 255, 255, 0.72));
 }
 
 .tabOn {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px -2px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 2px 8px -2px rgba(47, 163, 80, 0.55);
 }
 
 .tabOn:focus-visible {
@@ -134,7 +128,7 @@
 
 .ghostBtn:hover:not(:disabled) {
   background: var(--surface-subtle);
-  border-color: #cbd5e1;
+  border-color: var(--tint-line, #cbd5e1);
   color: var(--ink);
 }
 
@@ -155,7 +149,7 @@
 
 .iconBtn:hover:not(:disabled) {
   background: var(--accent-soft);
-  border-color: rgba(10, 133, 226, 0.42);
+  border-color: rgba(47, 163, 80, 0.42);
   color: var(--accent);
 }
 
@@ -201,7 +195,7 @@
 
 .exportBtn:hover:not(:disabled) {
   background: var(--accent-soft);
-  border-color: rgba(10, 133, 226, 0.42);
+  border-color: rgba(47, 163, 80, 0.42);
   color: var(--accent);
 }
 
@@ -230,7 +224,7 @@
 
 .exportLinks button:hover:not(:disabled) {
   background: var(--accent-soft);
-  border-color: rgba(10, 133, 226, 0.28);
+  border-color: rgba(47, 163, 80, 0.28);
 }
 
 .exportLinks button:disabled {
@@ -243,7 +237,7 @@
   margin: 0;
   padding: 11px 14px;
   border-radius: 11px;
-  background: #fff1f2;
+  background: var(--tint-danger, #fff1f2);
   border: 1px solid #fecdd3;
   color: var(--danger);
   font-size: 0.8125rem;
@@ -347,7 +341,7 @@
   appearance: none;
   border: none;
   border-radius: 10px;
-  background: linear-gradient(180deg, #0a85e2 0%, #0770c2 100%);
+  background: linear-gradient(180deg, #2fa350 0%, #268a42 100%);
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -355,12 +349,12 @@
   height: 36px;
   padding: 0 18px;
   cursor: pointer;
-  box-shadow: 0 3px 12px -4px rgba(10, 133, 226, 0.55);
+  box-shadow: 0 3px 12px -4px rgba(47, 163, 80, 0.55);
   transition: background 0.14s ease, transform 0.1s ease;
 }
 
 .primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #0a85e2 0%, #0a5e9f 100%);
+  background: linear-gradient(180deg, #2fa350 0%, #1f6f3a 100%);
 }
 
 .primary:active:not(:disabled) {
@@ -389,7 +383,7 @@
 
 .periodBtn:hover,
 .dropField:hover {
-  border-color: #cbd5e1;
+  border-color: var(--tint-line, #cbd5e1);
 }
 
 .periodBtn:focus,
@@ -470,7 +464,7 @@
   width: 100%;
   box-sizing: border-box;
   border: none;
-  border-bottom: 1px solid #f1f5fa;
+  border-bottom: 1px solid var(--tint-line, #f1f5fa);
   background: var(--surface);
   text-align: left;
   padding: 0.38rem 0.65rem;
@@ -522,7 +516,7 @@
 }
 
 .empHead {
-  background: #fbfcfe;
+  background: var(--tint-neutral, #fbfcfe);
   border-bottom: 1px solid var(--line);
   color: var(--ink-muted);
   font-weight: 700;
@@ -535,7 +529,7 @@
   appearance: none;
   width: 100%;
   border: none;
-  border-bottom: 1px solid #f1f5fa;
+  border-bottom: 1px solid var(--tint-line, #f1f5fa);
   background: var(--surface);
   text-align: left;
   cursor: pointer;
@@ -675,7 +669,7 @@
 }
 
 .chip:hover {
-  background: #dceefb;
+  background: var(--tint-info, #dceefb);
 }
 
 /* ── View area ── */
@@ -719,7 +713,7 @@
 
 .back:hover {
   background: var(--accent-soft);
-  border-color: rgba(10, 133, 226, 0.42);
+  border-color: rgba(47, 163, 80, 0.42);
   color: var(--accent);
 }
 
@@ -773,7 +767,7 @@
 
 .subTabOn {
   background: var(--accent-tint);
-  border-color: rgba(10, 133, 226, 0.28);
+  border-color: rgba(47, 163, 80, 0.28);
   color: var(--accent-hover);
 }
 
@@ -784,7 +778,15 @@
   }
 
   .page {
+    flex: none;
+    min-height: 0;
     padding: 0;
+  }
+
+  .viewCard,
+  .viewCard > :last-child {
+    flex: none;
+    min-height: 0;
   }
 }
 
@@ -831,7 +833,14 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 320px;
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+/* Table (or empty state) fills the card. Report max-height caps stay in place. */
+.viewCard > :last-child {
+  flex: 1 0 auto;
+  min-height: 16rem;
 }
 
 .viewMeta {

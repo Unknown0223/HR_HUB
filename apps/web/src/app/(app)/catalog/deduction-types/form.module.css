@@ -16,7 +16,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--tint-ink, #2c3e50);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -29,7 +29,7 @@
 .btnSave {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -48,9 +48,9 @@
 }
 
 .btnClose {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #0a85e2;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -65,18 +65,18 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
 .muted {
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin: 0;
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #eef0f4;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #eef0f4);
   border-radius: 6px;
   padding: 1.1rem 1.2rem;
   display: flex;
@@ -95,7 +95,7 @@
 .fieldLabel {
   display: block;
   font-size: 0.72rem;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   margin-bottom: 0.22rem;
 }
 
@@ -108,13 +108,13 @@
 .field textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input,
@@ -132,7 +132,7 @@
 .field select:focus,
 .field textarea:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -149,7 +149,7 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.85rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
 }
 
@@ -174,12 +174,12 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   transition: transform 0.15s ease;
 }
 
 .toggleOn {
-  background: #0a85e2;
+  background: #2fa350;
 }
 
 .toggleOn::after {
@@ -189,7 +189,7 @@
 .tabs {
   display: flex;
   gap: 0.15rem;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 1px solid var(--tint-line, #eef0f4);
   margin-top: 0.25rem;
 }
 
@@ -202,14 +202,14 @@
   font-size: 0.85rem;
   padding: 0.55rem 0.85rem;
   cursor: pointer;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
 
 .tabOn {
-  color: #0a85e2;
-  border-bottom-color: #0a85e2;
+  color: #2fa350;
+  border-bottom-color: #2fa350;
   font-weight: 600;
 }
 
@@ -246,7 +246,7 @@
 .fieldset legend {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   margin-bottom: 0.25rem;
   padding: 0;
 }
@@ -257,7 +257,7 @@
   align-items: flex-start;
   gap: 0.45rem;
   font-size: 0.85rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   line-height: 1.35;
 }
@@ -265,7 +265,7 @@
 .radio input,
 .check input {
   margin-top: 0.15rem;
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
   flex-shrink: 0;
 }
 
@@ -273,7 +273,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;

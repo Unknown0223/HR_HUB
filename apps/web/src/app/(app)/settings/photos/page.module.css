@@ -11,7 +11,7 @@
   flex-direction: column;
   gap: 0.3rem;
   font-size: 0.82rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .req {
@@ -28,19 +28,19 @@
   width: 100%;
   height: 34px;
   box-sizing: border-box;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.55rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
-  color: #3f4254;
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   text-align: left;
   cursor: pointer;
 }
 
 .folderBtn:hover {
-  border-color: #0a85e2;
+  border-color: #2fa350;
 }
 
 .folderBtnEmpty {
@@ -61,7 +61,7 @@
 .uploadBtn {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -83,7 +83,7 @@
   height: 18px;
   border-radius: 50%;
   border: 1px solid #b5b5c3;
-  color: #7e8299;
+  color: var(--tint-ink-muted, #7e8299);
   font-size: 0.72rem;
   font-weight: 700;
   display: inline-flex;
@@ -99,8 +99,8 @@
   gap: 0.25rem;
   padding: 0.3rem;
   border-radius: 12px;
-  background: #eef2f7;
-  border: 1px solid #e3e9f1;
+  background: var(--tint-info, #eef2f7);
+  border: 1px solid var(--line);
   margin-bottom: 0.85rem;
   max-width: 100%;
 }
@@ -117,21 +117,21 @@
   min-height: 36px;
   border-radius: 10px;
   cursor: pointer;
-  color: #64788f;
+  color: var(--ink-muted);
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
 }
 
 .tab:hover {
-  color: #0a1322;
-  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink-strong);
+  background: var(--tint-neutral, rgba(255, 255, 255, 0.72));
 }
 
 .tabOn {
   color: #fff;
-  background: #0a85e2;
-  box-shadow: 0 2px 8px -2px rgba(10, 133, 226, 0.55);
+  background: #2fa350;
+  box-shadow: 0 2px 8px -2px rgba(47, 163, 80, 0.55);
 }
 
 .toolbar {

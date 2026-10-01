@@ -1,11 +1,11 @@
 /* Arena month / period picker — replaces native input[type=month] */
 
 .wrap {
-  --mpp-ink: #14213a;
-  --mpp-muted: #64788f;
-  --mpp-line: #e3e9f1;
-  --mpp-accent: #0a85e2;
-  --mpp-accent-soft: rgba(10, 133, 226, 0.1);
+  --mpp-ink: var(--ink);
+  --mpp-muted: var(--ink-muted);
+  --mpp-line: var(--line);
+  --mpp-accent: #2fa350;
+  --mpp-accent-soft: rgba(47, 163, 80, 0.1);
   --mpp-surface: #ffffff;
   position: relative;
   display: inline-flex;
@@ -57,13 +57,13 @@
 }
 
 .trigger:hover {
-  border-color: rgba(10, 133, 226, 0.45);
-  background: #f8fbff;
+  border-color: rgba(47, 163, 80, 0.45);
+  background: var(--tint-neutral, #f8fbff);
 }
 
 .open .trigger {
-  border-color: rgba(10, 133, 226, 0.55);
-  box-shadow: 0 0 0 3px rgba(10, 133, 226, 0.16);
+  border-color: rgba(47, 163, 80, 0.55);
+  box-shadow: 0 0 0 3px rgba(47, 163, 80, 0.16);
 }
 
 .triggerIcon {
@@ -143,7 +143,7 @@
   place-items: center;
   border: 1px solid var(--mpp-line);
   border-radius: 9px;
-  background: #f2f5f9;
+  background: var(--surface-muted);
   color: var(--mpp-ink);
   cursor: pointer;
   font-size: 11px;
@@ -152,7 +152,7 @@
 
 .yearNav:hover {
   background: var(--mpp-accent-soft);
-  border-color: rgba(10, 133, 226, 0.35);
+  border-color: rgba(47, 163, 80, 0.35);
   color: var(--mpp-accent);
 }
 
@@ -165,8 +165,8 @@
 .cell {
   appearance: none;
   border: none;
-  background: #f2f5f9;
-  color: #354862;
+  background: var(--surface-muted);
+  color: var(--tint-ink, #3d5244);
   border-radius: 9px;
   height: 36px;
   font: inherit;
@@ -177,24 +177,24 @@
 }
 
 .cell:hover {
-  background: #e8eef6;
+  background: var(--accent-soft);
   color: var(--mpp-ink);
 }
 
 .cellToday {
-  box-shadow: inset 0 0 0 1.5px rgba(10, 133, 226, 0.45);
+  box-shadow: inset 0 0 0 1.5px rgba(47, 163, 80, 0.45);
   color: var(--mpp-accent);
-  background: #edf6fe;
+  background: var(--accent-soft);
 }
 
 .cellOn {
   background: var(--mpp-accent);
   color: #fff;
-  box-shadow: 0 6px 14px -6px rgba(10, 133, 226, 0.65);
+  box-shadow: 0 6px 14px -6px rgba(47, 163, 80, 0.65);
 }
 
 .cellOn:hover {
-  background: #0770c2;
+  background: #268a42;
   color: #fff;
 }
 

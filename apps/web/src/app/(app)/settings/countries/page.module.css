@@ -5,17 +5,17 @@
 
 .gpsWrap input {
   flex: 1;
-  background: #f4f6f9;
+  background: var(--tint-neutral, #f4f6f9);
   border-radius: 4px 0 0 4px;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .gpsBtn {
   appearance: none;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-left: none;
-  background: #fff;
-  color: #7e8299;
+  background: var(--surface);
+  color: var(--tint-ink-muted, #7e8299);
   min-width: 34px;
   cursor: pointer;
   font-size: 0.95rem;
@@ -37,7 +37,7 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   width: min(520px, 100%);
   box-shadow: 0 16px 48px rgba(15, 23, 42, 0.18);
@@ -51,7 +51,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .modalFooter {
@@ -62,10 +62,10 @@
 
 .details {
   font-size: 0.78rem;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   white-space: pre-wrap;
   margin: 0.35rem 0 0;
-  background: #f4f6f9;
+  background: var(--tint-neutral, #f4f6f9);
   border-radius: 4px;
   padding: 0.4rem 0.5rem;
 }

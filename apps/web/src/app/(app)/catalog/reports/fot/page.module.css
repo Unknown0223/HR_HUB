@@ -20,10 +20,10 @@
   width: 100%;
   box-sizing: border-box;
   height: 36px;
-  border: 1.5px solid #e3e9f1;
+  border: 1.5px solid var(--line);
   border-radius: 9px;
-  background: #fff;
-  color: #0a85e2;
+  background: var(--surface);
+  color: #2fa350;
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -34,8 +34,8 @@
 }
 
 .tplBtn:hover {
-  border-color: #cbd5e1;
-  background: #f2f5f9;
+  border-color: var(--tint-line, #cbd5e1);
+  background: var(--surface-muted);
 }
 
 .tplPanel {
@@ -51,8 +51,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   box-sizing: border-box;
-  background: #fff;
-  border: 1px solid #e8eef5;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e8eef5);
   border-radius: 12px;
   box-shadow: 0 12px 28px -14px rgba(16, 30, 54, 0.42);
   padding: 0.55rem;
@@ -61,7 +61,7 @@
 .tplPanel input {
   width: 100%;
   min-height: 32px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.5rem;
   margin-bottom: 0.45rem;
@@ -76,9 +76,9 @@
 
 .tplActions button {
   appearance: none;
-  border: 1px solid #e4e6ef;
-  background: #fff;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #e4e6ef);
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   border-radius: 4px;
   padding: 0.3rem 0.65rem;
   font: inherit;
@@ -87,15 +87,15 @@
 }
 
 .tplActions .save {
-  background: #0a85e2;
-  border-color: #0a85e2;
+  background: #2fa350;
+  border-color: #2fa350;
   color: #fff;
 }
 
 .periodLine {
   margin: 0 0 0.55rem;
   font-size: 0.88rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .subTabs {
@@ -103,7 +103,7 @@
   flex-wrap: wrap;
   gap: 0.35rem;
   margin: 0 0 0.65rem;
-  border-bottom: 1px solid #e4e6ef;
+  border-bottom: 1px solid var(--tint-line, #e4e6ef);
   padding-bottom: 0.35rem;
 }
 
@@ -111,7 +111,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
   font: inherit;
   font-size: 0.82rem;
   padding: 0.35rem 0.55rem;
@@ -120,43 +120,43 @@
 }
 
 .subOn {
-  color: #0a85e2;
-  border-bottom-color: #0a85e2;
+  color: #2fa350;
+  border-bottom-color: #2fa350;
   font-weight: 600;
 }
 
 .tableWrap {
   overflow: auto;
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   max-height: calc(100vh - 220px);
 }
 
 .table {
   border-collapse: collapse;
   font-size: 0.78rem;
-  background: #fff;
+  background: var(--surface);
   width: 100%;
   min-width: 720px;
 }
 
 .table th,
 .table td {
-  border: 1px solid #d8dbe0;
+  border: 1px solid var(--tint-line, #d8dbe0);
   padding: 0.28rem 0.4rem;
-  color: #181c32;
+  color: var(--tint-ink, #181c32);
   white-space: nowrap;
   text-align: center;
   vertical-align: middle;
 }
 
 .table th {
-  background: #f5f8fa;
+  background: var(--tint-neutral, #f5f8fa);
   font-weight: 600;
 }
 
 .table tbody tr:nth-child(even) {
-  background: #fafbfc;
+  background: var(--tint-neutral, #fafbfc);
 }
 
 .name {
@@ -179,8 +179,8 @@
 }
 
 .settings {
-  background: #fff;
-  border: 1px solid #e4e6ef;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e4e6ef);
   border-radius: 8px;
   padding: 1.15rem 1.4rem 1.35rem;
   max-width: 760px;
@@ -195,7 +195,7 @@
   align-items: flex-start;
   gap: 0.55rem;
   font-size: 0.9rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
   user-select: none;
 }

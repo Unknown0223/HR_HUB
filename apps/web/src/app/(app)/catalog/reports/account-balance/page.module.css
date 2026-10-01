@@ -24,18 +24,18 @@
   padding: 0.5rem 0.85rem;
   border-radius: 4px;
   cursor: pointer;
-  color: #5e6278;
+  color: var(--tint-ink-muted, #5e6278);
 }
 
 .tabOn {
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
 }
 
 .btnBlue {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
@@ -49,9 +49,9 @@
 
 .btnGhost {
   appearance: none;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #3f4254;
+  border: 1px solid var(--tint-line, #d1d5db);
+  background: var(--surface);
+  color: var(--tint-ink, #3f4254);
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -65,7 +65,7 @@
 .btnPrimary {
   appearance: none;
   border: none;
-  background: #0a85e2;
+  background: #2fa350;
   color: #fff;
   font: inherit;
   font-size: 0.85rem;
@@ -92,7 +92,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #0a85e2;
+  color: #2fa350;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
@@ -110,7 +110,7 @@
   margin: 0;
   padding: 0.5rem 0.7rem;
   color: #991b1b;
-  background: #fef2f2;
+  background: var(--tint-danger, #fef2f2);
   border-radius: 4px;
 }
 
@@ -118,20 +118,20 @@
   margin: 0;
   padding: 0.45rem 0.7rem;
   color: #0d9488;
-  background: #ecfdf5;
+  background: var(--tint-ok, #ecfdf5);
   border-radius: 4px;
 }
 
 .muted {
   margin: 0;
-  color: #95a5a6;
+  color: var(--tint-ink-muted, #95a5a6);
   padding: 2rem 1rem;
   text-align: center;
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--tint-line, #e5e7eb);
   border-radius: 8px;
   padding: 1.1rem 1.2rem;
   display: flex;
@@ -160,7 +160,7 @@
 
 .field label {
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--tint-ink-muted, #6b7280);
 }
 
 .req {
@@ -169,17 +169,17 @@
 
 .field input {
   height: 36px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--tint-line, #d1d5db);
   border-radius: 4px;
   padding: 0 0.65rem;
   font: inherit;
   font-size: 0.9rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
 }
 
 .field input:focus {
   outline: none;
-  border-color: #0a85e2;
+  border-color: #2fa350;
   box-shadow: 0 0 0 2px rgba(54, 153, 255, 0.12);
 }
 
@@ -193,12 +193,12 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.88rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   cursor: pointer;
 }
 
 .check input {
-  accent-color: #0a85e2;
+  accent-color: #2fa350;
 }
 
 .actions {
@@ -210,7 +210,7 @@
 }
 
 .viewArea {
-  background: #f1f3f6;
+  background: var(--tint-neutral, #f1f3f6);
   border-radius: 6px;
   min-height: 280px;
   padding: 0.75rem;
@@ -221,15 +221,15 @@
   flex-direction: column;
   gap: 0.2rem;
   margin-bottom: 0.65rem;
-  color: #3f4254;
+  color: var(--tint-ink, #3f4254);
   font-size: 0.88rem;
 }
 
 .tableWrap {
   overflow: auto;
-  background: #fff;
+  background: var(--surface);
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--tint-line, #e5e7eb);
 }
 
 .table {
@@ -241,13 +241,13 @@
 .table th,
 .table td {
   padding: 0.45rem 0.55rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--tint-line, #f3f4f6);
   text-align: left;
 }
 
 .table th {
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--tint-neutral, #f9fafb);
+  color: var(--tint-ink-muted, #6b7280);
   font-weight: 600;
   white-space: nowrap;
 }
