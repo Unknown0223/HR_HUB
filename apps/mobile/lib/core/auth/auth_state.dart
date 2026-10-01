@@ -19,6 +19,7 @@ class AuthUser {
     this.tenant,
     this.employee,
     this.teamSize = 0,
+    this.mustChangePassword = false,
   });
 
   final String id;
@@ -32,7 +33,21 @@ class AuthUser {
   /// Active employees in the divisions this user manages (org chart).
   final int teamSize;
 
+  /// Signed in with a one-time password from HR: the app is locked until a personal one is set.
+  final bool mustChangePassword;
+
   bool get hasTeam => teamSize > 0;
+
+  AuthUser withPasswordChanged() => AuthUser(
+        id: id,
+        email: email,
+        fullName: fullName,
+        role: role,
+        tenantId: tenantId,
+        tenant: tenant,
+        employee: employee,
+        teamSize: teamSize,
+      );
 
   bool get isApprover =>
       role == 'manager' ||
@@ -65,6 +80,7 @@ class AuthUser {
           ? Map<String, dynamic>.from(json['employee'] as Map)
           : null,
       teamSize: (json['teamSize'] as num?)?.toInt() ?? 0,
+      mustChangePassword: json['mustChangePassword'] == true,
     );
   }
 }
@@ -208,6 +224,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final me = await _api.get('/me');
     await _cacheMe(me);
     state = AuthState(user: AuthUser.fromJson(me), loading: false);
+  }
+
+  /// The server already cleared the one-time flag; unlock even if re-reading /me fails.
+  Future<void> passwordChanged() async {
+    try {
+      await refreshMe();
+      if (state.user?.mustChangePassword != true) return;
+    } catch (_) {}
+    final user = state.user;
+    if (user != null) {
+      state = AuthState(user: user.withPasswordChanged(), loading: false);
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
+import { downloadStyledXlsx } from '@/lib/xlsx-download';
 import shared from '../../../page-shared.module.css';
 import styles from './page.module.css';
 
@@ -14,6 +15,7 @@ type Account = {
   isActive: boolean;
   createdAt: string;
   passwordChangedAt: string | null;
+  mustChangePassword: boolean;
 };
 
 type Row = {
@@ -31,12 +33,27 @@ type Filter = '' | 'with' | 'without' | 'blocked';
 
 type Issued = { server: string; login: string; password: string; fullName: string };
 
-const PASSWORD_CHARS = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+type BulkIssued = {
+  employeeId: string;
+  tabNumber: string;
+  fullName: string;
+  division: string | null;
+  position: string | null;
+  login: string;
+  password: string;
+};
 
-function generatePassword(len = 10) {
-  const buf = new Uint32Array(len);
+type BulkResult = {
+  issued: BulkIssued[];
+  skipped: { employeeId: string; fullName: string; reason: string }[];
+  issuedAt: string;
+};
+
+/** One-time password: 6 digits, the app makes the employee replace it on first sign-in. */
+function generatePassword() {
+  const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
-  return Array.from(buf, (n) => PASSWORD_CHARS[n % PASSWORD_CHARS.length]).join('');
+  return String(buf[0] % 1_000_000).padStart(6, '0');
 }
 
 function suggestLogin(fullName: string) {
@@ -83,6 +100,11 @@ export default function MobileAccessPage() {
   const [modalBusy, setModalBusy] = useState(false);
   const [issued, setIssued] = useState<Issued | null>(null);
   const [rowBusy, setRowBusy] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkScope, setBulkScope] = useState<'without' | 'all'>('without');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkErr, setBulkErr] = useState('');
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null);
 
   useEffect(() => {
     setServerLink(window.location.host);
@@ -180,6 +202,50 @@ export default function MobileAccessPage() {
     }
   }
 
+  async function issueBulk() {
+    setBulkBusy(true);
+    setBulkErr('');
+    try {
+      const res = await apiFetch<Omit<BulkResult, 'issuedAt'>>(
+        '/api/mobile-accounts/temporary-passwords',
+        { method: 'POST', body: JSON.stringify({ scope: bulkScope }) },
+      );
+      setBulkResult({ ...res, issuedAt: new Date().toLocaleString('ru-RU') });
+      setBulkOpen(false);
+      await load();
+    } catch (e) {
+      setBulkErr(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function bulkText(r: BulkResult) {
+    return [
+      `HR HUB mobil ilova — Server: ${serverLink}`,
+      ...r.issued.map((i) => `${i.fullName}\tLogin: ${i.login}\tParol: ${i.password}`),
+    ].join('\n');
+  }
+
+  async function downloadBulk(r: BulkResult) {
+    await downloadStyledXlsx({
+      filename: `mobile-logins-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      sheetName: 'Логины',
+      title: 'HR HUB — вход в мобильное приложение',
+      subtitle: `Server: ${serverLink} · выдано ${r.issuedAt} · пароли одноразовые: при первом входе приложение попросит задать свой`,
+      columns: ['Таб. №', 'Сотрудник', 'Подразделение', 'Должность', 'Логин', 'Одноразовый пароль'],
+      rows: r.issued.map((i) => [
+        i.tabNumber,
+        i.fullName,
+        i.division ?? '',
+        i.position ?? '',
+        i.login,
+        { v: i.password, s: { bold: true } },
+      ]),
+      colWidths: [16, 36, 22, 22, 26, 20],
+    });
+  }
+
   const issuedText = useMemo(
     () =>
       issued
@@ -211,7 +277,10 @@ export default function MobileAccessPage() {
             Server: <b>{serverLink || '…'}</b> (ссылка уже указана в приложении по умолчанию)
           </li>
           <li>Логин: выданный HR (например <b>ali.valiyev</b>)</li>
-          <li>Пароль: выданный HR — затем сотрудник меняет его в «Sozlamalar → Parolni o‘zgartirish»</li>
+          <li>
+            Пароль: одноразовый от HR (6 цифр) — при первом входе приложение сразу попросит
+            задать свой пароль
+          </li>
         </ol>
         <p className={styles.mutedSmall}>
           Логины уникальны во всей системе: один и тот же логин не может быть у двух компаний,
@@ -244,6 +313,89 @@ export default function MobileAccessPage() {
         </section>
       ) : null}
 
+      {bulkResult ? (
+        <section className={styles.issued}>
+          <div className={styles.bulkBody}>
+            <div className={styles.issuedTitle}>
+              Одноразовые пароли выданы: {bulkResult.issued.length}
+              {bulkResult.skipped.length ? ` · пропущено: ${bulkResult.skipped.length}` : ''}
+            </div>
+            <p className={styles.mutedSmall}>
+              Скачайте или скопируйте список сейчас — после закрытия пароли больше не будут
+              показаны. При первом входе приложение попросит каждого задать свой пароль.
+            </p>
+            {bulkResult.issued.length ? (
+              <div className={styles.bulkTableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Таб. №</th>
+                      <th>Сотрудник</th>
+                      <th>Логин</th>
+                      <th>Пароль</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkResult.issued.map((i) => (
+                      <tr key={i.employeeId}>
+                        <td>{i.tabNumber}</td>
+                        <td>{i.fullName}</td>
+                        <td className={styles.mono}>{i.login}</td>
+                        <td className={styles.mono}>
+                          <b>{i.password}</b>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {bulkResult.skipped.length ? (
+              <ul className={styles.bulkSkipped}>
+                {bulkResult.skipped.map((s) => (
+                  <li key={s.employeeId}>
+                    {s.fullName} — {s.reason}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <div className={styles.issuedActions}>
+            <button
+              type="button"
+              className={shared.btn}
+              disabled={!bulkResult.issued.length}
+              onClick={() => void downloadBulk(bulkResult)}
+            >
+              <i className="fas fa-file-excel" /> Скачать Excel
+            </button>
+            <button
+              type="button"
+              className={shared.btnGhost}
+              disabled={!bulkResult.issued.length}
+              onClick={() => void navigator.clipboard?.writeText(bulkText(bulkResult))}
+            >
+              Копировать
+            </button>
+            <button
+              type="button"
+              className={shared.btnGhost}
+              onClick={() => {
+                if (
+                  bulkResult.issued.length &&
+                  !window.confirm('Пароли больше не будут показаны. Вы сохранили список?')
+                ) {
+                  return;
+                }
+                setBulkResult(null);
+              }}
+            >
+              Закрыть
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <div className={styles.toolbar}>
         <input
           className={styles.input}
@@ -266,6 +418,17 @@ export default function MobileAccessPage() {
             Показано: {data.total} · с аккаунтом: {data.withAccount}
           </span>
         ) : null}
+        <button
+          type="button"
+          className={`${shared.btn} ${styles.bulkBtn}`}
+          onClick={() => {
+            setBulkErr('');
+            setBulkScope('without');
+            setBulkOpen(true);
+          }}
+        >
+          <i className="fas fa-key" /> Выдать одноразовые пароли
+        </button>
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -318,7 +481,18 @@ export default function MobileAccessPage() {
                     <span className={`${styles.pill} ${styles.pillBlocked}`}>Заблокирован</span>
                   )}
                 </td>
-                <td>{fmtDate(row.account?.passwordChangedAt ?? null)}</td>
+                <td>
+                  {row.account?.mustChangePassword ? (
+                    <span
+                      className={`${styles.pill} ${styles.pillTemp}`}
+                      title="Сотрудник ещё не задал свой пароль"
+                    >
+                      Одноразовый · {fmtDate(row.account.passwordChangedAt)}
+                    </span>
+                  ) : (
+                    fmtDate(row.account?.passwordChangedAt ?? null)
+                  )}
+                </td>
                 <td className={styles.actions}>
                   <button
                     type="button"
@@ -388,7 +562,7 @@ export default function MobileAccessPage() {
                 type={showPass ? 'text' : 'password'}
                 value={passDraft}
                 autoComplete="new-password"
-                placeholder={editing.account ? 'Оставьте пустым, чтобы не менять' : 'Минимум 8 символов'}
+                placeholder={editing.account ? 'Оставьте пустым, чтобы не менять' : 'Минимум 6 символов'}
                 onChange={(e) => setPassDraft(e.target.value)}
               />
               <button
@@ -412,7 +586,8 @@ export default function MobileAccessPage() {
               </button>
             </div>
             <p className={styles.mutedSmall}>
-              Текущий пароль посмотреть нельзя — можно только задать новый.
+              Пароль одноразовый: при входе приложение попросит сотрудника задать свой. Текущий
+              пароль посмотреть нельзя — можно только задать новый.
             </p>
 
             {modalErr ? <p className={styles.error}>{modalErr}</p> : null}
@@ -429,10 +604,71 @@ export default function MobileAccessPage() {
               <button
                 type="button"
                 className={shared.btn}
-                disabled={modalBusy || !loginDraft.trim() || (!editing.account && passDraft.trim().length < 8)}
+                disabled={modalBusy || !loginDraft.trim() || (!editing.account && passDraft.trim().length < 6)}
                 onClick={() => void saveAccount()}
               >
                 {modalBusy ? '…' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkOpen ? (
+        <div className={styles.backdrop} onClick={() => !bulkBusy && setBulkOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.cardTitle}>Одноразовые пароли</h3>
+            <p className={styles.muted}>
+              Каждому сотруднику будет выдан пароль из 6 цифр. При первом входе в приложение
+              сотрудник обязан задать свой пароль — без этого приложение не откроется.
+            </p>
+            <label className={styles.radioRow}>
+              <input
+                type="radio"
+                name="bulkScope"
+                checked={bulkScope === 'without'}
+                onChange={() => setBulkScope('without')}
+              />
+              <span>
+                <b>Только без аккаунта</b>
+                <span className={styles.mutedSmall}>
+                  {' '}
+                  — создать аккаунты тем, у кого их ещё нет
+                </span>
+              </span>
+            </label>
+            <label className={styles.radioRow}>
+              <input
+                type="radio"
+                name="bulkScope"
+                checked={bulkScope === 'all'}
+                onChange={() => setBulkScope('all')}
+              />
+              <span>
+                <b>Всем сотрудникам</b>
+                <span className={styles.mutedSmall}>
+                  {' '}
+                  — также сбросить пароли существующих аккаунтов (служебные не затрагиваются)
+                </span>
+              </span>
+            </label>
+            {bulkErr ? <p className={styles.error}>{bulkErr}</p> : null}
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={shared.btnGhost}
+                disabled={bulkBusy}
+                onClick={() => setBulkOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={shared.btn}
+                disabled={bulkBusy}
+                onClick={() => void issueBulk()}
+              >
+                {bulkBusy ? '…' : 'Выдать'}
               </button>
             </div>
           </div>

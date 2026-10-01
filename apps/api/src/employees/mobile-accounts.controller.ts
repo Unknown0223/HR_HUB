@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
   Query,
 } from '@nestjs/common';
@@ -15,7 +16,11 @@ import { Roles } from '../auth/decorators';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import { EmployeesService } from './employees.service';
 import { MobileAccountsService } from './mobile-accounts.service';
-import { SetMobileAccountDto, SetMobileAccountStatusDto } from './mobile-accounts.dto';
+import {
+  IssueTemporaryPasswordsDto,
+  SetMobileAccountDto,
+  SetMobileAccountStatusDto,
+} from './mobile-accounts.dto';
 
 @ApiTags('mobile-accounts')
 @ApiBearerAuth()
@@ -37,6 +42,18 @@ export class MobileAccountsController {
     @Query('filter') filter?: 'with' | 'without' | 'blocked',
   ) {
     return this.accounts.list(this.employees.requireTenant(tenantId), q, filter);
+  }
+
+  @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)
+  @Post('temporary-passwords')
+  issueTemporary(
+    @CurrentTenant() tenantId: string | null,
+    @Body() dto: IssueTemporaryPasswordsDto,
+  ) {
+    return this.accounts.issueTemporaryPasswords(
+      this.employees.requireTenant(tenantId),
+      dto.scope,
+    );
   }
 
   @Roles(Role.platform_admin, Role.tenant_admin, Role.hr)

@@ -111,10 +111,11 @@ export class AuthService {
     if (await bcrypt.compare(next, user.passwordHash)) {
       throw new BadRequestException('Новый пароль совпадает с текущим');
     }
-    const meta =
+    const meta: Record<string, unknown> =
       user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
-        ? (user.meta as Record<string, unknown>)
+        ? { ...(user.meta as Record<string, unknown>) }
         : {};
+    delete meta.mustChangePassword;
     await this.prisma.user.update({
       where: { id: user.id },
       data: {

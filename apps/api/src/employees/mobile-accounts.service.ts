@@ -5,12 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { randomInt } from 'node:crypto';
 import { Prisma, Role, type User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { employeeNameSearchWhere } from '../common/name-search';
 import { runUnscoped } from '../common/data-scope';
 
 const LOGIN_RE = /^[a-z0-9._-]{3,32}$/;
+/** HR-issued passwords are one-time (the app forces a change), so they may be short. */
+const ISSUED_PASSWORD_MIN = 6;
+const STAFF_PASSWORD_MIN = 8;
 
 export type MobileAccountView = {
   userId: string;
@@ -19,12 +23,49 @@ export type MobileAccountView = {
   isActive: boolean;
   createdAt: Date;
   passwordChangedAt: string | null;
+  mustChangePassword: boolean;
+};
+
+export type IssuedCredential = {
+  employeeId: string;
+  tabNumber: string;
+  fullName: string;
+  division: string | null;
+  position: string | null;
+  login: string;
+  password: string;
 };
 
 function metaOf(u: { meta: unknown }): Record<string, unknown> {
   return u.meta && typeof u.meta === 'object' && !Array.isArray(u.meta)
     ? (u.meta as Record<string, unknown>)
     : {};
+}
+
+export function temporaryPassword() {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
+const TRANSLIT: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'j', з: 'z', и: 'i', й: 'y',
+  к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f',
+  х: 'x', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh', ъ: '', ы: 'i', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  ў: 'o', қ: 'q', ғ: 'g', ҳ: 'h',
+};
+
+/** `Lastname Firstname …` → `firstname.lastname`; falls back to the tab number. */
+export function suggestLogin(fullName: string, tabNumber: string) {
+  const latin = Array.from(fullName.toLowerCase(), (c) => TRANSLIT[c] ?? c)
+    .join('')
+    .replace(/[ʻʼ'`‘’]/g, '');
+  const [last = '', first = ''] = latin.split(/\s+/);
+  const byName = [first, last]
+    .map((p) => p.replace(/[^a-z0-9]/g, ''))
+    .filter(Boolean)
+    .join('.')
+    .slice(0, 28);
+  if (LOGIN_RE.test(byName)) return byName;
+  return `emp${tabNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}`.slice(0, 28);
 }
 
 /**
@@ -60,6 +101,7 @@ export class MobileAccountsService {
       createdAt: u.createdAt,
       passwordChangedAt:
         typeof meta.passwordChangedAt === 'string' ? meta.passwordChangedAt : null,
+      mustChangePassword: meta.mustChangePassword === true,
     };
   }
 
@@ -186,8 +228,8 @@ export class MobileAccountsService {
     if (!LOGIN_RE.test(loginName)) {
       throw new BadRequestException('Логин: 3–32 символа (латиница, цифры, . _ -)');
     }
-    if (password && password.length < 8) {
-      throw new BadRequestException('Пароль: минимум 8 символов');
+    if (password && password.length < ISSUED_PASSWORD_MIN) {
+      throw new BadRequestException(`Пароль: минимум ${ISSUED_PASSWORD_MIN} символов`);
     }
     const code = await this.tenantCode(tenantId);
     const emp = await runUnscoped(() =>
@@ -207,6 +249,11 @@ export class MobileAccountsService {
       if (linked && linked.role !== Role.employee) {
         // Staff accounts (HR, managers…) keep their login; only the password can be reset here.
         const current = this.view(linked, code);
+        if (password && password.length < STAFF_PASSWORD_MIN) {
+          throw new BadRequestException(
+            `Служебный аккаунт: пароль минимум ${STAFF_PASSWORD_MIN} символов`,
+          );
+        }
         if (password) {
           await this.prisma.user.update({
             where: { id: linked.id },
@@ -240,7 +287,7 @@ export class MobileAccountsService {
               login: loginName,
               employeeId,
               updatedAt: now,
-              ...(password ? { passwordChangedAt: now } : {}),
+              ...(password ? { passwordChangedAt: now, mustChangePassword: true } : {}),
             } as Prisma.InputJsonValue,
           },
         });
@@ -263,6 +310,7 @@ export class MobileAccountsService {
             createdAt: now,
             updatedAt: now,
             passwordChangedAt: now,
+            mustChangePassword: true,
           } as Prisma.InputJsonValue,
         },
       });
@@ -273,6 +321,69 @@ export class MobileAccountsService {
       }
       throw e;
     }
+  }
+
+  /** First free variant of `base` (base, base2, base3…) across all companies and this batch. */
+  private async freeLogin(base: string, reserved: Set<string>) {
+    const rows = await runUnscoped(() =>
+      this.prisma.user.findMany({
+        where: { email: { startsWith: base, mode: 'insensitive' } },
+        select: { email: true },
+      }),
+    );
+    const taken = new Set(rows.map((r) => r.email.toLowerCase().split('@')[0]));
+    for (let i = 1; i < 1000; i++) {
+      const candidate = i === 1 ? base : `${base}${i}`;
+      if (!taken.has(candidate) && !reserved.has(candidate)) return candidate;
+    }
+    throw new ConflictException(`Не удалось подобрать свободный логин для «${base}»`);
+  }
+
+  /**
+   * Issues one-time numeric passwords to active employees in bulk (`without` — only those
+   * without an account, `all` — also resets existing employee accounts). The plain passwords
+   * are returned once and never stored; staff accounts (HR, managers…) are left untouched.
+   */
+  async issueTemporaryPasswords(tenantId: string, scope: 'without' | 'all') {
+    const { items } = await this.list(tenantId);
+    const issued: IssuedCredential[] = [];
+    const skipped: { employeeId: string; fullName: string; reason: string }[] = [];
+    const reserved = new Set<string>();
+    for (const it of items) {
+      if (it.account && scope === 'without') continue;
+      if (it.account?.loginName.includes('@')) {
+        skipped.push({
+          employeeId: it.employeeId,
+          fullName: it.fullName,
+          reason: 'Служебный аккаунт — пароль меняется в «Пользователи»',
+        });
+        continue;
+      }
+      try {
+        const login =
+          it.account?.loginName ??
+          (await this.freeLogin(suggestLogin(it.fullName, it.tabNumber), reserved));
+        reserved.add(login);
+        const password = temporaryPassword();
+        const res = await this.sync(tenantId, it.employeeId, login, password);
+        issued.push({
+          employeeId: it.employeeId,
+          tabNumber: it.tabNumber,
+          fullName: it.fullName,
+          division: it.division,
+          position: it.position,
+          login: res?.loginName ?? login,
+          password,
+        });
+      } catch (e) {
+        skipped.push({
+          employeeId: it.employeeId,
+          fullName: it.fullName,
+          reason: e instanceof Error ? e.message : 'Ошибка',
+        });
+      }
+    }
+    return { issued, skipped };
   }
 
   async setActive(tenantId: string, employeeId: string, isActive: boolean) {

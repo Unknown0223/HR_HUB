@@ -217,6 +217,10 @@ export class MeService {
       tenant: tenant
         ? { id: tenant.id, code: tenant.code, name: tenant.name }
         : null,
+      mustChangePassword:
+        !!dbUser.meta &&
+        typeof dbUser.meta === 'object' &&
+        (dbUser.meta as Record<string, unknown>).mustChangePassword === true,
       employee: employee
         ? {
             id: employee.id,

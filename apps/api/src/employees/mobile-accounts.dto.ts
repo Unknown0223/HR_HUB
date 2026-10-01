@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SetMobileAccountDto {
@@ -13,6 +13,13 @@ export class SetMobileAccountDto {
   @IsString()
   @MaxLength(128)
   password?: string | null;
+}
+
+export class IssueTemporaryPasswordsDto {
+  /** `without` — only employees without an account; `all` — also reset existing ones. */
+  @ApiProperty({ enum: ['without', 'all'] })
+  @IsIn(['without', 'all'])
+  scope!: 'without' | 'all';
 }
 
 export class SetMobileAccountStatusDto {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/attendance/marks_screen.dart';
 import '../../features/attendance/mobile_punch_screen.dart';
 import '../../features/attendance/tabel_screen.dart';
+import '../../features/auth/force_password_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/permissions_screen.dart';
 import '../../features/auth/splash_screen.dart';
@@ -48,13 +49,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (!auth.isAuthenticated) {
         return loc == '/login' ? null : '/login';
       }
-      if (loc == '/login' || loc == '/splash') return '/home';
+      if (auth.user?.mustChangePassword == true) {
+        return loc == '/force-password' ? null : '/force-password';
+      }
+      if (loc == '/login' || loc == '/splash' || loc == '/force-password') return '/home';
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/permissions', builder: (_, _) => const PermissionsScreen()),
+      GoRoute(path: '/force-password', builder: (_, _) => const ForcePasswordScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return ShellScreen(navigationShell: navigationShell);
