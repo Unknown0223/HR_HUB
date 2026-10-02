@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
+import sharp from 'sharp';
 import { BadRequestException, BadGatewayException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -25,6 +26,7 @@ import {
 } from './device-credential-audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
+import { FaceMatchService, SFACE_MATCH_THRESHOLD } from '../face/face-match.service';
 import {
   markPhotoKindFromDirection,
   markPhotoKindFromMarkType,
@@ -118,6 +120,7 @@ export class AttendanceService {
     private readonly config: ConfigService,
     private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
+    private readonly faceMatch: FaceMatchService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
@@ -5498,6 +5501,7 @@ export class AttendanceService {
       longitude: number;
       accuracy: number;
       photoBase64: string;
+      selfieBase64?: string;
       liveness: { steps: string[]; durationMs?: number };
       comment?: string;
       integrity?: Record<string, unknown>;
@@ -5575,6 +5579,14 @@ export class AttendanceService {
       );
     }
 
+    const markId = (result as { markId?: string }).markId;
+    if (markId) {
+      void this.verifyMobileFace(tenantId, dto.employeeId, markId, {
+        selfieBase64: dto.selfieBase64,
+        reportBase64: dto.photoBase64,
+      });
+    }
+
     return {
       ...result,
       direction: dto.direction,
@@ -5585,6 +5597,150 @@ export class AttendanceService {
       locationName: fence?.locationName ?? null,
       photoUrl: this.storage.mediaUrl(stored.key, stored.url),
     };
+  }
+
+  /**
+   * Compares the phone selfie with the employee's reference photo and records the
+   * verdict on the mark; a mismatch keeps the punch but alerts approvers.
+   */
+  private async verifyMobileFace(
+    tenantId: string,
+    employeeId: string,
+    markId: string,
+    photos: { selfieBase64?: string; reportBase64: string },
+  ) {
+    let faceMatch: Record<string, unknown>;
+    let employeeName = '';
+    try {
+      const emp = await this.prisma.employee.findFirst({
+        where: { tenantId, id: employeeId },
+        select: {
+          firstName: true,
+          lastName: true,
+          faceProfile: { select: { photoKey: true, photoUrl: true } },
+          person: { select: { photoUrl: true } },
+        },
+      });
+      employeeName = [emp?.lastName, emp?.firstName].filter(Boolean).join(' ');
+      const ref = await this.loadReferenceFace(emp);
+      if (!ref) {
+        faceMatch = { status: 'no_avatar' };
+      } else if (!ref.ok) {
+        faceMatch = { status: 'no_face_avatar' };
+      } else {
+        const probe = await this.embedPunchSelfie(photos);
+        if (!probe.ok) {
+          faceMatch = { status: 'no_face_selfie', source: probe.source };
+        } else {
+          const score = this.faceMatch.similarity(probe.embedding, ref.embedding);
+          faceMatch = {
+            status: score >= SFACE_MATCH_THRESHOLD ? 'match' : 'mismatch',
+            score: Math.round(score * 1000) / 1000,
+            source: probe.source,
+          };
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`face match failed mark=${markId}: ${e instanceof Error ? e.message : e}`);
+      faceMatch = { status: 'error' };
+    }
+    faceMatch = {
+      ...faceMatch,
+      threshold: SFACE_MATCH_THRESHOLD,
+      checkedAt: new Date().toISOString(),
+    };
+
+    try {
+      const mark = await this.prisma.attendanceMark.findFirst({
+        where: { tenantId, id: markId },
+        select: { rawPayload: true },
+      });
+      if (!mark) return;
+      const payload =
+        mark.rawPayload && typeof mark.rawPayload === 'object' && !Array.isArray(mark.rawPayload)
+          ? (mark.rawPayload as Record<string, unknown>)
+          : {};
+      await this.prisma.attendanceMark.update({
+        where: { id: markId },
+        data: { rawPayload: { ...payload, faceMatch } as Prisma.InputJsonValue },
+      });
+      if (faceMatch.status === 'mismatch') {
+        const pct = Math.round(Math.max(0, Number(faceMatch.score)) * 100);
+        await this.notifications.notifyApprovers(tenantId, {
+          kind: NotificationKind.alert,
+          title: `Yuz mos emas: ${employeeName || 'xodim'}`,
+          body: `Telefon orqali belgida selfi profil rasmiga mos kelmadi (o‘xshashlik ${pct}%). Foto-hisobotni tekshiring.`,
+          entity: 'attendance_mark',
+          entityId: markId,
+          href: `/attendance/marks/${markId}`,
+        });
+      }
+    } catch (e) {
+      this.logger.warn(`face match save failed mark=${markId}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  private async loadReferenceFace(
+    emp: {
+      faceProfile: { photoKey: string | null; photoUrl: string | null } | null;
+      person: { photoUrl: string | null } | null;
+    } | null,
+  ) {
+    const candidates = [
+      emp?.faceProfile,
+      emp?.person?.photoUrl ? { photoKey: null, photoUrl: emp.person.photoUrl } : null,
+    ].filter((c): c is { photoKey: string | null; photoUrl: string | null } =>
+      Boolean(c && (c.photoKey || c.photoUrl) && !this.isPlaceholderFacePhoto(c)),
+    );
+    for (const c of candidates) {
+      const key =
+        c.photoKey ||
+        (c.photoUrl ? this.storageKeyFromUrl(c.photoUrl) : null);
+      const cacheKey = key
+        ? `key:${key}`
+        : `url:${createHash('sha1').update(c.photoUrl ?? '').digest('hex')}`;
+      const result = await this.faceMatch.embedCached(cacheKey, async () => {
+        if (key) return this.storage.getObjectBuffer(key);
+        const b64 = await this.resolveFaceBase64(c);
+        return b64 ? Buffer.from(b64, 'base64') : null;
+      });
+      if (result) return result;
+    }
+    return null;
+  }
+
+  /** MinIO key from a signed URL or our own /api/storage/file?key=… proxy URL. */
+  private storageKeyFromUrl(url: string): string | null {
+    const direct = this.storage.extractKeyFromUrl(url);
+    if (direct) return direct;
+    try {
+      const key = new URL(url, 'http://local').searchParams.get('key');
+      return key && this.storage.isSafeKey(key) ? key : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Prefers the liveness selfie; older app builds send only the photo report, whose
+   * top-left inset (≈32% of the width) is the selfie.
+   */
+  private async embedPunchSelfie(photos: { selfieBase64?: string; reportBase64: string }) {
+    if (photos.selfieBase64) {
+      const r = await this.faceMatch.embed(Buffer.from(photos.selfieBase64, 'base64'));
+      return { ...r, source: 'selfie' as const };
+    }
+    const report = Buffer.from(photos.reportBase64, 'base64');
+    const meta = await sharp(report).metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    if (!w || !h) return { ok: false as const, reason: 'bad_image' as const, source: 'report' as const };
+    const inset = await sharp(report)
+      .extract({ left: 0, top: 0, width: Math.round(w * 0.4), height: Math.min(h, Math.round(w * 0.65)) })
+      .jpeg({ quality: 92 })
+      .toBuffer();
+    const r = await this.faceMatch.embed(inset);
+    return { ...r, source: 'report' as const };
   }
 
   private haversineM(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -6781,6 +6937,10 @@ export class AttendanceService {
         payload.liveness && typeof payload.liveness === 'object' && !Array.isArray(payload.liveness)
           ? ((payload.liveness as Record<string, unknown>).steps as unknown[] | undefined)?.length ?? 0
           : 0,
+      faceMatch:
+        payload.faceMatch && typeof payload.faceMatch === 'object' && !Array.isArray(payload.faceMatch)
+          ? (payload.faceMatch as { status: string; score?: number; threshold?: number })
+          : null,
       changeHistory,
       createdByLabel: (payload.createdByLabel as string) || 'System',
       updatedByLabel: (payload.updatedByLabel as string) || 'System',

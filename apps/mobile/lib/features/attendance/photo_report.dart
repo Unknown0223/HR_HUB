@@ -17,6 +17,25 @@ Future<Uint8List> composePhotoReport({
   return compute(_compose, _ComposeArgs(back, selfie, stamp));
 }
 
+/// Liveness selfie downsized for the server-side match with the profile photo.
+Future<Uint8List> faceMatchSelfie(String selfiePath) async {
+  final bytes = await File(selfiePath).readAsBytes();
+  return compute(_shrinkSelfie, bytes);
+}
+
+Uint8List _shrinkSelfie(Uint8List bytes) {
+  final raw = img.decodeImage(bytes);
+  if (raw == null) throw StateError('Rasmni o‘qib bo‘lmadi');
+  var face = img.bakeOrientation(raw);
+  const edge = 720;
+  if (face.width > edge || face.height > edge) {
+    face = face.width >= face.height
+        ? img.copyResize(face, width: edge)
+        : img.copyResize(face, height: edge);
+  }
+  return img.encodeJpg(face, quality: 85);
+}
+
 class _ComposeArgs {
   const _ComposeArgs(this.back, this.selfie, this.stamp);
   final Uint8List back;

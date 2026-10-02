@@ -56,6 +56,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
   List<String> _livenessSteps = const [];
   int _livenessMs = 0;
   Uint8List? _photo;
+  Uint8List? _faceSelfie;
   Map<String, dynamic>? _result;
   bool _clockWrong = false;
   bool _autoTimeOff = false;
@@ -206,11 +207,15 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
           '${two(now.hour)}:${two(now.minute)}:${two(now.second)}\n'
           'GPS ${fix.latitude.toStringAsFixed(5)}, ${fix.longitude.toStringAsFixed(5)} '
           '+-${fix.accuracy.toStringAsFixed(0)}m';
+      final faceSelfie = faceMatchSelfie(
+        _selfie!.path,
+      ).then<Uint8List?>((b) => b).catchError((_) => null);
       _photo = await composePhotoReport(
         backPath: back.path,
         selfiePath: (front ?? _selfie!).path,
         stamp: stamp,
       );
+      _faceSelfie = await faceSelfie;
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -239,6 +244,9 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             longitude: fix.longitude,
             accuracy: fix.accuracy,
             photoBase64: base64Encode(_photo!),
+            selfieBase64: _faceSelfie == null
+                ? null
+                : base64Encode(_faceSelfie!),
             livenessSteps: _livenessSteps,
             livenessDurationMs: _livenessMs,
             integrity: fix.integrity.toJson(),

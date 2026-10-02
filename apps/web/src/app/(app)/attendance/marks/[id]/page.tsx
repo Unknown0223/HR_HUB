@@ -40,6 +40,7 @@ type Mark = {
   outsideGeofence?: boolean;
   photoReport?: boolean;
   livenessSteps?: number | null;
+  faceMatch?: { status: string; score?: number; threshold?: number } | null;
   geofenceComment?: string | null;
   distanceM?: number | null;
   radiusM?: number | null;
@@ -61,6 +62,22 @@ function empName(m: Mark) {
   const e = m.employee;
   if (!e) return '—';
   return [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' ');
+}
+
+const FACE_MATCH_TEXT: Record<string, string> = {
+  match: 'Лицо совпадает с профилем',
+  mismatch: 'Лицо не совпадает с профилем',
+  no_avatar: 'Нет фото профиля для сверки',
+  no_face_avatar: 'На фото профиля лицо не найдено',
+  no_face_selfie: 'На селфи лицо не найдено',
+  error: 'Сверка лица не выполнена',
+};
+
+function faceMatchText(fm: NonNullable<Mark['faceMatch']>) {
+  const label = FACE_MATCH_TEXT[fm.status] ?? fm.status;
+  return typeof fm.score === 'number'
+    ? `${label} · ${Math.round(Math.max(0, fm.score) * 100)}%`
+    : label;
 }
 
 function fmtDt(iso?: string | null) {
@@ -192,7 +209,20 @@ function MarkDetailInner() {
             Отметка ({empName(mark)}, {fmtDt(mark.occurredAt)})
           </div>
           <div className={styles.badges}>
-            {mark.faceRecognized || mark.identificationType?.includes('лиц') ? (
+            {mark.faceMatch ? (
+              <span
+                className={
+                  mark.faceMatch.status === 'match'
+                    ? styles.badgeOk
+                    : mark.faceMatch.status === 'mismatch'
+                      ? styles.badgeBad
+                      : styles.badgeWarn
+                }
+              >
+                {faceMatchText(mark.faceMatch)}
+              </span>
+            ) : mark.faceRecognized ||
+              (!mark.photoReport && mark.identificationType?.includes('лиц')) ? (
               <span className={styles.badgeInfo}>Лицо распознано</span>
             ) : null}
             <span className={styles.badgeType}>{mark.markTypeLabel}</span>
@@ -295,6 +325,14 @@ function MarkDetailInner() {
                   <span>Тип идентификации</span>
                   <b>{mark.identificationType || '—'}</b>
                 </label>
+                {mark.faceMatch ? (
+                  <label>
+                    <span>Сверка лица</span>
+                    <b className={mark.faceMatch.status === 'mismatch' ? styles.warnText : undefined}>
+                      {faceMatchText(mark.faceMatch)}
+                    </b>
+                  </label>
+                ) : null}
                 <label>
                   <span>BSSID</span>
                   <b>{mark.bssid || '—'}</b>

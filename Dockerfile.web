@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
+# The workspace lockfile pulls onnxruntime-node (API only); skip its CUDA download.
+ENV ONNXRUNTIME_NODE_INSTALL=skip
 RUN npm ci
 
 FROM node:20-bookworm-slim AS build

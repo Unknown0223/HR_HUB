@@ -528,6 +528,7 @@ export class MeService {
       longitude: dto.longitude,
       accuracy: dto.accuracy,
       photoBase64: photo,
+      selfieBase64: dto.selfieBase64 ? stripDataUrl(dto.selfieBase64) || undefined : undefined,
       liveness: { steps, durationMs: dto.liveness.durationMs },
       comment: dto.comment,
       integrity: dto.integrity

@@ -19,9 +19,10 @@ import { DeviceGwModule } from '../device-gw/device-gw.module';
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
+import { FaceModule } from '../face/face.module';
 
 @Module({
-  imports: [DeviceGwModule, StorageModule, NotificationsModule, SettingsModule],
+  imports: [DeviceGwModule, StorageModule, NotificationsModule, SettingsModule, FaceModule],
   controllers: [
     AttendanceController,
     OfficeLinkController,

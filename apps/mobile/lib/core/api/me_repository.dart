@@ -76,6 +76,7 @@ class MeRepository {
     required List<String> livenessSteps,
     required int livenessDurationMs,
     required Map<String, dynamic> integrity,
+    String? selfieBase64,
     String? comment,
   }) => _api.post(
     '/me/punches/mobile',
@@ -85,6 +86,7 @@ class MeRepository {
       'longitude': longitude,
       'accuracy': accuracy,
       'photoBase64': photoBase64,
+      if (selfieBase64 != null) 'selfieBase64': selfieBase64,
       'liveness': {
         'passed': true,
         'steps': livenessSteps,

@@ -103,6 +103,12 @@ export class MeMobilePunchDto {
   @IsString()
   photoBase64!: string;
 
+  @ApiPropertyOptional({ description: 'Liveness selfie JPEG (base64) for face match against the profile photo' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(3_000_000)
+  selfieBase64?: string;
+
   @ApiProperty({ type: MeLivenessDto })
   @ValidateNested()
   @Type(() => MeLivenessDto)
