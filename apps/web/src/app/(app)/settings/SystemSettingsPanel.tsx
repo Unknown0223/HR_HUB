@@ -12,7 +12,8 @@ type Panel =
   | 'timepad'
   | 'required'
   | 'recruitment'
-  | 'mark_photos';
+  | 'mark_photos'
+  | 'lateness';
 
 type MarkPhotoRetentionUnit = 'day' | 'month' | 'year';
 type MarkPhotoKind = 'in' | 'out' | 'mark' | 'estimated_out';
@@ -263,6 +264,7 @@ export function SystemSettingsPanel() {
             ['required', 'Настройки обязательных полей'],
             ['recruitment', 'Настройки рекрутинга'],
             ['mark_photos', 'Фото отметок (приход/уход)'],
+            ['lateness', 'Опоздания'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -908,6 +910,11 @@ export function SystemSettingsPanel() {
               : {}) as MarkPhotosSettings
           }
           onChange={(markPhotos) => set('markPhotos', markPhotos)}
+        />
+      ) : panel === 'lateness' ? (
+        <LatenessSettingsForm
+          value={(s.lateness && typeof s.lateness === 'object' ? s.lateness : {}) as SystemSettings}
+          onChange={(lateness) => set('lateness', lateness)}
         />
       ) : (
         <div className={styles.stub}>Нет данных</div>
@@ -1571,6 +1578,87 @@ function RecruitmentSettingsForm({
         <p className={styles.sectionTitle}>Настройки выплат стажировки по умолчанию</p>
         {payTable('internshipAccruals', 'Начисления (стажировка)', 'Начисление')}
         {payTable('internshipDeductions', 'Удержания (стажировка)', 'Удержание')}
+      </div>
+    </div>
+  );
+}
+
+function LatenessSettingsForm({
+  value,
+  onChange,
+}: {
+  value: SystemSettings;
+  onChange: (next: SystemSettings) => void;
+}) {
+  const enabled = asBool(value.excusedEnabled, false);
+  const perMonth = Math.min(31, Math.max(0, asNum(value.excusedPerMonth, 3)));
+  const maxMinutes = Math.min(1440, Math.max(1, asNum(value.excusedMaxMinutes, 60)));
+  const notify = asBool(value.notifyTerminalArrival, true);
+  const patch = (p: SystemSettings) =>
+    onChange({
+      excusedEnabled: enabled,
+      excusedPerMonth: perMonth,
+      excusedMaxMinutes: maxMinutes,
+      notifyTerminalArrival: notify,
+      ...p,
+    });
+
+  return (
+    <div className={styles.grid2}>
+      <div className={styles.col} style={{ gridColumn: '1 / -1' }}>
+        <p className={styles.sectionTitle}>Опоздания в табеле</p>
+        <p className={styles.hint}>
+          Допустимые минуты после начала смены задаются в графике работы («Допуск, мин»):
+          приход в эти минуты считается вовремя. Ниже — правило компании для опозданий сверх
+          допуска.
+        </p>
+      </div>
+
+      <div className={styles.policyCard} style={{ gridColumn: '1 / -1' }}>
+        <p className={styles.policyCardTitle}>Уважительные опоздания</p>
+        <Toggle
+          label="Часть опозданий в месяц считать уважительными (полный рабочий день)"
+          checked={enabled}
+          onChange={(v) => patch({ excusedEnabled: v })}
+        />
+        <div className={styles.grid2}>
+          <label className={styles.field}>
+            Сколько раз в месяц
+            <input
+              type="number"
+              min={0}
+              max={31}
+              value={perMonth}
+              disabled={!enabled}
+              onChange={(e) => patch({ excusedPerMonth: Number(e.target.value) })}
+            />
+          </label>
+          <label className={styles.field}>
+            Опоздание не более, минут
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              value={maxMinutes}
+              disabled={!enabled}
+              onChange={(e) => patch({ excusedMaxMinutes: Number(e.target.value) })}
+            />
+          </label>
+        </div>
+        <p className={styles.hint}>
+          {enabled
+            ? `Первые ${perMonth} опоздания в месяце длительностью до ${maxMinutes} мин засчитываются как полный день без минуса. Остальные опоздания — день засчитывается не полностью; исправить можно через «Корректировку табеля».`
+            : 'Правило выключено: каждое опоздание отмечается в табеле как есть.'}
+        </p>
+      </div>
+
+      <div className={styles.policyCard} style={{ gridColumn: '1 / -1' }}>
+        <p className={styles.policyCardTitle}>Уведомления сотруднику</p>
+        <Toggle
+          label="Сообщать в приложении о приходе, отмеченном на терминале (время, вовремя / опоздание)"
+          checked={notify}
+          onChange={(v) => patch({ notifyTerminalArrival: v })}
+        />
       </div>
     </div>
   );

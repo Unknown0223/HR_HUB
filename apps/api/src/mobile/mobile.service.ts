@@ -3,6 +3,8 @@ import { DayStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/current-user.decorator';
 import { MeService } from '../me/me.service';
+import { AttendanceService } from '../attendance/attendance.service';
+import { excusedLeft } from '../attendance/late-allowance';
 import { sanitizeNewsHtml } from '../news/news-html';
 
 const NEWS_DICTIONARY_CODE = 'news_feed';
@@ -24,6 +26,7 @@ export class MobileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly me: MeService,
+    private readonly attendance: AttendanceService,
   ) {}
 
   /**
@@ -91,6 +94,14 @@ export class MobileService {
       orderBy: { workDate: 'asc' },
     });
 
+    const rules = await this.attendance.latenessRules(resolved.tenantId);
+    // `work_date` is a DATE column: Prisma hands it back as UTC midnight, so `date` is that day.
+    const judged = await this.attendance.daysWithLateAllowance(
+      resolved.tenantId,
+      days,
+      rules,
+    );
+
     const totals = {
       onTime: days.filter((d) => d.status === DayStatus.on_time).length,
       late: days.filter((d) => d.status === DayStatus.late).length,
@@ -98,21 +109,30 @@ export class MobileService {
       dayOff: days.filter((d) => d.status === DayStatus.day_off).length,
       leave: days.filter((d) => d.status === DayStatus.leave).length,
       lateMinutes: days.reduce((sum, d) => sum + (d.lateMinutes ?? 0), 0),
+      lateExcused: judged.filter((d) => d.lateExcused).length,
+      notFull: judged.filter((d) => !d.fullDay).length,
     };
 
     return {
       year: y,
       month: m,
       linked: true,
-      days: days.map((d) => ({
-        // `work_date` is a DATE column: Prisma hands it back as UTC midnight.
-        date: d.workDate.toISOString().slice(0, 10),
+      days: judged.map((d) => ({
+        date: d.date,
         status: d.status,
         firstIn: d.firstInAt,
         lastOut: d.lastOutAt,
         lateMinutes: d.lateMinutes,
+        lateExcused: d.lateExcused,
+        fullDay: d.fullDay,
       })),
       totals,
+      lateness: {
+        excusedEnabled: rules.excusedEnabled,
+        excusedPerMonth: rules.excusedPerMonth,
+        excusedMaxMinutes: rules.excusedMaxMinutes,
+        excusedLeft: excusedLeft(judged, rules),
+      },
     };
   }
 

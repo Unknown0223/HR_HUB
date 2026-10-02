@@ -381,6 +381,14 @@
   outline-offset: -2px;
 }
 
+.cellNotFull {
+  box-shadow: inset 0 0 0 2px var(--danger);
+}
+
+.cellExcused {
+  box-shadow: inset 0 0 0 2px var(--ok);
+}
+
 .rowSelected td { background: rgba(47, 163, 80, 0.04); }
 
 .legend {

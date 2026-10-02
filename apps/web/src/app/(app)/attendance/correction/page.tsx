@@ -334,13 +334,19 @@ const GridRow = memo(function GridRow({
           );
         }
 
+        const notFull = !isPend && eff.status === 'late' && c.fullDay === false;
+        const excused = !isPend && eff.status === 'late' && c.lateExcused === true;
         return (
           <td key={c.date} className={tdClass}>
             <button
               type="button"
-              className={`${styles.cellBadge} ${styles[meta.cellClass as keyof typeof styles] || ''}`}
+              className={`${styles.cellBadge} ${styles[meta.cellClass as keyof typeof styles] || ''} ${
+                notFull ? styles.cellNotFull : excused ? styles.cellExcused : ''
+              }`}
               title={`${meta.label}${
                 eff.lateMinutes ? ` · ${eff.lateMinutes} мин` : ''
+              }${excused ? ' · уважительное, полный день' : ''}${
+                notFull ? ' · сверх лимита: день не полный' : ''
               } — клик: сменить статус`}
               onClick={() => onCellClick(row.employeeId, c)}
             >

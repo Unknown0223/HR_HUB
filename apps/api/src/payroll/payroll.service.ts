@@ -14,6 +14,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { buildExcelBuffer } from '../common/excel';
 import type { ImportResult } from '../common/import.dto';
+import { applyLateAllowance, normalizeLatenessRules } from '../attendance/late-allowance';
 import {
   CalculatePeriodDto,
   CreateAdvanceDto,
@@ -821,19 +822,34 @@ export class PayrollService {
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
 
-    const days = await this.prisma.attendanceDay.findMany({
-      where: {
-        tenantId,
-        workDate: { gte: from, lte: to },
-      },
-    });
+    const [days, setting] = await Promise.all([
+      this.prisma.attendanceDay.findMany({
+        where: {
+          tenantId,
+          workDate: { gte: from, lte: to },
+        },
+      }),
+      this.prisma.tenantSetting.findUnique({
+        where: { tenantId },
+        select: { extras: true },
+      }),
+    ]);
+    const extras = (setting?.extras ?? {}) as { system?: { lateness?: unknown } };
+    const rules = normalizeLatenessRules(extras.system?.lateness);
 
     return employees.map((emp) => {
-      const empDays = days.filter((d) => d.employeeId === emp.id);
+      const empDays = applyLateAllowance(
+        days
+          .filter((d) => d.employeeId === emp.id)
+          .map((d) => ({ ...d, date: d.workDate.toISOString().slice(0, 10) })),
+        rules,
+      );
       return {
         employee: emp,
         onTime: empDays.filter((d) => d.status === DayStatus.on_time).length,
         late: empDays.filter((d) => d.status === DayStatus.late).length,
+        lateExcused: empDays.filter((d) => d.lateExcused).length,
+        notFullDays: empDays.filter((d) => !d.fullDay).length,
         absent: empDays.filter((d) => d.status === DayStatus.absent).length,
         leave: empDays.filter((d) => d.status === DayStatus.leave).length,
         lateMinutes: empDays.reduce((s, d) => s + d.lateMinutes, 0),
@@ -845,6 +861,8 @@ export class PayrollService {
           date: d.workDate,
           status: d.status,
           lateMinutes: d.lateMinutes,
+          lateExcused: d.lateExcused,
+          fullDay: d.fullDay,
           firstInAt: d.firstInAt,
           lastOutAt: d.lastOutAt,
           plannedHours: d.plannedHours,

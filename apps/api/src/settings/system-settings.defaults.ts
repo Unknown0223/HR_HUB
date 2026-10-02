@@ -1,4 +1,9 @@
 /** HR HUB «Настройки системы» — defaults for TenantSetting.extras.system */
+import {
+  DEFAULT_LATENESS_RULES,
+  normalizeLatenessRules,
+  type LatenessRules,
+} from '../attendance/late-allowance';
 
 export type SystemSettings = {
   // Autogeneration / core
@@ -74,6 +79,8 @@ export type SystemSettings = {
   recruitment: RecruitmentSettings;
   /** Punch capture photos (приход / уход / отметка / примерный уход) */
   markPhotos: MarkPhotosSettings;
+  /** Excused late arrivals per month and terminal arrival notices */
+  lateness: LatenessRules;
 };
 
 /** Per document-type expiry reminder (PersonDocument.docType / catalog doc_types.code) */
@@ -645,6 +652,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   requiredFields: structuredClone(DEFAULT_REQUIRED_FIELDS_SETTINGS),
   recruitment: structuredClone(DEFAULT_RECRUITMENT_SETTINGS),
   markPhotos: structuredClone(DEFAULT_MARK_PHOTOS_SETTINGS),
+  lateness: { ...DEFAULT_LATENESS_RULES },
 };
 
 function mergeObj<T extends Record<string, unknown>>(base: T, patch: unknown): T {
@@ -756,6 +764,7 @@ export function mergeSystemSettings(raw: unknown): SystemSettings {
   merged.requiredFields = mergeRequiredFields(partial.requiredFields);
   merged.recruitment = mergeRecruitment(partial.recruitment);
   merged.markPhotos = mergeMarkPhotosSettings(partial.markPhotos);
+  merged.lateness = normalizeLatenessRules(partial.lateness);
   merged.documentTypeNotifications = mergeDocumentTypeNotifications(
     partial.documentTypeNotifications,
   );

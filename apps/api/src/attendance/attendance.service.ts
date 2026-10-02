@@ -81,6 +81,7 @@ import {
   type WeekPattern,
 } from './schedule-settings';
 import {
+  ATTENDANCE_TZ,
   dayBoundsFromYmd,
   endOfLocalDay,
   officialLastOutEnabled,
@@ -91,8 +92,13 @@ import {
   workDateOnly,
   ymdInTz,
 } from './attendance-day';
+import { applyLateAllowance, type LatenessRules } from './late-allowance';
 
 const GPS_OUTSIDE_COMMENT_MIN = 3;
+/** Sources whose result the employee already sees on the phone screen. */
+const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import']);
+/** Terminals sync old events after an outage; those must not ping the phone as "today". */
+const TERMINAL_NOTICE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 @Injectable()
 export class AttendanceService {
@@ -7191,10 +7197,11 @@ export class AttendanceService {
       byKey.set(dayKey(d.employeeId, ymd), d);
     }
 
+    const rules = await this.latenessRules(tenantId);
     const rows = employees.map((e) => {
       const pattern = (mergeScheduleSettings(e.schedule?.settings).weekPattern ??
         '6/1') as WeekPattern;
-      const cells = days.map((day) => {
+      const baseCells = days.map((day) => {
         const ymd = `${month}-${String(day).padStart(2, '0')}`;
         const rec = byKey.get(dayKey(e.id, ymd));
         const workDate = workDateOnly(new Date(`${ymd}T12:00:00+05:00`));
@@ -7214,9 +7221,11 @@ export class AttendanceService {
           lastOutAt: rec?.lastOutAt?.toISOString() ?? null,
         };
       });
+      const cells = applyLateAllowance(baseCells, rules);
       const present = cells.filter(
         (c) => c.status === DayStatus.on_time || c.status === DayStatus.late,
       ).length;
+      const notFullDays = cells.filter((c) => !c.fullDay).length;
       return {
         employeeId: e.id,
         fullName: [e.lastName, e.firstName, e.middleName]
@@ -7227,6 +7236,7 @@ export class AttendanceService {
         position: e.position?.name ?? null,
         schedule: e.schedule?.name ?? null,
         presentDays: present,
+        notFullDays,
         cells,
       };
     });
@@ -7254,6 +7264,7 @@ export class AttendanceService {
     return {
       month,
       days,
+      lateness: rules,
       referenceDate: refDate,
       stats: {
         employees: rows.length,
@@ -7335,11 +7346,16 @@ export class AttendanceService {
         update: {
           status: status as DayStatus,
           lateMinutes,
-          ...(status === DayStatus.absent ||
-          status === DayStatus.day_off ||
-          status === DayStatus.leave
-            ? {}
-            : {}),
+        },
+      });
+      await this.prisma.timesheetAdjustment.create({
+        data: {
+          tenantId,
+          employeeId: empId,
+          workDate,
+          oldStatus: existing?.status ?? null,
+          newStatus: status as DayStatus,
+          reason: raw.note?.trim() || 'Корректировка табеля',
         },
       });
       updated += 1;
@@ -8435,7 +8451,12 @@ export class AttendanceService {
       },
     });
 
-    await this.recalcDay(tenantId, employeeId, occurredAt);
+    const day = await this.recalcDay(tenantId, employeeId, occurredAt);
+    if (day) {
+      await this.notifyTerminalArrival(tenantId, employeeId, mark, day).catch((e) =>
+        this.logger.warn(`Terminal arrival notice failed: ${e instanceof Error ? e.message : e}`),
+      );
+    }
     return { ok: true, markId: mark.id, deviceId, visitor };
   }
 
@@ -8566,11 +8587,22 @@ export class AttendanceService {
       });
     }
 
+    // A timesheet correction is an HR decision: later punches only refresh the times.
+    if (existingDay && (await this.isDayCorrected(tenantId, existingDay))) {
+      return this.prisma.attendanceDay.update({
+        where: { id: existingDay.id },
+        data: {
+          firstInAt: firstIn?.occurredAt ?? existingDay.firstInAt,
+          lastOutAt: lastOut?.occurredAt ?? existingDay.lastOutAt,
+        },
+      });
+    }
+
     // Production / week pattern: day off (no punches в†’ day_off; punches still recorded as work)
     const plannedOff = isDayOffByPattern(workDate, pattern);
     if (plannedOff && !firstIn) {
       status = DayStatus.day_off;
-      await this.prisma.attendanceDay.upsert({
+      return this.prisma.attendanceDay.upsert({
         where: {
           tenantId_employeeId_workDate: { tenantId, employeeId, workDate },
         },
@@ -8590,7 +8622,6 @@ export class AttendanceService {
           earlyLeaveMinutes: 0,
         },
       });
-      return;
     }
 
     if (firstIn) {
@@ -8635,7 +8666,7 @@ export class AttendanceService {
       }
     }
 
-    await this.prisma.attendanceDay.upsert({
+    return this.prisma.attendanceDay.upsert({
       where: {
         tenantId_employeeId_workDate: { tenantId, employeeId, workDate },
       },
@@ -8656,6 +8687,109 @@ export class AttendanceService {
         lateMinutes,
         earlyLeaveMinutes,
       },
+    });
+  }
+
+  private async isDayCorrected(
+    tenantId: string,
+    day: { employeeId: string; workDate: Date; correctionId: string | null },
+  ) {
+    if (day.correctionId) return true;
+    const adjusted = await this.prisma.timesheetAdjustment.count({
+      where: { tenantId, employeeId: day.employeeId, workDate: day.workDate },
+    });
+    return adjusted > 0;
+  }
+
+  async latenessRules(tenantId: string): Promise<LatenessRules> {
+    const { system } = await this.settings.getSystemSettings(tenantId);
+    return system.lateness;
+  }
+
+  /** Month's days with the excused-lateness verdict applied (allowance spent in date order). */
+  async daysWithLateAllowance<T extends { workDate: Date; status: DayStatus; lateMinutes: number }>(
+    tenantId: string,
+    days: T[],
+    rules?: LatenessRules,
+  ) {
+    const r = rules ?? (await this.latenessRules(tenantId));
+    return applyLateAllowance(
+      days.map((d) => ({ ...d, date: d.workDate.toISOString().slice(0, 10) })),
+      r,
+    );
+  }
+
+  /**
+   * Phone punches already show the result on screen; a terminal does not, so the employee gets
+   * an in-app notice for the first arrival of the day with the on-time / late verdict.
+   */
+  private async notifyTerminalArrival(
+    tenantId: string,
+    employeeId: string,
+    mark: { id: string; occurredAt: Date; source: string; deviceId: string | null; rawPayload: unknown },
+    day: { workDate: Date; status: DayStatus; lateMinutes: number; firstInAt: Date | null },
+  ) {
+    if (PHONE_PUNCH_SOURCES.has(mark.source)) return;
+    if (!mark.deviceId && !this.sourceRequiresCapturePhoto(mark.source)) return;
+    const payload = this.asMeta(mark.rawPayload);
+    if (payload.isValid === false) return;
+    if (day.firstInAt?.getTime() !== mark.occurredAt.getTime()) return;
+    if (Date.now() - mark.occurredAt.getTime() > TERMINAL_NOTICE_MAX_AGE_MS) return;
+
+    const rules = await this.latenessRules(tenantId);
+    if (!rules.notifyTerminalArrival) return;
+
+    const ymd = day.workDate.toISOString().slice(0, 10);
+    const entityId = `${employeeId}:${ymd}`;
+    const sent = await this.prisma.notification.findFirst({
+      where: { tenantId, entity: 'attendance_arrival', entityId },
+      select: { id: true },
+    });
+    if (sent) return;
+
+    const device = mark.deviceId
+      ? await this.prisma.device.findFirst({
+          where: { id: mark.deviceId, tenantId },
+          select: { name: true, location: { select: { name: true } } },
+        })
+      : null;
+    const place = device?.location?.name || device?.name || '';
+    const time = new Intl.DateTimeFormat('ru-RU', {
+      timeZone: ATTENDANCE_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(mark.occurredAt);
+
+    let verdict = 'o‘z vaqtida.';
+    let tail = '';
+    if (day.status === DayStatus.late) {
+      verdict = `${day.lateMinutes} daqiqa kechikish.`;
+      if (rules.excusedEnabled) {
+        const monthStart = new Date(`${ymd.slice(0, 7)}-01T00:00:00.000Z`);
+        const monthDays = await this.prisma.attendanceDay.findMany({
+          where: {
+            tenantId,
+            employeeId,
+            workDate: { gte: monthStart, lte: day.workDate },
+          },
+          select: { workDate: true, status: true, lateMinutes: true },
+        });
+        const judged = await this.daysWithLateAllowance(tenantId, monthDays, rules);
+        const today = judged.find((d) => d.date === ymd);
+        const used = judged.filter((d) => d.lateExcused).length;
+        tail = today?.lateExcused
+          ? ` Sababli deb hisoblandi (bu oy ${used}/${rules.excusedPerMonth}), ish kuni to‘liq.`
+          : ' Bu kun to‘liq ish kuni hisoblanmaydi. Sababi bo‘lsa, HR korrektirovka qilishi mumkin.';
+      }
+    }
+
+    await this.notifications.notifyEmployee(tenantId, employeeId, {
+      kind: day.status === DayStatus.late ? 'alert' : 'info',
+      title: `Ishga kelish qayd etildi · ${time}`,
+      body: `Bugun ${time} da terminalda${place ? ` (${place})` : ''} belgi qo‘ydingiz — ${verdict}${tail}`,
+      entity: 'attendance_arrival',
+      entityId,
+      href: '/calendar',
     });
   }
 

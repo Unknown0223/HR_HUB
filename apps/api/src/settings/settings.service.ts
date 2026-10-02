@@ -322,6 +322,12 @@ export class SettingsService {
           ? patch.timepad
           : {}) as object),
       },
+      lateness: {
+        ...existing.lateness,
+        ...((patch.lateness && typeof patch.lateness === 'object'
+          ? patch.lateness
+          : {}) as object),
+      },
       markPhotos: (() => {
         const pr =
           patch.markPhotos && typeof patch.markPhotos === 'object'

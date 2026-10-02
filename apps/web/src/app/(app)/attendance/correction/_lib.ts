@@ -15,6 +15,10 @@ export type CorrectionCell = {
   earlyLeaveMinutes: number;
   firstInAt?: string | null;
   lastOutAt?: string | null;
+  /** Late, but inside the company's monthly excused allowance. */
+  lateExcused?: boolean;
+  /** False for a late day beyond the allowance: not a full working day until corrected. */
+  fullDay?: boolean;
 };
 
 export type CorrectionRow = {
