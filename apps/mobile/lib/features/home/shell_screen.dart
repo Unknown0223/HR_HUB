@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
+import '../notifications/inbox_watcher.dart';
 
 class ShellScreen extends ConsumerWidget {
   const ShellScreen({super.key, required this.navigationShell});
@@ -11,7 +12,8 @@ class ShellScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
+    return InboxWatcher(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       body: navigationShell,
       bottomNavigationBar: Container(
@@ -53,6 +55,7 @@ class ShellScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

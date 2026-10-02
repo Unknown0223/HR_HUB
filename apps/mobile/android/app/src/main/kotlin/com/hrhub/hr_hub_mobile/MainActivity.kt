@@ -10,8 +10,49 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
+    /** Route carried by a tapped inbox notification; Flutter takes it once on resume. */
+    private var pendingRoute: String? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        pendingRoute = intent?.getStringExtra("route")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra("route")?.let { pendingRoute = it }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hrhub/system")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "notify" -> {
+                        AppNotifier.show(
+                            this,
+                            call.argument<Int>("id") ?: 0,
+                            call.argument<String>("title") ?: "HR HUB",
+                            call.argument<String>("body"),
+                        )
+                        result.success(true)
+                    }
+                    "notificationsEnabled" -> result.success(AppNotifier.enabled(this))
+                    "openNotificationSettings" -> {
+                        AppNotifier.openNotificationSettings(this)
+                        result.success(true)
+                    }
+                    "openBiometricEnroll" -> {
+                        AppNotifier.openBiometricEnroll(this)
+                        result.success(true)
+                    }
+                    "takeLaunchRoute" -> {
+                        result.success(pendingRoute)
+                        pendingRoute = null
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hrhub/location_integrity")
             .setMethodCallHandler { call, result ->
                 when (call.method) {

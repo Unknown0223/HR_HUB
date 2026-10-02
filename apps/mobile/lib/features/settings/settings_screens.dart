@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/biometrics/biometric_service.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/security/app_lock.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/season.dart';
 import '../../shared/widgets.dart';
+import '../notifications/inbox_watcher.dart';
 
 String seasonLabel(Season s) => switch (s) {
   Season.spring => 'Bahor',
@@ -29,13 +31,26 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with WidgetsBindingObserver {
   bool _bioAvailable = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadBio();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadBio();
   }
 
   Future<void> _loadBio() async {
@@ -43,7 +58,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) setState(() => _bioAvailable = types.isNotEmpty);
   }
 
+  Future<void> _offerEnroll() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.tr('Barmoq izi qo‘shilmagan', 'Отпечаток не добавлен')),
+        content: Text(
+          ctx.tr(
+            'Barmoq izi bilan kirish uchun avval telefon sozlamalarida barmoq izini '
+                'qo‘shing. Qaytib kelganingizda bu yerda yoqishingiz mumkin.',
+            'Чтобы входить по отпечатку, сначала добавьте отпечаток в настройках '
+                'телефона. После возврата его можно будет включить здесь.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.tr('Bekor qilish', 'Отмена')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(ctx.tr('Sozlamalarni ochish', 'Открыть настройки')),
+          ),
+        ],
+      ),
+    );
+    if (go == true) await openBiometricEnrollSettings();
+  }
+
   Future<void> _toggleBio(bool v) async {
+    if (!_bioAvailable) {
+      await _loadBio();
+      if (!_bioAvailable) return _offerEnroll();
+    }
+    if (!mounted) return;
     if (v) {
       final ok = await ref
           .read(biometricServiceProvider)
@@ -141,14 +189,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         'Быстрый вход вместо PIN-кода',
                       )
                     : context.tr(
-                        'Qurilmada barmoq izi qo\'shilmagan',
-                        'На устройстве нет отпечатков',
+                        'Barmoq izi qo‘shilmagan — qo‘shish uchun bosing',
+                        'Отпечаток не добавлен — нажмите, чтобы добавить',
                       ),
                 showChevron: false,
+                onTap: () =>
+                    _toggleBio(!ref.read(appLockProvider).biometric),
                 trailing: Switch(
-                  value: ref.watch(appLockProvider).biometric,
+                  value: _bioAvailable && ref.watch(appLockProvider).biometric,
                   activeTrackColor: AppColors.accent,
-                  onChanged: _bioAvailable ? _toggleBio : null,
+                  onChanged: _toggleBio,
                 ),
               ),
             ],
@@ -159,10 +209,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               MenuTile(
                 icon: Icons.notifications_outlined,
                 label: context.tr('Bildirishnomalar', 'Уведомления'),
-                subtitle: context.tr(
-                  'Ilova ichidagi xabarlar',
-                  'Сообщения внутри приложения',
-                ),
+                subtitle: ref.watch(notifyPrefsProvider).enabled
+                    ? context.tr(
+                        'Telefonga xabar chiqariladi',
+                        'Уведомления на телефоне включены',
+                      )
+                    : context.tr(
+                        'Faqat ilova ichida',
+                        'Только внутри приложения',
+                      ),
                 onTap: () => context.push('/settings/notifications'),
               ),
             ],
@@ -256,45 +311,164 @@ class ThemeSettingsScreen extends StatelessWidget {
   }
 }
 
-/// Notifications are stored server-side and shown in the in-app list; the app has no push channel yet.
-class NotificationSettingsScreen extends StatelessWidget {
+/// Choose which server inbox items are mirrored as phone notifications.
+class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const kinds = [
-      (
-        Icons.how_to_reg_outlined,
-        'Yo‘qlik yoki boshqa so‘rovingiz tasdiqlanganda, rad etilganda yoki bekor qilinganda',
+  ConsumerState<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
+}
+
+class _NotificationSettingsScreenState
+    extends ConsumerState<NotificationSettingsScreen>
+    with WidgetsBindingObserver {
+  bool? _systemOn;
+
+  static const _icons = {
+    NotifyCategory.requests: Icons.how_to_reg_outlined,
+    NotifyCategory.advance: Icons.payments_outlined,
+    NotifyCategory.attendance: Icons.fingerprint,
+    NotifyCategory.news: Icons.campaign_outlined,
+    NotifyCategory.other: Icons.notifications_none,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshSystem();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshSystem();
+  }
+
+  Future<void> _refreshSystem() async {
+    final on = await systemNotificationsEnabled();
+    if (mounted) setState(() => _systemOn = on);
+  }
+
+  /// Android 13+ asks at runtime; once permanently denied only the system page can re-enable it.
+  Future<void> _ensureSystemPermission() async {
+    if (await systemNotificationsEnabled()) return _refreshSystem();
+    final status = await Permission.notification.request();
+    if (!status.isGranted) await openSystemNotificationSettings();
+    await _refreshSystem();
+  }
+
+  Future<void> _setEnabled(bool v) async {
+    await ref.read(notifyPrefsProvider.notifier).setEnabled(v);
+    if (v) await _ensureSystemPermission();
+  }
+
+  Future<void> _sendTest() async {
+    await _ensureSystemPermission();
+    if (!mounted) return;
+    await showSystemNotification(
+      id: 1,
+      title: context.tr('HR HUB — sinov xabari', 'HR HUB — тестовое уведомление'),
+      body: context.tr(
+        'Bildirishnomalar ishlayapti. Yangi xabarlar shu tarzda chiqadi.',
+        'Уведомления работают. Новые сообщения будут приходить так же.',
       ),
-      (Icons.campaign_outlined, 'HR barcha xodimlarga e’lon yuborganda'),
-      (Icons.gpp_maybe_outlined, 'Telefoningizda soxta lokatsiya aniqlanganda'),
-    ];
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = ref.watch(notifyPrefsProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBackBar(title: context.t('Bildirishnomalar')),
+      appBar: AppBackBar(title: context.tr('Bildirishnomalar', 'Уведомления')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.t('Qachon xabar keladi'),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            padding: EdgeInsets.zero,
+            child: SwitchListTile(
+              value: prefs.enabled,
+              activeTrackColor: AppColors.accent,
+              onChanged: _setEnabled,
+              title: Text(
+                context.tr('Telefonga xabar chiqarish', 'Показывать на телефоне'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                context.tr(
+                  'Yangi xabarlar telefonning bildirishnomalar panelida ko‘rinadi',
+                  'Новые сообщения появятся в шторке уведомлений',
                 ),
-                const SizedBox(height: 8),
-                for (final k in kinds)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      children: [
-                        Icon(k.$1, color: AppColors.accent, size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(context.t(k.$2))),
-                      ],
+              ),
+            ),
+          ),
+          if (prefs.enabled && _systemOn == false) ...[
+            const SizedBox(height: 12),
+            SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.notifications_off_outlined,
+                          color: AppColors.danger),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          context.tr(
+                            'Telefon sozlamalarida HR HUB bildirishnomalari o‘chirilgan',
+                            'В настройках телефона уведомления HR HUB отключены',
+                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: openSystemNotificationSettings,
+                    child: Text(context.tr('Ruxsat berish', 'Разрешить')),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      context.tr('Qaysi xabarlar chiqsin', 'Какие уведомления показывать'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
                     ),
+                  ),
+                ),
+                for (final c in NotifyCategory.values)
+                  SwitchListTile(
+                    value: prefs.enabled && !prefs.off.contains(c),
+                    activeTrackColor: AppColors.accent,
+                    onChanged: prefs.enabled
+                        ? (v) => ref
+                              .read(notifyPrefsProvider.notifier)
+                              .setCategory(c, v)
+                        : null,
+                    secondary: Icon(_icons[c], color: AppColors.accent),
+                    title: Text(context.tr(c.uz, c.ru)),
                   ),
               ],
             ),
@@ -302,17 +476,25 @@ class NotificationSettingsScreen extends StatelessWidget {
           const SizedBox(height: 12),
           SectionCard(
             child: Text(
-              context.t(
-                'Xabarlar ilova ichidagi «Bildirishnomalar» ro‘yxatida saqlanadi. '
-                'Telefonga push-xabar yuborish hozircha ulanmagan, shuning uchun '
-                'ularni ilovani ochganda ko‘rasiz.',
+              context.tr(
+                'Ilova ochiq yoki fonda ishlayotganda yangi xabarlar har daqiqada '
+                    'tekshiriladi. Barcha xabarlar ilova ichidagi ro‘yxatda ham saqlanadi.',
+                'Пока приложение открыто или работает в фоне, новые сообщения '
+                    'проверяются каждую минуту. Все сообщения также хранятся в списке '
+                    'внутри приложения.',
               ),
               style: const TextStyle(color: AppColors.inkMuted, height: 1.4),
             ),
           ),
           const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: prefs.enabled ? _sendTest : null,
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: Text(context.tr('Sinov xabarini yuborish', 'Отправить тестовое')),
+          ),
+          const SizedBox(height: 8),
           PrimaryButton(
-            label: context.t('Bildirishnomalarni ochish'),
+            label: context.tr('Bildirishnomalarni ochish', 'Открыть уведомления'),
             onPressed: () => context.push('/notifications'),
           ),
         ],
@@ -321,7 +503,7 @@ class NotificationSettingsScreen extends StatelessWidget {
   }
 }
 
-/// Former start/end-of-day reminder screen; reminders need a push channel, so it shares the info screen.
+/// Former start/end-of-day reminder screen; it now opens the notification settings.
 class NotifyRecordsScreen extends StatelessWidget {
   const NotifyRecordsScreen({super.key});
 
