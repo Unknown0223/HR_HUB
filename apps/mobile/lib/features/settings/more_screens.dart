@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/errors/api_exception.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -13,8 +14,8 @@ class SecurityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Xavfsizlik'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Xavfsizlik')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: SectionCard(
@@ -23,17 +24,17 @@ class SecurityScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Text(
-                  'Parolni o\'zgartirish',
-                  style: TextStyle(color: AppColors.inkMuted),
+                title: Text(
+                  context.t('Parolni o\'zgartirish'),
+                  style: const TextStyle(color: AppColors.inkMuted),
                 ),
                 onTap: () => context.push('/security/password'),
               ),
               const Divider(height: 1, color: AppColors.line),
               ListTile(
-                title: const Text(
-                  'PIN-kodni o\'zgartirish',
-                  style: TextStyle(color: AppColors.inkMuted),
+                title: Text(
+                  context.t('PIN-kodni o\'zgartirish'),
+                  style: const TextStyle(color: AppColors.inkMuted),
                 ),
                 onTap: () => context.push('/security/pin'),
               ),
@@ -62,19 +63,19 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
   String? _validate() {
     if (_current.text.isEmpty || _next.text.isEmpty || _again.text.isEmpty) {
-      return 'Barcha maydonlarni to‘ldiring';
+      return context.t('Barcha maydonlarni to‘ldiring');
     }
-    if (_next.text.trim().length < 8) return 'Yangi parol kamida 8 belgidan iborat bo‘lsin';
-    if (_next.text != _again.text) return 'Yangi parollar bir xil emas';
-    if (_next.text == _current.text) return 'Yangi parol joriy paroldan farq qilishi kerak';
+    if (_next.text.trim().length < 8) return context.t('Yangi parol kamida 8 belgidan iborat bo‘lsin');
+    if (_next.text != _again.text) return context.t('Yangi parollar bir xil emas');
+    if (_next.text == _current.text) return context.t('Yangi parol joriy paroldan farq qilishi kerak');
     return null;
   }
 
   String _humanize(Object e) {
     if (e is ApiException) {
-      if (e.statusCode == 429) return 'Juda ko‘p urinish. 15 daqiqadan keyin qayta urinib ko‘ring';
-      if (e.message.contains('Текущий пароль')) return 'Joriy parol noto‘g‘ri';
-      if (e.message.contains('совпадает')) return 'Yangi parol joriy parol bilan bir xil';
+      if (e.statusCode == 429) return context.t('Juda ko‘p urinish. 15 daqiqadan keyin qayta urinib ko‘ring');
+      if (e.message.contains('Текущий пароль')) return context.t('Joriy parol noto‘g‘ri');
+      if (e.message.contains('совпадает')) return context.t('Yangi parol joriy parol bilan bir xil');
       return e.message;
     }
     return e.toString();
@@ -97,7 +98,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Parol o‘zgartirildi. Keyingi kirishda yangi paroldan foydalaning')),
+        SnackBar(content: Text(context.t('Parol o‘zgartirildi. Keyingi kirishda yangi paroldan foydalaning'))),
       );
       context.pop();
     } catch (e) {
@@ -118,15 +119,15 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Parolni o\'zgartirish'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Parolni o\'zgartirish')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             SoftField(
               controller: _current,
-              hint: 'Joriy parol',
+              hint: context.t('Joriy parol'),
               prefixIcon: Icons.lock_outline,
               obscure: _o1,
               suffixIcon: IconButton(
@@ -137,7 +138,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             const SizedBox(height: 12),
             SoftField(
               controller: _next,
-              hint: 'Yangi parol',
+              hint: context.t('Yangi parol'),
               prefixIcon: Icons.lock_outline,
               obscure: _o2,
               suffixIcon: IconButton(
@@ -148,7 +149,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             const SizedBox(height: 12),
             SoftField(
               controller: _again,
-              hint: 'Parolni qayta kiriting',
+              hint: context.t('Parolni qayta kiriting'),
               prefixIcon: Icons.lock_outline,
               obscure: _o3,
               suffixIcon: IconButton(
@@ -157,9 +158,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Parol kamida 8 belgi. Uni hech kim, hatto administrator ham ko‘ra olmaydi.',
-              style: TextStyle(color: AppColors.inkMuted, fontSize: 12.5),
+            Text(
+              context.t('Parol kamida 8 belgi. Uni hech kim, hatto administrator ham ko‘ra olmaydi.'),
+              style: const TextStyle(color: AppColors.inkMuted, fontSize: 12.5),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -167,7 +168,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             ],
             const Spacer(),
             PrimaryButton(
-              label: 'O\'zgartirish',
+              label: context.t('O\'zgartirish'),
               busy: _busy,
               onPressed: _submit,
             ),
@@ -184,8 +185,8 @@ class HelpScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Yordam'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Yordam')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -194,7 +195,7 @@ class HelpScreen extends StatelessWidget {
               padding: EdgeInsets.zero,
               child: ListTile(
                 leading: const Icon(Icons.chat_bubble_outline),
-                title: const Text('Qo\'llab-quvvatlash bilan suhbat'),
+                title: Text(context.t('Qo\'llab-quvvatlash bilan suhbat')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {},
               ),
@@ -204,7 +205,7 @@ class HelpScreen extends StatelessWidget {
               padding: EdgeInsets.zero,
               child: ListTile(
                 leading: const Icon(Icons.telegram, color: Color(0xFF2AABEE)),
-                title: const Text('Telegram orqali chat'),
+                title: Text(context.t('Telegram orqali chat')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {},
               ),
@@ -223,17 +224,17 @@ class ModulesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasTeam = ref.watch(authProvider).user?.hasTeam == true;
     final items = [
-      (Icons.login_rounded, 'Kirish', '/punch/in'),
-      (Icons.logout_rounded, 'Chiqish', '/punch/out'),
-      (Icons.table_chart_outlined, 'Tabel', '/tabel'),
-      (Icons.assignment_outlined, 'So\'rovlar', '/requests'),
-      if (hasTeam) (Icons.groups_outlined, 'Jamoa', '/team'),
-      (Icons.payments_outlined, 'To\'lov', '/payroll'),
-      (Icons.note_alt_outlined, 'Qaydlar', '/marks'),
+      (Icons.login_rounded, context.t('Kirish'), '/punch/in'),
+      (Icons.logout_rounded, context.t('Chiqish'), '/punch/out'),
+      (Icons.table_chart_outlined, context.t('Tabel'), '/tabel'),
+      (Icons.assignment_outlined, context.t('So\'rovlar'), '/requests'),
+      if (hasTeam) (Icons.groups_outlined, context.t('Jamoa'), '/team'),
+      (Icons.payments_outlined, context.t('To\'lov'), '/payroll'),
+      (Icons.note_alt_outlined, context.t('Qaydlar'), '/marks'),
     ];
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Modullar'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Modullar')),
       body: GridView.builder(
         padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/biometrics/biometric_service.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/router/app_router.dart';
 import '../../core/security/app_lock.dart';
 import '../../core/theme/app_theme.dart';
@@ -127,7 +128,7 @@ class _UnlockViewState extends ConsumerState<UnlockView> {
         return true;
       case PinCheck.wrong:
         final left = ref.read(appLockProvider).attemptsLeft;
-        setState(() => _message = 'Noto‘g‘ri PIN-kod. Yana $left ta urinish qoldi');
+        setState(() => _message = context.t('Noto‘g‘ri PIN-kod. Yana {0} ta urinish qoldi', [left]));
         return false;
       case PinCheck.exhausted:
         await ref.read(authProvider.notifier).logout();
@@ -139,7 +140,7 @@ class _UnlockViewState extends ConsumerState<UnlockView> {
     final user = ref.read(authProvider).user;
     final first = user?.employee?['firstName']?.toString().trim() ?? '';
     final name = first.isNotEmpty ? first : (user?.displayName.split(' ').last ?? '');
-    return name.isEmpty ? 'Xush kelibsiz!' : 'Salom, $name!';
+    return name.isEmpty ? context.t('Xush kelibsiz!') : context.t('Salom, {0}!', [name]);
   }
 
   @override
@@ -149,14 +150,14 @@ class _UnlockViewState extends ConsumerState<UnlockView> {
       child: PinStage(
         header: const LockBadge(icon: Icons.lock_rounded),
         title: _greeting(),
-        subtitle: 'Ilovani ochish uchun PIN-kodni kiriting',
+        subtitle: context.t('Ilovani ochish uchun PIN-kodni kiriting'),
         message: _message,
         messageIsError: true,
         onComplete: _check,
         leadingKey: lock.biometric
             ? PadKey(
                 onTap: _biometric,
-                label: 'Barmoq izi',
+                label: context.t('Barmoq izi'),
                 plain: true,
                 child: const Icon(Icons.fingerprint_rounded, color: AppColors.accent, size: 38),
               )
@@ -168,29 +169,29 @@ class _UnlockViewState extends ConsumerState<UnlockView> {
                   key: const ValueKey('confirm'),
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Flexible(
+                    Flexible(
                       child: Text(
-                        'Parol bilan qayta kirasiz.',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
+                        context.t('Parol bilan qayta kirasiz.'),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
                       ),
                     ),
                     TextButton(
                       onPressed: () => setState(() => _confirmForgot = false),
-                      child: const Text('Bekor'),
+                      child: Text(context.tr('Bekor', 'Отмена')),
                     ),
                     TextButton(
                       onPressed: () => ref.read(authProvider.notifier).logout(),
                       style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                      child: const Text('Chiqish', style: TextStyle(fontWeight: FontWeight.w800)),
+                      child: Text(context.tr('Chiqish', 'Выйти'), style: const TextStyle(fontWeight: FontWeight.w800)),
                     ),
                   ],
                 )
               : TextButton(
                   key: const ValueKey('forgot'),
                   onPressed: () => setState(() => _confirmForgot = true),
-                  child: const Text(
-                    'PIN-kodni unutdingizmi?',
-                    style: TextStyle(fontSize: 14.5, color: AppColors.accent, fontWeight: FontWeight.w700),
+                  child: Text(
+                    context.t('PIN-kodni unutdingizmi?'),
+                    style: const TextStyle(fontSize: 14.5, color: AppColors.accent, fontWeight: FontWeight.w700),
                   ),
                 ),
         ),
@@ -236,14 +237,14 @@ class _PinSetupViewState extends ConsumerState<PinSetupView> {
           return true;
         }
         setState(() {
-          _message = 'Joriy PIN-kod noto‘g‘ri';
+          _message = context.t('Joriy PIN-kod noto‘g‘ri');
           _messageIsError = true;
         });
         return false;
       case _SetupStep.create:
         if (code.split('').toSet().length == 1 || _weak.contains(code)) {
           setState(() {
-            _message = 'Juda oddiy kod — boshqasini tanlang';
+            _message = context.t('Juda oddiy kod — boshqasini tanlang');
             _messageIsError = true;
           });
           return false;
@@ -254,7 +255,7 @@ class _PinSetupViewState extends ConsumerState<PinSetupView> {
       case _SetupStep.confirm:
         if (code != _first) {
           setState(() {
-            _message = 'Kodlar mos kelmadi — qaytadan o‘ylab toping';
+            _message = context.t('Kodlar mos kelmadi — qaytadan o‘ylab toping');
             _messageIsError = true;
           });
           return false;
@@ -279,7 +280,7 @@ class _PinSetupViewState extends ConsumerState<PinSetupView> {
   Future<void> _enableBiometric() async {
     setState(() => _bioBusy = true);
     final ok = await ref.read(biometricServiceProvider).authenticate(
-          reason: 'Barmoq izi bilan ochishni tasdiqlang',
+          reason: context.t('Barmoq izi bilan ochishni tasdiqlang'),
           allowSkipIfUnavailable: false,
         );
     if (!mounted) return;
@@ -330,13 +331,13 @@ class _PinSetupViewState extends ConsumerState<PinSetupView> {
 
   Widget _pinStep() {
     final (title, subtitle, icon) = switch (_step) {
-      _SetupStep.current => ('Joriy PIN-kodni kiriting', 'O‘zgartirishdan oldin tasdiqlang', Icons.lock_rounded),
+      _SetupStep.current => (context.t('Joriy PIN-kodni kiriting'), context.t('O‘zgartirishdan oldin tasdiqlang'), Icons.lock_rounded),
       _SetupStep.create => (
-          'PIN-kod o‘rnating',
-          'Ilovaga tez kirish uchun 4 xonali kod o‘ylab toping',
+          context.t('PIN-kod o‘rnating'),
+          context.t('Ilovaga tez kirish uchun 4 xonali kod o‘ylab toping'),
           Icons.lock_open_rounded,
         ),
-      _ => ('PIN-kodni takrorlang', 'Xuddi shu 4 raqamni yana kiriting', Icons.lock_rounded),
+      _ => (context.t('PIN-kodni takrorlang'), context.t('Xuddi shu 4 raqamni yana kiriting'), Icons.lock_rounded),
     };
     return PinStage(
       key: ValueKey(_step),
@@ -370,26 +371,26 @@ class _PinSetupViewState extends ConsumerState<PinSetupView> {
               children: [
                 const _PulsingFingerprint(),
                 const SizedBox(height: 14),
-                const Text(
-                  'Barmoq izi bilan ochish',
+                Text(
+                  context.t('Barmoq izi bilan ochish'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: AppColors.ink),
+                  style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: AppColors.ink),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'PIN-kod o‘rnatildi. Endi ilovani bir teginish bilan ochishingiz mumkin — '
-                  'PIN-kod zaxira sifatida qoladi.',
+                Text(
+                  context.t('PIN-kod o‘rnatildi. Endi ilovani bir teginish bilan ochishingiz mumkin — '
+                      'PIN-kod zaxira sifatida qoladi.'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.inkMuted, height: 1.4),
+                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.inkMuted, height: 1.4),
                 ),
                 const SizedBox(height: 26),
-                GlowButton(label: 'Yoqish', busy: _bioBusy, onPressed: _enableBiometric),
+                GlowButton(label: context.t('Yoqish'), busy: _bioBusy, onPressed: _enableBiometric),
                 const SizedBox(height: 6),
                 TextButton(
                   onPressed: _bioBusy ? null : () => _finish(biometric: false),
-                  child: const Text(
-                    'Keyinroq',
-                    style: TextStyle(fontSize: 15, color: AppColors.inkMuted, fontWeight: FontWeight.w700),
+                  child: Text(
+                    context.t('Keyinroq'),
+                    style: const TextStyle(fontSize: 15, color: AppColors.inkMuted, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -463,7 +464,7 @@ class ChangePinScreen extends StatelessWidget {
       onCancel: close,
       onDone: () {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PIN-kod yangilandi')),
+          SnackBar(content: Text(context.t('PIN-kod yangilandi'))),
         );
         close();
       },

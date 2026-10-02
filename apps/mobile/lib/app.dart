@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/auth/auth_state.dart';
+import 'core/i18n/app_lang.dart';
 import 'core/router/app_router.dart';
 import 'core/security/app_permissions.dart';
 import 'core/theme/app_theme.dart';
+import 'shared/seasonal_backdrop.dart';
 import 'core/tracking/tracking_controller.dart';
 import 'features/lock/app_lock_screens.dart';
 
@@ -14,11 +16,22 @@ class HrHubApp extends ConsumerStatefulWidget {
   ConsumerState<HrHubApp> createState() => _HrHubAppState();
 }
 
-class _HrHubAppState extends ConsumerState<HrHubApp> with WidgetsBindingObserver {
+class _HrHubAppState extends ConsumerState<HrHubApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  bool _artCached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_artCached) return;
+    _artCached = true;
+    precacheSeasonArt(context);
   }
 
   @override
@@ -31,7 +44,10 @@ class _HrHubAppState extends ConsumerState<HrHubApp> with WidgetsBindingObserver
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.read(permissionsProvider.notifier).refresh().then((_) => _syncTracking());
+      ref
+          .read(permissionsProvider.notifier)
+          .refresh()
+          .then((_) => _syncTracking());
     }
   }
 
@@ -47,6 +63,7 @@ class _HrHubAppState extends ConsumerState<HrHubApp> with WidgetsBindingObserver
     ref.listen(authProvider, (_, _) => _syncTracking());
     ref.listen(permissionsProvider, (_, _) => _syncTracking());
     final router = ref.watch(appRouterProvider);
+    final lang = ref.watch(appLangProvider);
     return MaterialApp.router(
       title: 'HR HUB',
       debugShowCheckedModeBanner: false,
@@ -55,9 +72,18 @@ class _HrHubAppState extends ConsumerState<HrHubApp> with WidgetsBindingObserver
       routerConfig: router,
       builder: (context, child) {
         final mq = MediaQuery.of(context);
-        return MediaQuery(
-          data: mq.copyWith(textScaler: ReadableTextScaler(mq.textScaler)),
-          child: AppLockGate(child: child ?? const SizedBox.shrink()),
+        return LangScope(
+          lang: lang,
+          child: MediaQuery(
+            data: mq.copyWith(textScaler: ReadableTextScaler(mq.textScaler)),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const SeasonalBackdrop(),
+                AppLockGate(child: child ?? const SizedBox.shrink()),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -72,7 +98,8 @@ class ReadableTextScaler extends TextScaler {
   final TextScaler system;
 
   static double boost(double fontSize) =>
-      fontSize * 1.08 + (fontSize < 15 ? (15 - fontSize).clamp(0, 3) * 0.35 : 0);
+      fontSize * 1.08 +
+      (fontSize < 15 ? (15 - fontSize).clamp(0, 3) * 0.35 : 0);
 
   @override
   double scale(double fontSize) => system.scale(boost(fontSize));

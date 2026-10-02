@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_state.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/my_avatar.dart';
 import '../../shared/widgets.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -17,7 +19,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     // Team membership changes on the server (org chart); refresh on open.
-    Future.microtask(() => ref.read(authProvider.notifier).refreshMe().catchError((_) {}));
+    Future.microtask(
+      () => ref.read(authProvider.notifier).refreshMe().catchError((_) {}),
+    );
   }
 
   @override
@@ -25,7 +29,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.watch(authProvider).user;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.accent,
@@ -33,17 +37,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              const Padding(
-                padding: EdgeInsets.only(left: 4, bottom: 12),
-                child: Text(
-                  'Profil',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.ink),
-                ),
-              ),
+              SceneHeading(context.t('Profil')),
               _HeaderCard(user: user),
               if (user?.hasTeam == true) ...[
                 const SizedBox(height: 14),
-                _TeamCard(size: user!.teamSize, onTap: () => context.push('/team')),
+                _TeamCard(
+                  size: user!.teamSize,
+                  onTap: () => context.push('/team'),
+                ),
               ],
               const SizedBox(height: 14),
               SectionCard(
@@ -53,33 +54,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     _MenuRow(
                       icon: Icons.person_outline_rounded,
                       color: const Color(0xFF3B82F6),
-                      label: 'Shaxsiy ma’lumotlar',
+                      label: context.t('Shaxsiy ma’lumotlar'),
                       onTap: () => context.push('/profile/details'),
                     ),
                     _MenuRow(
                       icon: Icons.my_location_rounded,
                       color: AppColors.accent,
-                      label: 'GPS kuzatuv',
-                      subtitle: 'Fon xizmati holati',
+                      label: context.t('GPS kuzatuv'),
+                      subtitle: context.t('Fon xizmati holati'),
                       onTap: () => context.push('/gps-track'),
                     ),
                     _MenuRow(
                       icon: Icons.settings_outlined,
                       color: const Color(0xFF6B7280),
-                      label: 'Sozlamalar',
+                      label: context.t('Sozlamalar'),
                       onTap: () => context.push('/settings'),
                     ),
                     _MenuRow(
                       icon: Icons.lock_outline_rounded,
                       color: const Color(0xFFE39B0B),
-                      label: 'Xavfsizlik',
-                      subtitle: 'Parol, PIN-kod',
+                      label: context.t('Xavfsizlik'),
+                      subtitle: context.t('Parol, PIN-kod'),
                       onTap: () => context.push('/security'),
                     ),
                     _MenuRow(
                       icon: Icons.support_agent_rounded,
                       color: const Color(0xFF8E6BD8),
-                      label: 'Yordam',
+                      label: context.t('Yordam'),
                       onTap: () => context.push('/help'),
                       last: true,
                     ),
@@ -93,12 +94,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.logout,
                     backgroundColor: AppColors.logout.withValues(alpha: 0.06),
-                    side: BorderSide(color: AppColors.logout.withValues(alpha: 0.4)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    side: BorderSide(
+                      color: AppColors.logout.withValues(alpha: 0.4),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
                   ),
                   icon: const Icon(Icons.logout_rounded),
-                  label: const Text('Hisobdan chiqish'),
+                  label: Text(context.t('Hisobdan chiqish')),
                   onPressed: () => _confirmLogout(context),
                 ),
               ),
@@ -106,7 +114,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const Center(
                 child: Text(
                   'HR HUB · v1.0.0',
-                  style: TextStyle(color: AppColors.inkFaint, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: AppColors.inkFaint,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -120,17 +132,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Hisobdan chiqish'),
-        content: const Text(
-          'Chiqqaningizdan so‘ng GPS kuzatuv to‘xtaydi. Davom etasizmi?',
-          style: TextStyle(fontSize: 15),
+        title: Text(ctx.t('Hisobdan chiqish')),
+        content: Text(
+          ctx.t('Chiqqaningizdan so‘ng GPS kuzatuv to‘xtaydi. Davom etasizmi?'),
+          style: const TextStyle(fontSize: 15),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor qilish')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.t('Bekor qilish')),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.logout),
-            child: const Text('Chiqish'),
+            child: Text(ctx.tr('Chiqish', 'Выйти')),
           ),
         ],
       ),
@@ -177,8 +192,11 @@ class _HeaderCard extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: AvatarCircle(name: user?.displayName, radius: 34),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const MyAvatar(radius: 34),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -187,7 +205,11 @@ class _HeaderCard extends StatelessWidget {
                   children: [
                     Text(
                       user?.displayName ?? '—',
-                      style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     if (position != null && position.isNotEmpty)
                       Text(
@@ -208,14 +230,18 @@ class _HeaderCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (tenant != null) _Chip(icon: Icons.business_rounded, text: tenant),
-              if (division != null) _Chip(icon: Icons.apartment_rounded, text: division),
+              if (tenant != null)
+                _Chip(icon: Icons.business_rounded, text: tenant),
+              if (division != null)
+                _Chip(icon: Icons.apartment_rounded, text: division),
               if (schedule != null)
                 _Chip(
                   icon: Icons.schedule_rounded,
-                  text: '${schedule['startTime'] ?? '09:00'} – ${schedule['endTime'] ?? '18:00'}',
+                  text:
+                      '${schedule['startTime'] ?? '09:00'} – ${schedule['endTime'] ?? '18:00'}',
                 ),
-              if (tab != null && tab.isNotEmpty) _Chip(icon: Icons.badge_outlined, text: '№ $tab'),
+              if (tab != null && tab.isNotEmpty)
+                _Chip(icon: Icons.badge_outlined, text: '№ $tab'),
             ],
           ),
         ],
@@ -243,7 +269,14 @@ class _Chip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: Colors.white),
           const SizedBox(width: 5),
-          Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
         ],
       ),
     );
@@ -268,7 +301,10 @@ class _TeamCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.45), width: 1.5),
+            border: Border.all(
+              color: AppColors.accent.withValues(alpha: 0.45),
+              width: 1.5,
+            ),
           ),
           child: Row(
             children: [
@@ -279,7 +315,11 @@ class _TeamCard extends StatelessWidget {
                   color: AppColors.accentTint,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.groups_rounded, color: AppColors.accent, size: 30),
+                child: const Icon(
+                  Icons.groups_rounded,
+                  color: AppColors.accent,
+                  size: 30,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -288,30 +328,47 @@ class _TeamCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Text('Mening jamoam', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                        Text(
+                          context.t('Mening jamoam'),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.accent,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             '$size',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 3),
-                    const Text(
-                      'Tabel, statistika va jonli joylashuv',
-                      style: TextStyle(color: AppColors.inkMuted, fontSize: 14),
+                    Text(
+                      context.t('Tabel, statistika va jonli joylashuv'),
+                      style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.accent, size: 28),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.accent,
+                size: 28,
+              ),
             ],
           ),
         ),
@@ -361,13 +418,28 @@ class _MenuRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       if (subtitle != null)
-                        Text(subtitle!, style: const TextStyle(color: AppColors.inkMuted, fontSize: 13)),
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(
+                            color: AppColors.inkMuted,
+                            fontSize: 13,
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.inkFaint),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.inkFaint,
+                ),
               ],
             ),
           ),

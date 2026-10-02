@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -44,22 +45,25 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(tabelProvider((_year, _month)));
-    final title = DateFormat('MMMM yyyy', 'uz').format(DateTime(_year, _month));
+    final title = DateFormat(
+      context.monthYearPattern,
+      context.dateLocale,
+    ).format(DateTime(_year, _month));
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.chevron_left, size: 30),
           onPressed: () => context.pop(),
         ),
-        title: const Text('Tabel'),
+        title: Text(context.t('Tabel')),
         titleSpacing: 0,
         actions: [
           IconButton(
             onPressed: () => context.push('/marks'),
             icon: const Icon(Icons.list_alt),
-            tooltip: 'Barcha qaydlar',
+            tooltip: context.t('Barcha qaydlar'),
           ),
         ],
       ),
@@ -115,10 +119,12 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
                 final linked = data['linked'] == true;
 
                 if (!linked) {
-                  return const SectionCard(
+                  return SectionCard(
                     child: Text(
-                      'Akkauntingiz xodim kartasiga bog‘lanmagan — tabel bo‘sh. '
-                      'HR bo‘limiga murojaat qiling.',
+                      context.t(
+                        'Akkauntingiz xodim kartasiga bog‘lanmagan — tabel bo‘sh. '
+                        'HR bo‘limiga murojaat qiling.',
+                      ),
                     ),
                   );
                 }
@@ -130,9 +136,9 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Oy xulosasi',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          Text(
+                            context.t('Oy xulosasi'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 12),
                           Wrap(
@@ -140,22 +146,22 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
                             runSpacing: 10,
                             children: [
                               _StatChip(
-                                label: 'Kelgan',
+                                label: context.tr('Kelgan', 'Явка'),
                                 value: '${summary['presentDays'] ?? 0}',
                                 color: AppColors.accent,
                               ),
                               _StatChip(
-                                label: 'Kech',
+                                label: context.t('Kech'),
                                 value: '${summary['lateDays'] ?? 0}',
                                 color: AppColors.warn,
                               ),
                               _StatChip(
-                                label: 'Yo‘q',
+                                label: context.tr('Yo‘q', 'Неявка'),
                                 value: '${summary['absentDays'] ?? 0}',
                                 color: AppColors.danger,
                               ),
                               _StatChip(
-                                label: 'Kech (daq)',
+                                label: context.t('Kech (daq)'),
                                 value: '${summary['lateMinutes'] ?? 0}',
                                 color: AppColors.inkMuted,
                               ),
@@ -169,17 +175,17 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Kunlar',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          Text(
+                            context.t('Kunlar'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 8),
                           if (days.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Text(
-                                'Bu oy uchun kunlar hali yo‘q',
-                                style: TextStyle(color: AppColors.inkMuted),
+                                context.t('Bu oy uchun kunlar hali yo‘q'),
+                                style: const TextStyle(color: AppColors.inkMuted),
                               ),
                             )
                           else
@@ -212,25 +218,25 @@ class _TabelScreenState extends ConsumerState<TabelScreen> {
                         children: [
                           Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'Belgilar',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                  context.t('Belgilar'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
                                 ),
                               ),
                               LinkText(
-                                'Barchasi',
+                                context.t('Barchasi'),
                                 onTap: () => context.push('/marks'),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           if (marks.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               child: Text(
-                                'Belgilar yo‘q',
-                                style: TextStyle(color: AppColors.inkMuted),
+                                context.t('Belgilar yo‘q'),
+                                style: const TextStyle(color: AppColors.inkMuted),
                               ),
                             )
                           else

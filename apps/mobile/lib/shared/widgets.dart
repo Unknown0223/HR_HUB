@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/i18n/app_lang.dart';
 import '../core/theme/app_theme.dart';
 
 /// API date-only fields arrive as `YYYY-MM-DDT00:00:00.000Z`; keep the calendar
@@ -20,11 +21,11 @@ String formatApiTime(dynamic value) {
 String punchDirectionLabel(dynamic direction) {
   switch (direction?.toString().toUpperCase()) {
     case 'IN':
-      return 'Kirish';
+      return trText('Kirish');
     case 'OUT':
-      return 'Chiqish';
+      return trText('Chiqish');
     default:
-      return 'Belgi';
+      return trText('Belgi');
   }
 }
 
@@ -36,22 +37,24 @@ dynamic markField(Map m, String key) {
 String markKindLabel(Map m) {
   switch (markField(m, 'markType')?.toString()) {
     case 'in':
-      return 'Kirish';
+      return trText('Kirish');
     case 'out':
-      return 'Chiqish';
+      return trText('Chiqish');
     case 'estimated_out':
-      return 'Taxminiy chiqish';
+      return trText('Taxminiy chiqish');
     case 'break_out':
-      return 'Tanaffusga chiqish';
+      return trText('Tanaffusga chiqish');
     case 'break_in':
-      return 'Tanaffusdan qaytish';
+      return trText('Tanaffusdan qaytish');
   }
   return punchDirectionLabel(m['direction']);
 }
 
 bool markIsEntry(Map m) {
   final type = markField(m, 'markType')?.toString();
-  if (type != null && type.isNotEmpty) return type == 'in' || type == 'break_in';
+  if (type != null && type.isNotEmpty) {
+    return type == 'in' || type == 'break_in';
+  }
   return m['direction']?.toString().toUpperCase() == 'IN';
 }
 
@@ -60,18 +63,18 @@ bool markOutsideGeofence(Map m) => markField(m, 'outsideGeofence') == true;
 String punchSourceLabel(dynamic source) {
   final s = source?.toString().toLowerCase() ?? '';
   if (s.isEmpty) return '';
-  if (s == 'mobile_app') return 'Telefon';
+  if (s == 'mobile_app') return trText('Telefon');
   if (s == 'gps') return 'GPS';
   if (s == 'qr') return 'QR';
   if (s.contains('face')) return 'Face ID';
-  if (s == 'manual') return 'Qo\'lda';
-  if (s == 'import') return 'Import';
-  return 'Terminal';
+  if (s == 'manual') return trText('Qo\'lda');
+  if (s == 'import') return trText('Import');
+  return trText('Terminal');
 }
 
 String punchAcceptedText(Map res) {
   final time = formatApiTime(res['occurredAt']);
-  final label = '${punchDirectionLabel(res['direction'])} qayd etildi';
+  final label = trText('{0} qayd etildi', [punchDirectionLabel(res['direction'])]);
   return time.isEmpty ? label : '$label · $time';
 }
 
@@ -89,49 +92,46 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    LangScope.of(context);
     final (label, color) = statusStyle(status);
     return Text(
       label,
-      style: TextStyle(
-        color: color,
-        fontWeight: FontWeight.w700,
-        fontSize: 13,
-      ),
+      style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
     );
   }
 }
 
 (String, Color) statusStyle(String s) {
-    switch (s) {
-      case 'on_time':
-        return ('Vaqtida', AppColors.success);
-      case 'late':
-        return ('Kech', AppColors.warn);
-      case 'absent':
-        return ('Kelmagan', AppColors.danger);
-      case 'leave':
-        return ('Ta’til', AppColors.accentSoft);
-      case 'day_off':
-        return ('Dam olish kuni', AppColors.inkMuted);
-      case 'holiday':
-        return ('Bayram', Color(0xFF8E6BD8));
-      case 'planned':
-        return ('Reja', AppColors.inkFaint);
-      case 'not_started':
-        return ('Boshlanmagan', AppColors.inkMuted);
-      case 'draft':
-        return ('Qoralama', AppColors.inkMuted);
-      case 'pending':
-        return ('Kutilmoqda', AppColors.warn);
-      case 'approved':
-        return ('Tasdiqlangan', AppColors.success);
-      case 'rejected':
-        return ('Rad etilgan', AppColors.danger);
-      case 'cancelled':
-        return ('Bekor', AppColors.inkMuted);
-      default:
-        return (s, AppColors.inkMuted);
-    }
+  switch (s) {
+    case 'on_time':
+      return (trText('Vaqtida'), AppColors.success);
+    case 'late':
+      return (trText('Kech'), AppColors.warn);
+    case 'absent':
+      return (trText('Kelmagan'), AppColors.danger);
+    case 'leave':
+      return (trText('Ta’til'), AppColors.accentSoft);
+    case 'day_off':
+      return (trText('Dam olish kuni'), AppColors.inkMuted);
+    case 'holiday':
+      return (trText('Bayram'), Color(0xFF8E6BD8));
+    case 'planned':
+      return (trText('Reja'), AppColors.inkFaint);
+    case 'not_started':
+      return (trText('Boshlanmagan'), AppColors.inkMuted);
+    case 'draft':
+      return (trText('Qoralama'), AppColors.inkMuted);
+    case 'pending':
+      return (trText('Kutilmoqda'), AppColors.warn);
+    case 'approved':
+      return (trText('Tasdiqlangan'), AppColors.success);
+    case 'rejected':
+      return (trText('Rad etilgan'), AppColors.danger);
+    case 'cancelled':
+      return (trText('Bekor'), AppColors.inkMuted);
+    default:
+      return (s, AppColors.inkMuted);
+  }
 }
 
 class EmptyState extends StatelessWidget {
@@ -143,15 +143,67 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.inkMuted,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon ?? Icons.inbox_outlined,
+              size: 30,
+              color: AppColors.inkFaint,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.inkMuted,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SceneHeading extends StatelessWidget {
+  const SceneHeading(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 14),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.78),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+              ),
+            ),
           ),
         ),
       ),
@@ -330,8 +382,9 @@ class PrimaryButton extends StatelessWidget {
       child: FilledButton(
         style: FilledButton.styleFrom(
           backgroundColor: color ?? AppColors.accent,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         onPressed: busy ? null : onPressed,
         child: busy
@@ -379,8 +432,9 @@ class SoftField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: label == null ? hint : null,
         labelText: label,
-        prefixIcon:
-            prefixIcon == null ? null : Icon(prefixIcon, color: AppColors.ink),
+        prefixIcon: prefixIcon == null
+            ? null
+            : Icon(prefixIcon, color: AppColors.ink),
         suffixIcon: suffixIcon,
       ),
     );
@@ -400,8 +454,9 @@ class AvatarCircle extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.bgSoft,
-      backgroundImage:
-          imageUrl != null && imageUrl!.isNotEmpty ? NetworkImage(imageUrl!) : null,
+      backgroundImage: imageUrl != null && imageUrl!.isNotEmpty
+          ? NetworkImage(imageUrl!)
+          : null,
       child: imageUrl == null || imageUrl!.isEmpty
           ? Text(
               initials,

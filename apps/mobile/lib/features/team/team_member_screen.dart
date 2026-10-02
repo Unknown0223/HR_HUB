@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/team_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/yandex_map_view.dart';
@@ -49,7 +50,11 @@ class _TeamMemberScreenState extends ConsumerState<TeamMemberScreen> {
   Future<void> _loadSheet() async {
     setState(() => _sheetLoading = true);
     try {
-      final d = await _repo.timesheet(widget.employeeId, year: _month.year, month: _month.month);
+      final d = await _repo.timesheet(
+        widget.employeeId,
+        year: _month.year,
+        month: _month.month,
+      );
       if (!mounted) return;
       setState(() {
         _sheet = d;
@@ -77,25 +82,26 @@ class _TeamMemberScreenState extends ConsumerState<TeamMemberScreen> {
     _loadSheet();
   }
 
-  Map get _employee => (_live?['employee'] ?? _sheet?['employee'] ?? const {}) as Map;
+  Map get _employee =>
+      (_live?['employee'] ?? _sheet?['employee'] ?? const {}) as Map;
 
   @override
   Widget build(BuildContext context) {
     final name = _employee['fullName']?.toString();
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.chevron_left, size: 30),
           onPressed: () => context.pop(),
         ),
         titleSpacing: 0,
-        title: Text(name == null ? 'Xodim' : shortName(name)),
+        title: Text(name == null ? context.t('Xodim') : shortName(name)),
       ),
       body: _sheet == null && _live == null
           ? (_error != null
-              ? EmptyState(message: '$_error')
-              : const Center(child: CircularProgressIndicator()))
+                ? EmptyState(message: '$_error')
+                : const Center(child: CircularProgressIndicator()))
           : RefreshIndicator(
               color: AppColors.accent,
               onRefresh: () => Future.wait([_loadSheet(), _loadLive()]),
@@ -110,7 +116,10 @@ class _TeamMemberScreenState extends ConsumerState<TeamMemberScreen> {
                   const SizedBox(height: 14),
                   _LiveCard(
                     live: _live,
-                    photoUrl: photoDataUrl(ref, _repo.mediaUrl(_employee['photoUrl']?.toString())),
+                    photoUrl: photoDataUrl(
+                      ref,
+                      _repo.mediaUrl(_employee['photoUrl']?.toString()),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   _MonthBar(
@@ -121,16 +130,20 @@ class _TeamMemberScreenState extends ConsumerState<TeamMemberScreen> {
                   ),
                   const SizedBox(height: 12),
                   if (_sheet != null) ...[
-                    _StatsGrid(summary: (_sheet!['summary'] as Map?) ?? const {}),
+                    _StatsGrid(
+                      summary: (_sheet!['summary'] as Map?) ?? const {},
+                    ),
                     const SizedBox(height: 14),
                     _CalendarCard(
                       month: _month,
-                      days: ((_sheet!['days'] as List?) ?? const []).cast<Map>(),
+                      days: ((_sheet!['days'] as List?) ?? const [])
+                          .cast<Map>(),
                       onDayTap: _showDay,
                     ),
                     const SizedBox(height: 14),
                     _DayList(
-                      days: ((_sheet!['days'] as List?) ?? const []).cast<Map>(),
+                      days: ((_sheet!['days'] as List?) ?? const [])
+                          .cast<Map>(),
                       onDayTap: _showDay,
                     ),
                   ],
@@ -155,19 +168,43 @@ class _TeamMemberScreenState extends ConsumerState<TeamMemberScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      DateFormat('d MMMM, EEEE', 'uz').format(d),
-                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                      DateFormat('d MMMM, EEEE', ctx.dateLocale).format(d),
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   StatusPill(status: day['status'].toString()),
                 ],
               ),
               const SizedBox(height: 16),
-              _kv('Kelgan vaqti', formatApiTime(day['firstIn']).ifEmpty('—')),
-              _kv('Ketgan vaqti', formatApiTime(day['lastOut']).ifEmpty('—')),
-              _kv('Ishlagan vaqti', (day['workedMinutes'] as num? ?? 0) > 0 ? hoursLabel(day['workedMinutes'] as num) : '—'),
-              _kv('Kechikish', (day['lateMinutes'] as num? ?? 0) > 0 ? hoursLabel(day['lateMinutes'] as num) : '—'),
-              _kv('Erta ketish', (day['earlyLeaveMinutes'] as num? ?? 0) > 0 ? hoursLabel(day['earlyLeaveMinutes'] as num) : '—'),
+              _kv(
+                ctx.t('Kelgan vaqti'),
+                formatApiTime(day['firstIn']).ifEmpty('—'),
+              ),
+              _kv(
+                ctx.t('Ketgan vaqti'),
+                formatApiTime(day['lastOut']).ifEmpty('—'),
+              ),
+              _kv(
+                ctx.t('Ishlagan vaqti'),
+                (day['workedMinutes'] as num? ?? 0) > 0
+                    ? hoursLabel(day['workedMinutes'] as num)
+                    : '—',
+              ),
+              _kv(
+                ctx.t('Kechikish'),
+                (day['lateMinutes'] as num? ?? 0) > 0
+                    ? hoursLabel(day['lateMinutes'] as num)
+                    : '—',
+              ),
+              _kv(
+                ctx.t('Erta ketish'),
+                (day['earlyLeaveMinutes'] as num? ?? 0) > 0
+                    ? hoursLabel(day['earlyLeaveMinutes'] as num)
+                    : '—',
+              ),
             ],
           ),
         ),
@@ -176,14 +213,22 @@ class _TeamMemberScreenState extends ConsumerState<TeamMemberScreen> {
   }
 
   Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Row(
-          children: [
-            Expanded(child: Text(k, style: const TextStyle(color: AppColors.inkMuted, fontSize: 15))),
-            Text(v, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            k,
+            style: const TextStyle(color: AppColors.inkMuted, fontSize: 15),
+          ),
         ),
-      );
+        Text(
+          v,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        ),
+      ],
+    ),
+  );
 }
 
 extension on String {
@@ -191,7 +236,11 @@ extension on String {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.employee, this.photoUrl, this.online = false});
+  const _ProfileHeader({
+    required this.employee,
+    this.photoUrl,
+    this.online = false,
+  });
 
   final Map employee;
   final String? photoUrl;
@@ -200,7 +249,9 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final schedule = employee['schedule'] as Map?;
-    final hours = schedule == null ? null : '${schedule['startTime'] ?? '09:00'} – ${schedule['endTime'] ?? '18:00'}';
+    final hours = schedule == null
+        ? null
+        : '${schedule['startTime'] ?? '09:00'} – ${schedule['endTime'] ?? '18:00'}';
     return SectionCard(
       child: Row(
         children: [
@@ -217,12 +268,18 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Text(
                   employee['fullName']?.toString() ?? '—',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
                 ),
                 if (employee['position'] != null)
                   Text(
                     employee['position'].toString(),
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
+                    style: const TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 14,
+                    ),
                   ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -230,10 +287,17 @@ class _ProfileHeader extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     if (employee['division'] != null)
-                      _Tag(icon: Icons.apartment_rounded, text: employee['division'].toString()),
-                    if (hours != null) _Tag(icon: Icons.schedule_rounded, text: hours),
+                      _Tag(
+                        icon: Icons.apartment_rounded,
+                        text: employee['division'].toString(),
+                      ),
+                    if (hours != null)
+                      _Tag(icon: Icons.schedule_rounded, text: hours),
                     if (employee['tabNumber'] != null)
-                      _Tag(icon: Icons.badge_outlined, text: '№ ${employee['tabNumber']}'),
+                      _Tag(
+                        icon: Icons.badge_outlined,
+                        text: '№ ${employee['tabNumber']}',
+                      ),
                   ],
                 ),
               ],
@@ -255,13 +319,19 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(color: AppColors.bgSoft, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: AppColors.bgSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 15, color: AppColors.accent),
           const SizedBox(width: 4),
-          Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
         ],
       ),
     );
@@ -296,11 +366,14 @@ class _LiveCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: (loc != null ? AppColors.accent : AppColors.inkFaint).withValues(alpha: 0.14),
+                    color: (loc != null ? AppColors.accent : AppColors.inkFaint)
+                        .withValues(alpha: 0.14),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    loc != null ? Icons.my_location_rounded : Icons.location_disabled_rounded,
+                    loc != null
+                        ? Icons.my_location_rounded
+                        : Icons.location_disabled_rounded,
                     color: loc != null ? AppColors.accent : AppColors.inkMuted,
                   ),
                 ),
@@ -309,17 +382,29 @@ class _LiveCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Hozirgi joylashuv', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                      Text(
+                        context.t('Hozirgi joylashuv'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
+                      ),
                       Text(
                         live == null
-                            ? 'Yuklanmoqda…'
+                            ? context.t('Yuklanmoqda…')
                             : loc != null
-                                ? 'Jonli · ${formatApiTime(loc['at'])} da yangilangan'
-                                : working
-                                    ? 'Telefon hali joylashuv yubormagan'
-                                    : '${windowReasonText(window['reason']?.toString())} — joylashuv ko‘rsatilmaydi',
+                            ? context.t('Jonli · {0} da yangilangan', [
+                                formatApiTime(loc['at']),
+                              ])
+                            : working
+                            ? context.t('Telefon hali joylashuv yubormagan')
+                            : context.t('{0} — joylashuv ko‘rsatilmaydi', [
+                                windowReasonText(window['reason']?.toString()),
+                              ]),
                         style: TextStyle(
-                          color: loc != null ? AppColors.accent : AppColors.inkMuted,
+                          color: loc != null
+                              ? AppColors.accent
+                              : AppColors.inkMuted,
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -329,11 +414,12 @@ class _LiveCard extends StatelessWidget {
                 ),
                 if (loc != null)
                   IconButton(
-                    tooltip: 'To‘liq ekran',
+                    tooltip: context.t('To‘liq ekran'),
                     icon: const Icon(Icons.open_in_full_rounded),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => _FullMapScreen(live: live!, photoUrl: photoUrl),
+                        builder: (_) =>
+                            _FullMapScreen(live: live!, photoUrl: photoUrl),
                       ),
                     ),
                   ),
@@ -344,7 +430,9 @@ class _LiveCard extends StatelessWidget {
             SizedBox(
               height: 230,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(0)),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(0),
+                ),
                 child: YandexMapView(
                   fitKey: live?['employee']?['employeeId'],
                   pins: [_pin(live!, photoUrl)],
@@ -359,17 +447,28 @@ class _LiveCard extends StatelessWidget {
                 runSpacing: 6,
                 children: [
                   if (loc['accuracy'] != null)
-                    _Meta(icon: Icons.gps_fixed_rounded, text: '±${(loc['accuracy'] as num).round()} m'),
+                    _Meta(
+                      icon: Icons.gps_fixed_rounded,
+                      text: context.t('±{0} m', [
+                        (loc['accuracy'] as num).round(),
+                      ]),
+                    ),
                   if (device?['batteryPct'] != null)
                     _Meta(
-                      icon: device?['charging'] == true ? Icons.battery_charging_full_rounded : Icons.battery_5_bar_rounded,
+                      icon: device?['charging'] == true
+                          ? Icons.battery_charging_full_rounded
+                          : Icons.battery_5_bar_rounded,
                       text: '${device!['batteryPct']}%',
                     ),
                   _Meta(
                     icon: Icons.route_rounded,
                     text: (live?['distanceM'] as num? ?? 0) > 0
-                        ? '${((live!['distanceM'] as num) / 1000).toStringAsFixed(1)} km · $fixes nuqta'
-                        : '$fixes nuqta',
+                        ? context.t('{0} km · {1} nuqta', [
+                            ((live!['distanceM'] as num) / 1000)
+                                .toStringAsFixed(1),
+                            fixes,
+                          ])
+                        : context.t('{0} nuqta', [fixes]),
                   ),
                 ],
               ),
@@ -378,11 +477,16 @@ class _LiveCard extends StatelessWidget {
             Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.bgSoft, borderRadius: BorderRadius.circular(14)),
-              child: const Text(
-                'Xodimning joylashuvi faqat uning ish jadvali bo‘yicha ish vaqti ichida ko‘rinadi. '
-                'Dam olish kunlari va ishdan keyin ma’lumot yig‘ilmaydi.',
-                style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
+              decoration: BoxDecoration(
+                color: AppColors.bgSoft,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                context.t(
+                  'Xodimning joylashuvi faqat uning ish jadvali bo‘yicha ish vaqti ichida ko‘rinadi. '
+                  'Dam olish kunlari va ishdan keyin ma’lumot yig‘ilmaydi.',
+                ),
+                style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
               ),
             ),
         ],
@@ -416,8 +520,14 @@ class _FullMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final track = liveRoute(live);
     return Scaffold(
-      appBar: AppBackBar(title: shortName((live['employee'] as Map?)?['fullName']?.toString())),
-      body: YandexMapView(fitKey: 1, pins: [_pin(live, photoUrl)], track: track),
+      appBar: AppBackBar(
+        title: shortName((live['employee'] as Map?)?['fullName']?.toString()),
+      ),
+      body: YandexMapView(
+        fitKey: 1,
+        pins: [_pin(live, photoUrl)],
+        track: track,
+      ),
     );
   }
 }
@@ -435,14 +545,22 @@ class _Meta extends StatelessWidget {
       children: [
         Icon(icon, size: 17, color: AppColors.inkMuted),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
       ],
     );
   }
 }
 
 class _MonthBar extends StatelessWidget {
-  const _MonthBar({required this.month, required this.onPrev, required this.onNext, this.loading = false});
+  const _MonthBar({
+    required this.month,
+    required this.onPrev,
+    required this.onNext,
+    this.loading = false,
+  });
 
   final DateTime month;
   final VoidCallback onPrev;
@@ -453,25 +571,41 @@ class _MonthBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final isCurrent = month.year == now.year && month.month == now.month;
-    final label = DateFormat('LLLL yyyy', 'uz').format(month);
+    final label = DateFormat(
+      context.monthYearPattern,
+      context.dateLocale,
+    ).format(month);
     return Row(
       children: [
-        const Expanded(
-          child: Text('Tabel', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        Expanded(
+          child: Text(
+            context.t('Tabel'),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
         ),
         _RoundBtn(icon: Icons.chevron_left_rounded, onTap: onPrev),
         SizedBox(
           width: 140,
           child: Center(
             child: loading
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : Text(
                     label[0].toUpperCase() + label.substring(1),
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
                   ),
           ),
         ),
-        _RoundBtn(icon: Icons.chevron_right_rounded, onTap: isCurrent ? null : onNext),
+        _RoundBtn(
+          icon: Icons.chevron_right_rounded,
+          onTap: isCurrent ? null : onNext,
+        ),
       ],
     );
   }
@@ -493,7 +627,10 @@ class _RoundBtn extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(6),
-          child: Icon(icon, color: onTap == null ? AppColors.inkFaint : AppColors.ink),
+          child: Icon(
+            icon,
+            color: onTap == null ? AppColors.inkFaint : AppColors.ink,
+          ),
         ),
       ),
     );
@@ -528,14 +665,17 @@ class _StatsGrid extends StatelessWidget {
                         color: (rate ?? 0) >= 80
                             ? AppColors.success
                             : (rate ?? 0) >= 50
-                                ? AppColors.warn
-                                : AppColors.danger,
+                            ? AppColors.warn
+                            : AppColors.danger,
                         backgroundColor: AppColors.bgSoft,
                       ),
                     ),
                     Text(
                       rate == null ? '—' : '$rate%',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
@@ -545,15 +685,31 @@ class _StatsGrid extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Davomat', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    Text(
+                      context.t('Davomat'),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                      '${n('present')} / ${n('plannedToDate')} ish kuni kelgan',
-                      style: const TextStyle(color: AppColors.inkMuted, fontSize: 14, fontWeight: FontWeight.w600),
+                      context.t('{0} / {1} ish kuni kelgan', [
+                        n('present'),
+                        n('plannedToDate'),
+                      ]),
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     Text(
-                      'Oy rejasi: ${n('planDays')} ish kuni',
-                      style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
+                      context.t('Oy rejasi: {0} ish kuni', [n('planDays')]),
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -570,26 +726,43 @@ class _StatsGrid extends StatelessWidget {
           crossAxisSpacing: 10,
           childAspectRatio: 0.95,
           children: [
-            _StatTile(icon: Icons.check_circle_rounded, color: AppColors.success, value: '${n('onTime')}', label: 'Vaqtida'),
-            _StatTile(icon: Icons.schedule_rounded, color: AppColors.warn, value: '${n('late')}', label: 'Kechikkan'),
-            _StatTile(icon: Icons.cancel_rounded, color: AppColors.danger, value: '${n('absent')}', label: 'Kelmagan'),
+            _StatTile(
+              icon: Icons.check_circle_rounded,
+              color: AppColors.success,
+              value: '${n('onTime')}',
+              label: context.t('Vaqtida'),
+            ),
+            _StatTile(
+              icon: Icons.schedule_rounded,
+              color: AppColors.warn,
+              value: '${n('late')}',
+              label: context.t('Kechikkan'),
+            ),
+            _StatTile(
+              icon: Icons.cancel_rounded,
+              color: AppColors.danger,
+              value: '${n('absent')}',
+              label: context.t('Kelmagan'),
+            ),
             _StatTile(
               icon: Icons.timer_outlined,
               color: AppColors.accent,
-              value: (n('workedMinutes') / 60).toStringAsFixed(n('workedMinutes') < 600 ? 1 : 0),
-              label: 'Ishlagan soat',
+              value: (n('workedMinutes') / 60).toStringAsFixed(
+                n('workedMinutes') < 600 ? 1 : 0,
+              ),
+              label: context.t('Ishlagan soat'),
             ),
             _StatTile(
               icon: Icons.hourglass_bottom_rounded,
               color: AppColors.warn,
               value: '${n('lateMinutes')}',
-              label: 'Kechikish, daq',
+              label: context.t('Kechikish, daq'),
             ),
             _StatTile(
               icon: Icons.beach_access_rounded,
               color: const Color(0xFF8E6BD8),
               value: '${n('leave') + n('dayOff')}',
-              label: 'Dam / ta’til',
+              label: context.t('Dam / ta’til'),
             ),
           ],
         ),
@@ -599,7 +772,12 @@ class _StatsGrid extends StatelessWidget {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.icon, required this.color, required this.value, required this.label});
+  const _StatTile({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+  });
 
   final IconData icon;
   final Color color;
@@ -620,12 +798,19 @@ class _StatTile extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+          ),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.inkMuted, fontSize: 12, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: AppColors.inkMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -634,7 +819,11 @@ class _StatTile extends StatelessWidget {
 }
 
 class _CalendarCard extends StatelessWidget {
-  const _CalendarCard({required this.month, required this.days, required this.onDayTap});
+  const _CalendarCard({
+    required this.month,
+    required this.days,
+    required this.onDayTap,
+  });
 
   final DateTime month;
   final List<Map> days;
@@ -642,7 +831,9 @@ class _CalendarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const weekdays = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+    final weekdays = context.dateLocale == 'ru'
+        ? const ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+        : const ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
     final lead = DateTime(month.year, month.month, 1).weekday - 1;
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     return SectionCard(
@@ -655,7 +846,11 @@ class _CalendarCard extends StatelessWidget {
                   child: Center(
                     child: Text(
                       w,
-                      style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 13),
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
@@ -670,7 +865,12 @@ class _CalendarCard extends StatelessWidget {
             crossAxisSpacing: 6,
             children: [
               for (var i = 0; i < lead; i++) const SizedBox.shrink(),
-              for (final d in days) _DayCell(day: d, isToday: d['date'] == today, onTap: () => onDayTap(d)),
+              for (final d in days)
+                _DayCell(
+                  day: d,
+                  isToday: d['date'] == today,
+                  onTap: () => onDayTap(d),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -692,7 +892,11 @@ class _CalendarCard extends StatelessWidget {
 }
 
 class _DayCell extends StatelessWidget {
-  const _DayCell({required this.day, required this.onTap, this.isToday = false});
+  const _DayCell({
+    required this.day,
+    required this.onTap,
+    this.isToday = false,
+  });
 
   final Map day;
   final bool isToday;
@@ -702,7 +906,8 @@ class _DayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = day['status'].toString();
     final color = statusStyle(status).$2;
-    final strong = status == 'on_time' || status == 'late' || status == 'absent';
+    final strong =
+        status == 'on_time' || status == 'late' || status == 'absent';
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -711,7 +916,13 @@ class _DayCell extends StatelessWidget {
               ? Colors.transparent
               : color.withValues(alpha: strong ? 0.9 : 0.16),
           borderRadius: BorderRadius.circular(10),
-          border: isToday ? Border.all(color: AppColors.ink, width: 2) : Border.all(color: AppColors.line.withValues(alpha: status == 'planned' ? 1 : 0)),
+          border: isToday
+              ? Border.all(color: AppColors.ink, width: 2)
+              : Border.all(
+                  color: AppColors.line.withValues(
+                    alpha: status == 'planned' ? 1 : 0,
+                  ),
+                ),
         ),
         alignment: Alignment.center,
         child: Text(
@@ -719,7 +930,9 @@ class _DayCell extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 15,
-            color: strong ? Colors.white : (status == 'planned' ? AppColors.inkFaint : AppColors.ink),
+            color: strong
+                ? Colors.white
+                : (status == 'planned' ? AppColors.inkFaint : AppColors.ink),
           ),
         ),
       ),
@@ -738,9 +951,23 @@ class _Legend extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4))),
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
         const SizedBox(width: 5),
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.inkMuted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -754,16 +981,23 @@ class _DayList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = days.where((d) => d['status'] != 'planned').toList().reversed.toList();
+    final shown = days
+        .where((d) => d['status'] != 'planned')
+        .toList()
+        .reversed
+        .toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return SectionCard(
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
-            child: Text('Kunlar bo‘yicha', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: Text(
+              context.t('Kunlar bo‘yicha'),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
           ),
           for (var i = 0; i < shown.length; i++) ...[
             if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
@@ -798,10 +1032,20 @@ class _DayRow extends StatelessWidget {
               width: 46,
               child: Column(
                 children: [
-                  Text('${d.day}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                   Text(
-                    DateFormat('EEE', 'uz').format(d),
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 12, fontWeight: FontWeight.w600),
+                    '${d.day}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    DateFormat('EEE', context.dateLocale).format(d),
+                    style: const TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -816,7 +1060,10 @@ class _DayRow extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       '${firstIn.ifEmpty('—')}  →  ${lastOut.ifEmpty('—')}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ],
@@ -826,11 +1073,21 @@ class _DayRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (worked > 0)
-                  Text(hoursLabel(worked), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  Text(
+                    hoursLabel(worked),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
                 if (late > 0)
                   Text(
-                    '+${hoursLabel(late)} kech',
-                    style: const TextStyle(color: AppColors.warn, fontWeight: FontWeight.w700, fontSize: 12),
+                    context.t('+{0} kech', [hoursLabel(late)]),
+                    style: const TextStyle(
+                      color: AppColors.warn,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
               ],
             ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -12,30 +13,56 @@ final marksProvider = FutureProvider.autoDispose((ref) {
   return ref.read(meRepositoryProvider).marks(from: from);
 });
 
-class MarksScreen extends ConsumerWidget {
+enum _MarkFilter { all, entry, exit }
+
+class MarksScreen extends ConsumerStatefulWidget {
   const MarksScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MarksScreen> createState() => _MarksScreenState();
+}
+
+class _MarksScreenState extends ConsumerState<MarksScreen> {
+  _MarkFilter _filter = _MarkFilter.all;
+
+  static const _filterLabels = {
+    _MarkFilter.all: 'Barchasi',
+    _MarkFilter.entry: 'Faqat kirish',
+    _MarkFilter.exit: 'Faqat chiqish',
+  };
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(marksProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.chevron_left, size: 30),
           onPressed: () => context.pop(),
         ),
-        title: const Text('Barcha qaydlar'),
+        title: Text(context.t('Barcha qaydlar')),
         titleSpacing: 0,
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.person_search_outlined),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.filter_list),
+          PopupMenuButton<_MarkFilter>(
+            tooltip: context.t('Saralash'),
+            initialValue: _filter,
+            onSelected: (f) => setState(() => _filter = f),
+            icon: Badge(
+              isLabelVisible: _filter != _MarkFilter.all,
+              smallSize: 8,
+              backgroundColor: AppColors.accent,
+              child: const Icon(Icons.filter_list),
+            ),
+            itemBuilder: (_) => [
+              for (final f in _MarkFilter.values)
+                CheckedPopupMenuItem(
+                  value: f,
+                  checked: f == _filter,
+                  child: Text(context.t(_filterLabels[f]!)),
+                ),
+            ],
           ),
         ],
       ),
@@ -47,14 +74,28 @@ class MarksScreen extends ConsumerWidget {
         },
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => EmptyState(message: 'Xato: $e'),
+          error: (e, _) => EmptyState(message: context.t('Xato: {0}', [e])),
           data: (data) {
-            final items = (data['items'] as List?) ?? [];
+            final items = ((data['items'] as List?) ?? [])
+                .where(
+                  (m) => switch (_filter) {
+                    _MarkFilter.all => true,
+                    _MarkFilter.entry => markIsEntry(m as Map),
+                    _MarkFilter.exit => !markIsEntry(m as Map),
+                  },
+                )
+                .toList();
             if (items.isEmpty) {
               return ListView(
-                children: const [
-                  SizedBox(height: 140),
-                  EmptyState(message: 'Qaydlar topilmadi'),
+                children: [
+                  const SizedBox(height: 140),
+                  EmptyState(
+                    message: _filter == _MarkFilter.all
+                        ? context.t('Bu oyda qaydlar yo‘q')
+                        : context.t('«{0}» bo‘yicha qayd topilmadi', [
+                            context.t(_filterLabels[_filter]!),
+                          ]),
+                  ),
                 ],
               );
             }
@@ -65,8 +106,9 @@ class MarksScreen extends ConsumerWidget {
               itemBuilder: (context, i) {
                 final m = items[i] as Map;
                 final entry = markIsEntry(m);
-                final at = DateTime.tryParse(m['occurredAt']?.toString() ?? '')
-                    ?.toLocal();
+                final at = DateTime.tryParse(
+                  m['occurredAt']?.toString() ?? '',
+                )?.toLocal();
                 final source = punchSourceLabel(m['source']);
                 final outside = markOutsideGeofence(m);
                 final comment = markField(m, 'geofenceComment')?.toString();
@@ -90,8 +132,9 @@ class MarksScreen extends ConsumerWidget {
                           children: [
                             Text(
                               markKindLabel(m),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             Text(
                               at == null
@@ -102,17 +145,19 @@ class MarksScreen extends ConsumerWidget {
                             if (outside)
                               Text(
                                 comment == null || comment.isEmpty
-                                    ? 'Hududdan tashqarida'
-                                    : 'Hududdan tashqarida · $comment',
+                                    ? context.t('Hududdan tashqarida')
+                                    : context.t('Hududdan tashqarida · {0}', [
+                                        comment,
+                                      ]),
                                 style: const TextStyle(
                                   color: AppColors.warn,
                                   fontSize: 12,
                                 ),
                               ),
                             if (invalid)
-                              const Text(
-                                'Yaroqsiz belgi',
-                                style: TextStyle(
+                              Text(
+                                context.t('Yaroqsiz belgi'),
+                                style: const TextStyle(
                                   color: AppColors.danger,
                                   fontSize: 12,
                                 ),

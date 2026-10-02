@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 
 const _deepGreen = Color(0xFF1F6F3A);
@@ -332,19 +333,19 @@ class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateM
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 220),
                       child: widget.busy
-                          ? const Row(
-                              key: ValueKey('busy'),
+                          ? Row(
+                              key: const ValueKey('busy'),
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                SizedBox(
+                                const SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                                 ),
-                                SizedBox(width: 12),
+                                const SizedBox(width: 12),
                                 Text(
-                                  'Tekshirilmoqda…',
-                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                                  context.t('Tekshirilmoqda…'),
+                                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                                 ),
                               ],
                             )

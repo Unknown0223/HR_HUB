@@ -3,7 +3,10 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/season.dart';
+import '../../shared/seasonal_backdrop.dart';
 
 const kPinLength = 4;
 const _deepGreen = Color(0xFF1F6F3A);
@@ -19,7 +22,8 @@ class BrandBackdrop extends StatefulWidget {
   State<BrandBackdrop> createState() => _BrandBackdropState();
 }
 
-class _BrandBackdropState extends State<BrandBackdrop> with SingleTickerProviderStateMixin {
+class _BrandBackdropState extends State<BrandBackdrop>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ambient = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 16),
@@ -33,16 +37,23 @@ class _BrandBackdropState extends State<BrandBackdrop> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.of(context).disableAnimations && _ambient.isAnimating) _ambient.stop();
+    if (MediaQuery.of(context).disableAnimations && _ambient.isAnimating) {
+      _ambient.stop();
+    }
 
     Widget orb(double size, Color color, double alpha) => Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(colors: [color.withValues(alpha: alpha), color.withValues(alpha: 0)]),
-          ),
-        );
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            color.withValues(alpha: alpha),
+            color.withValues(alpha: 0),
+          ],
+        ),
+      ),
+    );
 
     return Material(
       color: Colors.white,
@@ -59,15 +70,20 @@ class _BrandBackdropState extends State<BrandBackdrop> with SingleTickerProvider
                     final t = Curves.easeInOut.transform(_ambient.value);
                     return Transform.translate(
                       offset: Offset(-10 + 20 * t, -20),
-                      child: Transform.scale(scale: 1.05 + 0.07 * t, alignment: Alignment.topCenter, child: child),
+                      child: Transform.scale(
+                        scale: 1.05 + 0.07 * t,
+                        alignment: Alignment.topCenter,
+                        child: child,
+                      ),
                     );
                   },
                   child: Image.asset(
-                    'assets/images/login_bg.jpg',
+                    SeasonX.now.asset,
                     fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
+                    alignment: Alignment.centerLeft,
                     filterQuality: FilterQuality.medium,
-                    frameBuilder: (context, child, frame, syncLoaded) => syncLoaded
+                    frameBuilder: (context, child, frame, syncLoaded) =>
+                        syncLoaded
                         ? child
                         : AnimatedOpacity(
                             opacity: frame == null ? 0 : 1,
@@ -84,12 +100,19 @@ class _BrandBackdropState extends State<BrandBackdrop> with SingleTickerProvider
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0xCCFFFFFF), Color(0x00FFFFFF), Color(0x14FFFFFF), Color(0xF2FFFFFF), Colors.white],
+                      colors: [
+                        Color(0xCCFFFFFF),
+                        Color(0x00FFFFFF),
+                        Color(0x14FFFFFF),
+                        Color(0xF2FFFFFF),
+                        Colors.white,
+                      ],
                       stops: [0, 0.14, 0.4, 0.66, 1],
                     ),
                   ),
                 ),
               ),
+              const Positioned.fill(child: SeasonFall()),
               AnimatedBuilder(
                 animation: _ambient,
                 builder: (context, _) {
@@ -99,17 +122,17 @@ class _BrandBackdropState extends State<BrandBackdrop> with SingleTickerProvider
                       Positioned(
                         left: -w * 0.3 + math.sin(t) * 30,
                         top: h * 0.58 + math.cos(t) * 24,
-                        child: orb(w * 0.9, AppColors.accent, 0.28),
+                        child: orb(w * 0.9, SeasonX.now.orb, 0.28),
                       ),
                       Positioned(
                         right: -w * 0.35 + math.cos(t) * 28,
                         top: h * 0.72 + math.sin(t) * 26,
-                        child: orb(w * 0.95, const Color(0xFF2BB673), 0.24),
+                        child: orb(w * 0.95, SeasonX.now.orbSoft, 0.24),
                       ),
                       Positioned(
                         left: w * 0.15 + math.cos(t + 1) * 34,
                         bottom: -w * 0.45 + math.sin(t + 1) * 20,
-                        child: orb(w * 0.9, const Color(0xFF9BE15D), 0.26),
+                        child: orb(w * 0.9, SeasonX.now.bit, 0.26),
                       ),
                     ],
                   );
@@ -141,22 +164,31 @@ class BrandChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              LockBadge(icon: Icons.how_to_reg_rounded, size: 40),
-              SizedBox(width: 10),
+              const LockBadge(icon: Icons.how_to_reg_rounded, size: 40),
+              const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
+                  const Text(
                     'HR HUB',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: _deepGreen),
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                      color: _deepGreen,
+                    ),
                   ),
                   Text(
-                    'Davomat · GPS · Kadrlar',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.inkMuted),
+                    context.t('Davomat · GPS · Kadrlar'),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.inkMuted,
+                    ),
                   ),
                 ],
               ),
@@ -170,7 +202,11 @@ class BrandChip extends StatelessWidget {
 
 /// Frosted card that slides up on first appearance; the illustration shows through it.
 class GlassPanel extends StatelessWidget {
-  const GlassPanel({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 8)});
+  const GlassPanel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 8),
+  });
 
   final Widget child;
   final EdgeInsets padding;
@@ -179,11 +215,16 @@ class GlassPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 650),
+      duration: MediaQuery.of(context).disableAnimations
+          ? Duration.zero
+          : const Duration(milliseconds: 650),
       curve: Curves.easeOutCubic,
       builder: (context, t, child) => Opacity(
         opacity: t,
-        child: Transform.translate(offset: Offset(0, 60 * (1 - t)), child: child),
+        child: Transform.translate(
+          offset: Offset(0, 60 * (1 - t)),
+          child: child,
+        ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
@@ -203,9 +244,16 @@ class GlassPanel extends StatelessWidget {
                 ],
               ),
               borderRadius: BorderRadius.circular(32),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 1.4),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.75),
+                width: 1.4,
+              ),
               boxShadow: [
-                BoxShadow(color: _deepGreen.withValues(alpha: 0.1), blurRadius: 30, offset: const Offset(0, 12)),
+                BoxShadow(
+                  color: _deepGreen.withValues(alpha: 0.1),
+                  blurRadius: 30,
+                  offset: const Offset(0, 12),
+                ),
               ],
             ),
             child: child,
@@ -250,7 +298,8 @@ class PinStage extends StatefulWidget {
   State<PinStage> createState() => _PinStageState();
 }
 
-class _PinStageState extends State<PinStage> with SingleTickerProviderStateMixin {
+class _PinStageState extends State<PinStage>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _shake = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 420),
@@ -305,50 +354,64 @@ class _PinStageState extends State<PinStage> with SingleTickerProviderStateMixin
         Text(
           widget.title,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: AppColors.ink),
+          style: const TextStyle(
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
+            color: AppColors.ink,
+          ),
         ),
         if (widget.subtitle != null) ...[
           const SizedBox(height: 5),
           Text(
             widget.subtitle!,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.inkMuted,
+            ),
           ),
         ],
         const SizedBox(height: 20),
-          AnimatedBuilder(
-            animation: _shake,
-            builder: (context, child) {
-              final t = _shake.value;
-              return Transform.translate(
-                offset: Offset(math.sin(t * math.pi * 6) * 12 * (1 - t), 0),
-                child: child,
-              );
-            },
-            child: PinDots(length: _code.length, error: _error),
-          ),
-          SizedBox(
-            height: 36,
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: message == null
-                    ? const SizedBox.shrink()
-                    : Text(
-                        message,
-                        key: ValueKey(message),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: widget.messageIsError ? AppColors.danger : AppColors.inkMuted,
-                        ),
+        AnimatedBuilder(
+          animation: _shake,
+          builder: (context, child) {
+            final t = _shake.value;
+            return Transform.translate(
+              offset: Offset(math.sin(t * math.pi * 6) * 12 * (1 - t), 0),
+              child: child,
+            );
+          },
+          child: PinDots(length: _code.length, error: _error),
+        ),
+        SizedBox(
+          height: 36,
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: message == null
+                  ? const SizedBox.shrink()
+                  : Text(
+                      message,
+                      key: ValueKey(message),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: widget.messageIsError
+                            ? AppColors.danger
+                            : AppColors.inkMuted,
                       ),
-              ),
+                    ),
             ),
           ),
-          PinPad(onDigit: _digit, onBackspace: _backspace, leading: widget.leadingKey),
-          SizedBox(height: 44, child: widget.footer),
+        ),
+        PinPad(
+          onDigit: _digit,
+          onBackspace: _backspace,
+          leading: widget.leadingKey,
+        ),
+        SizedBox(height: 44, child: widget.footer),
       ],
     );
 
@@ -368,7 +431,12 @@ class _PinStageState extends State<PinStage> with SingleTickerProviderStateMixin
               Padding(
                 padding: EdgeInsets.only(top: header == null ? 0 : 32),
                 child: GlassPanel(
-                  padding: EdgeInsets.fromLTRB(18, header == null ? 22 : 44, 18, 4),
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    header == null ? 22 : 44,
+                    18,
+                    4,
+                  ),
                   child: content,
                 ),
               ),
@@ -379,7 +447,8 @@ class _PinStageState extends State<PinStage> with SingleTickerProviderStateMixin
                       ? Duration.zero
                       : const Duration(milliseconds: 800),
                   curve: const Interval(0.3, 1, curve: Curves.elasticOut),
-                  builder: (context, t, child) => Transform.scale(scale: t, child: child),
+                  builder: (context, t, child) =>
+                      Transform.scale(scale: t, child: child),
                   child: header,
                 ),
             ],
@@ -417,14 +486,19 @@ class PinDots extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: filled || error ? LinearGradient(colors: colors) : null,
-              color: filled || error ? null : Colors.white.withValues(alpha: 0.7),
+              color: filled || error
+                  ? null
+                  : Colors.white.withValues(alpha: 0.7),
               border: Border.all(
-                color: filled || error ? Colors.transparent : AppColors.accentSoft,
+                color: filled || error
+                    ? Colors.transparent
+                    : AppColors.accentSoft,
                 width: 1.6,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: (error ? AppColors.danger : AppColors.accent).withValues(alpha: filled ? 0.35 : 0),
+                  color: (error ? AppColors.danger : AppColors.accent)
+                      .withValues(alpha: filled ? 0.35 : 0),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -438,7 +512,12 @@ class PinDots extends StatelessWidget {
 }
 
 class PinPad extends StatelessWidget {
-  const PinPad({super.key, required this.onDigit, required this.onBackspace, this.leading});
+  const PinPad({
+    super.key,
+    required this.onDigit,
+    required this.onBackspace,
+    this.leading,
+  });
 
   final ValueChanged<String> onDigit;
   final VoidCallback onBackspace;
@@ -447,10 +526,17 @@ class PinPad extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget row(List<Widget> keys) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: keys),
-        );
-    Widget digit(String d) => PadKey(onTap: () => onDigit(d), label: d, child: Text(d, style: _digitStyle));
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: keys,
+      ),
+    );
+    Widget digit(String d) => PadKey(
+      onTap: () => onDigit(d),
+      label: d,
+      child: Text(d, style: _digitStyle),
+    );
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 330),
@@ -465,9 +551,13 @@ class PinPad extends StatelessWidget {
             digit('0'),
             PadKey(
               onTap: onBackspace,
-              label: 'O‘chirish',
+              label: context.t('O‘chirish'),
               plain: true,
-              child: const Icon(Icons.backspace_rounded, color: AppColors.inkMuted, size: 26),
+              child: const Icon(
+                Icons.backspace_rounded,
+                color: AppColors.inkMuted,
+                size: 26,
+              ),
             ),
           ]),
         ],
@@ -475,12 +565,22 @@ class PinPad extends StatelessWidget {
     );
   }
 
-  static const _digitStyle = TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.ink);
+  static const _digitStyle = TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ink,
+  );
 }
 
 /// Round keypad button with a press-in scale and a green flash.
 class PadKey extends StatefulWidget {
-  const PadKey({super.key, required this.onTap, required this.child, required this.label, this.plain = false});
+  const PadKey({
+    super.key,
+    required this.onTap,
+    required this.child,
+    required this.label,
+    this.plain = false,
+  });
 
   static const size = 68.0;
 
@@ -524,16 +624,21 @@ class _PadKeyState extends State<PadKey> {
               color: widget.plain
                   ? (_down ? AppColors.accentTint : Colors.transparent)
                   : _down
-                      ? AppColors.accentTint
-                      : Colors.white.withValues(alpha: 0.88),
+                  ? AppColors.accentTint
+                  : Colors.white.withValues(alpha: 0.88),
               border: widget.plain
                   ? null
-                  : Border.all(color: _down ? AppColors.accentSoft : Colors.white, width: 1.4),
+                  : Border.all(
+                      color: _down ? AppColors.accentSoft : Colors.white,
+                      width: 1.4,
+                    ),
               boxShadow: widget.plain
                   ? null
                   : [
                       BoxShadow(
-                        color: _deepGreen.withValues(alpha: _down ? 0.04 : 0.08),
+                        color: _deepGreen.withValues(
+                          alpha: _down ? 0.04 : 0.08,
+                        ),
                         blurRadius: _down ? 6 : 14,
                         offset: Offset(0, _down ? 2 : 5),
                       ),
@@ -567,7 +672,11 @@ class LockBadge extends StatelessWidget {
           colors: [AppColors.headerTop, AppColors.headerBottom],
         ),
         boxShadow: [
-          BoxShadow(color: AppColors.accent.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Icon(icon, color: Colors.white, size: size * 0.48),

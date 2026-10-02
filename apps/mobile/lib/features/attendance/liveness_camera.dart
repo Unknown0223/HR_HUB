@@ -6,6 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import 'liveness.dart';
 
@@ -64,7 +65,7 @@ class _LivenessCameraState extends State<LivenessCamera>
       final cams = await availableCameras();
       _camera = cams.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
-        orElse: () => throw Exception('Old kamera topilmadi'),
+        orElse: () => throw Exception(trText('Old kamera topilmadi')),
       );
       final controller = CameraController(
         _camera!,
@@ -82,8 +83,9 @@ class _LivenessCameraState extends State<LivenessCamera>
       await controller.startImageStream(_onFrame);
       setState(() {});
     } catch (e) {
-      setState(() => _error =
-          'Kamera ishga tushmadi: ${e.toString().replaceFirst('Exception: ', '')}');
+      setState(() => _error = trText('Kamera ishga tushmadi: {0}', [
+            e.toString().replaceFirst('Exception: ', ''),
+          ]));
     }
   }
 
@@ -143,7 +145,9 @@ class _LivenessCameraState extends State<LivenessCamera>
       if (mounted) widget.onPassed(file, _challenge);
     } catch (e) {
       _capturing = false;
-      if (mounted) setState(() => _error = 'Selfie olinmadi: $e');
+      if (mounted) {
+        setState(() => _error = context.t('Selfie olinmadi: {0}', [e]));
+      }
     }
   }
 
@@ -156,27 +160,31 @@ class _LivenessCameraState extends State<LivenessCamera>
 
   (String, String, IconData) _instruction() {
     if (_faces == 0) {
-      return ('Yuzingizni ramka ichiga joylang', 'Telefonni yuz balandligida ushlang', Icons.face_rounded);
+      return (context.t('Yuzingizni ramka ichiga joylang'), context.t('Telefonni yuz balandligida ushlang'), Icons.face_rounded);
     }
     if (_faces > 1) {
-      return ('Kadrda faqat o‘zingiz bo‘ling', 'Boshqa odamlar kadrdan chiqsin', Icons.group_off_rounded);
+      return (context.t('Kadrda faqat o‘zingiz bo‘ling'), context.t('Boshqa odamlar kadrdan chiqsin'), Icons.group_off_rounded);
     }
     switch (_challenge.phase) {
       case LivenessPhase.center:
-        return ('To‘g‘ri kameraga qarang', 'Tekshiruv boshlanmoqda', Icons.center_focus_strong_rounded);
+        return (context.t('To‘g‘ri kameraga qarang'), context.t('Tekshiruv boshlanmoqda'), Icons.center_focus_strong_rounded);
       case LivenessPhase.turn:
         final d = _challenge.current!;
-        return ('Boshingizni ${d.label.toLowerCase()} buring', 'Strelka yo‘nalishida sekin buriling', d.icon);
+        return (
+          context.t('Boshingizni {0} buring', [context.t(d.label).toLowerCase()]),
+          context.t('Strelka yo‘nalishida sekin buriling'),
+          d.icon,
+        );
       case LivenessPhase.back:
-        return ('Yana to‘g‘ri qarang', 'Boshingizni markazga qaytaring', Icons.center_focus_strong_rounded);
+        return (context.t('Yana to‘g‘ri qarang'), context.t('Boshingizni markazga qaytaring'), Icons.center_focus_strong_rounded);
       case LivenessPhase.finalCenter:
-        return ('To‘g‘ri qarang', 'Surat avtomatik olinadi', Icons.photo_camera_front_rounded);
+        return (context.t('To‘g‘ri qarang'), context.t('Surat avtomatik olinadi'), Icons.photo_camera_front_rounded);
       case LivenessPhase.done:
-        return ('Tasdiqlandi', 'Surat saqlanmoqda…', Icons.verified_rounded);
+        return (context.tr('Tasdiqlandi', 'Подтверждено'), context.t('Surat saqlanmoqda…'), Icons.verified_rounded);
       case LivenessPhase.failed:
         return (
-          _challenge.failReason ?? 'Tekshiruv muvaffaqiyatsiz',
-          'Qaytadan boshlab, ko‘rsatmalarni bajaring',
+          context.t(_challenge.failReason ?? 'Tekshiruv muvaffaqiyatsiz'),
+          context.t('Qaytadan boshlab, ko‘rsatmalarni bajaring'),
           Icons.error_outline_rounded,
         );
     }
@@ -268,19 +276,19 @@ class _LivenessCameraState extends State<LivenessCamera>
                               ? Icons.group_rounded
                               : Icons.face_outlined,
                       text: _faces == 1
-                          ? 'Yuz aniqlandi'
+                          ? context.t('Yuz aniqlandi')
                           : _faces > 1
-                              ? '$_faces ta yuz'
-                              : 'Yuz qidirilmoqda',
+                              ? context.t('{0} ta yuz', [_faces])
+                              : context.t('Yuz qidirilmoqda'),
                       color: _faces == 1 ? AppColors.accentSoft : Colors.white,
                     ),
                   ),
-                  const Positioned(
+                  Positioned(
                     top: 12,
                     right: 12,
                     child: _GlassChip(
                       icon: Icons.lock_rounded,
-                      text: 'Jonli tekshiruv',
+                      text: context.t('Jonli tekshiruv'),
                       color: Colors.white,
                     ),
                   ),
@@ -311,9 +319,9 @@ class _LivenessCameraState extends State<LivenessCamera>
               ),
               onPressed: _restart,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text(
-                'Qaytadan boshlash',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              label: Text(
+                context.t('Qaytadan boshlash'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ),
           ),
@@ -368,9 +376,9 @@ class _StepRail extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Harakatlar',
-                style: TextStyle(color: AppColors.inkMuted, fontSize: 11.5),
+              Text(
+                context.t('Harakatlar'),
+                style: const TextStyle(color: AppColors.inkMuted, fontSize: 11.5),
               ),
               Text(
                 '$done / $total',
@@ -627,15 +635,15 @@ class _CaptureFlash extends StatelessWidget {
         color: Colors.white.withValues(alpha: v),
         child: child,
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.verified_rounded, color: AppColors.accent, size: 72),
-            SizedBox(height: 8),
+            const Icon(Icons.verified_rounded, color: AppColors.accent, size: 72),
+            const SizedBox(height: 8),
             Text(
-              'Tasdiqlandi',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.ink),
+              context.tr('Tasdiqlandi', 'Подтверждено'),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.ink),
             ),
           ],
         ),
@@ -762,7 +770,7 @@ class _Message extends StatelessWidget {
             const SizedBox(height: 12),
             Text(text, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const Text('Qayta urinish')),
+            OutlinedButton(onPressed: onRetry, child: Text(context.t('Qayta urinish'))),
           ],
         ),
       ),

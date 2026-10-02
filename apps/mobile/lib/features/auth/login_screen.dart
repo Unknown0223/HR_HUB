@@ -8,7 +8,11 @@ import '../../core/api/api_client.dart';
 import '../../core/api/api_config.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/errors/api_exception.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/season.dart';
+import '../../shared/seasonal_backdrop.dart';
+import '../lock/pin_widgets.dart';
 import 'login_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -33,7 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   );
   late final Animation<double> _brandIn = _interval(0, 0.45);
   late final Animation<double> _cardIn = _interval(0.15, 0.6);
-  /// Title, server, login, password, button тАФ revealed one after another.
+  /// Title, server, login, password, button — revealed one after another.
   late final List<Animation<double>> _items = [
     for (var i = 0; i < 5; i++) _interval(0.3 + i * 0.1, 0.65 + i * 0.07),
   ];
@@ -71,21 +75,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   Future<bool> _applyServer() async {
     final url = ApiConfig.resolveServer(_server.text);
     if (url == null) {
-      _fail('Server silkasi notoтАШgтАШri. Masalan: ${ApiConfig.displayServer(ApiConfig.defaultBaseUrl)}');
+      _fail(context.t('Server silkasi noto‘g‘ri. Masalan: {0}', [ApiConfig.displayServer(ApiConfig.defaultBaseUrl)]));
       return false;
     }
     await ref.read(apiClientProvider).setBaseUrl(url);
     return true;
   }
 
-  /// Line under the ┬лServer┬╗ field: the host the app will connect to, or why the link is invalid.
+  /// Line under the «Server» field: the host the app will connect to, or why the link is invalid.
   (IconData, String, Color) _serverHint(String input) {
     if (input.trim().isEmpty) {
-      return (Icons.info_outline_rounded, 'Server silkasi (HR beradi)', AppColors.inkFaint);
+      return (Icons.info_outline_rounded, context.t('Server silkasi (HR beradi)'), AppColors.inkFaint);
     }
     final url = ApiConfig.resolveServer(input);
     if (url == null) {
-      return (Icons.error_outline, 'Silka notoтАШgтАШri тАФ masalan: hr-akfa.up.railway.app', AppColors.danger);
+      return (Icons.error_outline, context.t('Silka noto‘g‘ri — masalan: hr-akfa.up.railway.app'), AppColors.danger);
     }
     return (Icons.link_rounded, ApiConfig.hostOf(url), AppColors.inkFaint);
   }
@@ -93,15 +97,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   String? _credentialsError() {
     if (_server.text.trim().isEmpty || _email.text.trim().isEmpty || _password.text.isEmpty) {
       _markEmpty = true;
-      return 'Server, login va parolni kiriting';
+      return context.t('Server, login va parolni kiriting');
     }
     return null;
   }
 
   String _humanize(Object e) {
     if (e is ApiException) {
-      if (e.statusCode == 401) return 'Login yoki parol notoтАШgтАШri';
-      if (e.statusCode == 429) return 'Juda koтАШp urinish. 15 daqiqadan keyin qayta urinib koтАШring';
+      if (e.statusCode == 401) return context.t('Login yoki parol noto‘g‘ri');
+      if (e.statusCode == 429) return context.t('Juda ko‘p urinish. 15 daqiqadan keyin qayta urinib ko‘ring');
     }
     return e.toString();
   }
@@ -150,16 +154,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     if (reduceMotion && _ambient.isAnimating) _ambient.stop();
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Positioned.fill(child: _background()),
+          const Positioned.fill(child: SceneBackdrop()),
+          const Positioned.fill(child: SeasonFall()),
           Positioned.fill(child: IgnorePointer(child: _glowOrbs())),
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: 140,
+            height: 110,
             child: IgnorePointer(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -167,7 +172,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withValues(alpha: 0.85),
+                      Colors.white.withValues(alpha: 0.6),
                       Colors.white.withValues(alpha: 0),
                     ],
                   ),
@@ -188,7 +193,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                         _Reveal(
                           animation: _brandIn,
                           offset: const Offset(0, -0.4),
-                          child: _brand(),
+                          child: const Align(alignment: Alignment.centerLeft, child: BrandChip()),
                         ),
                         const Spacer(),
                         const SizedBox(height: 180),
@@ -224,32 +229,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     );
   }
 
-  /// Slow drift over the illustration so the screen feels alive without distracting.
-  Widget _background() {
-    return AnimatedBuilder(
-      animation: _ambient,
-      builder: (context, child) {
-        final t = Curves.easeInOut.transform(_ambient.value);
-        return Transform.translate(
-          offset: Offset(-8 + 16 * t, -36),
-          child: Transform.scale(
-            scale: 1.04 + 0.05 * t,
-            alignment: Alignment.topCenter,
-            child: child,
-          ),
-        );
-      },
-      child: Image.asset(
-        'assets/images/login_bg.jpg',
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-        filterQuality: FilterQuality.medium,
-      ),
-    );
-  }
-
   /// Soft drifting green lights in the lower half, so the translucent card has colour behind it.
   Widget _glowOrbs() {
+    final season = SeasonX.now;
     Widget orb(double size, Color color, double alpha) => Container(
           width: size,
           height: size,
@@ -275,76 +257,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 Positioned(
                   left: -w * 0.25 + math.sin(t) * 30,
                   top: h * 0.55 + math.cos(t) * 24,
-                  child: orb(w * 0.85, AppColors.accent, 0.45),
+                  child: orb(w * 0.85, season.orb, 0.45),
                 ),
                 Positioned(
                   right: -w * 0.3 + math.cos(t) * 28,
                   top: h * 0.68 + math.sin(t) * 30,
-                  child: orb(w * 0.9, const Color(0xFF2BB673), 0.40),
+                  child: orb(w * 0.9, season.orbSoft, 0.40),
                 ),
                 Positioned(
                   left: w * 0.2 + math.cos(t + 1) * 36,
                   bottom: -w * 0.35 + math.sin(t + 1) * 20,
-                  child: orb(w * 0.8, const Color(0xFF9BE15D), 0.38),
+                  child: orb(w * 0.8, season.bit, 0.38),
                 ),
               ],
             );
           },
         );
       },
-    );
-  }
-
-  Widget _brand() {
-    return Row(
-      children: [
-        AnimatedBuilder(
-          animation: _ambient,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(0, math.sin(_ambient.value * math.pi * 2) * 2.5),
-            child: child,
-          ),
-          child: Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.headerTop, AppColors.headerBottom],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 26),
-          ),
-        ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'HR HUB',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                color: Color(0xFF1F6F3A),
-              ),
-            ),
-            Text(
-              'Davomat ┬╖ GPS ┬╖ Kadrlar',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -381,17 +310,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             children: [
               _Reveal(
                 animation: _items[0],
-                child: const Text(
-                  'Xush kelibsiz!',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.ink),
+                child: Text(
+                  context.t('Xush kelibsiz!'),
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.ink),
                 ),
               ),
               const SizedBox(height: 4),
               _Reveal(
                 animation: _items[0],
-                child: const Text(
-                  'Login va parolni HR bo\'limidan oling',
-                  style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                child: Text(
+                  context.t('Login va parolni HR bo\'limidan oling'),
+                  style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
                 ),
               ),
               const SizedBox(height: 20),
@@ -402,7 +331,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                   children: [
                     AuthField(
                       controller: _server,
-                      label: 'Server',
+                      label: context.t('Server'),
                       hint: 'hr-akfa.up.railway.app',
                       icon: Icons.apartment_rounded,
                       error: _markEmpty,
@@ -441,8 +370,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 child: AuthField(
                   controller: _email,
                   focusNode: _loginFocus,
-                  label: 'Login',
-                  hint: 'masalan: ali.valiyev',
+                  label: context.t('Login'),
+                  hint: context.t('masalan: ali.valiyev'),
                   icon: Icons.person_rounded,
                   error: _markEmpty,
                   keyboardType: TextInputType.emailAddress,
@@ -457,8 +386,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 child: AuthField(
                   controller: _password,
                   focusNode: _passwordFocus,
-                  label: 'Parol',
-                  hint: 'тАвтАвтАвтАвтАвтАвтАвтАв',
+                  label: context.t('Parol'),
+                  hint: '••••••••',
                   icon: Icons.lock_rounded,
                   obscure: _obscure,
                   error: _markEmpty,
@@ -466,7 +395,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                   autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _submit(),
                   suffix: IconButton(
-                    tooltip: _obscure ? 'Parolni koтАШrsatish' : 'Parolni yashirish',
+                    tooltip: _obscure ? context.t('Parolni ko‘rsatish') : context.t('Parolni yashirish'),
                     onPressed: () => setState(() => _obscure = !_obscure),
                     icon: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
@@ -511,7 +440,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               const SizedBox(height: 20),
               _Reveal(
                 animation: _items[4],
-                child: GlowButton(label: 'Kirish', busy: _busy, onPressed: _submit),
+                child: GlowButton(label: context.tr('Kirish', 'Войти'), busy: _busy, onPressed: _submit),
               ),
               const SizedBox(height: 12),
             ],

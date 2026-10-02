@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/errors/api_exception.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
+import '../home/home_screen.dart';
 import 'requests_screen.dart';
+
+enum _Mode { daily, hourly }
 
 class CreateAbsenceScreen extends ConsumerStatefulWidget {
   const CreateAbsenceScreen({super.key});
@@ -15,16 +20,20 @@ class CreateAbsenceScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
-  List<dynamic> _types = [];
+  List<Map> _types = [];
   String? _typeId;
+  _Mode _mode = _Mode.daily;
+  DateTimeRange? _range;
   DateTime? _date;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-  String _mode = 'Soatlik';
   final _note = TextEditingController();
   bool _loading = true;
   bool _busy = false;
   String? _error;
+
+  static final _day = DateFormat('dd.MM.yyyy');
+  static final _iso = DateFormat('yyyy-MM-dd');
 
   @override
   void initState() {
@@ -39,26 +48,64 @@ class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
   }
 
   Future<void> _loadTypes() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final types = await ref.read(meRepositoryProvider).absenceTypes();
+      final types = (await ref.read(meRepositoryProvider).absenceTypes())
+          .cast<Map>();
+      if (!mounted) return;
       setState(() {
         _types = types;
-        if (types.isNotEmpty) {
-          _typeId = (types.first as Map)['id']?.toString();
-        }
+        _typeId = types.isEmpty ? null : types.first['id']?.toString();
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = _humanize(e);
         _loading = false;
       });
     }
   }
 
+  String _hhmm(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _humanize(Object e) {
+    final msg = e is ApiException ? e.message : '$e';
+    if (msg.contains('overlaps existing')) {
+      return context.t(
+        'Bu kunlarga allaqachon yo‘qlik so‘rovi bor (kutilayotgan yoki tasdiqlangan)',
+      );
+    }
+    if (msg.contains('endTime must be after')) {
+      return context.t('Tugash vaqti boshlanish vaqtidan keyin bo‘lishi kerak');
+    }
+    return msg;
+  }
+
+  String? _validate() {
+    if (_typeId == null) return context.t('Yo‘qlik turini tanlang');
+    if (_mode == _Mode.daily) {
+      if (_range == null) return context.t('Sanalarni belgilang');
+      return null;
+    }
+    if (_date == null) return context.t('Sanani belgilang');
+    if (_startTime == null || _endTime == null) {
+      return context.t('Boshlanish va tugash vaqtini belgilang');
+    }
+    if (_hhmm(_endTime!).compareTo(_hhmm(_startTime!)) <= 0) {
+      return context.t('Tugash vaqti boshlanish vaqtidan keyin bo‘lishi kerak');
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
-    if (_typeId == null) {
-      setState(() => _error = 'Yo‘qlik turini tanlang');
+    final invalid = _validate();
+    if (invalid != null) {
+      setState(() => _error = invalid);
       return;
     }
     setState(() {
@@ -66,125 +113,193 @@ class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
       _error = null;
     });
     try {
-      final day = _date ?? DateTime.now();
-      final fmt = DateFormat('yyyy-MM-dd');
-      await ref.read(meRepositoryProvider).createAbsence(
+      final daily = _mode == _Mode.daily;
+      await ref
+          .read(meRepositoryProvider)
+          .createAbsence(
             absenceTypeId: _typeId!,
-            startDate: fmt.format(day),
-            endDate: fmt.format(day),
+            startDate: _iso.format(daily ? _range!.start : _date!),
+            endDate: _iso.format(daily ? _range!.end : _date!),
+            startTime: daily ? null : _hhmm(_startTime!),
+            endTime: daily ? null : _hhmm(_endTime!),
             note: _note.text.trim(),
           );
       ref.invalidate(myRequestsProvider);
+      ref.invalidate(homeRequestsProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('So‘rov yuborildi')),
+        SnackBar(content: Text(context.t('So‘rov rahbarga yuborildi'))),
       );
       Navigator.of(context).pop();
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = _humanize(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Future<void> _pickRange() async {
+    final now = DateTime.now();
+    final r = await showDateRangePicker(
+      context: context,
+      initialDateRange: _range,
+      firstDate: now.subtract(const Duration(days: 30)),
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: context.t('Yo‘qlik sanalari'),
+      saveText: context.t('Tanlash'),
+    );
+    if (r != null) setState(() => _range = r);
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date ?? now,
+      firstDate: now.subtract(const Duration(days: 30)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (d != null) setState(() => _date = d);
+  }
+
+  Future<TimeOfDay?> _pickTime(TimeOfDay? initial) => showTimePicker(
+    context: context,
+    initialTime: initial ?? const TimeOfDay(hour: 9, minute: 0),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+      child: child!,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
-    final typeName = _types.cast<Map?>().firstWhere(
-          (t) => t?['id']?.toString() == _typeId,
-          orElse: () => null,
-        )?['name']
-            ?.toString() ??
-        'Больничный';
+    final type = _types
+        .where((t) => t['id']?.toString() == _typeId)
+        .cast<Map?>()
+        .firstWhere((_) => true, orElse: () => null);
+    final days = _range == null ? 0 : _range!.duration.inDays + 1;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(
-        title: 'Ish joyida yo\'qlik so\'rovi',
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(
+        title: context.t('Ish joyida yo\'qlik so\'rovi'),
         centerTitle: true,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _types.isEmpty
+          ? ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const SizedBox(height: 80),
+                EmptyState(
+                  message:
+                      _error ??
+                      context.t(
+                        'Yo‘qlik turlari sozlanmagan. HR bo‘limiga murojaat qiling.',
+                      ),
+                ),
+                TextButton(
+                  onPressed: _loadTypes,
+                  child: Text(context.t('Qayta urinish')),
+                ),
+              ],
+            )
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 SectionCard(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _dropdownRow(_mode, () async {
-                        final v = await _pickOption(
-                          ['Soatlik', 'Kunlik'],
-                          _mode,
-                        );
-                        if (v != null) setState(() => _mode = v);
-                      }),
-                      const SizedBox(height: 10),
-                      _dropdownRow(typeName, () async {
-                        if (_types.isEmpty) return;
-                        final names = _types
-                            .map((t) => (t as Map)['name']?.toString() ?? '')
-                            .toList();
-                        final picked = await _pickOption(names, typeName);
-                        if (picked == null) return;
-                        final match = _types.cast<Map>().firstWhere(
-                              (t) => t['name']?.toString() == picked,
-                            );
-                        setState(() => _typeId = match['id']?.toString());
-                      }),
-                      const Divider(height: 28, color: AppColors.line),
-                      _valueRow(
-                        value: _date == null
-                            ? 'Ko\'rsatilmagan'
-                            : DateFormat('dd.MM.yyyy').format(_date!),
-                        label: 'sana',
-                        action: TextButton(
-                          onPressed: () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate: _date ?? DateTime.now(),
-                              firstDate: DateTime.now()
-                                  .subtract(const Duration(days: 30)),
-                              lastDate: DateTime.now()
-                                  .add(const Duration(days: 365)),
-                            );
-                            if (d != null) setState(() => _date = d);
-                          },
-                          child: const Text('Belgilash'),
-                        ),
+                      SegmentedButton<_Mode>(
+                        segments: [
+                          ButtonSegment(
+                            value: _Mode.daily,
+                            label: Text(context.t('Kunlik')),
+                            icon: const Icon(Icons.date_range),
+                          ),
+                          ButtonSegment(
+                            value: _Mode.hourly,
+                            label: Text(context.t('Soatlik')),
+                            icon: const Icon(Icons.schedule),
+                          ),
+                        ],
+                        selected: {_mode},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (s) => setState(() {
+                          _mode = s.first;
+                          _error = null;
+                        }),
+                      ),
+                      const SizedBox(height: 12),
+                      _dropdownRow(
+                        type?['name']?.toString() ?? context.t('Yo‘qlik turi'),
+                        () async {
+                          final picked = await _pickType();
+                          if (picked != null) {
+                            setState(() => _typeId = picked);
+                          }
+                        },
                       ),
                       const Divider(height: 28, color: AppColors.line),
-                      _valueRow(
-                        value: _startTime == null
-                            ? 'Ko\'rsatilmagan'
-                            : _startTime!.format(context),
-                        label: 'Boshlanish vaqti',
-                        action: IconButton(
-                          onPressed: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: _startTime ?? TimeOfDay.now(),
-                            );
-                            if (t != null) setState(() => _startTime = t);
-                          },
-                          icon: const Icon(Icons.touch_app_outlined),
+                      if (_mode == _Mode.daily)
+                        _valueRow(
+                          value: _range == null
+                              ? context.t('Ko\'rsatilmagan')
+                              : days == 1
+                              ? _day.format(_range!.start)
+                              : '${_day.format(_range!.start)} – ${_day.format(_range!.end)}',
+                          label: _range == null
+                              ? context.t('sanalar')
+                              : context.t('{0} kun', [days]),
+                          action: TextButton(
+                            onPressed: _pickRange,
+                            child: Text(context.t('Belgilash')),
+                          ),
+                        )
+                      else ...[
+                        _valueRow(
+                          value: _date == null
+                              ? context.t('Ko\'rsatilmagan')
+                              : _day.format(_date!),
+                          label: context.t('sana'),
+                          action: TextButton(
+                            onPressed: _pickDate,
+                            child: Text(context.t('Belgilash')),
+                          ),
                         ),
-                      ),
-                      const Divider(height: 28, color: AppColors.line),
-                      _valueRow(
-                        value: _endTime == null
-                            ? 'Ko\'rsatilmagan'
-                            : _endTime!.format(context),
-                        label: 'Tugash vaqti',
-                        action: IconButton(
-                          onPressed: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: _endTime ?? TimeOfDay.now(),
-                            );
-                            if (t != null) setState(() => _endTime = t);
-                          },
-                          icon: const Icon(Icons.touch_app_outlined),
+                        const Divider(height: 28, color: AppColors.line),
+                        _valueRow(
+                          value: _startTime == null
+                              ? context.t('Ko\'rsatilmagan')
+                              : _hhmm(_startTime!),
+                          label: context.t('Boshlanish vaqti'),
+                          action: IconButton(
+                            onPressed: () async {
+                              final t = await _pickTime(_startTime);
+                              if (t != null) {
+                                setState(() => _startTime = t);
+                              }
+                            },
+                            icon: const Icon(Icons.schedule),
+                          ),
                         ),
-                      ),
+                        const Divider(height: 28, color: AppColors.line),
+                        _valueRow(
+                          value: _endTime == null
+                              ? context.t('Ko\'rsatilmagan')
+                              : _hhmm(_endTime!),
+                          label: context.t('Tugash vaqti'),
+                          action: IconButton(
+                            onPressed: () async {
+                              final t = await _pickTime(_endTime ?? _startTime);
+                              if (t != null) setState(() => _endTime = t);
+                            },
+                            icon: const Icon(Icons.schedule),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -193,14 +308,17 @@ class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.chat_bubble_outline,
-                              color: AppColors.accent, size: 18),
-                          SizedBox(width: 8),
+                          const Icon(
+                            Icons.chat_bubble_outline,
+                            color: AppColors.accent,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            'Izoh',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                            context.t('Izoh'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
@@ -208,8 +326,9 @@ class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
                       TextField(
                         controller: _note,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText: 'Izoh matni',
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          hintText: context.t('Sabab yoki qo‘shimcha ma’lumot'),
                         ),
                       ),
                     ],
@@ -217,11 +336,14 @@ class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: AppColors.danger),
+                  ),
                 ],
                 const SizedBox(height: 24),
                 PrimaryButton(
-                  label: 'Yuborish',
+                  label: context.t('Yuborish'),
                   busy: _busy,
                   onPressed: _submit,
                 ),
@@ -270,22 +392,29 @@ class _CreateAbsenceScreenState extends ConsumerState<CreateAbsenceScreen> {
     );
   }
 
-  Future<String?> _pickOption(List<String> options, String current) {
+  Future<String?> _pickType() {
     return showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.cardAlt,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options
-              .map(
-                (o) => ListTile(
-                  title: Text(o),
-                  trailing: o == current ? const Icon(Icons.check) : null,
-                  onTap: () => Navigator.pop(ctx, o),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final t in _types)
+                ListTile(
+                  title: Text(t['name']?.toString() ?? ''),
+                  trailing: t['id']?.toString() == _typeId
+                      ? const Icon(Icons.check, color: AppColors.accent)
+                      : null,
+                  onTap: () => Navigator.pop(ctx, t['id']?.toString()),
                 ),
-              )
-              .toList(),
+            ],
+          ),
         ),
       ),
     );

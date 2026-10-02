@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/advance/advance_screen.dart';
 import '../../features/attendance/marks_screen.dart';
 import '../../features/attendance/mobile_punch_screen.dart';
 import '../../features/attendance/tabel_screen.dart';
@@ -108,6 +109,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const CreateAbsenceScreen(),
       ),
       GoRoute(path: '/requests', builder: (_, __) => const RequestsScreen()),
+      GoRoute(path: '/advance', builder: (_, _) => const AdvanceScreen()),
       GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
       GoRoute(path: '/team', builder: (_, _) => const TeamScreen()),
       GoRoute(

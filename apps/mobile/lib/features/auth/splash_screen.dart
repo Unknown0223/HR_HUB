@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../lock/pin_widgets.dart';
 
@@ -66,9 +67,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               opacity: _subtitle,
               child: SlideTransition(
                 position: Tween(begin: const Offset(0, 0.6), end: Offset.zero).animate(_subtitle),
-                child: const Text(
-                  'Davomat · GPS · Kadrlar',
-                  style: TextStyle(
+                child: Text(
+                  context.t('Davomat · GPS · Kadrlar'),
+                  style: const TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.4,
@@ -82,9 +83,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             const SizedBox(height: 14),
             FadeTransition(
               opacity: _loader,
-              child: const Text(
-                'Yuklanmoqda…',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
+              child: Text(
+                context.t('Yuklanmoqda…'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.inkMuted),
               ),
             ),
             const Spacer(),

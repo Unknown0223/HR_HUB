@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -17,8 +18,8 @@ class InboxScreen extends ConsumerWidget {
     final async = ref.watch(inboxProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Tasdiq navbati'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Tasdiq navbati')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(inboxProvider);
@@ -32,9 +33,9 @@ class InboxScreen extends ConsumerWidget {
             final requests = (data['requests'] as List?) ?? [];
             if (absences.isEmpty && requests.isEmpty) {
               return ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  EmptyState(message: 'Kutilayotgan so‘rov yo‘q'),
+                children: [
+                  const SizedBox(height: 120),
+                  EmptyState(message: context.t('Kutilayotgan so‘rov yo‘q')),
                 ],
               );
             }
@@ -46,17 +47,20 @@ class InboxScreen extends ConsumerWidget {
                   final emp = m['employee'];
                   final name = emp is Map
                       ? '${emp['lastName'] ?? ''} ${emp['firstName'] ?? ''}'
-                          .trim()
+                            .trim()
                       : '';
                   final type = m['absenceType'];
-                  final typeName =
-                      type is Map ? type['name']?.toString() ?? '' : '';
+                  final typeName = type is Map
+                      ? type['name']?.toString() ?? ''
+                      : '';
                   return _ReviewCard(
-                    title: name.isEmpty ? 'Yo‘qlik' : name,
+                    title: name.isEmpty ? context.t('Yo‘qlik') : name,
                     subtitle:
                         '$typeName · ${_d(m['startDate'])} → ${_d(m['endDate'])}',
-                    onApprove: () => _reviewAbsence(ref, context, m['id'], true),
-                    onReject: () => _reviewAbsence(ref, context, m['id'], false),
+                    onApprove: () =>
+                        _reviewAbsence(ref, context, m['id'], true),
+                    onReject: () =>
+                        _reviewAbsence(ref, context, m['id'], false),
                   );
                 }),
                 ...requests.map((r) {
@@ -64,10 +68,10 @@ class InboxScreen extends ConsumerWidget {
                   final emp = m['employee'];
                   final name = emp is Map
                       ? '${emp['lastName'] ?? ''} ${emp['firstName'] ?? ''}'
-                          .trim()
+                            .trim()
                       : '';
                   return _ReviewCard(
-                    title: m['title']?.toString() ?? 'So‘rov',
+                    title: m['title']?.toString() ?? context.t('So‘rov'),
                     subtitle: '$name · ${m['type'] ?? ''}',
                     onApprove: () =>
                         _reviewRequest(ref, context, m['id'], true),
@@ -90,21 +94,24 @@ class InboxScreen extends ConsumerWidget {
     bool approve,
   ) async {
     try {
-      await ref.read(meRepositoryProvider).reviewAbsence(
-            id.toString(),
-            approve ? 'approved' : 'rejected',
-          );
+      await ref
+          .read(meRepositoryProvider)
+          .reviewAbsence(id.toString(), approve ? 'approved' : 'rejected');
       ref.invalidate(inboxProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(approve ? 'Tasdiqlandi' : 'Rad etildi')),
+          SnackBar(
+            content: Text(
+              approve ? context.t('Tasdiqlandi') : context.t('Rad etildi'),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -116,21 +123,24 @@ class InboxScreen extends ConsumerWidget {
     bool approve,
   ) async {
     try {
-      await ref.read(meRepositoryProvider).reviewRequest(
-            id.toString(),
-            approve ? 'approved' : 'rejected',
-          );
+      await ref
+          .read(meRepositoryProvider)
+          .reviewRequest(id.toString(), approve ? 'approved' : 'rejected');
       ref.invalidate(inboxProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(approve ? 'Tasdiqlandi' : 'Rad etildi')),
+          SnackBar(
+            content: Text(
+              approve ? context.t('Tasdiqlandi') : context.t('Rad etildi'),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -172,14 +182,14 @@ class _ReviewCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: onReject,
-                    child: const Text('Rad'),
+                    child: Text(context.t('Rad')),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton(
                     onPressed: onApprove,
-                    child: const Text('Tasdiq'),
+                    child: Text(context.tr('Tasdiq', 'Одобрить')),
                   ),
                 ),
               ],

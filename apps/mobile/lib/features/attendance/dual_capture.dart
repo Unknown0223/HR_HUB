@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 
 enum _Phase { preview, back, front }
@@ -54,7 +55,7 @@ class _DualCaptureState extends State<DualCapture> {
       final cams = await availableCameras();
       _backCam = cams.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => throw Exception('Orqa kamera topilmadi'),
+        orElse: () => throw Exception(trText('Orqa kamera topilmadi')),
       );
       _frontCam = cams.where((c) => c.lensDirection == CameraLensDirection.front).firstOrNull;
       final c = CameraController(_backCam!, ResolutionPreset.high, enableAudio: false);
@@ -87,7 +88,7 @@ class _DualCaptureState extends State<DualCapture> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Surat olinmadi: ${_clean(e)}';
+        _error = context.t('Surat olinmadi: {0}', [_clean(e)]);
         _phase = _Phase.preview;
         _backShot = null;
       });
@@ -168,9 +169,9 @@ class _DualCaptureState extends State<DualCapture> {
         : Image.file(File(widget.livenessSelfie.path), fit: BoxFit.cover);
 
     final hint = switch (_phase) {
-      _Phase.preview => 'Ish joyingizni kadrga oling va tugmani bosing',
-      _Phase.back => 'Orqa kamera suratga olmoqda…',
-      _Phase.front => 'Old kamera: kameraga qarang…',
+      _Phase.preview => context.t('Ish joyingizni kadrga oling va tugmani bosing'),
+      _Phase.back => context.t('Orqa kamera suratga olmoqda…'),
+      _Phase.front => context.t('Old kamera: kameraga qarang…'),
     };
 
     return Column(
@@ -279,9 +280,9 @@ class _DualCaptureState extends State<DualCapture> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Bitta bosishda ikkala kamera suratga oladi',
-          style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
+        Text(
+          context.t('Bitta bosishda ikkala kamera suratga oladi'),
+          style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
         ),
       ],
     );

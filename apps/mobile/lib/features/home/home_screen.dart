@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/errors/api_exception.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/my_avatar.dart';
 import '../../shared/widgets.dart';
 
 final todayProvider = FutureProvider.autoDispose((ref) {
@@ -31,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
     final monthAsync = ref.watch(homeMonthProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
         child: _buildList(context, ref, user, todayAsync, monthAsync),
@@ -60,6 +62,7 @@ class HomeScreen extends ConsumerWidget {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
+          const SizedBox(height: 18),
           _Header(user: user, todayAsync: todayAsync),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -107,20 +110,26 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     _QuickTile(
                       icon: Icons.table_chart_outlined,
-                      label: 'Tabel',
+                      label: context.t('Tabel'),
                       onTap: () => context.push('/tabel'),
                     ),
                     const SizedBox(width: 10),
                     _QuickTile(
                       icon: Icons.assignment_outlined,
-                      label: 'So\'rovlar',
+                      label: context.t('So\'rovlar'),
                       onTap: () => context.push('/requests'),
                     ),
                     const SizedBox(width: 10),
                     _QuickTile(
                       icon: Icons.payments_outlined,
-                      label: 'To\'lov',
+                      label: context.t('To\'lov'),
                       onTap: () => context.push('/payroll'),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickTile(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: context.t('Avans'),
+                      onTap: () => context.push('/advance'),
                     ),
                   ],
                 ),
@@ -143,7 +152,6 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final emp = user?.employee;
     final firstName = emp?['firstName']?.toString() ?? '';
-    final name = user?.displayName ?? '';
     final position = _nameOf(emp?['position']);
     final division = _nameOf(emp?['division']);
     final subtitle = [
@@ -152,7 +160,7 @@ class _Header extends StatelessWidget {
     ].where((s) => s.isNotEmpty).join(' · ');
     final status = todayAsync.valueOrNull?['status']?.toString() ?? '';
     final isOff = status == 'day_off' || status == 'leave';
-    final dayLabel = DateFormat('EEEE, d MMMM', 'uz').format(DateTime.now());
+    final dayLabel = DateFormat('EEEE, d MMMM', context.dateLocale).format(DateTime.now());
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -180,17 +188,13 @@ class _Header extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Colors.white.withValues(alpha: 0.25),
-                    child: Text(
-                      _initials(name),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.35),
                     ),
+                    child: const MyAvatar(radius: 25),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -199,8 +203,8 @@ class _Header extends StatelessWidget {
                       children: [
                         Text(
                           firstName.isNotEmpty
-                              ? 'Salom, $firstName!'
-                              : 'Salom!',
+                              ? context.t('Salom, {0}!', [firstName])
+                              : context.t('Salom!'),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 21,
@@ -241,7 +245,7 @@ class _Header extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${_capitalize(dayLabel)} · ${isOff ? 'Dam olish kuni' : 'Ish kuni'}',
+                  '${_capitalize(dayLabel)} · ${isOff ? context.t('Dam olish kuni') : context.t('Ish kuni')}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12.5,
@@ -275,7 +279,7 @@ class _TodayCard extends StatelessWidget {
         ? marks.last['occurredAt']
         : null;
     final schedule = data['schedule'] is Map ? data['schedule'] as Map : null;
-    final (statusLabel, statusColor) = _statusOf(status, lateMinutes);
+    final (statusLabel, statusColor) = _statusOf(context, status, lateMinutes);
 
     return SectionCard(
       child: Column(
@@ -283,9 +287,9 @@ class _TodayCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
-                'Bugun',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+              Text(
+                context.t('Bugun'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
               ),
               const Spacer(),
               Container(
@@ -311,7 +315,10 @@ class _TodayCard extends StatelessWidget {
           if (schedule != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Ish vaqti: ${schedule['startTime'] ?? '--:--'} – ${schedule['endTime'] ?? '--:--'}',
+              context.t('Ish vaqti: {0} – {1}', [
+                schedule['startTime'] ?? '--:--',
+                schedule['endTime'] ?? '--:--',
+              ]),
               style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
             ),
           ],
@@ -319,13 +326,15 @@ class _TodayCard extends StatelessWidget {
           Row(
             children: [
               _TimeBox(
-                label: 'Kelgan',
+                label: context.t('Kelgan'),
                 icon: Icons.login_rounded,
                 value: _fmt(data['firstIn']),
               ),
               const SizedBox(width: 10),
               _TimeBox(
-                label: estimatedOut != null ? 'Ketgan (taxminiy)' : 'Ketgan',
+                label: estimatedOut != null
+                    ? context.t('Ketgan (taxminiy)')
+                    : context.t('Ketgan'),
                 icon: Icons.logout_rounded,
                 value: estimatedOut != null
                     ? '~${_fmt(estimatedOut)}'
@@ -334,9 +343,9 @@ class _TodayCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Telefon orqali belgi',
-            style: TextStyle(
+          Text(
+            context.t('Telefon orqali belgi'),
+            style: const TextStyle(
               color: AppColors.inkMuted,
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
@@ -347,16 +356,20 @@ class _TodayCard extends StatelessWidget {
             children: [
               _PunchButton(
                 icon: Icons.login_rounded,
-                label: 'Kirish',
-                hint: marks.isEmpty ? 'Ishga keldim' : 'Qayd etilgan',
+                label: context.t('Kirish'),
+                hint: marks.isEmpty
+                    ? context.t('Ishga keldim')
+                    : context.t('Qayd etilgan'),
                 color: AppColors.accent,
                 onTap: marks.isEmpty ? () => context.push('/punch/in') : null,
               ),
               const SizedBox(width: 10),
               _PunchButton(
                 icon: Icons.logout_rounded,
-                label: 'Chiqish',
-                hint: marks.isEmpty ? 'Avval kirish' : 'Ishdan ketdim',
+                label: context.t('Chiqish'),
+                hint: marks.isEmpty
+                    ? context.t('Avval kirish')
+                    : context.t('Ishdan ketdim'),
                 color: AppColors.warn,
                 onTap: marks.isEmpty ? null : () => context.push('/punch/out'),
               ),
@@ -371,7 +384,7 @@ class _TodayCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => context.push('/marks'),
-                child: const Text('Barcha qaydlar'),
+                child: Text(context.t('Barcha qaydlar')),
               ),
             ),
           ],
@@ -380,25 +393,25 @@ class _TodayCard extends StatelessWidget {
     );
   }
 
-  (String, Color) _statusOf(String status, int lateMinutes) {
+  (String, Color) _statusOf(BuildContext context, String status, int lateMinutes) {
     switch (status) {
       case 'on_time':
-        return ('O\'z vaqtida', AppColors.success);
+        return (context.t('O\'z vaqtida'), AppColors.success);
       case 'late':
         return (
           lateMinutes > 0
-              ? 'Kechikdi · ${_formatMinutes(lateMinutes)}'
-              : 'Kechikdi',
+              ? context.t('Kechikdi · {0}', [_formatMinutes(context, lateMinutes)])
+              : context.t('Kechikdi'),
           AppColors.warn,
         );
       case 'absent':
-        return ('Kelmagan', AppColors.danger);
+        return (context.t('Kelmagan'), AppColors.danger);
       case 'leave':
-        return ('Ta\'til', AppColors.accent);
+        return (context.t('Ta\'til'), AppColors.accent);
       case 'day_off':
-        return ('Dam olish', AppColors.inkMuted);
+        return (context.t('Dam olish'), AppColors.inkMuted);
       default:
-        return ('Hali kelmagan', AppColors.inkMuted);
+        return (context.t('Hali kelmagan'), AppColors.inkMuted);
     }
   }
 }
@@ -549,9 +562,9 @@ class _MarkRow extends StatelessWidget {
                   style: const TextStyle(fontSize: 14),
                 ),
                 if (outside)
-                  const Text(
-                    'Hududdan tashqarida',
-                    style: TextStyle(color: AppColors.warn, fontSize: 12),
+                  Text(
+                    context.t('Hududdan tashqarida'),
+                    style: const TextStyle(color: AppColors.warn, fontSize: 12),
                   ),
               ],
             ),
@@ -580,7 +593,7 @@ class _MyInfoCard extends StatelessWidget {
         ? monthAsync.valueOrNull!['summary'] as Map
         : null;
     final monthLabel = _capitalize(
-      DateFormat('LLLL', 'uz').format(DateTime.now()),
+      DateFormat('LLLL', context.dateLocale).format(DateTime.now()),
     );
 
     String stat(String key) {
@@ -592,13 +605,13 @@ class _MyInfoCard extends StatelessWidget {
     final rows = <(IconData, String, String)>[
       (
         Icons.badge_outlined,
-        'Tabel raqami',
+        context.t('Tabel raqami'),
         emp?['tabNumber']?.toString() ?? '',
       ),
-      (Icons.work_outline_rounded, 'Lavozim', _nameOf(emp?['position'])),
-      (Icons.apartment_rounded, 'Bo\'lim', _nameOf(emp?['division'])),
-      (Icons.schedule_rounded, 'Ish jadvali', _nameOf(schedule)),
-      (Icons.phone_outlined, 'Telefon', emp?['phone']?.toString() ?? ''),
+      (Icons.work_outline_rounded, context.t('Lavozim'), _nameOf(emp?['position'])),
+      (Icons.apartment_rounded, context.t('Bo\'lim'), _nameOf(emp?['division'])),
+      (Icons.schedule_rounded, context.t('Ish jadvali'), _nameOf(schedule)),
+      (Icons.phone_outlined, context.t('Telefon'), emp?['phone']?.toString() ?? ''),
     ].where((r) => r.$3.isNotEmpty).toList();
 
     return SectionCard(
@@ -607,9 +620,9 @@ class _MyInfoCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
-                'Mening ma\'lumotlarim',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+              Text(
+                context.t('Mening ma\'lumotlarim'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
               ),
               const Spacer(),
               Text(
@@ -623,19 +636,19 @@ class _MyInfoCard extends StatelessWidget {
             children: [
               _StatBox(
                 value: stat('presentDays'),
-                label: 'Ishlagan kun',
+                label: context.t('Ishlagan kun'),
                 color: AppColors.success,
               ),
               const SizedBox(width: 8),
               _StatBox(
                 value: stat('lateDays'),
-                label: 'Kechikish',
+                label: context.t('Kechikish'),
                 color: AppColors.warn,
               ),
               const SizedBox(width: 8),
               _StatBox(
                 value: stat('absentDays'),
-                label: 'Kelmagan',
+                label: context.t('Kelmagan'),
                 color: AppColors.danger,
               ),
             ],
@@ -773,20 +786,16 @@ class _QuickTile extends StatelessWidget {
 
 String _nameOf(dynamic v) => v is Map ? v['name']?.toString() ?? '' : '';
 
-String _initials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
-  final letters = parts.take(2).map((p) => p[0].toUpperCase()).join();
-  return letters.isEmpty ? '?' : letters;
-}
-
 String _capitalize(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 
-String _formatMinutes(int minutes) {
+String _formatMinutes(BuildContext context, int minutes) {
   final h = minutes ~/ 60;
   final m = minutes % 60;
-  if (h == 0) return '$m daq';
-  return m == 0 ? '$h soat' : '$h soat $m daq';
+  if (h == 0) return context.t('{0} daq', [m]);
+  return m == 0
+      ? context.t('{0} soat', [h])
+      : context.t('{0} soat {1} daq', [h, m]);
 }
 
 String _fmt(dynamic v) {

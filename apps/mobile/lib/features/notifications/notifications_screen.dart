@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
@@ -17,13 +18,13 @@ class NotificationsScreen extends ConsumerWidget {
     final async = ref.watch(notificationsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.chevron_left, size: 30),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('Bildirishnomalar'),
+        title: Text(context.t('Bildirishnomalar')),
         titleSpacing: 0,
         actions: [
           Padding(
@@ -56,9 +57,12 @@ class NotificationsScreen extends ConsumerWidget {
           data: (items) {
             if (items.isEmpty) {
               return ListView(
-                children: const [
-                  SizedBox(height: 160),
-                  EmptyState(message: ''),
+                children: [
+                  const SizedBox(height: 160),
+                  EmptyState(
+                    message: context.t('Bildirishnomalar yo‘q'),
+                    icon: Icons.notifications_none,
+                  ),
                 ],
               );
             }
@@ -69,8 +73,9 @@ class NotificationsScreen extends ConsumerWidget {
               itemBuilder: (context, i) {
                 final m = items[i] as Map;
                 final unread = m['readAt'] == null;
-                final at = DateTime.tryParse(m['createdAt']?.toString() ?? '')
-                    ?.toLocal();
+                final at = DateTime.tryParse(
+                  m['createdAt']?.toString() ?? '',
+                )?.toLocal();
                 return SectionCard(
                   child: InkWell(
                     onTap: () async {
@@ -106,8 +111,9 @@ class NotificationsScreen extends ConsumerWidget {
                               if (m['body'] != null)
                                 Text(
                                   m['body'].toString(),
-                                  style:
-                                      const TextStyle(color: AppColors.muted),
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                  ),
                                 ),
                               if (at != null)
                                 Text(

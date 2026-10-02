@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/security/app_permissions.dart';
 import '../../core/theme/app_theme.dart';
 import '../attendance/punch_widgets.dart';
@@ -32,12 +33,14 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
     final notifier = ref.read(permissionsProvider.notifier);
     final total = AppPermission.values.length;
     final done = perms.grantedCount;
-    final anyBlocked = perms.statuses.values.contains(GrantStatus.permanentlyDenied);
+    final anyBlocked = perms.statuses.values.contains(
+      GrantStatus.permanentlyDenied,
+    );
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           child: Column(
             children: [
@@ -55,18 +58,24 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
                         index: i + 1,
                         child: _PermissionTile(
                           permission: AppPermission.values[i],
-                          status: perms.statuses[AppPermission.values[i]] ?? GrantStatus.denied,
+                          status:
+                              perms.statuses[AppPermission.values[i]] ??
+                              GrantStatus.denied,
                           onTap: _busy
                               ? null
-                              : () => _run(() => notifier.request(AppPermission.values[i])),
+                              : () => _run(
+                                  () =>
+                                      notifier.request(AppPermission.values[i]),
+                                ),
                         ),
                       ),
                     if (anyBlocked) ...[
                       const SizedBox(height: 4),
-                      const _Note(
-                        text: 'Ba’zi ruxsatlar rad etilgan. «Sozlamalar» tugmasi orqali '
+                      _Note(
+                        text: context.t(
+                            'Ba’zi ruxsatlar rad etilgan. «Sozlamalar» tugmasi orqali '
                             'ilova sozlamalarini ochib, ruxsatni qo‘lda yoqing — so‘ng shu '
-                            'ekranga qayting.',
+                            'ekranga qayting.'),
                       ),
                     ],
                   ],
@@ -88,16 +97,23 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ShimmerButton(
-                      label: _busy ? 'Kutilmoqda…' : 'Barcha ruxsatlarni berish',
+                      label: _busy
+                          ? context.t('Kutilmoqda…')
+                          : context.t('Barcha ruxsatlarni berish'),
                       icon: Icons.verified_user_rounded,
-                      colors: const [AppColors.headerTop, AppColors.headerBottom],
-                      onPressed: _busy ? null : () => _run(notifier.requestAllMissing),
+                      colors: const [
+                        AppColors.headerTop,
+                        AppColors.headerBottom,
+                      ],
+                      onPressed: _busy
+                          ? null
+                          : () => _run(notifier.requestAllMissing),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Barcha ruxsatlar berilmaguncha ilovadan foydalanib bo‘lmaydi',
+                    Text(
+                      context.t('Barcha ruxsatlar berilmaguncha ilovadan foydalanib bo‘lmaydi'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.inkFaint, fontSize: 12),
+                      style: const TextStyle(color: AppColors.inkFaint, fontSize: 12),
                     ),
                   ],
                 ),
@@ -149,9 +165,9 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Ruxsatlar kerak',
-                  style: TextStyle(
+                Text(
+                  context.t('Ruxsatlar kerak'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 21,
                     fontWeight: FontWeight.w800,
@@ -159,8 +175,11 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'HR HUB ishlashi uchun $total ta ruxsat zarur',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+                  context.t('HR HUB ishlashi uchun {0} ta ruxsat zarur', [total]),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 ClipRRect(
@@ -179,7 +198,7 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '$done / $total berildi',
+                  context.t('{0} / {1} berildi', [done, total]),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -196,7 +215,11 @@ class _Header extends StatelessWidget {
 }
 
 class _PermissionTile extends StatelessWidget {
-  const _PermissionTile({required this.permission, required this.status, this.onTap});
+  const _PermissionTile({
+    required this.permission,
+    required this.status,
+    this.onTap,
+  });
 
   final AppPermission permission;
   final GrantStatus status;
@@ -206,7 +229,9 @@ class _PermissionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final granted = status == GrantStatus.granted;
     final blocked = status == GrantStatus.permanentlyDenied;
-    final color = granted ? AppColors.success : (blocked ? AppColors.danger : AppColors.warn);
+    final color = granted
+        ? AppColors.success
+        : (blocked ? AppColors.danger : AppColors.warn);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: AnimatedContainer(
@@ -215,7 +240,9 @@ class _PermissionTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: granted ? AppColors.accentTint : AppColors.card,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: granted ? AppColors.accentSoft : AppColors.line),
+          border: Border.all(
+            color: granted ? AppColors.accentSoft : AppColors.line,
+          ),
         ),
         child: Row(
           children: [
@@ -234,13 +261,20 @@ class _PermissionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    permission.title,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    context.t(permission.title),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    permission.reason,
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 12.5, height: 1.3),
+                    context.t(permission.reason),
+                    style: const TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
                   ),
                 ],
               ),
@@ -248,7 +282,8 @@ class _PermissionTile extends StatelessWidget {
             const SizedBox(width: 8),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+              transitionBuilder: (child, anim) =>
+                  ScaleTransition(scale: anim, child: child),
               child: granted
                   ? const Icon(
                       Icons.check_circle_rounded,
@@ -265,7 +300,7 @@ class _PermissionTile extends StatelessWidget {
                       ),
                       onPressed: onTap,
                       child: Text(
-                        blocked ? 'Sozlamalar' : 'Berish',
+                        blocked ? context.t('Sozlamalar') : context.t('Berish'),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -292,10 +327,17 @@ class _Note extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, color: AppColors.danger, size: 18),
+          const Icon(
+            Icons.info_outline_rounded,
+            color: AppColors.danger,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 12.5, height: 1.4)),
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12.5, height: 1.4),
+            ),
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/team_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/yandex_map_view.dart';
@@ -41,24 +42,24 @@ String hoursLabel(num minutes) {
   final m = minutes.round();
   final h = m ~/ 60;
   final r = m % 60;
-  if (h == 0) return '$r daq';
-  return r == 0 ? '$h soat' : '$h s $r daq';
+  if (h == 0) return trText('{0} daq', [r]);
+  return r == 0 ? trText('{0} soat', [h]) : trText('{0} s {1} daq', [h, r]);
 }
 
 String windowReasonText(String? reason) {
   switch (reason) {
     case 'working':
-      return 'Ish vaqtida';
+      return trText('Ish vaqtida');
     case 'day_off':
-      return 'Dam olish kuni';
+      return trText('Dam olish kuni');
     case 'holiday':
-      return 'Bayram kuni';
+      return trText('Bayram kuni');
     case 'absence':
-      return 'Ta’tilda';
+      return trText('Ta’tilda');
     case 'before_start':
-      return 'Ish hali boshlanmagan';
+      return trText('Ish hali boshlanmagan');
     case 'after_end':
-      return 'Ish vaqti tugagan';
+      return trText('Ish vaqti tugagan');
     default:
       return '—';
   }

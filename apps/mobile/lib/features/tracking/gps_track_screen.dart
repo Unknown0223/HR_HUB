@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tracking/tracking_controller.dart';
 import '../../shared/widgets.dart';
@@ -37,7 +38,10 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
   Future<void> _load() async {
     final tracking = ref.read(trackingControllerProvider);
     await tracking.ensureStarted();
-    final results = await Future.wait([tracking.nativeStatus(), tracking.serverStatus()]);
+    final results = await Future.wait([
+      tracking.nativeStatus(),
+      tracking.serverStatus(),
+    ]);
     if (!mounted) return;
     setState(() {
       _native = results[0] as TrackingNativeStatus;
@@ -51,39 +55,76 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
     return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
   }
 
-  static DateTime? _parse(Object? v) => v == null ? null : DateTime.tryParse(v.toString());
+  static DateTime? _parse(Object? v) =>
+      v == null ? null : DateTime.tryParse(v.toString());
 
   (String, String, IconData, List<Color>) _headline() {
     final window = _server?['window'] as Map?;
     final reason = window?['reason']?.toString() ?? _native?.windowReason;
     final state = _native?.state;
     if (_server != null && _server!['registered'] != true) {
-      return ('Kuzatuv ulanmagan', 'Hisobingiz xodim kartasiga bog‘lanmagan', Icons.link_off_rounded,
-          const [Color(0xFFB0BEC5), Color(0xFF78909C)]);
+      return (
+        context.t('Kuzatuv ulanmagan'),
+        context.t('Hisobingiz xodim kartasiga bog‘lanmagan'),
+        Icons.link_off_rounded,
+        const [Color(0xFFB0BEC5), Color(0xFF78909C)],
+      );
     }
     if (state == 'no_permission') {
-      return ('Ruxsat yo‘q', 'Joylashuv ruxsatini «Doim ruxsat» qiling', Icons.location_disabled_rounded,
-          const [Color(0xFFFF8A80), AppColors.danger]);
+      return (
+        context.t('Ruxsat yo‘q'),
+        context.t('Joylashuv ruxsatini «Doim ruxsat» qiling'),
+        Icons.location_disabled_rounded,
+        const [Color(0xFFFF8A80), AppColors.danger],
+      );
     }
     if (state == 'gps_off') {
-      return ('GPS o‘chirilgan', 'Telefonda joylashuv xizmatini yoqing', Icons.gps_off_rounded,
-          const [Color(0xFFFF8A80), AppColors.danger]);
+      return (
+        context.t('GPS o‘chirilgan'),
+        context.t('Telefonda joylashuv xizmatini yoqing'),
+        Icons.gps_off_rounded,
+        const [Color(0xFFFF8A80), AppColors.danger],
+      );
     }
     if (window?['active'] == true || reason == 'working') {
-      return ('Kuzatuv faol', 'Ish vaqti: joylashuv avtomatik uzatilmoqda', Icons.share_location_rounded,
-          const [AppColors.headerTop, AppColors.headerBottom]);
+      return (
+        context.t('Kuzatuv faol'),
+        context.t('Ish vaqti: joylashuv avtomatik uzatilmoqda'),
+        Icons.share_location_rounded,
+        const [AppColors.headerTop, AppColors.headerBottom],
+      );
     }
     return switch (reason) {
-      'day_off' => ('Dam olish kuni', 'Bugun joylashuv uzatilmaydi', Icons.weekend_rounded,
-          const [Color(0xFF90CAF9), Color(0xFF42A5F5)]),
-      'holiday' => ('Bayram kuni', 'Bugun joylashuv uzatilmaydi', Icons.celebration_rounded,
-          const [Color(0xFF90CAF9), Color(0xFF42A5F5)]),
-      'absence' => ('Ta’til / ruxsat', 'Tasdiqlangan ta’tilda kuzatuv o‘chadi', Icons.beach_access_rounded,
-          const [Color(0xFF90CAF9), Color(0xFF42A5F5)]),
-      'before_start' => ('Ish hali boshlanmagan', 'Ish vaqti boshlanishi bilan kuzatuv yoqiladi',
-          Icons.schedule_rounded, const [Color(0xFFF7C24A), Color(0xFFE08A00)]),
-      _ => ('Ish vaqtidan tashqari', 'Ish vaqti tugadi — joylashuv uzatilmaydi', Icons.bedtime_rounded,
-          const [Color(0xFFF7C24A), Color(0xFFE08A00)]),
+      'day_off' => (
+        context.t('Dam olish kuni'),
+        context.t('Bugun joylashuv uzatilmaydi'),
+        Icons.weekend_rounded,
+        const [Color(0xFF90CAF9), Color(0xFF42A5F5)],
+      ),
+      'holiday' => (
+        context.t('Bayram kuni'),
+        context.t('Bugun joylashuv uzatilmaydi'),
+        Icons.celebration_rounded,
+        const [Color(0xFF90CAF9), Color(0xFF42A5F5)],
+      ),
+      'absence' => (
+        context.t('Ta’til / ruxsat'),
+        context.t('Tasdiqlangan ta’tilda kuzatuv o‘chadi'),
+        Icons.beach_access_rounded,
+        const [Color(0xFF90CAF9), Color(0xFF42A5F5)],
+      ),
+      'before_start' => (
+        context.t('Ish hali boshlanmagan'),
+        context.t('Ish vaqti boshlanishi bilan kuzatuv yoqiladi'),
+        Icons.schedule_rounded,
+        const [Color(0xFFF7C24A), Color(0xFFE08A00)],
+      ),
+      _ => (
+        context.t('Ish vaqtidan tashqari'),
+        context.t('Ish vaqti tugadi — joylashuv uzatilmaydi'),
+        Icons.bedtime_rounded,
+        const [Color(0xFFF7C24A), Color(0xFFE08A00)],
+      ),
     };
   }
 
@@ -97,8 +138,8 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
     final battery = _server?['batteryPct'];
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'GPS kuzatuv', centerTitle: true),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('GPS kuzatuv'), centerTitle: true),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -159,7 +200,10 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
                                 if (start != null && end != null) ...[
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Ish vaqti: ${_hm(start)} – ${_hm(end)}',
+                                    context.t('Ish vaqti: {0} – {1}', [
+                                      _hm(start),
+                                      _hm(end),
+                                    ]),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
@@ -180,19 +224,22 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
                       children: [
                         _Stat(
                           icon: Icons.cloud_done_rounded,
-                          label: 'Oxirgi yuborish',
-                          value: _hm(_native?.lastSentAt ?? _parse(_server?['lastSeenAt'])),
+                          label: context.t('Oxirgi yuborish'),
+                          value: _hm(
+                            _native?.lastSentAt ??
+                                _parse(_server?['lastSeenAt']),
+                          ),
                         ),
                         const SizedBox(width: 10),
                         _Stat(
                           icon: Icons.place_rounded,
-                          label: 'Bugun nuqtalar',
+                          label: context.t('Bugun nuqtalar'),
                           value: '${_server?['pointsToday'] ?? 0}',
                         ),
                         const SizedBox(width: 10),
                         _Stat(
                           icon: Icons.battery_std_rounded,
-                          label: 'Batareya',
+                          label: context.t('Batareya'),
                           value: battery == null ? '—' : '$battery%',
                         ),
                       ],
@@ -205,19 +252,23 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
                       children: [
                         _Row(
                           icon: Icons.memory_rounded,
-                          label: 'Fon xizmati',
-                          value: _native?.running == true ? 'Ishlamoqda' : 'To‘xtagan',
+                          label: context.t('Fon xizmati'),
+                          value: _native?.running == true
+                              ? context.t('Ishlamoqda')
+                              : context.t('To‘xtagan'),
                           ok: _native?.running == true,
                         ),
                         _Row(
                           icon: Icons.battery_saver_rounded,
-                          label: 'Batareya cheklovi',
-                          value: _native?.batteryOptimizationIgnored == true ? 'O‘chirilgan' : 'Yoqilgan',
+                          label: context.t('Batareya cheklovi'),
+                          value: _native?.batteryOptimizationIgnored == true
+                              ? context.t('O‘chirilgan')
+                              : context.t('Yoqilgan'),
                           ok: _native?.batteryOptimizationIgnored == true,
                         ),
                         _Row(
                           icon: Icons.gps_fixed_rounded,
-                          label: 'Oxirgi GPS nuqta',
+                          label: context.t('Oxirgi GPS nuqta'),
                           value: _hm(_native?.lastFixAt),
                           ok: _native?.lastFixAt != null,
                         ),
@@ -227,18 +278,22 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
                   const SizedBox(height: 14),
                   StaggeredEntrance(
                     index: 3,
-                    child: const _Card(
+                    child: _Card(
                       children: [
                         _Info(
                           icon: Icons.verified_user_rounded,
-                          text: 'Joylashuv faqat ish jadvalingizdagi vaqtda uzatiladi. Dam olish, '
-                              'bayram va tasdiqlangan ta’til kunlarida hamda ish vaqtidan '
-                              'tashqarida server ma’lumotni qabul qilmaydi.',
+                          text: context.t(
+                            'Joylashuv faqat ish jadvalingizdagi vaqtda uzatiladi. Dam olish, '
+                            'bayram va tasdiqlangan ta’til kunlarida hamda ish vaqtidan '
+                            'tashqarida server ma’lumotni qabul qilmaydi.',
+                          ),
                         ),
                         _Info(
                           icon: Icons.battery_charging_full_rounded,
-                          text: 'Quvvatlanayotganda nuqtalar tez-tez, batareya kamayganda va '
-                              'bir joyda turganingizda kamroq olinadi.',
+                          text: context.t(
+                            'Quvvatlanayotganda nuqtalar tez-tez, batareya kamayganda va '
+                            'bir joyda turganingizda kamroq olinadi.',
+                          ),
                         ),
                       ],
                     ),
@@ -248,18 +303,25 @@ class _GpsTrackScreenState extends ConsumerState<GpsTrackScreen> {
                     index: 4,
                     child: TextButton.icon(
                       onPressed: () async {
-                        final opened =
-                            await ref.read(trackingControllerProvider).openAutostartSettings();
+                        final opened = await ref
+                            .read(trackingControllerProvider)
+                            .openAutostartSettings();
                         if (!opened && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Bu telefonda alohida avtoishga tushirish sozlamasi yo‘q'),
+                            SnackBar(
+                              content: Text(
+                                context.t(
+                                  'Bu telefonda alohida avtoishga tushirish sozlamasi yo‘q',
+                                ),
+                              ),
                             ),
                           );
                         }
                       },
                       icon: const Icon(Icons.rocket_launch_rounded),
-                      label: const Text('Avtoishga tushirish (Xiaomi, Oppo, Vivo…)'),
+                      label: Text(
+                        context.t('Avtoishga tushirish (Xiaomi, Oppo, Vivo…)'),
+                      ),
                     ),
                   ),
                 ],
@@ -291,8 +353,14 @@ class _Stat extends StatelessWidget {
           children: [
             Icon(icon, color: AppColors.accent, size: 20),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-            Text(label, style: const TextStyle(color: AppColors.inkMuted, fontSize: 11.5)),
+            Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+            Text(
+              label,
+              style: const TextStyle(color: AppColors.inkMuted, fontSize: 11.5),
+            ),
           ],
         ),
       ),
@@ -319,7 +387,12 @@ class _Card extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.icon, required this.label, required this.value, required this.ok});
+  const _Row({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.ok,
+  });
 
   final IconData icon;
   final String label;
@@ -363,7 +436,14 @@ class _Info extends StatelessWidget {
           Icon(icon, color: AppColors.accent, size: 20),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(text, style: const TextStyle(color: AppColors.inkMuted, height: 1.4, fontSize: 13)),
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.inkMuted,
+                height: 1.4,
+                fontSize: 13,
+              ),
+            ),
           ),
         ],
       ),

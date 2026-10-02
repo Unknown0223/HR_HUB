@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/team_repository.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/yandex_map_view.dart';
@@ -71,22 +72,22 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.chevron_left, size: 30),
           onPressed: () => context.pop(),
         ),
         titleSpacing: 0,
-        title: const Text('Mening jamoam'),
+        title: Text(context.t('Mening jamoam')),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
         ],
       ),
       body: _data == null
           ? (_error != null
-              ? EmptyState(message: '$_error')
-              : const Center(child: CircularProgressIndicator()))
+                ? EmptyState(message: '$_error')
+                : const Center(child: CircularProgressIndicator()))
           : Column(
               children: [
                 Padding(
@@ -132,7 +133,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                       showCheckmark: false,
                       selectedColor: AppColors.accent,
                       backgroundColor: AppColors.card,
-                      side: BorderSide(color: _filter == f ? AppColors.accent : AppColors.line),
+                      side: BorderSide(
+                        color: _filter == f ? AppColors.accent : AppColors.line,
+                      ),
                       labelStyle: TextStyle(
                         color: _filter == f ? Colors.white : AppColors.ink,
                         fontWeight: FontWeight.w700,
@@ -145,9 +148,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: EmptyState(message: 'Bu bo‘limda xodim yo‘q'),
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: EmptyState(message: context.t('Bu bo‘limda xodim yo‘q')),
             )
           else
             for (final m in items) ...[
@@ -175,7 +178,13 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
               fitKey: located.map((m) => m['employeeId']).join(','),
               pins: [
                 for (final m in located)
-                  memberPin(m, photoUrl: photoDataUrl(ref, _repo.mediaUrl(m['photoUrl']?.toString()))),
+                  memberPin(
+                    m,
+                    photoUrl: photoDataUrl(
+                      ref,
+                      _repo.mediaUrl(m['photoUrl']?.toString()),
+                    ),
+                  ),
               ],
               onPinTap: (id) => context.push('/team/$id'),
             ),
@@ -189,16 +198,26 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 12)],
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x22000000), blurRadius: 12),
+                    ],
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.location_off_outlined, color: AppColors.inkMuted),
-                      SizedBox(width: 10),
+                      const Icon(
+                        Icons.location_off_outlined,
+                        color: AppColors.inkMuted,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Hozir hech kimning joylashuvi yo‘q. Joylashuv faqat ish vaqti ichida ko‘rsatiladi.',
-                          style: TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600),
+                          context.t(
+                            'Hozir hech kimning joylashuvi yo‘q. Joylashuv faqat ish vaqti ichida ko‘rsatiladi.',
+                          ),
+                          style: const TextStyle(
+                            color: AppColors.inkMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -215,11 +234,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
     int count(bool Function(Map) p) => _items.where(p).length;
     String s(Map m) => (m['today'] as Map?)?['status']?.toString() ?? '';
     return switch (f) {
-      _Filter.all => 'Hammasi · ${_items.length}',
-      _Filter.present => 'Ishda · ${count((m) => s(m) == 'on_time' || s(m) == 'late')}',
-      _Filter.late => 'Kechikkan · ${count((m) => s(m) == 'late')}',
-      _Filter.absent => 'Kelmagan · ${count((m) => s(m) == 'absent' || s(m) == 'not_started')}',
-      _Filter.off => 'Dam olishda · ${count((m) => ['day_off', 'holiday', 'leave'].contains(s(m)))}',
+      _Filter.all => context.t('Hammasi · {0}', [_items.length]),
+      _Filter.present => context.t('Ishda · {0}', [
+        count((m) => s(m) == 'on_time' || s(m) == 'late'),
+      ]),
+      _Filter.late => context.t('Kechikkan · {0}', [
+        count((m) => s(m) == 'late'),
+      ]),
+      _Filter.absent => context.t('Kelmagan · {0}', [
+        count((m) => s(m) == 'absent' || s(m) == 'not_started'),
+      ]),
+      _Filter.off => context.t('Dam olishda · {0}', [
+        count((m) => ['day_off', 'holiday', 'leave'].contains(s(m))),
+      ]),
     };
   }
 }
@@ -233,7 +260,9 @@ class _SummaryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = DateTime.tryParse(date ?? '');
-    final dateText = d == null ? '' : DateFormat('d MMMM, EEEE', 'uz').format(d);
+    final dateText = d == null
+        ? ''
+        : DateFormat('d MMMM, EEEE', context.dateLocale).format(d);
     int n(String k) => (summary[k] as num?)?.toInt() ?? 0;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -264,13 +293,20 @@ class _SummaryHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${n('total')} ta xodim',
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+                      context.t('{0} ta xodim', [n('total')]),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     if (dateText.isNotEmpty)
                       Text(
                         dateText,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                   ],
                 ),
@@ -280,10 +316,18 @@ class _SummaryHeader extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              _stat('Ishda', n('present'), Icons.check_circle_rounded),
-              _stat('Kechikkan', n('late'), Icons.schedule_rounded),
-              _stat('Kelmagan', n('absent') + n('notStarted'), Icons.cancel_rounded),
-              _stat('Xaritada', n('located'), Icons.location_on_rounded),
+              _stat(context.t('Ishda'), n('present'), Icons.check_circle_rounded),
+              _stat(context.t('Kechikkan'), n('late'), Icons.schedule_rounded),
+              _stat(
+                context.t('Kelmagan'),
+                n('absent') + n('notStarted'),
+                Icons.cancel_rounded,
+              ),
+              _stat(
+                context.t('Xaritada'),
+                n('located'),
+                Icons.location_on_rounded,
+              ),
             ],
           ),
         ],
@@ -306,13 +350,21 @@ class _SummaryHeader extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '$value',
-              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -322,7 +374,11 @@ class _SummaryHeader extends StatelessWidget {
 }
 
 class _ModeSwitch extends StatelessWidget {
-  const _ModeSwitch({required this.mapMode, required this.located, required this.onChanged});
+  const _ModeSwitch({
+    required this.mapMode,
+    required this.located,
+    required this.onChanged,
+  });
 
   final bool mapMode;
   final Object located;
@@ -341,12 +397,18 @@ class _ModeSwitch extends StatelessWidget {
             decoration: BoxDecoration(
               color: active ? AppColors.card : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: active ? const [BoxShadow(color: Color(0x14000000), blurRadius: 8)] : null,
+              boxShadow: active
+                  ? const [BoxShadow(color: Color(0x14000000), blurRadius: 8)]
+                  : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 20, color: active ? AppColors.accent : AppColors.inkMuted),
+                Icon(
+                  icon,
+                  size: 20,
+                  color: active ? AppColors.accent : AppColors.inkMuted,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   label,
@@ -364,11 +426,14 @@ class _ModeSwitch extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.bgSoft, borderRadius: BorderRadius.circular(15)),
+      decoration: BoxDecoration(
+        color: AppColors.bgSoft,
+        borderRadius: BorderRadius.circular(15),
+      ),
       child: Row(
         children: [
-          tab(false, Icons.view_list_rounded, 'Ro‘yxat'),
-          tab(true, Icons.map_rounded, 'Xarita · $located'),
+          tab(false, Icons.view_list_rounded, context.t('Ro‘yxat')),
+          tab(true, Icons.map_rounded, context.t('Xarita · {0}', [located])),
         ],
       ),
     );
@@ -389,9 +454,10 @@ class _MemberCard extends StatelessWidget {
     final firstIn = formatApiTime(today['firstIn']);
     final lastOut = formatApiTime(today['lastOut']);
     final located = member['location'] is Map;
-    final subtitle = [member['position'], member['division']]
-        .where((e) => e != null && e.toString().isNotEmpty)
-        .join(' · ');
+    final subtitle = [
+      member['position'],
+      member['division'],
+    ].where((e) => e != null && e.toString().isNotEmpty).join(' · ');
     return Material(
       color: AppColors.card,
       borderRadius: BorderRadius.circular(18),
@@ -421,14 +487,20 @@ class _MemberCard extends StatelessWidget {
                       member['fullName']?.toString() ?? '—',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
                     ),
                     if (subtitle.isNotEmpty)
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                        style: const TextStyle(
+                          color: AppColors.inkMuted,
+                          fontSize: 13,
+                        ),
                       ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -450,7 +522,9 @@ class _MemberCard extends StatelessWidget {
               Column(
                 children: [
                   Icon(
-                    located ? Icons.location_on_rounded : Icons.location_off_outlined,
+                    located
+                        ? Icons.location_on_rounded
+                        : Icons.location_off_outlined,
                     color: located ? AppColors.accent : AppColors.inkFaint,
                   ),
                   const SizedBox(height: 10),
@@ -478,7 +552,10 @@ class _TimeTag extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: AppColors.inkMuted),
         const SizedBox(width: 3),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+        Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
       ],
     );
   }

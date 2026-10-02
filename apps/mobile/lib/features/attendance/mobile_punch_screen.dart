@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_config.dart';
 import '../../core/api/me_repository.dart';
 import '../../core/errors/api_exception.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/security/location_guard.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
@@ -45,7 +46,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
 
   final _comment = TextEditingController();
   _Step _step = _Step.locating;
-  String _status = 'Joylashuv aniqlanmoqda…';
+  String _status = trText('Joylashuv aniqlanmoqda…');
   String? _error;
 
   PreciseFix? _fix;
@@ -57,7 +58,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
   Map<String, dynamic>? _result;
 
   bool get _isIn => widget.direction == 'IN';
-  String get _title => _isIn ? 'Kirish' : 'Chiqish';
+  String get _title => context.t(_isIn ? 'Kirish' : 'Chiqish');
   bool get _outside => _fence != null && _fence!['inside'] != true;
   bool get _commentOk => _comment.text.trim().length >= _minCommentLength;
   bool get _canStart => !_outside || _commentOk;
@@ -79,14 +80,18 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     setState(() {
       _step = _Step.locating;
       _error = null;
-      _status = 'GPS sun’iy yo‘ldosh signali kutilmoqda…';
+      _status = context.t('GPS sun’iy yo‘ldosh signali kutilmoqda…');
     });
     try {
       final fix = await LocationGuard().acquire(
         onSample: (p, n) {
           if (!mounted) return;
-          setState(() => _status =
-              'Aniqlik: ${p.accuracy.toStringAsFixed(0)} m · o‘lchov $n');
+          setState(
+            () => _status = context.t('Aniqlik: {0} m · o‘lchov {1}', [
+              p.accuracy.toStringAsFixed(0),
+              n,
+            ]),
+          );
         },
       );
       if (!mounted) return;
@@ -95,15 +100,18 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
         return;
       }
       if (fix.accuracy > ApiConfig.maxGpsAccuracyM) {
-        setState(() => _error =
-            'GPS aniqligi past (${fix.accuracy.toStringAsFixed(0)} m). '
-            'Ochiq joyga chiqib qayta urinib ko‘ring.');
+        setState(
+          () => _error = context.t(
+            'GPS aniqligi past ({0} m). '
+            'Ochiq joyga chiqib qayta urinib ko‘ring.',
+            [fix.accuracy.toStringAsFixed(0)],
+          ),
+        );
         return;
       }
-      final fence = await ref.read(meRepositoryProvider).checkGps(
-            latitude: fix.latitude,
-            longitude: fix.longitude,
-          );
+      final fence = await ref
+          .read(meRepositoryProvider)
+          .checkGps(latitude: fix.latitude, longitude: fix.longitude);
       if (!mounted) return;
       setState(() {
         _fix = fix;
@@ -120,9 +128,11 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
   }
 
   Future<void> _blockMockLocation(PreciseFix fix) async {
-    var message = _mockWarningFallback;
+    var message = context.t(_mockWarningFallback);
     try {
-      final res = await ref.read(meRepositoryProvider).reportMockLocation(
+      final res = await ref
+          .read(meRepositoryProvider)
+          .reportMockLocation(
             integrity: fix.integrity.toJson(),
             latitude: fix.latitude,
             longitude: fix.longitude,
@@ -139,18 +149,25 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.card,
-        icon: const Icon(Icons.gpp_bad_rounded, color: AppColors.danger, size: 48),
-        title: const Text(
-          'Soxta lokatsiya aniqlandi',
+        icon: const Icon(
+          Icons.gpp_bad_rounded,
+          color: AppColors.danger,
+          size: 48,
+        ),
+        title: Text(
+          ctx.t('Soxta lokatsiya aniqlandi'),
           textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            color: AppColors.danger,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         content: Text(message, style: const TextStyle(height: 1.45)),
         actions: [
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Tushundim'),
+            child: Text(ctx.t('Tushundim')),
           ),
         ],
       ),
@@ -172,12 +189,13 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     setState(() {
       _step = _Step.sending;
       _error = null;
-      _status = 'Foto-hisobot tayyorlanmoqda…';
+      _status = context.t('Foto-hisobot tayyorlanmoqda…');
     });
     try {
       final now = DateTime.now();
       String two(int v) => v.toString().padLeft(2, '0');
-      final stamp = 'HR HUB | ${_isIn ? 'KIRISH' : 'CHIQISH'} | '
+      final stamp =
+          'HR HUB | ${_isIn ? 'KIRISH' : 'CHIQISH'} | '
           '${two(now.day)}.${two(now.month)}.${now.year} '
           '${two(now.hour)}:${two(now.minute)}:${two(now.second)}\n'
           'GPS ${fix.latitude.toStringAsFixed(5)}, ${fix.longitude.toStringAsFixed(5)} '
@@ -190,7 +208,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Foto-hisobot tayyorlanmadi: $e';
+          _error = context.t('Foto-hisobot tayyorlanmadi: {0}', [e]);
           _step = _Step.photoReport;
         });
       }
@@ -204,10 +222,12 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     setState(() {
       _step = _Step.sending;
       _error = null;
-      _status = 'Serverga yuborilmoqda…';
+      _status = context.t('Serverga yuborilmoqda…');
     });
     try {
-      final res = await ref.read(meRepositoryProvider).punchMobile(
+      final res = await ref
+          .read(meRepositoryProvider)
+          .punchMobile(
             direction: widget.direction,
             latitude: fix.latitude,
             longitude: fix.longitude,
@@ -265,8 +285,10 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     return PopScope(
       canPop: !locked,
       child: Scaffold(
-        backgroundColor: AppColors.bg,
-        appBar: locked ? null : AppBackBar(title: '$_title — telefon orqali'),
+        backgroundColor: Colors.transparent,
+        appBar: locked
+            ? null
+            : AppBackBar(title: context.t('{0} — telefon orqali', [_title])),
         body: SafeArea(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 350),
@@ -275,8 +297,10 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             transitionBuilder: (child, anim) => FadeTransition(
               opacity: anim,
               child: SlideTransition(
-                position: Tween(begin: const Offset(0.06, 0), end: Offset.zero)
-                    .animate(anim),
+                position: Tween(
+                  begin: const Offset(0.06, 0),
+                  end: Offset.zero,
+                ).animate(anim),
                 child: child,
               ),
             ),
@@ -330,9 +354,9 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
                 size: 200,
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Aniq joylashuv olinmoqda',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+              Text(
+                context.t('Aniq joylashuv olinmoqda'),
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
               AnimatedSwitcher(
@@ -344,9 +368,9 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              const _InfoChip(
+              _InfoChip(
                 icon: Icons.shield_rounded,
-                text: 'Faqat tizim GPS · soxta lokatsiya tekshiriladi',
+                text: context.t('Faqat tizim GPS · soxta lokatsiya tekshiriladi'),
                 color: AppColors.success,
               ),
             ] else ...[
@@ -363,7 +387,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
               ),
               const SizedBox(height: 20),
               ShimmerButton(
-                label: 'Qayta urinish',
+                label: context.t('Qayta urinish'),
                 icon: Icons.my_location_rounded,
                 colors: _directionColors(_isIn),
                 onPressed: _locate,
@@ -385,7 +409,10 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             children: [
               StaggeredEntrance(index: 0, child: _HeroCard(isIn: _isIn)),
               const SizedBox(height: 14),
-              StaggeredEntrance(index: 1, child: _GeoCard(fix: fix, fence: _fence)),
+              StaggeredEntrance(
+                index: 1,
+                child: _GeoCard(fix: fix, fence: _fence),
+              ),
               if (_outside) ...[
                 const SizedBox(height: 12),
                 StaggeredEntrance(
@@ -397,11 +424,15 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
                     maxLength: 500,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
-                      labelText: 'Izoh (majburiy)',
-                      hintText: 'Masalan: mijoz oldida, xizmat safari…',
+                      labelText: context.t('Izoh (majburiy)'),
+                      hintText: context.t(
+                        'Masalan: mijoz oldida, xizmat safari…',
+                      ),
                       prefixIcon: const Icon(Icons.edit_note_rounded),
                       errorText: _comment.text.isNotEmpty && !_commentOk
-                          ? 'Kamida $_minCommentLength ta belgi'
+                          ? context.t('Kamida {0} ta belgi', [
+                              _minCommentLength,
+                            ])
                           : null,
                     ),
                   ),
@@ -419,7 +450,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
                 child: TextButton.icon(
                   onPressed: _locate,
                   icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Joylashuvni yangilash'),
+                  label: Text(context.t('Joylashuvni yangilash')),
                 ),
               ),
             ],
@@ -440,14 +471,18 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
           child: StaggeredEntrance(
             index: 4,
             child: ShimmerButton(
-              label: _canStart ? 'Yuzni tekshirishni boshlash' : 'Avval izoh yozing',
-              icon: _canStart ? Icons.face_retouching_natural : Icons.edit_note_rounded,
+              label: _canStart
+                  ? context.t('Yuzni tekshirishni boshlash')
+                  : context.t('Avval izoh yozing'),
+              icon: _canStart
+                  ? Icons.face_retouching_natural
+                  : Icons.edit_note_rounded,
               colors: _directionColors(_isIn),
               onPressed: _canStart
                   ? () => setState(() {
-                        _error = null;
-                        _step = _Step.liveness;
-                      })
+                      _error = null;
+                      _step = _Step.liveness;
+                    })
                   : null,
             ),
           ),
@@ -492,7 +527,10 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
               child: Text(
                 _status,
                 key: ValueKey(_status),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -534,15 +572,22 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 76),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 76,
+                ),
               ),
             ),
             const SizedBox(height: 26),
             StaggeredEntrance(
               index: 2,
               child: Text(
-                '$_title qayd etildi',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                context.t('{0} qayd etildi', [_title]),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             const SizedBox(height: 6),
@@ -551,8 +596,8 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
               child: Text(
                 [
                   if (time.isNotEmpty) time,
-                  'foto-hisobot yuborildi',
-                  if (outside) 'hududdan tashqarida',
+                  context.t('foto-hisobot yuborildi'),
+                  if (outside) context.t('hududdan tashqarida'),
                 ].join(' · '),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
@@ -576,9 +621,9 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Bosh sahifaga qaytilmoqda…',
-              style: TextStyle(color: AppColors.inkFaint, fontSize: 12.5),
+            Text(
+              context.t('Bosh sahifaga qaytilmoqda…'),
+              style: const TextStyle(color: AppColors.inkFaint, fontSize: 12.5),
             ),
           ],
         ),
@@ -599,9 +644,9 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
               size: 150,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Yuborilmadi',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            Text(
+              context.t('Yuborilmadi'),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
@@ -611,7 +656,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             ),
             const SizedBox(height: 20),
             ShimmerButton(
-              label: 'Qayta yuborish',
+              label: context.t('Qayta yuborish'),
               icon: Icons.refresh_rounded,
               colors: _directionColors(_isIn),
               onPressed: _photo == null ? null : _send,
@@ -619,7 +664,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Bosh sahifaga qaytish'),
+              child: Text(context.t('Bosh sahifaga qaytish')),
             ),
           ],
         ),
@@ -640,13 +685,13 @@ class _GeoCard extends StatelessWidget {
     final color = f == null
         ? AppColors.inkMuted
         : inside
-            ? AppColors.success
-            : AppColors.warn;
+        ? AppColors.success
+        : AppColors.warn;
     final title = f == null
-        ? 'Hudud belgilanmagan'
+        ? context.t('Hudud belgilanmagan')
         : inside
-            ? 'Hudud ichidasiz'
-            : 'Hududdan tashqaridasiz';
+        ? context.t('Hudud ichidasiz')
+        : context.t('Hududdan tashqaridasiz');
     final distance = (f?['distanceM'] as num?)?.toDouble();
     final radius = (f?['radiusM'] as num?)?.toDouble();
     final place = f?['locationName']?.toString() ?? '';
@@ -681,8 +726,8 @@ class _GeoCard extends StatelessWidget {
                   f == null
                       ? Icons.location_on_rounded
                       : inside
-                          ? Icons.verified_rounded
-                          : Icons.wrong_location_rounded,
+                      ? Icons.verified_rounded
+                      : Icons.wrong_location_rounded,
                   color: color,
                   size: 22,
                 ),
@@ -705,7 +750,10 @@ class _GeoCard extends StatelessWidget {
                         place,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                        style: const TextStyle(
+                          color: AppColors.inkMuted,
+                          fontSize: 13,
+                        ),
                       ),
                   ],
                 ),
@@ -719,12 +767,15 @@ class _GeoCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Ruxsat: ${radius.toStringAsFixed(0)} m',
-                  style: const TextStyle(color: AppColors.inkFaint, fontSize: 12),
+                  context.t('Ruxsat: {0} m', [radius.toStringAsFixed(0)]),
+                  style: const TextStyle(
+                    color: AppColors.inkFaint,
+                    fontSize: 12,
+                  ),
                 ),
                 const Spacer(),
                 Text(
-                  'Siz: ${distance.toStringAsFixed(0)} m',
+                  context.t('Siz: {0} m', [distance.toStringAsFixed(0)]),
                   style: TextStyle(
                     color: color,
                     fontSize: 12.5,
@@ -741,15 +792,17 @@ class _GeoCard extends StatelessWidget {
             children: [
               _InfoChip(
                 icon: Icons.gps_fixed_rounded,
-                text: '±${fix.accuracy.toStringAsFixed(0)} m aniqlik',
+                text: context.t('±{0} m aniqlik', [
+                  fix.accuracy.toStringAsFixed(0),
+                ]),
               ),
               _InfoChip(
                 icon: Icons.stacked_line_chart_rounded,
-                text: '${fix.samples} ta o‘lchov',
+                text: context.t('{0} ta o‘lchov', [fix.samples]),
               ),
-              const _InfoChip(
+              _InfoChip(
                 icon: Icons.shield_rounded,
-                text: 'Tizim GPS · himoyalangan',
+                text: context.t('Tizim GPS · himoyalangan'),
                 color: AppColors.success,
               ),
             ],
@@ -770,9 +823,13 @@ class _GeoCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       f == null
-                          ? 'Hudud belgilanmagan — izoh talab qilinmaydi.'
-                          : 'Belgi qabul qilinadi, lekin izoh majburiy va u '
+                          ? context.t(
+                              'Hudud belgilanmagan — izoh talab qilinmaydi.',
+                            )
+                          : context.t(
+                              'Belgi qabul qilinadi, lekin izoh majburiy va u '
                               '«hududdan tashqarida» deb belgilanadi.',
+                            ),
                       style: const TextStyle(
                         color: AppColors.inkMuted,
                         fontSize: 12.5,
@@ -812,7 +869,11 @@ class _InfoChip extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             text,
-            style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: c,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -828,10 +889,35 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = _directionColors(isIn);
     final now = DateTime.now();
-    const months = [
-      'yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun',
-      'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr',
-    ];
+    final months = context.dateLocale == 'ru'
+        ? const [
+            'января',
+            'февраля',
+            'марта',
+            'апреля',
+            'мая',
+            'июня',
+            'июля',
+            'августа',
+            'сентября',
+            'октября',
+            'ноября',
+            'декабря',
+          ]
+        : const [
+            'yanvar',
+            'fevral',
+            'mart',
+            'aprel',
+            'may',
+            'iyun',
+            'iyul',
+            'avgust',
+            'sentabr',
+            'oktabr',
+            'noyabr',
+            'dekabr',
+          ];
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 12, 18, 12),
       decoration: BoxDecoration(
@@ -864,7 +950,7 @@ class _HeroCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isIn ? 'Ishga kelish' : 'Ishdan ketish',
+                  context.t(isIn ? 'Ishga kelish' : 'Ishdan ketish'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -881,7 +967,10 @@ class _HeroCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${now.day} ${months[now.month - 1]} · telefon orqali',
+                  context.t('{0} {1} · telefon orqali', [
+                    now.day,
+                    months[now.month - 1],
+                  ]),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 12.5,
@@ -905,14 +994,26 @@ class _StepsCard extends StatelessWidget {
   const _StepsCard();
 
   static const _steps = [
-    (Icons.face_retouching_natural, 'Insonlik tekshiruvi',
-        'Boshingizni ekrandagi yo‘nalishlarga buring (3–8 ta, tasodifiy)'),
-    (Icons.camera_rounded, 'Foto-hisobot',
-        'Bitta bosishda orqa va old kamera suratga oladi'),
-    (Icons.cloud_upload_rounded, 'Yuborish',
-        'Suratlar birlashtirilib avtomatik yuboriladi'),
-    (Icons.check_circle_rounded, 'Tasdiq',
-        '2 soniyalik bildirishnoma, so‘ng bosh sahifa'),
+    (
+      Icons.face_retouching_natural,
+      'Insonlik tekshiruvi',
+      'Boshingizni ekrandagi yo‘nalishlarga buring (3–8 ta, tasodifiy)',
+    ),
+    (
+      Icons.camera_rounded,
+      'Foto-hisobot',
+      'Bitta bosishda orqa va old kamera suratga oladi',
+    ),
+    (
+      Icons.cloud_upload_rounded,
+      'Yuborish',
+      'Suratlar birlashtirilib avtomatik yuboriladi',
+    ),
+    (
+      Icons.check_circle_rounded,
+      'Tasdiq',
+      '2 soniyalik bildirishnoma, so‘ng bosh sahifa',
+    ),
   ];
 
   @override
@@ -927,9 +1028,9 @@ class _StepsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Qanday o‘tadi',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          Text(
+            context.t('Qanday o‘tadi'),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
           ),
           const SizedBox(height: 12),
           for (var i = 0; i < _steps.length; i++)
@@ -948,7 +1049,11 @@ class _StepsCard extends StatelessWidget {
                             color: AppColors.accentTint,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(_steps[i].$1, size: 18, color: AppColors.accent),
+                          child: Icon(
+                            _steps[i].$1,
+                            size: 18,
+                            color: AppColors.accent,
+                          ),
                         ),
                         if (i < _steps.length - 1)
                           Expanded(
@@ -968,7 +1073,7 @@ class _StepsCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _steps[i].$2,
+                              context.t(_steps[i].$2),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,
@@ -976,7 +1081,7 @@ class _StepsCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _steps[i].$3,
+                              context.t(_steps[i].$3),
                               style: const TextStyle(
                                 color: AppColors.inkMuted,
                                 fontSize: 12.5,
@@ -996,4 +1101,3 @@ class _StepsCard extends StatelessWidget {
     );
   }
 }
-

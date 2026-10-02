@@ -2,9 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/biometrics/biometric_service.dart';
+import '../../core/i18n/app_lang.dart';
 import '../../core/security/app_lock.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/season.dart';
 import '../../shared/widgets.dart';
+
+String seasonLabel(Season s) => switch (s) {
+  Season.spring => 'Bahor',
+  Season.summer => 'Yoz',
+  Season.autumn => 'Kuz',
+  Season.winter => 'Qish',
+};
+
+String seasonLabelRu(Season s) => switch (s) {
+  Season.spring => 'Весна',
+  Season.summer => 'Лето',
+  Season.autumn => 'Осень',
+  Season.winter => 'Зима',
+};
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -15,8 +31,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _bioAvailable = false;
-  String themeLabel = 'Tizimdagi kabi';
-  String lang = 'O\'zbekcha';
 
   @override
   void initState() {
@@ -31,8 +45,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _toggleBio(bool v) async {
     if (v) {
-      final ok = await ref.read(biometricServiceProvider).authenticate(
-            reason: 'Barmoq izi bilan ochishni tasdiqlang',
+      final ok = await ref
+          .read(biometricServiceProvider)
+          .authenticate(
+            reason: context.t('Barmoq izi bilan ochishni tasdiqlang'),
             allowSkipIfUnavailable: false,
           );
       if (!ok) return;
@@ -40,11 +56,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(appLockProvider.notifier).setBiometric(v);
   }
 
+  Future<void> _pickLang() async {
+    final current = ref.read(appLangProvider);
+    final picked = await showModalBottomSheet<AppLang>(
+      context: context,
+      backgroundColor: AppColors.cardAlt,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                ctx.tr('Ilova tili', 'Язык приложения'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+            for (final lang in AppLang.values)
+              ListTile(
+                title: Text(lang.label),
+                trailing: lang == current
+                    ? const Icon(Icons.check, color: AppColors.accent)
+                    : null,
+                onTap: () => Navigator.pop(ctx, lang),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) await ref.read(appLangProvider.notifier).set(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(appLangProvider);
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Sozlamalar'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.tr('Sozlamalar', 'Настройки')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -52,20 +101,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               MenuTile(
                 icon: Icons.brightness_6_outlined,
-                label: themeLabel,
-                subtitle: 'mavzu',
-                onTap: () async {
-                  final result = await context.push<String>('/settings/theme');
-                  if (result != null) setState(() => themeLabel = result);
-                },
+                label: context.tr(
+                  'Fasl bo‘yicha · ${seasonLabel(SeasonX.now)}',
+                  'По сезону · ${seasonLabelRu(SeasonX.now)}',
+                ),
+                subtitle: context.tr('Mavzu', 'Тема'),
+                onTap: () => context.push('/settings/theme'),
               ),
               const Divider(height: 1, color: AppColors.line),
               MenuTile(
                 icon: Icons.language,
-                label: lang,
-                subtitle: 'Ilova tili',
-                showChevron: false,
-                onTap: () => _langSheet(),
+                label: lang.label,
+                subtitle: context.tr('Ilova tili', 'Язык приложения'),
+                onTap: _pickLang,
               ),
             ],
           ),
@@ -74,22 +122,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               MenuTile(
                 icon: Icons.lock_outline,
-                label: 'Parolni o\'zgartirish',
+                label: context.tr('Parolni o\'zgartirish', 'Сменить пароль'),
                 onTap: () => context.push('/security/password'),
               ),
               const Divider(height: 1, color: AppColors.line),
               MenuTile(
                 icon: Icons.pin_outlined,
-                label: 'PIN-kodni o\'zgartirish',
+                label: context.tr('PIN-kodni o\'zgartirish', 'Сменить PIN-код'),
                 onTap: () => context.push('/security/pin'),
               ),
               const Divider(height: 1, color: AppColors.line),
               MenuTile(
                 icon: Icons.fingerprint,
-                label: 'Barmoq izi bilan ochish',
+                label: context.tr('Barmoq izi bilan ochish', 'Вход по отпечатку'),
                 subtitle: _bioAvailable
-                    ? 'PIN-kod o\'rniga tezkor kirish'
-                    : 'Qurilmada barmoq izi qo\'shilmagan',
+                    ? context.tr(
+                        'PIN-kod o\'rniga tezkor kirish',
+                        'Быстрый вход вместо PIN-кода',
+                      )
+                    : context.tr(
+                        'Qurilmada barmoq izi qo\'shilmagan',
+                        'На устройстве нет отпечатков',
+                      ),
                 showChevron: false,
                 trailing: Switch(
                   value: ref.watch(appLockProvider).biometric,
@@ -104,25 +158,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               MenuTile(
                 icon: Icons.notifications_outlined,
-                label: 'Ish kunining boshlanishi va oxiri haqida bil...',
-                onTap: () => context.push('/settings/notify-records'),
-              ),
-              const Divider(height: 1, color: AppColors.line),
-              MenuTile(
-                icon: Icons.notifications_active_outlined,
-                label: 'Boshqalar',
+                label: context.tr('Bildirishnomalar', 'Уведомления'),
+                subtitle: context.tr(
+                  'Ilova ichidagi xabarlar',
+                  'Сообщения внутри приложения',
+                ),
                 onTap: () => context.push('/settings/notifications'),
               ),
             ],
           ),
           const SizedBox(height: 12),
           _group(
-            children: const [
+            children: [
               Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Text(
-                  'HR HUB mobile · Face ID + fingerprint',
-                  style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
+                  context.t('HR HUB mobile · Face ID + barmoq izi'),
+                  style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
                 ),
               ),
             ],
@@ -138,220 +190,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(children: children),
     );
   }
-
-  void _langSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.cardAlt,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final langs = ['Русский', 'English', 'O\'zbekcha'];
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Til', style: TextStyle(color: AppColors.inkMuted)),
-                ),
-                ...langs.map(
-                  (l) => ListTile(
-                    title: Text(l),
-                    trailing: lang == l ? const Icon(Icons.check) : null,
-                    onTap: () {
-                      setState(() => lang = l);
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.bgSoft,
-                      foregroundColor: AppColors.ink,
-                    ),
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Yopish'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
+/// The app has a single light theme whose illustration follows the calendar season.
 class ThemeSettingsScreen extends StatelessWidget {
   const ThemeSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const options = [
-      'Tizimdagi kabi',
-      'Yorug\'',
-      'Qorong\'i',
-    ];
+    final current = SeasonX.now;
+    const months = {
+      Season.spring: 'Mart – May',
+      Season.summer: 'Iyun – Avgust',
+      Season.autumn: 'Sentyabr – Noyabr',
+      Season.winter: 'Dekabr – Fevral',
+    };
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Mavzu'),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SectionCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < options.length; i++) ...[
-                if (i > 0) const Divider(height: 1, color: AppColors.line),
-                ListTile(
-                  title: Text(options[i]),
-                  trailing: Radio<String>(
-                    value: options[i],
-                    groupValue: 'Tizimdagi kabi',
-                    activeColor: AppColors.accent,
-                    onChanged: (_) => Navigator.pop(context, options[i]),
-                  ),
-                  onTap: () => Navigator.pop(context, options[i]),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({super.key});
-
-  @override
-  State<NotificationSettingsScreen> createState() =>
-      _NotificationSettingsScreenState();
-}
-
-class _NotificationSettingsScreenState
-    extends State<NotificationSettingsScreen> {
-  final Map<String, bool> toggles = {
-    for (final k in [
-      'a1',
-      'a2',
-      'a3',
-      'b1',
-      'b2',
-      'b3',
-      'c1',
-      'c2',
-      'c3',
-      'd1',
-      'e1',
-      'f1',
-    ])
-      k: true,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: const AppBackBar(title: 'Bildirishnomalar'),
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Mavzu')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _section('Ish joyida yo\'qlik so\'rovlari', [
-            _t('a1', 'Ish joyida yo\'qlik so\'rovlari'),
-            _t('a2', 'Holat o\'zgarishi'),
-            _t('a3', 'Rahbar tasdig\'i'),
-          ]),
-          _section('Ish jadvalini o\'zgartirish so\'rovlari', [
-            _t('b1', 'Ish jadvalini o\'zgartirish so\'rovlari'),
-            _t('b2', 'Holat o\'zgarishi'),
-            _t('b3', 'Rahbar tasdig\'i'),
-          ]),
-          _section('Davomat', [
-            _t('c1', 'Xodimning kech qolishi'),
-            _t('c2', 'Xodimning erta ishdan ketishi'),
-            _t('c3', 'Ishdan keyingi kunning qisqacha mazmuni'),
-          ]),
-          _section('Taqvim', [
-            _t('d1', 'Ishchi taqvimdagi o\'zgarishlar'),
-          ]),
-          _section('KPI', [
-            _t('e1', 'Rejani o\'zgarishi'),
-          ]),
-          _section('Vazifalar', [
-            _t('f1', 'Vazifalarni o\'zgarishi'),
-          ]),
+          SectionCard(
+            child: Text(
+              context.t(
+                'Ilova ko‘rinishi yil fasliga qarab o‘zi almashadi: fon rasmi va ranglar '
+                'har faslda yangilanadi. Qo‘lda tanlash shart emas.',
+              ),
+              style: const TextStyle(color: AppColors.inkMuted, height: 1.4),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final s in Season.values) ...[
+                  if (s != Season.values.first)
+                    const Divider(height: 1, color: AppColors.line),
+                  ListTile(
+                    leading: CircleAvatar(radius: 14, backgroundColor: s.orb),
+                    title: Text(
+                      context.t(seasonLabel(s)),
+                      style: TextStyle(
+                        fontWeight: s == current
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(context.t(months[s]!)),
+                    trailing: s == current
+                        ? const Icon(
+                            Icons.check_circle,
+                            color: AppColors.accent,
+                          )
+                        : null,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _section(String title, List<Widget> children) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: SectionCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.inkMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _t(String key, String label) {
-    return SwitchListTile(
-      title: Text(label, style: const TextStyle(fontSize: 14)),
-      value: toggles[key] ?? true,
-      activeTrackColor: AppColors.toggleOn,
-      onChanged: (v) => setState(() => toggles[key] = v),
-    );
-  }
 }
 
-class NotifyRecordsScreen extends StatefulWidget {
-  const NotifyRecordsScreen({super.key});
-
-  @override
-  State<NotifyRecordsScreen> createState() => _NotifyRecordsScreenState();
-}
-
-class _NotifyRecordsScreenState extends State<NotifyRecordsScreen> {
-  bool startOn = true;
-  bool endOn = true;
+/// Notifications are stored server-side and shown in the in-app list; the app has no push channel yet.
+class NotificationSettingsScreen extends StatelessWidget {
+  const NotificationSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBackBar(
-        title: 'Qaydlar bo\'yicha',
-        actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.save_outlined)),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.history)),
-        ],
+    const kinds = [
+      (
+        Icons.how_to_reg_outlined,
+        'Yo‘qlik yoki boshqa so‘rovingiz tasdiqlanganda, rad etilganda yoki bekor qilinganda',
       ),
+      (Icons.campaign_outlined, 'HR barcha xodimlarga e’lon yuborganda'),
+      (Icons.gpp_maybe_outlined, 'Telefoningizda soxta lokatsiya aniqlanganda'),
+    ];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBackBar(title: context.t('Bildirishnomalar')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -359,89 +280,51 @@ class _NotifyRecordsScreenState extends State<NotifyRecordsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Ish kunining boshlanish vaqti, ish kunining tugash vaqti haqida bildirishnomalar',
-                  style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                Text(
+                  context.t('Qachon xabar keladi'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                 ),
-                const SizedBox(height: 16),
-                _block(
-                  title: 'Ish kunining boshlanish vaqti',
-                  value: startOn,
-                  onChanged: (v) => setState(() => startOn = v),
-                  left: 'Avval',
-                  right: '10 min',
-                ),
-                const SizedBox(height: 16),
-                _block(
-                  title: 'Ish kunining tugash vaqti',
-                  value: endOn,
-                  onChanged: (v) => setState(() => endOn = v),
-                  left: 'Keyin',
-                  right: '10 min',
-                ),
+                const SizedBox(height: 8),
+                for (final k in kinds)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Icon(k.$1, color: AppColors.accent, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(context.t(k.$2))),
+                      ],
+                    ),
+                  ),
               ],
             ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: Text(
+              context.t(
+                'Xabarlar ilova ichidagi «Bildirishnomalar» ro‘yxatida saqlanadi. '
+                'Telefonga push-xabar yuborish hozircha ulanmagan, shuning uchun '
+                'ularni ilovani ochganda ko‘rasiz.',
+              ),
+              style: const TextStyle(color: AppColors.inkMuted, height: 1.4),
+            ),
+          ),
+          const SizedBox(height: 16),
+          PrimaryButton(
+            label: context.t('Bildirishnomalarni ochish'),
+            onPressed: () => context.push('/notifications'),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _block({
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    required String left,
-    required String right,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            ),
-            Switch(
-              value: value,
-              activeTrackColor: AppColors.toggleOn,
-              onChanged: onChanged,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: _dropdown(left)),
-            const SizedBox(width: 8),
-            Expanded(child: _dropdown(right)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            const Text('Interval', style: TextStyle(color: AppColors.inkMuted)),
-            const SizedBox(width: 12),
-            Expanded(child: _dropdown('Not selected')),
-          ],
-        ),
-      ],
-    );
-  }
+/// Former start/end-of-day reminder screen; reminders need a push channel, so it shares the info screen.
+class NotifyRecordsScreen extends StatelessWidget {
+  const NotifyRecordsScreen({super.key});
 
-  Widget _dropdown(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: Text(text)),
-          const Icon(Icons.arrow_drop_down, color: AppColors.inkMuted),
-        ],
-      ),
-    );
-  }
+  @override
+  Widget build(BuildContext context) => const NotificationSettingsScreen();
 }
