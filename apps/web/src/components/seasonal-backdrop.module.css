@@ -49,6 +49,7 @@
   background-size: cover;
   transform-origin: left center;
   animation: seasonDrift 18s ease-in-out infinite alternate;
+  transition: background-position 0.9s ease;
 }
 
 .orbs,

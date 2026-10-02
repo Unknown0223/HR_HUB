@@ -3,7 +3,6 @@
   flex-direction: column;
   min-height: 100vh;
   position: relative;
-  background: var(--bg);
 }
 
 .skipLink {
@@ -1128,11 +1127,12 @@
 }
 
 .loading {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: grid;
   place-items: center;
   color: var(--ink-muted);
-  background: var(--bg);
 }
 
 .profileWrap {

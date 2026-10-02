@@ -603,7 +603,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <SeasonalBackdrop mode="app" section={activeSectionId} />
       <a className={styles.skipLink} href="#main-content">
         {t('К основному содержимому')}
       </a>
@@ -1242,9 +1241,16 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Lives outside the Suspense boundary so the photo is in the server HTML and survives the session load. */
+function ShellBackdrop() {
+  const pathname = usePathname() ?? '';
+  return <SeasonalBackdrop mode="app" section={findNavSection(pathname)} />;
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <I18nProvider>
+      <ShellBackdrop />
       <Suspense fallback={<div className={styles.loading}>Загрузка…</div>}>
         <AppShellInner>{children}</AppShellInner>
       </Suspense>
