@@ -135,6 +135,7 @@ const Map<String, String> ruAttendance = {
   'Old kamera topilmadi': 'Фронтальная камера не найдена',
   'Kamera ishga tushmadi: {0}': 'Не удалось запустить камеру: {0}',
   'Selfie olinmadi: {0}': 'Не удалось сделать селфи: {0}',
+  'Yuzni aniqlash ishlamadi: {0}': 'Распознавание лица не работает: {0}',
   'Yuzingizni ramka ichiga joylang': 'Поместите лицо в рамку',
   'Telefonni yuz balandligida ushlang': 'Держите телефон на уровне лица',
   'Kadrda faqat o‘zingiz bo‘ling': 'В кадре должны быть только вы',

@@ -28,9 +28,24 @@ class _LivenessCameraState extends State<LivenessCamera>
     options: FaceDetectorOptions(
       performanceMode: FaceDetectorMode.fast,
       enableTracking: true,
-      minFaceSize: 0.3,
+      minFaceSize: 0.2,
     ),
   );
+
+  /// Some phones report the wrong front-sensor orientation, which makes ML Kit see a sideways
+  /// face and never detect it. Until a face is found we cycle through the rotations.
+  List<InputImageRotation> _rotations = const [];
+  int _rotationIndex = 0;
+  bool _rotationLocked = false;
+  int _emptyFrames = 0;
+  int _failedFrames = 0;
+  DateTime _lastFrameAt = DateTime.now();
+  Timer? _watchdog;
+  static const _framesPerRotation = 8;
+  static const _framesToUnlock = 30;
+  static const _maxFailedFrames = 20;
+  static const _detectTimeout = Duration(seconds: 3);
+  static const _stallTimeout = Duration(seconds: 5);
   late final AnimationController _anim = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
@@ -49,15 +64,56 @@ class _LivenessCameraState extends State<LivenessCamera>
 
   @override
   void dispose() {
+    _watchdog?.cancel();
+    _releaseCamera();
+    _detector.close();
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _releaseCamera() {
     final c = _controller;
     _controller = null;
     if (c != null) {
       if (c.value.isStreamingImages) c.stopImageStream().catchError((_) {});
       c.dispose();
     }
-    _detector.close();
-    _anim.dispose();
-    super.dispose();
+  }
+
+  Future<void> _restartCamera() async {
+    _watchdog?.cancel();
+    _releaseCamera();
+    _processing = false;
+    _capturing = false;
+    _failedFrames = 0;
+    if (!mounted) return;
+    setState(() {
+      _error = null;
+      _faces = 0;
+    });
+    await _start();
+  }
+
+  /// Restarts the camera when the image stream silently stops delivering frames.
+  void _startWatchdog() {
+    _watchdog?.cancel();
+    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) {
+      final c = _controller;
+      if (c == null || _capturing || !c.value.isStreamingImages) return;
+      if (DateTime.now().difference(_lastFrameAt) > _stallTimeout) {
+        debugPrint('liveness: image stream stalled, restarting camera');
+        _restartCamera();
+      }
+    });
+  }
+
+  static List<InputImageRotation> _rotationOrder(int sensor) {
+    final order = <int>[sensor, (360 - sensor) % 360, 0, 90, 180, 270];
+    final seen = <int>{};
+    return [
+      for (final deg in order)
+        if (seen.add(deg)) ?InputImageRotationValue.fromRawValue(deg),
+    ];
   }
 
   Future<void> _start() async {
@@ -67,6 +123,10 @@ class _LivenessCameraState extends State<LivenessCamera>
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => throw Exception(trText('Old kamera topilmadi')),
       );
+      _rotations = _rotationOrder(_camera!.sensorOrientation);
+      _rotationIndex = 0;
+      _rotationLocked = false;
+      _emptyFrames = 0;
       final controller = CameraController(
         _camera!,
         ResolutionPreset.medium,
@@ -80,9 +140,12 @@ class _LivenessCameraState extends State<LivenessCamera>
         return;
       }
       _controller = controller;
+      _lastFrameAt = DateTime.now();
       await controller.startImageStream(_onFrame);
+      _startWatchdog();
       setState(() {});
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = trText('Kamera ishga tushmadi: {0}', [
             e.toString().replaceFirst('Exception: ', ''),
           ]));
@@ -90,11 +153,10 @@ class _LivenessCameraState extends State<LivenessCamera>
   }
 
   InputImage? _toInputImage(CameraImage image) {
-    final camera = _camera;
-    if (camera == null || image.planes.isEmpty) return null;
-    final rotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
+    if (_camera == null || image.planes.isEmpty || _rotations.isEmpty) return null;
+    final rotation = _rotations[_rotationIndex % _rotations.length];
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
-    if (rotation == null || format == null) return null;
+    if (format == null) return null;
     final plane = image.planes.first;
     return InputImage.fromBytes(
       bytes: plane.bytes,
@@ -107,14 +169,37 @@ class _LivenessCameraState extends State<LivenessCamera>
     );
   }
 
+  void _trackRotation(int faceCount) {
+    if (faceCount > 0) {
+      _rotationLocked = true;
+      _emptyFrames = 0;
+      return;
+    }
+    _emptyFrames++;
+    if (_rotationLocked) {
+      if (_emptyFrames >= _framesToUnlock) {
+        _rotationLocked = false;
+        _emptyFrames = 0;
+      }
+    } else if (_emptyFrames >= _framesPerRotation) {
+      _rotationIndex = (_rotationIndex + 1) % _rotations.length;
+      _emptyFrames = 0;
+    }
+  }
+
   Future<void> _onFrame(CameraImage image) async {
+    _lastFrameAt = DateTime.now();
     if (_processing || _capturing) return;
     _processing = true;
     try {
       final input = _toInputImage(image);
-      if (input == null) return;
-      final faces = await _detector.processImage(input);
+      if (input == null) {
+        throw StateError('unsupported frame format ${image.format.raw}');
+      }
+      final faces = await _detector.processImage(input).timeout(_detectTimeout);
       if (!mounted) return;
+      _failedFrames = 0;
+      _trackRotation(faces.length);
       final face = faces.length == 1 ? faces.first : null;
       _challenge.feed(
         face == null
@@ -129,6 +214,11 @@ class _LivenessCameraState extends State<LivenessCamera>
       }
     } catch (e) {
       debugPrint('liveness frame failed: $e');
+      if (++_failedFrames >= _maxFailedFrames && mounted && _error == null) {
+        _watchdog?.cancel();
+        _releaseCamera();
+        setState(() => _error = context.t('Yuzni aniqlash ishlamadi: {0}', [e]));
+      }
     } finally {
       _processing = false;
     }
@@ -204,10 +294,7 @@ class _LivenessCameraState extends State<LivenessCamera>
   Widget build(BuildContext context) {
     final c = _controller;
     if (_error != null) {
-      return _Message(text: _error!, onRetry: () {
-        setState(() => _error = null);
-        _start();
-      });
+      return _Message(text: _error!, onRetry: _restartCamera);
     }
     if (c == null || !c.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
