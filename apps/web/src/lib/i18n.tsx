@@ -50,6 +50,16 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    if (lang !== 'uz') return;
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    void Promise.all([import('./i18n-dom'), import('./i18n-uz-full')]).then(([dom, dict]) => {
+      if (!cancelled) stop = dom.startDomTranslation(dict.UZ_FULL);
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
   }, [lang]);
 
   const setLang = useCallback((next: Lang) => {
