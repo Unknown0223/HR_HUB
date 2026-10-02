@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -9,8 +10,18 @@ final teamRepositoryProvider = Provider<TeamRepository>((ref) {
 });
 
 /// Employee photos sit behind auth, so they are fetched with the session and cached per URL.
-final teamPhotoProvider = FutureProvider.family<Uint8List?, String>((ref, url) {
-  return ref.read(teamRepositoryProvider).photoBytes(url);
+/// A failed fetch (cold start, token refresh, flaky network) is retried instead of being
+/// cached as "no photo" for the rest of the session.
+final teamPhotoProvider = FutureProvider.family<Uint8List?, String>((
+  ref,
+  url,
+) async {
+  final bytes = await ref.read(teamRepositoryProvider).photoBytes(url);
+  if (bytes == null) {
+    final retry = Timer(const Duration(seconds: 15), ref.invalidateSelf);
+    ref.onDispose(retry.cancel);
+  }
+  return bytes;
 });
 
 /// Manager's view of the employees in the divisions they lead.
@@ -25,17 +36,23 @@ class TeamRepository {
     String employeeId, {
     required int year,
     required int month,
-  }) =>
-      _api.get('/team/$employeeId/timesheet', query: {
-        'year': '$year',
-        'month': '$month',
-      });
+  }) => _api.get(
+    '/team/$employeeId/timesheet',
+    query: {'year': '$year', 'month': '$month'},
+  );
 
   /// Location is only present while the employee is inside working hours.
   Future<Map<String, dynamic>> live(String employeeId) =>
       _api.get('/team/$employeeId/live');
 
   Future<Uint8List?> photoBytes(String url) async {
+    if (url.startsWith('data:')) {
+      try {
+        return UriData.parse(url).contentAsBytes();
+      } catch (_) {
+        return null;
+      }
+    }
     try {
       final res = await _api.dio.get<List<int>>(
         url,
@@ -58,7 +75,9 @@ class TeamRepository {
     final u = Uri.tryParse(url);
     if (u == null) return url;
     if (u.host == 'localhost' || u.host == '127.0.0.1') {
-      return u.replace(scheme: base.scheme, host: base.host, port: base.port).toString();
+      return u
+          .replace(scheme: base.scheme, host: base.host, port: base.port)
+          .toString();
     }
     return url;
   }

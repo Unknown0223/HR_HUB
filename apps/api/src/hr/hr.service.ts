@@ -9,6 +9,7 @@ import {
   DocumentType,
   EmploymentStatus,
   HrChangeKind,
+  NotificationKind,
   Prisma,
   RequestStatus,
   RequestType,
@@ -39,6 +40,13 @@ export type HrDocFile = {
   url?: string;
   uploadedAt: string;
   uploadedBy?: string | null;
+};
+
+/** Employee-facing wording for a reviewed request (mobile notifications are in Uzbek). */
+const REVIEW_VERDICT_UZ: Partial<Record<RequestStatus, string>> = {
+  approved: 'tasdiqlandi',
+  rejected: 'rad etildi',
+  cancelled: 'bekor qilindi',
 };
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -824,6 +832,21 @@ export class HrService {
       await this.revertLeaveRange(tenantId, row.employeeId, row.startDate, row.endDate);
     }
 
+    const verdict = REVIEW_VERDICT_UZ[status];
+    if (verdict && status !== prev) {
+      const range = [row.startDate, row.endDate]
+        .map((d) => d.toISOString().slice(0, 10).split('-').reverse().join('.'))
+        .filter((v, i, all) => all.indexOf(v) === i)
+        .join(' – ');
+      await this.notifications.notifyEmployee(tenantId, row.employeeId, {
+        kind: NotificationKind.approval,
+        title: `So‘rovingiz ${verdict}: ${updated.absenceType?.name ?? 'yo‘qlik'}`,
+        body: [range, reviewNote?.trim()].filter(Boolean).join(' · ') || undefined,
+        entity: 'absence',
+        entityId: id,
+      });
+    }
+
     return updated;
   }
 
@@ -1314,6 +1337,15 @@ export class HrService {
       entityId: id,
       href: `/attendance?tab=requests&scope=to_me`,
     });
+    if (row.employeeId) {
+      await this.notifications.notifyEmployee(tenantId, row.employeeId, {
+        kind: NotificationKind.approval,
+        title: `So‘rovingiz ${REVIEW_VERDICT_UZ[dto.status]}: ${row.title}`,
+        body: dto.reviewNote?.trim() || undefined,
+        entity: 'hr-request',
+        entityId: id,
+      });
+    }
 
     return updated;
   }

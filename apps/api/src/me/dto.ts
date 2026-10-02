@@ -12,6 +12,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -242,6 +243,17 @@ export class MeCreateAbsenceDto {
   @ApiProperty()
   @IsDateString()
   endDate!: string;
+
+  /** Part-day absence: HH:mm, together with `endTime` on a single date. */
+  @ApiPropertyOptional({ example: '14:00' })
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  startTime?: string;
+
+  @ApiPropertyOptional({ example: '16:30' })
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  endTime?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

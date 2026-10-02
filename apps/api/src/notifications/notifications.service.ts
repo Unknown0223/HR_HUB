@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationKind, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { runUnscoped } from '../common/data-scope';
 
 @Injectable()
 export class NotificationsService {
@@ -80,6 +81,56 @@ export class NotificationsService {
       })),
     });
     return users;
+  }
+
+  /**
+   * The employee's own login(s): linked via `users.meta.employeeId`, or by matching e-mail
+   * (the same rule `MeService.resolveEmployee` uses). No-op when the employee has no account.
+   */
+  async notifyEmployee(
+    tenantId: string,
+    employeeId: string,
+    data: {
+      kind?: NotificationKind;
+      title: string;
+      body?: string;
+      entity?: string;
+      entityId?: string;
+      href?: string;
+    },
+  ) {
+    const users = await runUnscoped(async () => {
+      const emp = await this.prisma.employee.findFirst({
+        where: { tenantId, id: employeeId },
+        select: { email: true },
+      });
+      const email = emp?.email?.trim();
+      return this.prisma.user.findMany({
+        where: {
+          tenantId,
+          isActive: true,
+          OR: [
+            { meta: { path: ['employeeId'], equals: employeeId } },
+            ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+    });
+    if (!users.length) return 0;
+    await this.prisma.notification.createMany({
+      data: users.map((u) => ({
+        tenantId,
+        userId: u.id,
+        kind: data.kind ?? NotificationKind.info,
+        title: data.title,
+        body: data.body,
+        entity: data.entity,
+        entityId: data.entityId,
+        href: data.href,
+      })),
+    });
+    return users.length;
   }
 
   async notifyAllUsers(

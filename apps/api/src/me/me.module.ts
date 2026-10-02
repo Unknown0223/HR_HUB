@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { AttendanceModule } from '../attendance/attendance.module';
 import { HrModule } from '../hr/hr.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { StorageModule } from '../storage/storage.module';
 import { MeController } from './me.controller';
 import { MeService } from './me.service';
 
 @Module({
-  imports: [AttendanceModule, HrModule, NotificationsModule],
+  imports: [AttendanceModule, HrModule, NotificationsModule, StorageModule],
   controllers: [MeController],
   providers: [MeService],
   exports: [MeService],

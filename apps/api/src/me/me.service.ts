@@ -5,7 +5,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import {
+  AdvanceStatus,
   DayStatus,
+  DocumentLifecycle,
   NotificationKind,
   Prisma,
   PunchDirection,
@@ -42,6 +44,8 @@ import {
 } from '../common/name-search';
 import { runUnscoped } from '../common/data-scope';
 import { checkGpsJump } from '../tracking/gps-jump';
+import { StorageService } from '../storage/storage.service';
+import { summarizePayroll } from './payroll-summary';
 
 const MAX_GPS_ACCURACY_M = 100;
 /** ~15 KB JPEG — anything smaller cannot hold a back photo plus a selfie inset. */
@@ -76,6 +80,7 @@ export class MeService {
     private readonly attendance: AttendanceService,
     private readonly hr: HrService,
     private readonly notificationsService: NotificationsService,
+    private readonly storage: StorageService,
   ) {}
 
   requireTenant(tenantId: string | null): string {
@@ -203,9 +208,10 @@ export class MeService {
 
   async getProfile(user: AuthUser) {
     const { tenantId, dbUser, employee } = await this.resolveEmployee(user);
-    const [tenant, team] = await Promise.all([
+    const [tenant, team, photoUrl] = await Promise.all([
       this.prisma.tenant.findUnique({ where: { id: tenantId } }),
       employee ? this.subordinateIds(tenantId, employee.id) : Promise.resolve([]),
+      employee ? this.employeePhoto(tenantId, employee.id) : Promise.resolve(null),
     ]);
 
     return {
@@ -233,6 +239,7 @@ export class MeService {
             division: employee.division,
             position: employee.position,
             schedule: employee.schedule,
+            photoUrl,
           }
         : null,
       teamSize: team.length,
@@ -347,6 +354,8 @@ export class MeService {
       absenceTypeId: dto.absenceTypeId,
       startDate: dto.startDate,
       endDate: dto.endDate,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
       note: dto.note,
     });
   }
@@ -807,49 +816,182 @@ export class MeService {
     };
   }
 
-  async payrollSummary(user: AuthUser) {
-    const { tenantId, employee } = await this.requireEmployee(user);
+  /** Face-profile photo first (what the web card shows), then the person's photo. */
+  private async employeePhoto(tenantId: string, employeeId: string): Promise<string | null> {
+    const row = await runUnscoped(() =>
+      this.prisma.employee.findFirst({
+        where: { tenantId, id: employeeId },
+        select: {
+          faceProfile: { select: { photoUrl: true, photoKey: true } },
+          person: { select: { photoUrl: true } },
+        },
+      }),
+    );
+    return this.storage.mediaUrl(
+      row?.faceProfile?.photoKey,
+      row?.faceProfile?.photoUrl ?? row?.person?.photoUrl,
+    );
+  }
 
-    const advances = await this.prisma.payrollAdvance.findMany({
-      where: { tenantId, employeeId: employee.id },
-      include: {
-        period: { select: { id: true, year: true, month: true, status: true } },
-      },
-      orderBy: { paidAt: 'desc' },
-      take: 12,
-    });
-
-    const latestPeriod = await this.prisma.payrollPeriod.findFirst({
+  /**
+   * Nearest leader up the org chart: the head of the employee's division, or of a parent
+   * division when the employee heads their own.
+   */
+  private async managerOf(tenantId: string, employeeId: string, divisionId: string | null) {
+    if (!divisionId) return null;
+    const divisions = await this.prisma.division.findMany({
       where: { tenantId },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      select: { id: true, parentId: true, managerId: true },
     });
+    const byId = new Map(divisions.map((d) => [d.id, d]));
+    const seen = new Set<string>();
+    let cur = byId.get(divisionId);
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      if (cur.managerId && cur.managerId !== employeeId) {
+        const m = await this.prisma.employee.findFirst({
+          where: { tenantId, id: cur.managerId },
+          select: { id: true, firstName: true, lastName: true, middleName: true, phone: true },
+        });
+        if (m) {
+          return {
+            id: m.id,
+            fullName: [m.lastName, m.firstName, m.middleName].filter(Boolean).join(' '),
+            phone: m.phone,
+          };
+        }
+      }
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return null;
+  }
 
-    let periodLines: unknown[] = [];
-    if (latestPeriod) {
-      periodLines = await this.prisma.payrollLine.findMany({
+  /** Own HR card for the mobile profile: personal data, contacts, work info, ids, documents. */
+  async getDetails(user: AuthUser) {
+    const { tenantId, employee } = await this.requireEmployee(user);
+    return runUnscoped(async () => {
+      const emp = await this.prisma.employee.findFirstOrThrow({
+        where: { tenantId, id: employee.id },
+        include: {
+          region: { select: { name: true } },
+          person: { include: { region: { select: { name: true } } } },
+        },
+      });
+      const person = emp.person;
+      const [manager, docs, docTypes] = await Promise.all([
+        this.managerOf(tenantId, emp.id, emp.divisionId),
+        this.prisma.personDocument.findMany({
+          where: {
+            tenantId,
+            OR: [{ employeeId: emp.id }, ...(person ? [{ personId: person.id }] : [])],
+          },
+          orderBy: [{ issuedAt: 'desc' }, { createdAt: 'desc' }],
+        }),
+        this.prisma.dictionary.findFirst({
+          where: { tenantId, code: 'doc_types' },
+          include: { items: { select: { code: true, name: true } } },
+        }),
+      ]);
+      const typeName = new Map((docTypes?.items ?? []).map((i) => [i.code, i.name]));
+      const schedule = employee.schedule;
+
+      return {
+        id: emp.id,
+        tabNumber: emp.tabNumber,
+        lastName: emp.lastName,
+        firstName: emp.firstName,
+        middleName: emp.middleName,
+        birthDate: person?.birthDate ?? null,
+        gender: person?.gender ?? null,
+        nationality: person?.nationality ?? null,
+        phone: emp.phone ?? person?.phone ?? null,
+        email: emp.email ?? person?.email ?? null,
+        telegram: emp.telegramUsername?.replace(/^@/, '') || null,
+        region: emp.region?.name ?? person?.region?.name ?? null,
+        addressResidence: person?.addressResidence ?? null,
+        addressRegistration: person?.addressRegistration ?? null,
+        division: employee.division?.name ?? null,
+        position: employee.position?.name ?? null,
+        employmentType: emp.employmentType,
+        hiredAt: emp.hiredAt,
+        schedule: schedule
+          ? { name: schedule.name, startTime: schedule.startTime, endTime: schedule.endTime }
+          : null,
+        manager,
+        pinfl: person?.pinfl ?? null,
+        inn: person?.inn ?? null,
+        inps: person?.inps ?? null,
+        photoUrl: await this.employeePhoto(tenantId, emp.id),
+        documents: docs.map((d) => ({
+          id: d.id,
+          type: d.docType,
+          typeName: typeName.get(d.docType) ?? d.docType,
+          number: d.docNumber,
+          issuedAt: d.issuedAt,
+          expiresAt: d.expiresAt,
+          issuer: d.issuer,
+        })),
+      };
+    });
+  }
+
+  /** One payroll month (defaults to the current one) split into accruals, withholdings and advances. */
+  async payrollSummary(user: AuthUser, year?: number, month?: number) {
+    const { tenantId, employee } = await this.requireEmployee(user);
+    const now = new Date();
+    const y = year && Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : now.getFullYear();
+    const m = month && Number.isInteger(month) && month >= 1 && month <= 12 ? month : now.getMonth() + 1;
+    const baseSalary = employee.baseSalary == null ? null : Number(employee.baseSalary);
+
+    const period = await this.prisma.payrollPeriod.findUnique({
+      where: { tenantId_year_month: { tenantId, year: y, month: m } },
+    });
+    if (!period) {
+      return {
+        employeeId: employee.id,
+        year: y,
+        month: m,
+        baseSalary,
+        period: null,
+        ...summarizePayroll([], []),
+        periodAdvances: [],
+      };
+    }
+
+    const [lines, advances] = await Promise.all([
+      this.prisma.payrollLine.findMany({
         where: {
           tenantId,
-          periodId: latestPeriod.id,
+          periodId: period.id,
           employeeId: employee.id,
+          status: DocumentLifecycle.posted,
         },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      });
-    }
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.payrollAdvance.findMany({
+        where: {
+          tenantId,
+          periodId: period.id,
+          employeeId: employee.id,
+          status: AdvanceStatus.paid,
+        },
+        orderBy: { paidAt: 'asc' },
+      }),
+    ]);
 
     return {
       employeeId: employee.id,
-      baseSalary: employee.baseSalary,
-      latestPeriod: latestPeriod
-        ? {
-            id: latestPeriod.id,
-            year: latestPeriod.year,
-            month: latestPeriod.month,
-            status: latestPeriod.status,
-          }
-        : null,
-      advances,
-      lines: periodLines,
+      year: y,
+      month: m,
+      baseSalary,
+      period: { id: period.id, year: period.year, month: period.month, status: period.status },
+      ...summarizePayroll(lines, advances.map((a) => a.amount)),
+      periodAdvances: advances.map((a) => ({
+        id: a.id,
+        amount: Number(a.amount),
+        paidAt: a.paidAt,
+        note: a.note,
+      })),
     };
   }
 

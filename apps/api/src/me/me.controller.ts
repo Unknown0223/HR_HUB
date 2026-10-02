@@ -45,6 +45,11 @@ export class MeController {
     return this.me.getProfile(user);
   }
 
+  @Get('details')
+  details(@CurrentUser() user: AuthUser) {
+    return this.me.getDetails(user);
+  }
+
   @Get('attendance/today')
   today(@CurrentUser() user: AuthUser) {
     return this.me.todayAttendance(user);
@@ -192,7 +197,17 @@ export class MeController {
   }
 
   @Get('payroll/summary')
-  payrollSummary(@CurrentUser() user: AuthUser) {
-    return this.me.payrollSummary(user);
+  @ApiQuery({ name: 'year', required: false })
+  @ApiQuery({ name: 'month', required: false })
+  payrollSummary(
+    @CurrentUser() user: AuthUser,
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.me.payrollSummary(
+      user,
+      year ? Number(year) : undefined,
+      month ? Number(month) : undefined,
+    );
   }
 }
