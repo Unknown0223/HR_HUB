@@ -210,6 +210,8 @@ model Tenant {
   payrollPeriods  PayrollPeriod[]
   payrollLines    PayrollLine[]
   payrollAdvances PayrollAdvance[]
+  advanceLimits   AdvanceLimit[]
+  advanceRequests AdvanceRequest[]
   payrollAccrualDocs PayrollAccrualDoc[]
   payrollLedgerEntries PayrollLedgerEntry[]
   settlementAudits   SettlementAudit[]
@@ -538,6 +540,7 @@ model Employee {
   faceProfile FaceProfile?
   payrollLines    PayrollLine[]
   payrollAdvances PayrollAdvance[]
+  advanceRequests AdvanceRequest[]
   payrollAccrualLines PayrollAccrualLine[]
   payrollAccrualDeductions PayrollAccrualDeduction[]
   payrollSheetLines PayrollSheetLine[]
@@ -1284,11 +1287,70 @@ model PayrollAdvance {
   period      PayrollPeriod? @relation(fields: [periodId], references: [id])
   employee    Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   sourceSheet PayrollSheet?  @relation(fields: [sourceSheetId], references: [id], onDelete: SetNull)
+  request     AdvanceRequest?
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([sourceSheetId])
   @@map("payroll_advances")
+}
+
+enum AdvanceRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+/// Largest advance an employee may ask for without a justification. A rule targets roles,
+/// specific employees, or everyone (both lists empty); an employee rule beats a role rule,
+/// which beats an everyone rule, and among rules of one kind the smallest cap applies.
+model AdvanceLimit {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String
+  maxAmount   Decimal  @map("max_amount") @db.Decimal(14, 2)
+  roles       Role[]   @default([])
+  employeeIds String[] @default([]) @map("employee_ids") @db.Uuid
+  /// Shown to the employee next to the cap: why it exists and what to explain when asking for more.
+  reason      String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("advance_limits")
+}
+
+/// Employee's request for a salary advance; approval creates a draft PayrollAdvance.
+model AdvanceRequest {
+  id               String               @id @default(uuid()) @db.Uuid
+  tenantId         String               @map("tenant_id") @db.Uuid
+  employeeId       String               @map("employee_id") @db.Uuid
+  amount           Decimal              @db.Decimal(14, 2)
+  comment          String?
+  /// Cap in force when the request was made (null: no limit configured).
+  limitAmount      Decimal?             @map("limit_amount") @db.Decimal(14, 2)
+  limitId          String?              @map("limit_id") @db.Uuid
+  overLimit        Boolean              @default(false) @map("over_limit")
+  status           AdvanceRequestStatus @default(pending)
+  createdByUserId  String?              @map("created_by_user_id") @db.Uuid
+  reviewedByUserId String?              @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime?            @map("reviewed_at")
+  reviewNote       String?              @map("review_note")
+  advanceId        String?              @unique @map("advance_id") @db.Uuid
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  advance  PayrollAdvance? @relation(fields: [advanceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, employeeId])
+  @@map("advance_requests")
 }
 
 enum PayrollSheetKind {

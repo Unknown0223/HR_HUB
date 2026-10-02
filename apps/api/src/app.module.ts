@@ -29,6 +29,7 @@ import { TelegramModule } from './telegram/telegram.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { TeamModule } from './team/team.module';
 import { AccessModule } from './access/access.module';
+import { AdvancesModule } from './advances/advances.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AccessModule } from './access/access.module';
     HrModule,
     DashboardModule,
     PayrollModule,
+    AdvancesModule,
     ReportsModule,
     SettingsModule,
     CatalogModule,

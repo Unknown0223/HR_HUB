@@ -278,6 +278,12 @@ export const NAV_SECTIONS: NavSection[] = [
         title: 'Расчёт',
         items: [
           { id: 'payroll', label: 'Периоды и авансы', href: '/payroll', faIcon: 'fa-calculator' },
+          {
+            id: 'advance-requests',
+            label: 'Заявки на аванс',
+            href: '/payroll/advance-requests',
+            faIcon: 'fa-hand-holding-usd',
+          },
           { id: 'timesheets', label: 'Табель', href: '/payroll/timesheets', faIcon: 'fa-calendar-check' },
           { id: 'accruals', label: 'Все начисления', href: '/payroll/accruals', faIcon: 'fa-coins' },
           { id: 'vedomost', label: 'Ведомость', href: '/payroll/vedomost', faIcon: 'fa-file-invoice-dollar' },
