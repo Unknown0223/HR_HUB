@@ -34,6 +34,15 @@ import styles from './shell.module.css';
 import sb from './sidebar.module.css';
 
 const COMPACT_KEY = 'hrhub.sidebar.compact';
+const OPEN_KEY = 'hrhub.sidebar.open';
+
+function storeOpenSections(ids: NavSectionId[]) {
+  try {
+    localStorage.setItem(OPEN_KEY, JSON.stringify(ids));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 const BOTTOM_SHORTCUTS: { section: NavSectionId; label: string }[] = [
   { section: 'home', label: 'Главная' },
@@ -85,14 +94,20 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [access, setAccess] = useState<MyAccess | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compact, setCompact] = useState(false);
-  /** Accordion: at most one section is expanded; it follows the current page. */
-  const [openSection, setOpenSection] = useState<NavSectionId | null>(null);
+  /** Several sections may stay expanded; the current page's section opens itself. */
+  const [openSections, setOpenSections] = useState<NavSectionId[]>([]);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   useLayoutEffect(() => {
     try {
       setCompact(localStorage.getItem(COMPACT_KEY) === '1');
+      const stored: unknown = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]');
+      if (Array.isArray(stored)) {
+        const known = new Set<string>(NAV_SECTIONS.map((s) => s.id));
+        const ids = stored.filter((id): id is NavSectionId => known.has(id));
+        setOpenSections((prev) => [...new Set([...ids, ...prev])]);
+      }
     } catch {
       /* storage unavailable */
     }
@@ -289,40 +304,56 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const activeSectionId = useMemo(() => findNavSection(pathname, search), [pathname, search]);
   const activeSection = NAV_SECTIONS.find((s) => s.id === activeSectionId) ?? null;
 
-  useEffect(() => {
-    setOpenSection(activeSectionId);
-  }, [activeSectionId]);
+  const updateOpenSections = useCallback(
+    (fn: (prev: NavSectionId[]) => NavSectionId[]) => {
+      setOpenSections((prev) => {
+        const next = fn(prev);
+        if (next !== prev) storeOpenSections(next);
+        return next;
+      });
+    },
+    [],
+  );
 
-  const isSectionOpen = useCallback((id: NavSectionId) => openSection === id, [openSection]);
+  useEffect(() => {
+    if (!activeSectionId) return;
+    updateOpenSections((prev) =>
+      prev.includes(activeSectionId) ? prev : [...prev, activeSectionId],
+    );
+  }, [activeSectionId, updateOpenSections]);
+
+  const isSectionOpen = useCallback(
+    (id: NavSectionId) => openSections.includes(id),
+    [openSections],
+  );
+
+  const setCompactStored = useCallback((next: boolean) => {
+    setCompact(next);
+    try {
+      localStorage.setItem(COMPACT_KEY, next ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const toggleNavSection = useCallback(
     (id: NavSectionId) => {
       if (compact) {
-        setCompact(false);
-        try {
-          localStorage.setItem(COMPACT_KEY, '0');
-        } catch {
-          /* storage unavailable */
-        }
-        setOpenSection(id);
+        setCompactStored(false);
+        updateOpenSections((prev) => (prev.includes(id) ? prev : [...prev, id]));
         return;
       }
-      setOpenSection((prev) => (prev === id ? null : id));
+      updateOpenSections((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      );
     },
-    [compact],
+    [compact, setCompactStored, updateOpenSections],
   );
 
-  function toggleCompact() {
-    setCompact((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(COMPACT_KEY, next ? '1' : '0');
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  }
+  const collapseAllSections = useCallback(
+    () => updateOpenSections(() => []),
+    [updateOpenSections],
+  );
 
   const siblingGroup = useMemo(() => {
     const parts = pathname.split('/').filter(Boolean);
@@ -558,6 +589,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       .map((g) => ({ ...g, items: filterNavItems(g.items, access, session.user.role) }))
       .filter((g) => g.items.length > 0),
   })).filter((sec) => sec.groups.length > 0);
+
+  const expandedCount = visibleSections.filter(
+    (sec) => openSections.includes(sec.id) && sec.groups.flatMap((g) => g.items).length > 1,
+  ).length;
 
   const bottomShortcuts = BOTTOM_SHORTCUTS.flatMap((s) => {
     const first = visibleSections.find((v) => v.id === s.section)?.groups[0]?.items[0];
@@ -1100,6 +1135,33 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
       <div className={sb.body}>
         <aside className={compact ? sb.sidebarCompact : sb.sidebar} data-no-print>
+          <div className={sb.sidebarHead}>
+            {!compact ? (
+              <>
+                <span className={sb.sidebarHeadTitle}>Разделы</span>
+                <button
+                  type="button"
+                  className={sb.headTool}
+                  disabled={!expandedCount}
+                  title="Закрыть все разделы"
+                  aria-label="Закрыть все разделы"
+                  onClick={collapseAllSections}
+                >
+                  <i className="fas fa-compress-alt" aria-hidden />
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className={compact ? sb.railToggleWide : sb.headTool}
+              aria-pressed={compact}
+              title={compact ? 'Развернуть меню' : 'Свернуть меню до иконок'}
+              aria-label={compact ? 'Развернуть меню' : 'Свернуть меню до иконок'}
+              onClick={() => setCompactStored(!compact)}
+            >
+              <i className={`fas ${compact ? 'fa-angle-double-right' : 'fa-angle-double-left'}`} aria-hidden />
+            </button>
+          </div>
           <nav className={sb.navScroll} aria-label="Основная навигация">
             <SidebarNav
               idPrefix="side-nav"
@@ -1111,18 +1173,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               compact={compact}
             />
           </nav>
-          <div className={sb.sidebarFoot}>
-            <button
-              type="button"
-              className={sb.collapseBtn}
-              aria-pressed={compact}
-              title={compact ? 'Развернуть меню' : 'Свернуть меню'}
-              onClick={toggleCompact}
-            >
-              <i className={`fas ${compact ? 'fa-angle-double-right' : 'fa-angle-double-left'}`} aria-hidden />
-              <span>Свернуть меню</span>
-            </button>
-          </div>
         </aside>
 
         <div className={sb.content}>

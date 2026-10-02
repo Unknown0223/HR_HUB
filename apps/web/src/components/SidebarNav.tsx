@@ -46,7 +46,9 @@ export function SidebarNav({
                 title={compact ? sec.label : undefined}
                 onClick={onNavigate}
               >
-                <i className={`fas ${sec.faIcon} ${sb.sectionIcon}`} aria-hidden />
+                <span className={sb.sectionIcon} aria-hidden>
+                  <i className={`fas ${sec.faIcon}`} />
+                </span>
                 <span className={sb.sectionLabel}>{sec.label}</span>
               </Link>
             </div>
@@ -66,7 +68,9 @@ export function SidebarNav({
               title={compact ? sec.label : undefined}
               onClick={() => onToggle(sec.id)}
             >
-              <i className={`fas ${sec.faIcon} ${sb.sectionIcon}`} aria-hidden />
+              <span className={sb.sectionIcon} aria-hidden>
+                <i className={`fas ${sec.faIcon}`} />
+              </span>
               <span className={sb.sectionLabel}>{sec.label}</span>
               <i
                 className={`fas fa-chevron-right ${open ? sb.chevronOpen : sb.chevron}`}
@@ -74,11 +78,13 @@ export function SidebarNav({
               />
             </button>
             {open ? (
-              <div id={panelId} className={sb.items}>
+              <div id={panelId} className={sectionActive ? sb.itemsActive : sb.items}>
                 {sec.groups.map((g) => (
                   <div key={g.id} role="group" aria-label={g.title}>
                     {showGroupTitles && g.title !== sec.label ? (
-                      <div className={sb.groupTitle}>{g.title}</div>
+                      <div className={sb.groupTitle}>
+                        <span>{g.title}</span>
+                      </div>
                     ) : null}
                     <ul className={sb.itemList}>
                       {g.items.map((item) => {
