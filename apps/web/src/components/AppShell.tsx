@@ -96,7 +96,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [access, setAccess] = useState<MyAccess | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compact, setCompact] = useState(false);
-  /** Several sections may stay expanded; the current page's section opens itself. */
+  /** Accordion: at most one section is expanded; the current page's section opens itself. */
   const [openSections, setOpenSections] = useState<NavSectionId[]>([]);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -108,7 +108,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       if (Array.isArray(stored)) {
         const known = new Set<string>(NAV_SECTIONS.map((s) => s.id));
         const ids = stored.filter((id): id is NavSectionId => known.has(id));
-        setOpenSections((prev) => [...new Set([...ids, ...prev])]);
+        setOpenSections((prev) => (prev.length ? prev : ids.slice(-1)));
       }
     } catch {
       /* storage unavailable */
@@ -320,7 +320,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!activeSectionId) return;
     updateOpenSections((prev) =>
-      prev.includes(activeSectionId) ? prev : [...prev, activeSectionId],
+      prev.length === 1 && prev[0] === activeSectionId ? prev : [activeSectionId],
     );
   }, [activeSectionId, updateOpenSections]);
 
@@ -342,12 +342,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     (id: NavSectionId) => {
       if (compact) {
         setCompactStored(false);
-        updateOpenSections((prev) => (prev.includes(id) ? prev : [...prev, id]));
+        updateOpenSections(() => [id]);
         return;
       }
-      updateOpenSections((prev) =>
-        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-      );
+      updateOpenSections((prev) => (prev.includes(id) ? [] : [id]));
     },
     [compact, setCompactStored, updateOpenSections],
   );
