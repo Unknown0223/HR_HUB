@@ -58,29 +58,13 @@
   font-size: var(--font-size-sm);
 }
 
+/* Profile card on top across the full width, sections below it. */
 .layout {
   display: grid;
-  /* HR HUB: fixed sidebar + fluid main */
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
   align-items: start;
   width: 100%;
-}
-
-@media (max-width: 1100px) {
-  .layout {
-    grid-template-columns: 300px minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 960px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-  }
 }
 
 .sidebar,
@@ -93,17 +77,119 @@
 }
 
 .sidebar {
-  padding: 1rem 1.15rem 1.35rem;
-  position: sticky;
-  top: 0.65rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  gap: 1.25rem 1.5rem;
+  align-items: start;
+  padding: 1.25rem 1.35rem;
 }
 
 .sideTop {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: -0.35rem -0.25rem 0.55rem 0;
-  position: relative;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sideTop > * {
+  pointer-events: auto;
+}
+
+.heroIdentity {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  min-width: 0;
+  padding: 0.5rem 0 0 0.75rem;
+}
+
+.heroInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.heroIdentity .avatarWrap {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.heroIdentity .avatar {
+  width: 112px;
+  height: 112px;
+}
+
+.heroIdentity .nameRow {
+  justify-content: flex-start;
+}
+
+.heroIdentity .fullName {
+  text-align: left;
+  font-size: 1.05rem;
+}
+
+.heroIdentity .roleLine {
+  text-align: left;
+  margin: 0.25rem 0 0.45rem;
+}
+
+.heroIdentity .statusWrap,
+.heroIdentity .flagRow {
+  justify-content: flex-start;
+}
+
+.heroIdentity .statusPill {
+  margin: 0 0 0.6rem;
+}
+
+.heroIdentity .flagRow {
+  margin: -0.2rem 0 0.6rem;
+}
+
+.heroIdentity .quickFacts {
+  margin: 0;
+}
+
+.sidebar .sideGroups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.75rem 1rem;
+  align-content: start;
+}
+
+@media (max-width: 1180px) {
+  .sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .heroIdentity {
+    padding-left: 1.5rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .heroIdentity {
+    flex-direction: column;
+    align-items: center;
+    padding-left: 0;
+    text-align: center;
+  }
+
+  .heroIdentity .nameRow,
+  .heroIdentity .statusWrap,
+  .heroIdentity .flagRow {
+    justify-content: center;
+  }
+
+  .heroIdentity .fullName,
+  .heroIdentity .roleLine {
+    text-align: center;
+  }
 }
 
 .sideBack {
@@ -1012,6 +1098,264 @@ button.calCell {
   text-align: center;
   background: var(--tint-neutral, #fff5f6);
   min-height: 1.55rem;
+}
+
+/* Timesheet calendar day tones: --tone is the accent, --tone-bg the cell tint. */
+.toneOntime {
+  --tone: #16a34a;
+  --tone-bg: #effaf2;
+}
+
+.toneLate {
+  --tone: #d97706;
+  --tone-bg: #fff7e8;
+}
+
+.toneNoout {
+  --tone: #ca8a04;
+  --tone-bg: #fefbe6;
+}
+
+.toneAbsent {
+  --tone: #dc2626;
+  --tone-bg: #fdf0f0;
+}
+
+.toneLeave {
+  --tone: #7c3aed;
+  --tone-bg: #f5f0ff;
+}
+
+.toneOff {
+  --tone: #94a3b8;
+  --tone-bg: #f6f7f9;
+}
+
+.toneWorking {
+  --tone: #2563eb;
+  --tone-bg: #eff5ff;
+}
+
+.toneFuture {
+  --tone: transparent;
+  --tone-bg: var(--surface);
+}
+
+.toneNodata {
+  --tone: #cbd5e1;
+  --tone-bg: var(--surface);
+}
+
+.calGrid .calTone {
+  position: relative;
+  border: 0;
+  border-right: 1px solid var(--line, #e5e7eb);
+  border-bottom: 1px solid var(--line, #e5e7eb);
+  min-height: 112px;
+  padding: 0.4rem 0.5rem 0.45rem 0.6rem;
+  background: var(--tone-bg);
+  gap: 0.3rem;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.calGrid .calTone::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--tone);
+}
+
+.calGrid button.calTone:hover {
+  background: var(--tone-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--tone),
+    0 6px 18px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+  z-index: 1;
+}
+
+.calGrid button.calCell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.calGrid .calCellToday {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.calCellTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+  min-height: 1.4rem;
+}
+
+.calGrid .calDayNum {
+  align-self: auto;
+  order: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-strong, #1f2937);
+}
+
+.calGrid .calDayNumToday {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.calChip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  color: color-mix(in srgb, var(--tone) 80%, #111827);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.calFactTime {
+  font-size: 0.98rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-strong, #111827);
+  letter-spacing: 0.01em;
+}
+
+.calFactSep {
+  margin: 0 0.2rem;
+  color: var(--ink-faint, #9ca3af);
+  font-weight: 500;
+}
+
+.calFactLabel {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--tone) 85%, #111827);
+}
+
+.calNoMarks {
+  font-size: 0.72rem;
+  color: var(--ink-faint, #9ca3af);
+}
+
+.calDetails {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-muted, #6b7280);
+  line-height: 1.3;
+}
+
+.calGrid .calDeficit {
+  width: auto;
+  align-self: flex-start;
+  min-height: 0;
+  padding: 0.05rem 0.4rem;
+  border: none;
+  border-radius: 6px;
+  background: #fdecee;
+  color: #dc2626;
+  font-size: 0.68rem;
+}
+
+.calSchedLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--ink-faint, #9ca3af);
+  font-variant-numeric: tabular-nums;
+}
+
+.calSchedLine svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.calDowWeekend {
+  color: #dc2626;
+}
+
+.calSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+}
+
+.calSumItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: var(--tone-bg);
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  color: var(--ink, #374151);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.calSumItem strong {
+  color: color-mix(in srgb, var(--tone) 85%, #111827);
+  font-weight: 800;
+}
+
+.calSumDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tone);
+}
+
+.calSumTotal {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-muted, #6b7280);
+}
+
+.calSumTotal strong {
+  color: var(--ink-strong, #111827);
+}
+
+@media (max-width: 760px) {
+  .calGrid .calTone {
+    min-height: 84px;
+    padding: 0.3rem 0.3rem 0.3rem 0.45rem;
+  }
+
+  .calChip,
+  .calSchedLine,
+  .calDetails {
+    display: none;
+  }
+
+  .calFactTime {
+    font-size: 0.74rem;
+  }
 }
 
 .tableWrap {

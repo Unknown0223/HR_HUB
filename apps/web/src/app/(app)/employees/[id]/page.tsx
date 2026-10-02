@@ -893,6 +893,56 @@ function deficitLabel(planned: number, worked: number) {
   return `- ${m} мин`;
 }
 
+type CalTone =
+  | 'ontime'
+  | 'late'
+  | 'absent'
+  | 'noout'
+  | 'working'
+  | 'off'
+  | 'leave'
+  | 'holiday'
+  | 'future'
+  | 'nodata';
+
+const CAL_TONES: Array<{ tone: CalTone; label: string; cls: string }> = [
+  { tone: 'ontime', label: 'Вовремя', cls: styles.toneOntime },
+  { tone: 'late', label: 'Опоздание', cls: styles.toneLate },
+  { tone: 'noout', label: 'Нет ухода', cls: styles.toneNoout },
+  { tone: 'absent', label: 'Прогул', cls: styles.toneAbsent },
+  { tone: 'leave', label: 'Отпуск', cls: styles.toneLeave },
+  { tone: 'off', label: 'Выходной', cls: styles.toneOff },
+];
+
+const CAL_TONE_META: Record<CalTone, { label: string; cls: string }> = {
+  ...Object.fromEntries(CAL_TONES.map((t) => [t.tone, t])),
+  working: { label: 'На работе', cls: styles.toneWorking },
+  holiday: { label: 'Праздник', cls: styles.toneOff },
+  future: { label: '', cls: styles.toneFuture },
+  nodata: { label: 'Нет данных', cls: styles.toneNodata },
+} as Record<CalTone, { label: string; cls: string }>;
+
+function calTone(o: {
+  status?: string;
+  lateMinutes?: number;
+  inHm: string | null;
+  outHm: string | null;
+  isLeave: boolean;
+  isDayOff: boolean;
+  isToday: boolean;
+  isFuture: boolean;
+}): CalTone {
+  if (o.isLeave || o.status === 'leave') return 'leave';
+  if (o.status === 'holiday') return 'holiday';
+  if (o.inHm) {
+    if (!o.outHm) return o.isToday ? 'working' : 'noout';
+    return o.status === 'late' || (o.lateMinutes ?? 0) > 0 ? 'late' : 'ontime';
+  }
+  if (o.isDayOff) return 'off';
+  if (o.status === 'absent') return 'absent';
+  return o.isFuture || o.isToday ? 'future' : 'nodata';
+}
+
 function formatDurationRu(mins: number) {
   if (!Number.isFinite(mins) || mins <= 0) return '—';
   const h = Math.floor(mins / 60);
@@ -4181,6 +4231,7 @@ export default function EmployeeDetailPage() {
                 }}
               />
             </div>
+            <div className={styles.heroIdentity}>
             <div className={styles.avatarWrap}>
               {row.faceProfile?.photoUrl ? (
                 <PhotoThumb
@@ -4196,6 +4247,7 @@ export default function EmployeeDetailPage() {
                 </div>
               )}
             </div>
+            <div className={styles.heroInfo}>
             <div className={styles.nameRow}>
               <h2 className={styles.fullName}>{fullName(row)}</h2>
               {row.faceProfile?.photoUrl ? (
@@ -4253,6 +4305,8 @@ export default function EmployeeDetailPage() {
                 <dd>{tenureLabel(row.hiredAt, row.dismissedAt)}</dd>
               </div>
             </dl>
+            </div>
+            </div>
             <div className={styles.sideGroups}>
               <section className={styles.sideGroup}>
                 <h3 className={styles.sideGroupTitle}>Контакты</h3>
@@ -4934,115 +4988,167 @@ export default function EmployeeDetailPage() {
                           </button>
                         </div>
                       </div>
+                      {(() => {
+                        const todayKey = ymdToday();
+                        const counts: Partial<Record<CalTone, number>> = {};
+                        let workedTotal = 0;
+                        let lateTotal = 0;
+                        for (const { date, inMonth } of calendarCells) {
+                          if (!inMonth) continue;
+                          const key = date.toISOString().slice(0, 10);
+                          const day = dayByDate.get(key);
+                          const tone = calTone({
+                            status: day?.status,
+                            lateMinutes: day?.lateMinutes,
+                            inHm: fmtHmFromIso(day?.firstInAt),
+                            outHm: fmtHmFromIso(day?.lastOutAt),
+                            isLeave: leaveDateKeys.has(key),
+                            isDayOff: day?.status === 'day_off' || isWeekendPattern(date, row.schedule),
+                            isToday: key === todayKey,
+                            isFuture: key > todayKey,
+                          });
+                          counts[tone] = (counts[tone] ?? 0) + 1;
+                          workedTotal += workedMinutes(day);
+                          lateTotal += day?.lateMinutes ?? 0;
+                        }
+                        return (
+                          <div className={styles.calSummary}>
+                            {CAL_TONES.map((t) => (
+                              <span key={t.tone} className={`${styles.calSumItem} ${t.cls}`}>
+                                <i className={styles.calSumDot} aria-hidden />
+                                {t.label}
+                                <strong>{counts[t.tone] ?? 0}</strong>
+                              </span>
+                            ))}
+                            <span className={styles.calSumTotal}>
+                              Отработано <strong>{formatDurationRu(workedTotal)}</strong>
+                              {lateTotal > 0 ? (
+                                <>
+                                  {' · '}опозданий <strong>{formatDurationRu(lateTotal)}</strong>
+                                </>
+                              ) : null}
+                            </span>
+                          </div>
+                        );
+                      })()}
                       <div className={styles.calGrid}>
-                        {DOW.map((d) => (
-                          <div key={d} className={styles.calDow}>
+                        {DOW.map((d, i) => (
+                          <div
+                            key={d}
+                            className={`${styles.calDow} ${i >= 5 ? styles.calDowWeekend : ''}`}
+                          >
                             {d}
                           </div>
                         ))}
                         {calendarCells.map(({ date, inMonth }) => {
                           const key = date.toISOString().slice(0, 10);
                           const day = dayByDate.get(key);
-                          const off = isWeekendPattern(date, row.schedule);
                           const todayKey = ymdToday();
                           const isToday = inMonth && key === todayKey;
                           const isLeave = leaveDateKeys.has(key);
-                          const isDayOff = day?.status === 'day_off' || off;
+                          const isDayOff =
+                            day?.status === 'day_off' || isWeekendPattern(date, row.schedule);
                           const schedLabel = row.schedule
-                            ? `${row.schedule.startTime} - ${row.schedule.endTime}`
-                            : '09:00 - 18:00';
+                            ? `${row.schedule.startTime}–${row.schedule.endTime}`
+                            : '09:00–18:00';
                           const inHm = fmtHmFromIso(day?.firstInAt);
                           const outHm = fmtHmFromIso(day?.lastOutAt);
-                          const planned = plannedWorkMinutes(row.schedule);
                           const worked = workedMinutes(day);
                           const deficit =
-                            inHm && outHm ? deficitLabel(planned, worked) : null;
-                          const canOpen = inMonth;
+                            inHm && outHm ? deficitLabel(plannedWorkMinutes(row.schedule), worked) : null;
+                          const tone = calTone({
+                            status: day?.status,
+                            lateMinutes: day?.lateMinutes,
+                            inHm,
+                            outHm,
+                            isLeave,
+                            isDayOff,
+                            isToday,
+                            isFuture: key > todayKey,
+                          });
+                          const meta = CAL_TONE_META[tone];
+                          const late = day?.lateMinutes ?? 0;
 
-                          let content: ReactNode = null;
+                          let fact: ReactNode = null;
                           if (inMonth) {
-                            if (isLeave) {
-                              content = (
-                                <>
-                                  <span className={`${styles.calBar} ${styles.calSched}`}>
-                                    {schedLabel}
-                                  </span>
-                                  <span className={`${styles.calBar} ${styles.calLeave}`}>
-                                    Отпуск
-                                  </span>
-                                </>
-                              );
-                            } else if (isDayOff) {
-                              content = (
-                                <span className={`${styles.calBar} ${styles.calOff}`}>
-                                  Выходной
+                            if (inHm) {
+                              fact = (
+                                <span className={styles.calFactTime}>
+                                  {inHm}
+                                  <span className={styles.calFactSep}>–</span>
+                                  {outHm || '…'}
                                 </span>
                               );
-                            } else {
-                              // 2 qator: grafik + fakt; 3-qator: deficit bo‘lsa
-                              let factBar: ReactNode = (
-                                <span className={`${styles.calBar} ${styles.calFactEmpty}`}>
-                                  —
-                                </span>
-                              );
-                              if (day?.status === 'absent' && !inHm) {
-                                factBar = (
-                                  <span className={`${styles.calBar} ${styles.calAbsent}`}>
-                                    Прогул
-                                  </span>
-                                );
-                              } else if (inHm && !outHm) {
-                                factBar = (
-                                  <span className={`${styles.calBar} ${styles.calNoOut}`}>
-                                    {inHm} - Нет ухода
-                                  </span>
-                                );
-                              } else if (inHm && outHm) {
-                                factBar = (
-                                  <span className={`${styles.calBar} ${styles.calFact}`}>
-                                    {inHm} - {outHm}
-                                  </span>
-                                );
-                              }
-                              content = (
-                                <>
-                                  <span className={`${styles.calBar} ${styles.calSched}`}>
-                                    {schedLabel}
-                                  </span>
-                                  {factBar}
-                                  {deficit ? (
-                                    <span className={styles.calDeficit}>{deficit}</span>
-                                  ) : null}
-                                </>
-                              );
+                            } else if (tone === 'off' || tone === 'holiday' || tone === 'leave') {
+                              fact = <span className={styles.calFactLabel}>{meta.label}</span>;
+                            } else if (tone === 'absent') {
+                              fact = <span className={styles.calFactLabel}>Не пришёл</span>;
+                            } else if (tone === 'nodata') {
+                              fact = <span className={styles.calNoMarks}>нет отметок</span>;
                             }
                           }
 
-                          const cellClass = `${styles.calCell} ${
-                            inMonth ? '' : styles.calCellMuted
-                          } ${isToday ? styles.calCellToday : ''} ${
-                            canOpen ? styles.calCellClickable : ''
-                          } ${deficit ? styles.calCellTall : ''}`;
+                          const details: string[] = [];
+                          if (inMonth && late > 0) details.push(`+${late} мин опоздание`);
+                          if (inMonth && worked > 0) details.push(formatDurationRu(worked));
+
+                          const cellClass = [
+                            styles.calCell,
+                            inMonth ? `${styles.calTone} ${meta.cls}` : styles.calCellMuted,
+                            isToday ? styles.calCellToday : '',
+                            inMonth ? styles.calCellClickable : '',
+                          ].join(' ');
 
                           const inner = (
                             <>
-                              <div
-                                className={`${styles.calDayNum} ${
-                                  isToday ? styles.calDayNumToday : ''
-                                }`}
-                              >
-                                {date.getUTCDate()}
+                              <div className={styles.calCellTop}>
+                                <span
+                                  className={`${styles.calDayNum} ${
+                                    isToday ? styles.calDayNumToday : ''
+                                  }`}
+                                >
+                                  {date.getUTCDate()}
+                                </span>
+                                {inMonth &&
+                                meta.label &&
+                                tone !== 'off' &&
+                                tone !== 'holiday' &&
+                                tone !== 'nodata' ? (
+                                  <span className={styles.calChip}>{meta.label}</span>
+                                ) : null}
                               </div>
-                              <div className={styles.calStack}>{content}</div>
+                              {inMonth ? (
+                                <div className={styles.calStack}>
+                                  {fact}
+                                  {details.length ? (
+                                    <span className={styles.calDetails}>{details.join(' · ')}</span>
+                                  ) : null}
+                                  {deficit ? (
+                                    <span className={styles.calDeficit}>{deficit.replace('- ', '−')}</span>
+                                  ) : null}
+                                  {!isDayOff && !isLeave ? (
+                                    <span className={styles.calSchedLine}>
+                                      <svg viewBox="0 0 24 24" aria-hidden>
+                                        <circle cx="12" cy="12" r="8.5" />
+                                        <path d="M12 7.5V12l3 2" />
+                                      </svg>
+                                      {schedLabel}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : null}
                             </>
                           );
 
-                          if (canOpen) {
+                          if (inMonth) {
                             return (
                               <button
                                 key={key + String(inMonth)}
                                 type="button"
                                 className={cellClass}
+                                title={[meta.label, inHm && `${inHm}–${outHm || '…'}`, ...details]
+                                  .filter(Boolean)
+                                  .join(' · ')}
                                 onClick={() => {
                                   setDayModalKey(key);
                                   setDayModalTab('stats');
