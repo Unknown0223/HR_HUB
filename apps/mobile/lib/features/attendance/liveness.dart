@@ -26,7 +26,13 @@ class HeadPose {
   final double yaw;
   final double pitch;
 
-  bool get centered => yaw.abs() < 10 && pitch.abs() < 10;
+  bool get centered => yaw.abs() < 12 && pitch.abs() < 12;
+
+  /// Loose "looking at the phone" check used to learn the employee's neutral pose: a phone
+  /// held below the face reads about -10° pitch even when looking straight at it.
+  bool get roughlyCentered => yaw.abs() < 15 && pitch.abs() < 22;
+
+  HeadPose relativeTo(HeadPose base) => HeadPose(yaw - base.yaw, pitch - base.pitch);
 
   bool matches(HeadDirection d) {
     switch (d) {
@@ -52,15 +58,16 @@ class HeadPose {
 
 enum LivenessPhase { center, turn, back, finalCenter, done, failed }
 
-/// Random head-movement challenge: 3–8 distinct directions out of 8.
-/// Each turn must be held for a few frames and followed by a return to
-/// center, so a still photo or a looping video cannot pass.
+/// Random head-movement challenge: 3–4 distinct directions out of 8 (the API needs at
+/// least 3). Each turn must be held for a few frames and followed by a return to
+/// center, so a still photo or a looping video cannot pass. Angles are measured from
+/// the neutral pose learned in the first phase.
 class LivenessChallenge {
   LivenessChallenge(this.steps, {DateTime? now}) : _startedAt = now ?? DateTime.now();
 
   factory LivenessChallenge.random({Random? rng, DateTime? now}) {
     final r = rng ?? Random.secure();
-    final count = 3 + r.nextInt(6);
+    final count = 3 + r.nextInt(2);
     final all = [...HeadDirection.values]..shuffle(r);
     return LivenessChallenge(all.take(count).toList(), now: now);
   }
@@ -68,7 +75,7 @@ class LivenessChallenge {
   static const _turnHoldFrames = 3;
   static const _centerHoldFrames = 3;
   static const _finalHoldFrames = 4;
-  static const stepTimeout = Duration(seconds: 8);
+  static const stepTimeout = Duration(seconds: 10);
 
   final List<HeadDirection> steps;
   final DateTime _startedAt;
@@ -77,6 +84,9 @@ class LivenessChallenge {
   int _hold = 0;
   int? _trackingId;
   DateTime? _phaseStartedAt;
+  HeadPose _neutral = const HeadPose(0, 0);
+  double _neutralYawSum = 0;
+  double _neutralPitchSum = 0;
   String? failReason;
 
   HeadDirection? get current => index < steps.length ? steps[index] : null;
@@ -107,9 +117,15 @@ class LivenessChallenge {
       _trackingId = trackingId;
     }
 
+    if (phase == LivenessPhase.center) {
+      _learnNeutral(pose, t);
+      return;
+    }
+    pose = pose.relativeTo(_neutral);
+
     switch (phase) {
       case LivenessPhase.center:
-        _advanceWhen(pose.centered, _centerHoldFrames, LivenessPhase.turn, t);
+        break;
       case LivenessPhase.turn:
         _advanceWhen(pose.matches(current!), _turnHoldFrames, LivenessPhase.back, t);
       case LivenessPhase.back:
@@ -127,6 +143,22 @@ class LivenessChallenge {
       case LivenessPhase.done:
       case LivenessPhase.failed:
         break;
+    }
+  }
+
+  void _learnNeutral(HeadPose pose, DateTime t) {
+    if (!pose.roughlyCentered) {
+      _hold = 0;
+      _neutralYawSum = 0;
+      _neutralPitchSum = 0;
+      return;
+    }
+    _hold++;
+    _neutralYawSum += pose.yaw;
+    _neutralPitchSum += pose.pitch;
+    if (_hold >= _centerHoldFrames) {
+      _neutral = HeadPose(_neutralYawSum / _hold, _neutralPitchSum / _hold);
+      _enter(LivenessPhase.turn, t);
     }
   }
 

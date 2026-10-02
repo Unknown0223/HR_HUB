@@ -15,11 +15,11 @@ const _poses = {
 };
 
 void main() {
-  test('random challenge has 3–8 distinct directions', () {
+  test('random challenge has 3–4 distinct directions', () {
     final rng = Random(1);
     for (var i = 0; i < 200; i++) {
       final c = LivenessChallenge.random(rng: rng);
-      expect(c.steps.length, inInclusiveRange(3, 8));
+      expect(c.steps.length, inInclusiveRange(3, 4));
       expect(c.steps.toSet().length, c.steps.length);
     }
   });
@@ -59,6 +59,30 @@ void main() {
     frames(center, 4);
     expect(c.phase, LivenessPhase.done);
     expect(c.apiSteps, ['left', 'up_right', 'down']);
+  });
+
+  test('a phone held below the face (neutral pitch -10) still passes', () {
+    final t0 = DateTime(2026, 1, 1, 9);
+    var t = t0;
+    final c = LivenessChallenge([HeadDirection.left, HeadDirection.down, HeadDirection.up], now: t0);
+    void frames(HeadPose p, int n) {
+      for (var i = 0; i < n; i++) {
+        t = t.add(const Duration(milliseconds: 150));
+        c.feed(p, faces: 1, trackingId: 3, now: t);
+      }
+    }
+
+    HeadPose tilted(HeadPose p) => HeadPose(p.yaw + 1.5, p.pitch - 10);
+    final center = tilted(const HeadPose(0, 0));
+    frames(center, 3);
+    expect(c.phase, LivenessPhase.turn);
+    for (final d in c.steps) {
+      frames(tilted(_poses[d]!), 3);
+      expect(c.phase, LivenessPhase.back, reason: '$d');
+      frames(center, 3);
+    }
+    frames(center, 4);
+    expect(c.phase, LivenessPhase.done);
   });
 
   test('a still face never passes and times out', () {

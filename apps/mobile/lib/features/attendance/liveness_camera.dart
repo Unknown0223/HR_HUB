@@ -42,7 +42,10 @@ class _LivenessCameraState extends State<LivenessCamera>
   DateTime _lastFrameAt = DateTime.now();
   Timer? _watchdog;
   static const _framesPerRotation = 8;
-  static const _framesToUnlock = 30;
+  static const _diag = bool.fromEnvironment('LIVENESS_DIAG');
+  final _diagWatch = Stopwatch();
+  int _diagFrames = 0;
+  int _diagDetectMs = 0;
   static const _maxFailedFrames = 20;
   static const _detectTimeout = Duration(seconds: 3);
   static const _stallTimeout = Duration(seconds: 5);
@@ -169,22 +172,39 @@ class _LivenessCameraState extends State<LivenessCamera>
     );
   }
 
+  /// Once a face is seen the rotation stays fixed for this camera session: a wrong
+  /// (e.g. upside-down) rotation would invert the head angles.
   void _trackRotation(int faceCount) {
+    if (_rotationLocked) return;
     if (faceCount > 0) {
       _rotationLocked = true;
-      _emptyFrames = 0;
       return;
     }
-    _emptyFrames++;
-    if (_rotationLocked) {
-      if (_emptyFrames >= _framesToUnlock) {
-        _rotationLocked = false;
-        _emptyFrames = 0;
-      }
-    } else if (_emptyFrames >= _framesPerRotation) {
+    if (++_emptyFrames >= _framesPerRotation) {
       _rotationIndex = (_rotationIndex + 1) % _rotations.length;
       _emptyFrames = 0;
     }
+  }
+
+  void _logDiag(DateTime detectStart, CameraImage image, int faceCount, Face? face) {
+    if (!_diagWatch.isRunning) _diagWatch.start();
+    _diagFrames++;
+    _diagDetectMs += DateTime.now().difference(detectStart).inMilliseconds;
+    if (_diagWatch.elapsedMilliseconds < 1000) return;
+    final rotation = _rotations[_rotationIndex % _rotations.length];
+    debugPrint(
+      'liveness diag: fps=${(_diagFrames * 1000 / _diagWatch.elapsedMilliseconds).toStringAsFixed(1)} '
+      'detectMs=${(_diagDetectMs / _diagFrames).round()} '
+      'img=${image.width}x${image.height} fmt=${image.format.raw} rot=${rotation.rawValue} '
+      'locked=$_rotationLocked faces=$faceCount '
+      'yaw=${face?.headEulerAngleY?.toStringAsFixed(1)} '
+      'pitch=${face?.headEulerAngleX?.toStringAsFixed(1)} '
+      'roll=${face?.headEulerAngleZ?.toStringAsFixed(1)} '
+      'phase=${_challenge.phase.name} step=${_challenge.current?.name}',
+    );
+    _diagFrames = 0;
+    _diagDetectMs = 0;
+    _diagWatch.reset();
   }
 
   Future<void> _onFrame(CameraImage image) async {
@@ -196,11 +216,13 @@ class _LivenessCameraState extends State<LivenessCamera>
       if (input == null) {
         throw StateError('unsupported frame format ${image.format.raw}');
       }
+      final detectStart = _diag ? DateTime.now() : null;
       final faces = await _detector.processImage(input).timeout(_detectTimeout);
       if (!mounted) return;
       _failedFrames = 0;
       _trackRotation(faces.length);
       final face = faces.length == 1 ? faces.first : null;
+      if (detectStart != null) _logDiag(detectStart, image, faces.length, face);
       _challenge.feed(
         face == null
             ? null
