@@ -80,6 +80,20 @@ telefon orqali kirish/chiqish belgisi, yo‘qlik so‘rovini yuborish, HR’ga m
 - e-mail, mintaqa, manzillar, INN, INPS bo‘sh;
 - yo‘qlik turlari nomlari rus tilida (lug‘atdagi qiymatlar).
 
+## Qo‘shimcha funksiyalar (2026-10-02)
+
+| Funksiya | Qayerda | Holat |
+|---|---|---|
+| Avans so‘rovi: limitlar (rol / xodim / hammaga, bir qoidada bir nechta), limitdan oshsa izoh majburiy + tushuntirish, tasdiqlash/rad + xodimga bildirishnoma | API, web «Зарплата → Заявки на аванс», mobil «Avans» | ✅ commit `533571b`; mobil ekran emulyatorda ochildi (limit belgilanmaganligi to‘g‘ri ko‘rsatildi) |
+| Terminal orqali o‘tilganda ilovaga bildirishnoma (vaqt, o‘z vaqtida / X daqiqa kechikish) | API | ✅ commit `21a676e` |
+| Kechikish qoidalari: grace daqiqa, oyiga N marta X daqiqagacha sababli = to‘liq kun, oshgani to‘liq emas, korrektirovka saqlanadi | API, web «Настройки → Опоздания» | ✅ commit `21a676e`, unit testlar bilan |
+| Mobil taqvim: yashil / sariq / qizil / kulrang kunlar, kunni bosganda telefon va terminal fotolari | mobil | ✅ ekran; `sinov`da davomat yozuvi yo‘q, shuning uchun rangli kunlar real ma’lumotda ko‘rilmadi |
+| Web sidebar: guruh nomlari, faol bo‘lim, bir nechta ochiq bo‘lim, ikonka rejimi | web | ✅ commit `ce75233` |
+| Web orqa fon kech paydo bo‘lishi | web, barcha sahifalar | ✅ commit `3ef72ef`: rasm endi birinchi kadrgacha yuklanadi (225 ms, avval 419 ms birinchi chizishdan keyin) |
+| Til interfeysi RU/UZ | web (commit `bb3e595`), mobil (Sozlamalar → Ilova tili) | ✅ mobil: ~440 ta matn, emulyatorda o‘tish darhol ishladi |
+
+Tekshiruvlar: API `npm test` **144/144**, web `tsc` xatosiz, mobil `flutter analyze` xato/ogohlantirishsiz. APK: `Desktop\HR-HUB-mobile.apk`.
+
 ## Muhim eslatma: server
 
 Bir martalik parollar va `sinov` akkaunti faqat **lokal** bazada. Ilova sukut bo‘yicha production serverga (`hr-akfa.up.railway.app`) ulanadi — u yerdagi ma’lumotlar boshqacha (masalan, boshqa tug‘ilgan kun va mintaqa). Lokal ma’lumotlar bilan ishlash uchun ilovadagi «Server» maydoniga kompyuter manzilini kiriting (`<kompyuter IP>:3001`, emulyatorda `10.0.2.2:3001`). Production’da ishlashi uchun API deploy qilinishi kerak.
