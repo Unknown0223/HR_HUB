@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { confirm } from '@/lib/dialogs';
+import { useI18n } from '@/lib/i18n';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import shared from '../../../page-shared.module.css';
@@ -52,6 +53,7 @@ const EMPTY: Draft = {
 };
 
 export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
+  const { t } = useI18n();
   const [rows, setRows] = useState<LimitRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -65,11 +67,11 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
       const data = await apiFetch<LimitRow[]>('/api/advance-requests/limits');
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      setError(e instanceof Error ? e.message : t('Ошибка загрузки'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -90,8 +92,8 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
   async function save() {
     if (!draft) return;
     const amount = Number(draft.maxAmount.replace(/\s/g, ''));
-    if (!draft.name.trim()) return setError('Укажите название');
-    if (!Number.isFinite(amount) || amount <= 0) return setError('Укажите максимальную сумму');
+    if (!draft.name.trim()) return setError(t('Укажите название'));
+    if (!Number.isFinite(amount) || amount <= 0) return setError(t('Укажите максимальную сумму'));
     setBusy(true);
     setError('');
     const body = {
@@ -110,19 +112,19 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
       setDraft(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось сохранить');
+      setError(e instanceof Error ? e.message : t('Не удалось сохранить'));
     } finally {
       setBusy(false);
     }
   }
 
   async function remove(row: LimitRow) {
-    if (!(await confirm(`Удалить ограничение «${row.name}»?`))) return;
+    if (!(await confirm(t('Удалить ограничение «{name}»?', { name: row.name })))) return;
     try {
       await apiFetch(`/api/advance-requests/limits/${row.id}`, { method: 'DELETE' });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось удалить');
+      setError(e instanceof Error ? e.message : t('Не удалось удалить'));
     }
   }
 
@@ -130,18 +132,18 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
     <>
       <div className={styles.limitsIntro}>
         <p>
-          Лимит — максимальная сумма аванса без объяснения. Правило можно задать для ролей,
-          для конкретных сотрудников или для всех (если не выбраны ни роли, ни сотрудники).
-          Если подходит несколько правил: правило сотрудника важнее правила роли, правило роли
-          важнее общего, а среди правил одного вида действует меньшая сумма.
+          {t(
+            'Лимит — максимальная сумма аванса без объяснения. Правило можно задать для ролей, для конкретных сотрудников или для всех (если не выбраны ни роли, ни сотрудники). Если подходит несколько правил: правило сотрудника важнее правила роли, правило роли важнее общего, а среди правил одного вида действует меньшая сумма.',
+          )}
         </p>
         <p>
-          Сотрудник видит лимит и пояснение в приложении. Если он просит больше лимита,
-          комментарий «на что нужен аванс» обязателен; в пределах лимита — нет.
+          {t(
+            'Сотрудник видит лимит и пояснение в приложении. Если он просит больше лимита, комментарий «на что нужен аванс» обязателен; в пределах лимита — нет.',
+          )}
         </p>
         {canEdit ? (
           <button type="button" className={styles.createBtn} onClick={() => setDraft({ ...EMPTY })}>
-            <i className="fas fa-plus" aria-hidden /> Добавить ограничение
+            <i className="fas fa-plus" aria-hidden /> {t('Добавить ограничение')}
           </button>
         ) : null}
       </div>
@@ -152,25 +154,25 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Название</th>
-              <th className={styles.num}>Макс. сумма</th>
-              <th>Кому</th>
-              <th>Пояснение для сотрудника</th>
-              <th>Статус</th>
-              <th aria-label="Действия" />
+              <th>{t('Название')}</th>
+              <th className={styles.num}>{t('Макс. сумма')}</th>
+              <th>{t('Кому')}</th>
+              <th>{t('Пояснение для сотрудника')}</th>
+              <th>{t('Статус')}</th>
+              <th aria-label={t('Действия')} />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={6} className={styles.empty}>
-                  Загрузка…
+                  {t('Загрузка…')}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className={styles.empty}>
-                  Ограничений нет — сотрудники могут запрашивать любую сумму без комментария
+                  {t('Ограничений нет — сотрудники могут запрашивать любую сумму без комментария')}
                 </td>
               </tr>
             ) : (
@@ -188,13 +190,13 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
                       {r.employees.length === 0
                         ? r.roles.map((role) => (
                             <span key={role} className={styles.targetRole}>
-                              <i className="fas fa-user-tag" aria-hidden /> {roleLabel(role)}
+                              <i className="fas fa-user-tag" aria-hidden /> {t(roleLabel(role))}
                             </span>
                           ))
                         : null}
                       {r.employees.length === 0 && r.roles.length === 0 ? (
                         <span className={styles.targetAll}>
-                          <i className="fas fa-users" aria-hidden /> Все сотрудники
+                          <i className="fas fa-users" aria-hidden /> {t('Все сотрудники')}
                         </span>
                       ) : null}
                     </div>
@@ -202,20 +204,20 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
                   <td className={styles.comment}>{r.reason || <span className={styles.sub}>—</span>}</td>
                   <td>
                     <span className={`${shared.badge} ${r.isActive ? shared.badgeOk : shared.badgeDraft}`}>
-                      {r.isActive ? 'Активно' : 'Выключено'}
+                      {r.isActive ? t('Активно') : t('Выключено')}
                     </span>
                   </td>
                   <td className={styles.actions}>
                     {canEdit ? (
                       <>
-                        <button type="button" className={styles.iconBtn} onClick={() => edit(r)} title="Изменить">
+                        <button type="button" className={styles.iconBtn} onClick={() => edit(r)} title={t('Изменить')}>
                           <i className="fas fa-pen" aria-hidden />
                         </button>
                         <button
                           type="button"
                           className={styles.iconBtn}
                           onClick={() => void remove(r)}
-                          title="Удалить"
+                          title={t('Удалить')}
                         >
                           <i className="fas fa-trash" aria-hidden />
                         </button>
@@ -232,15 +234,15 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
       <FormModal
         open={!!draft}
         width="md"
-        title={draft?.id ? 'Изменить ограничение' : 'Новое ограничение'}
+        title={draft?.id ? t('Изменить ограничение') : t('Новое ограничение')}
         onClose={() => setDraft(null)}
         footer={
           <>
             <button type="button" className={modal.btnGhost} onClick={() => setDraft(null)}>
-              Отмена
+              {t('Отмена')}
             </button>
             <button type="button" className={modal.btnPrimary} disabled={busy} onClick={() => void save()}>
-              Сохранить
+              {t('Сохранить')}
             </button>
           </>
         }
@@ -251,17 +253,19 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
             <div className={modal.row2}>
               <label className={modal.field}>
                 <span>
-                  Название<span className={modal.req}>*</span>
+                  {t('Название')}
+                  <span className={modal.req}>*</span>
                 </span>
                 <input
                   value={draft.name}
-                  placeholder="Например: Рядовые сотрудники"
+                  placeholder={t('Например: Рядовые сотрудники')}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 />
               </label>
               <label className={modal.field}>
                 <span>
-                  Максимальная сумма, сум<span className={modal.req}>*</span>
+                  {t('Максимальная сумма, сум')}
+                  <span className={modal.req}>*</span>
                 </span>
                 <input
                   inputMode="numeric"
@@ -273,7 +277,7 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
             </div>
 
             <div className={modal.field}>
-              <span>Роли</span>
+              <span>{t('Роли')}</span>
               <div className={styles.roleChecks}>
                 {ROLES.map((r) => (
                   <label key={r.id} className={modal.checkRow}>
@@ -289,7 +293,7 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
                         })
                       }
                     />
-                    {r.label}
+                    {t(r.label)}
                   </label>
                 ))}
               </div>
@@ -301,19 +305,21 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
             />
             <p className={styles.sub}>
               {draft.employees.length
-                ? 'Правило действует для выбранных сотрудников (роли не учитываются).'
+                ? t('Правило действует для выбранных сотрудников (роли не учитываются).')
                 : draft.roles.length
-                  ? 'Правило действует для выбранных ролей.'
-                  : 'Ни роли, ни сотрудники не выбраны — правило действует для всех.'}
+                  ? t('Правило действует для выбранных ролей.')
+                  : t('Ни роли, ни сотрудники не выбраны — правило действует для всех.')}
             </p>
 
             <label className={modal.field}>
-              <span>Пояснение для сотрудника</span>
+              <span>{t('Пояснение для сотрудника')}</span>
               <textarea
                 rows={3}
                 maxLength={1000}
                 value={draft.reason}
-                placeholder="Например: Аванс выдаётся не больше 40% оклада. Если нужно больше — напишите, на что (лечение, учёба и т.п.)."
+                placeholder={t(
+                  'Например: Аванс выдаётся не больше 40% оклада. Если нужно больше — напишите, на что (лечение, учёба и т.п.).',
+                )}
                 onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
               />
             </label>
@@ -324,7 +330,7 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
                 checked={draft.isActive}
                 onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
               />
-              Активно
+              {t('Активно')}
             </label>
           </div>
         ) : null}
@@ -334,6 +340,7 @@ export function AdvanceLimitsTab({ canEdit }: { canEdit: boolean }) {
 }
 
 function EmployeePicker({ value, onChange }: { value: Emp[]; onChange: (v: Emp[]) => void }) {
+  const { t } = useI18n();
   const [q, setQ] = useState('');
   const [options, setOptions] = useState<Emp[]>([]);
   const [open, setOpen] = useState(false);
@@ -363,7 +370,7 @@ function EmployeePicker({ value, onChange }: { value: Emp[]; onChange: (v: Emp[]
 
   return (
     <div className={modal.field}>
-      <span>Сотрудники</span>
+      <span>{t('Сотрудники')}</span>
       {value.length ? (
         <div className={styles.targets}>
           {value.map((e) => (
@@ -372,7 +379,7 @@ function EmployeePicker({ value, onChange }: { value: Emp[]; onChange: (v: Emp[]
               <button
                 type="button"
                 className={styles.chipX}
-                aria-label={`Убрать ${empName(e)}`}
+                aria-label={`${t('Убрать')} ${empName(e)}`}
                 onClick={() => onChange(value.filter((x) => x.id !== e.id))}
               >
                 ×
@@ -384,7 +391,7 @@ function EmployeePicker({ value, onChange }: { value: Emp[]; onChange: (v: Emp[]
       <div className={modal.combo}>
         <input
           value={q}
-          placeholder="Поиск сотрудника по ФИО или табельному…"
+          placeholder={t('Поиск сотрудника по ФИО или табельному…')}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => options.length && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}

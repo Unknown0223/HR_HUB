@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch, getSession } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import shared from '../../../page-shared.module.css';
@@ -66,6 +67,7 @@ const fmtDate = (v: string | null) =>
     : '—';
 
 export function AdvanceRequestsPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab') === 'limits' ? 'limits' : 'requests';
@@ -104,12 +106,12 @@ export function AdvanceRequestsPage() {
       const data = await apiFetch<RequestRow[]>(`/api/advance-requests?${qs}`);
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      setError(e instanceof Error ? e.message : t('Ошибка загрузки'));
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, t]);
 
   useEffect(() => {
     if (tab === 'requests') void load();
@@ -139,7 +141,7 @@ export function AdvanceRequestsPage() {
   async function submitReview() {
     if (!reviewing) return;
     if (reviewing.verdict === 'rejected' && !note.trim()) {
-      setError('Укажите причину отказа — сотрудник увидит её в приложении');
+      setError(t('Укажите причину отказа — сотрудник увидит её в приложении'));
       return;
     }
     setBusy(true);
@@ -149,15 +151,19 @@ export function AdvanceRequestsPage() {
         method: 'PATCH',
         body: JSON.stringify({ status: reviewing.verdict, reviewNote: note.trim() || undefined }),
       });
+      const vars = { name: fio(reviewing.row.employee), amount: money(reviewing.row.amount) };
       setFlash(
         reviewing.verdict === 'approved'
-          ? `Заявка ${fio(reviewing.row.employee)} принята: ${money(reviewing.row.amount)}. Аванс создан в «Периоды и авансы», сотрудник получил уведомление.`
-          : `Заявка ${fio(reviewing.row.employee)} отклонена, сотрудник получил уведомление.`,
+          ? t(
+              'Заявка {name} принята: {amount}. Аванс создан в «Периоды и авансы», сотрудник получил уведомление.',
+              vars,
+            )
+          : t('Заявка {name} отклонена, сотрудник получил уведомление.', vars),
       );
       setReviewing(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось сохранить');
+      setError(e instanceof Error ? e.message : t('Не удалось сохранить'));
     } finally {
       setBusy(false);
     }
@@ -170,10 +176,11 @@ export function AdvanceRequestsPage() {
           <i className="fas fa-hand-holding-usd" aria-hidden />
         </div>
         <div className={shared.pageHeaderText}>
-          <h1 className={shared.pageTitle}>Заявки на аванс</h1>
+          <h1 className={shared.pageTitle}>{t('Заявки на аванс')}</h1>
           <p className={shared.pageSubtitle}>
-            Сотрудники запрашивают аванс из мобильного приложения. Сумма больше лимита
-            приходит только с объяснением.
+            {t(
+              'Сотрудники запрашивают аванс из мобильного приложения. Сумма больше лимита приходит только с объяснением.',
+            )}
           </p>
         </div>
       </div>
@@ -186,7 +193,7 @@ export function AdvanceRequestsPage() {
           className={tab === 'requests' ? styles.tabOn : styles.tab}
           onClick={() => patchUrl({ tab: null })}
         >
-          <i className="fas fa-inbox" aria-hidden /> Заявки
+          <i className="fas fa-inbox" aria-hidden /> {t('Заявки')}
         </button>
         <button
           type="button"
@@ -195,7 +202,7 @@ export function AdvanceRequestsPage() {
           className={tab === 'limits' ? styles.tabOn : styles.tab}
           onClick={() => patchUrl({ tab: 'limits', status: null })}
         >
-          <i className="fas fa-sliders-h" aria-hidden /> Ограничения
+          <i className="fas fa-sliders-h" aria-hidden /> {t('Ограничения')}
         </button>
       </div>
 
@@ -205,36 +212,36 @@ export function AdvanceRequestsPage() {
         <>
           <div className={styles.toolbar}>
             <div className={styles.chips}>
-              {STATUS_TABS.map((t) => (
+              {STATUS_TABS.map((s) => (
                 <button
-                  key={t.id || 'all'}
+                  key={s.id || 'all'}
                   type="button"
-                  className={status === t.id ? styles.chipOn : styles.chip}
-                  onClick={() => patchUrl({ status: t.id === 'pending' ? null : t.id })}
+                  className={status === s.id ? styles.chipOn : styles.chip}
+                  onClick={() => patchUrl({ status: s.id === 'pending' ? null : s.id })}
                 >
-                  {t.label}
+                  {t(s.label)}
                 </button>
               ))}
             </div>
             <div className={styles.toolRight}>
               {status === 'pending' && rows.length > 0 ? (
                 <span className={styles.total}>
-                  Всего на рассмотрении: <strong>{money(pendingTotal)}</strong>
+                  {t('Всего на рассмотрении:')} <strong>{money(pendingTotal)}</strong>
                 </span>
               ) : null}
               <input
                 className={styles.search}
-                placeholder="Поиск по ФИО, табельному…"
+                placeholder={t('Поиск по ФИО, табельному…')}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                aria-label="Поиск"
+                aria-label={t('Поиск')}
               />
               <button
                 type="button"
                 className={styles.iconBtn}
                 onClick={() => void load()}
-                title="Обновить"
-                aria-label="Обновить"
+                title={t('Обновить')}
+                aria-label={t('Обновить')}
               >
                 <i className="fas fa-sync-alt" aria-hidden />
               </button>
@@ -244,7 +251,12 @@ export function AdvanceRequestsPage() {
           {flash ? (
             <div className={styles.flash} role="status">
               <i className="fas fa-check-circle" aria-hidden /> {flash}
-              <button type="button" className={styles.flashClose} onClick={() => setFlash('')} aria-label="Скрыть">
+              <button
+                type="button"
+                className={styles.flashClose}
+                onClick={() => setFlash('')}
+                aria-label={t('Скрыть')}
+              >
                 ×
               </button>
             </div>
@@ -255,26 +267,26 @@ export function AdvanceRequestsPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Сотрудник</th>
-                  <th className={styles.num}>Сумма</th>
-                  <th>Лимит</th>
-                  <th>Комментарий сотрудника</th>
-                  <th>Подана</th>
-                  <th>Статус</th>
-                  <th aria-label="Действия" />
+                  <th>{t('Сотрудник')}</th>
+                  <th className={styles.num}>{t('Сумма')}</th>
+                  <th>{t('Лимит')}</th>
+                  <th>{t('Комментарий сотрудника')}</th>
+                  <th>{t('Подана')}</th>
+                  <th>{t('Статус')}</th>
+                  <th aria-label={t('Действия')} />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
                     <td colSpan={7} className={styles.empty}>
-                      Загрузка…
+                      {t('Загрузка…')}
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className={styles.empty}>
-                      {status === 'pending' ? 'Новых заявок нет' : 'Заявок не найдено'}
+                      {status === 'pending' ? t('Новых заявок нет') : t('Заявок не найдено')}
                     </td>
                   </tr>
                 ) : (
@@ -293,20 +305,22 @@ export function AdvanceRequestsPage() {
                         <td className={`${styles.num} ${styles.amount}`}>{money(r.amount)}</td>
                         <td>
                           {r.limitAmount == null ? (
-                            <span className={styles.sub}>не задан</span>
+                            <span className={styles.sub}>{t('не задан')}</span>
                           ) : r.overLimit ? (
-                            <span className={styles.overTag} title="Сумма больше лимита">
-                              <i className="fas fa-exclamation-triangle" aria-hidden /> выше{' '}
-                              {money(r.limitAmount)}
+                            <span className={styles.overTag} title={t('Сумма больше лимита')}>
+                              <i className="fas fa-exclamation-triangle" aria-hidden />{' '}
+                              {t('выше {amount}', { amount: money(r.limitAmount) })}
                             </span>
                           ) : (
-                            <span className={styles.sub}>до {money(r.limitAmount)}</span>
+                            <span className={styles.sub}>
+                              {t('до {amount}', { amount: money(r.limitAmount) })}
+                            </span>
                           )}
                         </td>
                         <td className={styles.comment}>{r.comment || <span className={styles.sub}>—</span>}</td>
                         <td className={styles.sub}>{fmtDate(r.createdAt)}</td>
                         <td>
-                          <span className={`${shared.badge} ${meta.cls}`}>{meta.label}</span>
+                          <span className={`${shared.badge} ${meta.cls}`}>{t(meta.label)}</span>
                           {r.status !== 'pending' && r.status !== 'cancelled' ? (
                             <div className={styles.sub}>
                               {r.reviewedByName ? `${r.reviewedByName}, ` : ''}
@@ -323,14 +337,14 @@ export function AdvanceRequestsPage() {
                                 className={styles.approve}
                                 onClick={() => openReview(r, 'approved')}
                               >
-                                <i className="fas fa-check" aria-hidden /> Принять
+                                <i className="fas fa-check" aria-hidden /> {t('Принять')}
                               </button>
                               <button
                                 type="button"
                                 className={styles.reject}
                                 onClick={() => openReview(r, 'rejected')}
                               >
-                                <i className="fas fa-times" aria-hidden /> Отклонить
+                                <i className="fas fa-times" aria-hidden /> {t('Отклонить')}
                               </button>
                             </>
                           ) : null}
@@ -348,12 +362,12 @@ export function AdvanceRequestsPage() {
       <FormModal
         open={!!reviewing}
         width="sm"
-        title={reviewing?.verdict === 'approved' ? 'Принять заявку на аванс' : 'Отклонить заявку'}
+        title={reviewing?.verdict === 'approved' ? t('Принять заявку на аванс') : t('Отклонить заявку')}
         onClose={() => setReviewing(null)}
         footer={
           <>
             <button type="button" className={modal.btnGhost} onClick={() => setReviewing(null)}>
-              Отмена
+              {t('Отмена')}
             </button>
             <button
               type="button"
@@ -361,7 +375,7 @@ export function AdvanceRequestsPage() {
               disabled={busy}
               onClick={() => void submitReview()}
             >
-              {reviewing?.verdict === 'approved' ? 'Принять' : 'Отклонить'}
+              {reviewing?.verdict === 'approved' ? t('Принять') : t('Отклонить')}
             </button>
           </>
         }
@@ -371,7 +385,10 @@ export function AdvanceRequestsPage() {
             <p className={styles.reviewSummary}>
               <strong>{fio(reviewing.row.employee)}</strong> — {money(reviewing.row.amount)}
               {reviewing.row.overLimit ? (
-                <span className={styles.overTag}> выше лимита {money(reviewing.row.limitAmount)}</span>
+                <span className={styles.overTag}>
+                  {' '}
+                  {t('выше лимита {amount}', { amount: money(reviewing.row.limitAmount) })}
+                </span>
               ) : null}
             </p>
             {reviewing.row.comment ? (
@@ -379,13 +396,14 @@ export function AdvanceRequestsPage() {
             ) : null}
             {reviewing.verdict === 'approved' ? (
               <p className={styles.sub}>
-                Будет создан аванс в статусе «Черновик» в разделе «Периоды и авансы» — там его
-                отмечают выплаченным.
+                {t(
+                  'Будет создан аванс в статусе «Черновик» в разделе «Периоды и авансы» — там его отмечают выплаченным.',
+                )}
               </p>
             ) : null}
             <label className={modal.field}>
               <span>
-                {reviewing.verdict === 'approved' ? 'Комментарий (необязательно)' : 'Причина отказа'}
+                {reviewing.verdict === 'approved' ? t('Комментарий (необязательно)') : t('Причина отказа')}
                 {reviewing.verdict === 'rejected' ? <span className={modal.req}>*</span> : null}
               </span>
               <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} />

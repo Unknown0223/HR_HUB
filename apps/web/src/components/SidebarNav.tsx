@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n';
 import type { NavSection, NavSectionId } from '@/lib/nav-registry';
 import sb from './sidebar.module.css';
 
@@ -27,10 +28,12 @@ export function SidebarNav({
   onNavigate,
   idPrefix,
 }: Props) {
+  const { t } = useI18n();
   return (
     <>
       {sections.map((sec) => {
         const items = sec.groups.flatMap((g) => g.items);
+        const secLabel = t(sec.label);
         const sectionActive = activeSectionId === sec.id;
         const headCls = sectionActive ? sb.sectionActive : sb.sectionBtn;
 
@@ -43,13 +46,13 @@ export function SidebarNav({
                 href={item.href}
                 className={headCls}
                 aria-current={active ? 'page' : undefined}
-                title={compact ? sec.label : undefined}
+                title={compact ? secLabel : undefined}
                 onClick={onNavigate}
               >
                 <span className={sb.sectionIcon} aria-hidden>
                   <i className={`fas ${sec.faIcon}`} />
                 </span>
-                <span className={sb.sectionLabel}>{sec.label}</span>
+                <span className={sb.sectionLabel}>{secLabel}</span>
               </Link>
             </div>
           );
@@ -65,13 +68,13 @@ export function SidebarNav({
               className={headCls}
               aria-expanded={open}
               aria-controls={open ? panelId : undefined}
-              title={compact ? sec.label : undefined}
+              title={compact ? secLabel : undefined}
               onClick={() => onToggle(sec.id)}
             >
               <span className={sb.sectionIcon} aria-hidden>
                 <i className={`fas ${sec.faIcon}`} />
               </span>
-              <span className={sb.sectionLabel}>{sec.label}</span>
+              <span className={sb.sectionLabel}>{secLabel}</span>
               <i
                 className={`fas fa-chevron-right ${open ? sb.chevronOpen : sb.chevron}`}
                 aria-hidden
@@ -80,10 +83,10 @@ export function SidebarNav({
             {open ? (
               <div id={panelId} className={sectionActive ? sb.itemsActive : sb.items}>
                 {sec.groups.map((g) => (
-                  <div key={g.id} role="group" aria-label={g.title}>
+                  <div key={g.id} role="group" aria-label={t(g.title)}>
                     {showGroupTitles && g.title !== sec.label ? (
                       <div className={sb.groupTitle}>
-                        <span>{g.title}</span>
+                        <span>{t(g.title)}</span>
                       </div>
                     ) : null}
                     <ul className={sb.itemList}>
@@ -97,7 +100,7 @@ export function SidebarNav({
                               aria-current={active ? 'page' : undefined}
                               onClick={onNavigate}
                             >
-                              {item.label}
+                              {t(item.label)}
                             </Link>
                           </li>
                         );

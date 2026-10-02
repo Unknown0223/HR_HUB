@@ -29,6 +29,7 @@ import {
 } from '@/lib/role-access';
 import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
 import { applyTheme, storedTheme, type ThemeMode } from '@/lib/theme';
+import { I18nProvider, LANGS, useI18n } from '@/lib/i18n';
 import { SidebarNav } from './SidebarNav';
 import styles from './shell.module.css';
 import sb from './sidebar.module.css';
@@ -59,6 +60,7 @@ function initials(name: string) {
 }
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
+  const { t, lang, setLang } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams?.toString() ? `?${searchParams.toString()}` : '';
@@ -552,15 +554,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     if (pwdBusy) return;
     setPwdMsg('');
     if (!pwdForm.current) {
-      setPwdMsg('Введите текущий пароль');
+      setPwdMsg(t('Введите текущий пароль'));
       return;
     }
     if (pwdForm.next.length < 8) {
-      setPwdMsg('Новый пароль должен быть не короче 8 символов');
+      setPwdMsg(t('Новый пароль должен быть не короче 8 символов'));
       return;
     }
     if (pwdForm.next !== pwdForm.confirm) {
-      setPwdMsg('Пароли не совпадают');
+      setPwdMsg(t('Пароли не совпадают'));
       return;
     }
     setPwdBusy(true);
@@ -570,17 +572,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ currentPassword: pwdForm.current, newPassword: pwdForm.next }),
       });
       setPwdForm({ current: '', next: '', confirm: '' });
-      setPwdMsg('Пароль обновлён');
+      setPwdMsg(t('Пароль обновлён'));
       setTimeout(closePasswordModal, 900);
     } catch (err) {
-      setPwdMsg(err instanceof Error && err.message ? err.message : 'Не удалось изменить пароль');
+      setPwdMsg(err instanceof Error && err.message ? err.message : t('Не удалось изменить пароль'));
     } finally {
       setPwdBusy(false);
     }
   }
 
   if (!session) {
-    return <div className={styles.loading}>Загрузка…</div>;
+    return <div className={styles.loading}>{t('Загрузка…')}</div>;
   }
 
   const visibleSections: NavSection[] = NAV_SECTIONS.map((sec) => ({
@@ -603,7 +605,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <div className={styles.shell}>
       <SeasonalBackdrop mode="app" section={activeSectionId} />
       <a className={styles.skipLink} href="#main-content">
-        К основному содержимому
+        {t('К основному содержимому')}
       </a>
       <header className={styles.topNav} data-no-print>
         <div className={styles.topNavInner}>
@@ -611,7 +613,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             ref={menuBtnRef}
             type="button"
             className={sb.menuBtn}
-            aria-label="Меню"
+            aria-label={t('Меню')}
             aria-expanded={mobileOpen}
             aria-controls="app-nav-drawer"
             onClick={() => setMobileOpen((v) => !v)}
@@ -634,17 +636,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <nav className={sb.crumbs} aria-label="Хлебные крошки">
+          <nav className={sb.crumbs} aria-label={t('Хлебные крошки')}>
             {activeSection ? (
               <>
-                <span className={sb.crumbSection}>{activeSection.label}</span>
+                <span className={sb.crumbSection}>{t(activeSection.label)}</span>
                 <span className={sb.crumbSep} aria-hidden>
                   /
                 </span>
               </>
             ) : null}
             <span className={sb.crumbPage} aria-current="page">
-              {pageTitle}
+              {t(pageTitle)}
             </span>
           </nav>
 
@@ -653,19 +655,28 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               className={styles.iconBtn}
-              title={themeMode === 'light' ? 'Тёмная тема' : 'Светлая тема'}
-              aria-label={themeMode === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}
+              title={themeMode === 'light' ? t('Тёмная тема') : t('Светлая тема')}
+              aria-label={themeMode === 'light' ? t('Тёмная тема') : t('Светлая тема')}
               aria-pressed={themeMode === 'dark'}
               onClick={toggleScreenMode}
             >
               <i className={`fas ${themeMode === 'light' ? 'fa-moon' : 'fa-sun'}`} aria-hidden />
             </button>
+            <button
+              type="button"
+              className={`${styles.iconBtn} ${styles.langBtn}`}
+              title={t('Язык интерфейса')}
+              aria-label={t('Язык интерфейса')}
+              onClick={() => setLang(lang === 'ru' ? 'uz' : 'ru')}
+            >
+              {LANGS.find((l) => l.id === lang)?.short}
+            </button>
             <div className={styles.menuWrap}>
               <button
                 type="button"
                 className={styles.iconBtn}
-                title="Поиск"
-                aria-label="Поиск"
+                title={t('Поиск')}
+                aria-label={t('Поиск')}
                 aria-expanded={searchOpen}
                 onClick={() => {
                   setSearchOpen((v) => !v);
@@ -678,32 +689,32 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               {searchOpen ? (
                 <div className={`${styles.dropMenu} ${styles.searchModal}`} role="dialog">
                   <div className={styles.dropHead}>
-                    <span>Глобальный поиск</span>
+                    <span>{t('Глобальный поиск')}</span>
                   </div>
                   <div className={styles.searchBox}>
                     <input
                       autoFocus
                       type="search"
                       className={styles.searchInput}
-                      placeholder="Сотрудник, физлицо, подразделение…"
+                      placeholder={t('Сотрудник, физлицо, подразделение…')}
                       value={searchQ}
                       onChange={(e) => setSearchQ(e.target.value)}
                     />
                   </div>
                   <div className={styles.searchBody}>
                     {searchBusy ? (
-                      <div className={styles.dropEmpty}>Поиск…</div>
+                      <div className={styles.dropEmpty}>{t('Поиск…')}</div>
                     ) : !searchRes || searchQ.trim().length < 1 ? (
-                      <div className={styles.dropEmpty}>Введите запрос</div>
+                      <div className={styles.dropEmpty}>{t('Введите запрос')}</div>
                     ) : !searchRes.employees.length &&
                       !searchRes.persons.length &&
                       !searchRes.divisions.length ? (
-                      <div className={styles.dropEmpty}>Ничего не найдено</div>
+                      <div className={styles.dropEmpty}>{t('Ничего не найдено')}</div>
                     ) : (
                       <>
                         {searchRes.employees.length ? (
                           <div className={styles.searchGroup}>
-                            <div className={styles.searchGroupTitle}>Сотрудники</div>
+                            <div className={styles.searchGroupTitle}>{t('Сотрудники')}</div>
                             {searchRes.employees.map((e) => (
                               <Link
                                 key={e.id}
@@ -719,7 +730,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                         ) : null}
                         {searchRes.persons.length ? (
                           <div className={styles.searchGroup}>
-                            <div className={styles.searchGroupTitle}>Физические лица</div>
+                            <div className={styles.searchGroupTitle}>{t('Физические лица')}</div>
                             {searchRes.persons.map((p) => (
                               <Link
                                 key={p.id}
@@ -735,7 +746,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                         ) : null}
                         {searchRes.divisions.length ? (
                           <div className={styles.searchGroup}>
-                            <div className={styles.searchGroupTitle}>Подразделения</div>
+                            <div className={styles.searchGroupTitle}>{t('Подразделения')}</div>
                             {searchRes.divisions.map((d) => (
                               <Link
                                 key={d.id}
@@ -760,8 +771,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 className={styles.iconBtn}
-                title="Уведомления"
-                aria-label="Уведомления"
+                title={t('Уведомления')}
+                aria-label={t('Уведомления')}
                 aria-expanded={notifyOpen}
                 onClick={() => {
                   setNotifyOpen((v) => !v);
@@ -778,7 +789,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               {notifyOpen ? (
                 <div className={`${styles.dropMenu} ${styles.dropWide}`} role="menu">
                   <div className={styles.dropHead}>
-                    <span>Уведомления ({notifications.length})</span>
+                    <span>{t('Уведомления')} ({notifications.length})</span>
                     <div className={styles.dropHeadActions}>
                       {unreadCount > 0 ? (
                         <button
@@ -791,7 +802,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                             await loadNotifications();
                           }}
                         >
-                          Прочитать все
+                          {t('Прочитать все')}
                         </button>
                       ) : null}
                       {notifications.length > 0 ? (
@@ -806,13 +817,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                             setUnreadCount(0);
                           }}
                         >
-                          Очистить
+                          {t('Очистить')}
                         </button>
                       ) : null}
                     </div>
                   </div>
                   {notifications.length === 0 ? (
-                    <div className={styles.dropEmpty}>Нет уведомлений</div>
+                    <div className={styles.dropEmpty}>{t('Нет уведомлений')}</div>
                   ) : (
                     <div className={styles.notifyList}>
                       {notifications.slice(0, 20).map((n) => (
@@ -846,7 +857,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                             <strong>{n.title}</strong>
                             {n.body ? <span>{n.body}</span> : null}
                             <small>
-                              {new Date(n.createdAt).toLocaleString('ru-RU', {
+                              {new Date(n.createdAt).toLocaleString(lang === 'uz' ? 'uz-Latn-UZ' : 'ru-RU', {
                                 day: '2-digit',
                                 month: 'short',
                                 hour: '2-digit',
@@ -857,8 +868,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                           <button
                             type="button"
                             className={styles.notifyDismiss}
-                            title="Удалить"
-                            aria-label="Удалить уведомление"
+                            title={t('Удалить')}
+                            aria-label={t('Удалить уведомление')}
                             onClick={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -898,7 +909,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                   setSearchOpen(false);
                 }}
                 aria-expanded={profileOpen}
-                aria-label="Профиль"
+                aria-label={t('Профиль')}
                 title={session.user.fullName}
               >
                 <span className={styles.avatar}>{initials(session.user.fullName)}</span>
@@ -914,7 +925,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                   <div className={styles.profileMenuHead}>
                     <strong>{session.user.fullName}</strong>
                     <span>
-                      {session.tenant?.name || session.user.email || 'Организация'}
+                      {session.tenant?.name || session.user.email || t('Организация')}
                     </span>
                   </div>
                   <Link
@@ -923,7 +934,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     onClick={() => setProfileOpen(false)}
                   >
                     <i className="fas fa-user" aria-hidden />
-                    Профиль
+                    {t('Профиль')}
                   </Link>
                   <a
                     className={styles.dropItemLink}
@@ -931,7 +942,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     onClick={() => setProfileOpen(false)}
                   >
                     <i className="fas fa-comment-dots" aria-hidden />
-                    Оставить отзыв
+                    {t('Оставить отзыв')}
                   </a>
                   <button
                     type="button"
@@ -943,7 +954,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     }}
                   >
                     <i className="fas fa-key" aria-hidden />
-                    Изменить пароль
+                    {t('Изменить пароль')}
                   </button>
                   <Link
                     href="/m"
@@ -951,7 +962,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     onClick={() => setProfileOpen(false)}
                   >
                     <i className="fas fa-mobile-alt" aria-hidden />
-                    Мобильная версия
+                    {t('Мобильная версия')}
                   </Link>
                   <button
                     type="button"
@@ -962,9 +973,20 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                       className={`fas ${themeMode === 'light' ? 'fa-moon' : 'fa-sun'}`}
                       aria-hidden
                     />
-                    Режим экрана
+                    {t('Режим экрана')}
                     <span className={styles.dropHint}>
-                      {themeMode === 'light' ? 'Светлый' : 'Тёмный'}
+                      {themeMode === 'light' ? t('Светлый') : t('Тёмный')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.dropItem}
+                    onClick={() => setLang(lang === 'ru' ? 'uz' : 'ru')}
+                  >
+                    <i className="fas fa-language" aria-hidden />
+                    {t('Язык интерфейса')}
+                    <span className={styles.dropHint}>
+                      {LANGS.find((l) => l.id === lang)?.label}
                     </span>
                   </button>
                   <button
@@ -976,12 +998,12 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     }}
                   >
                     <i className="fas fa-lock" aria-hidden />
-                    Блокировка экрана
+                    {t('Блокировка экрана')}
                   </button>
                   <div className={styles.profileMenuSep} />
                   <button type="button" className={styles.logout} onClick={logout}>
                     <i className="fas fa-sign-out-alt" aria-hidden />
-                    Выйти
+                    {t('Выйти')}
                   </button>
                   <button
                     type="button"
@@ -989,7 +1011,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     onClick={logoutForgetDevice}
                   >
                     <i className="fas fa-unlink" aria-hidden />
-                    Выйти и забыть устройство
+                    {t('Выйти и забыть устройство')}
                   </button>
                 </div>
               ) : null}
@@ -1003,13 +1025,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <div className={styles.lockCard}>
             <span className={styles.lockAvatar}>{initials(session.user.fullName)}</span>
             <strong>{session.user.fullName}</strong>
-            <span className={styles.lockHint}>Экран заблокирован</span>
+            <span className={styles.lockHint}>{t('Экран заблокирован')}</span>
             <button
               type="button"
               className={styles.lockUnlock}
               onClick={() => setScreenLocked(false)}
             >
-              Разблокировать
+              {t('Разблокировать')}
             </button>
           </div>
         </div>
@@ -1030,18 +1052,18 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             onSubmit={submitPasswordChange}
           >
             <div className={styles.pwdHead}>
-              <h2 id="pwd-title">Изменить пароль</h2>
+              <h2 id="pwd-title">{t('Изменить пароль')}</h2>
               <button
                 type="button"
                 className={styles.pwdClose}
-                aria-label="Закрыть"
+                aria-label={t('Закрыть')}
                 onClick={closePasswordModal}
               >
                 ×
               </button>
             </div>
             <label className={styles.pwdField}>
-              <span>Текущий пароль</span>
+              <span>{t('Текущий пароль')}</span>
               <input
                 type="password"
                 autoComplete="current-password"
@@ -1052,7 +1074,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               />
             </label>
             <label className={styles.pwdField}>
-              <span>Новый пароль</span>
+              <span>{t('Новый пароль')}</span>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -1063,7 +1085,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               />
             </label>
             <label className={styles.pwdField}>
-              <span>Подтверждение</span>
+              <span>{t('Подтверждение')}</span>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -1076,10 +1098,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             {pwdMsg ? <p className={styles.pwdMsg}>{pwdMsg}</p> : null}
             <div className={styles.pwdActions}>
               <button type="button" onClick={closePasswordModal}>
-                Отмена
+                {t('Отмена')}
               </button>
               <button type="submit" className={styles.pwdSave} disabled={pwdBusy}>
-                Сохранить
+                {t('Сохранить')}
               </button>
             </div>
           </form>
@@ -1091,7 +1113,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             className={sb.backdrop}
-            aria-label="Закрыть меню"
+            aria-label={t('Закрыть меню')}
             tabIndex={-1}
             onClick={() => setMobileOpen(false)}
           />
@@ -1100,7 +1122,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             className={sb.drawer}
             role="dialog"
             aria-modal="true"
-            aria-label="Навигация"
+            aria-label={t('Навигация')}
             data-no-print
           >
             <div className={sb.drawerHead}>
@@ -1112,13 +1134,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                 ref={drawerCloseRef}
                 type="button"
                 className={sb.drawerClose}
-                aria-label="Закрыть меню"
+                aria-label={t('Закрыть меню')}
                 onClick={() => setMobileOpen(false)}
               >
                 <i className="fas fa-times" aria-hidden />
               </button>
             </div>
-            <nav className={sb.navScroll} aria-label="Основная навигация">
+            <nav className={sb.navScroll} aria-label={t('Основная навигация')}>
               <SidebarNav
                 idPrefix="drawer-nav"
                 sections={visibleSections}
@@ -1138,13 +1160,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <div className={sb.sidebarHead}>
             {!compact ? (
               <>
-                <span className={sb.sidebarHeadTitle}>Разделы</span>
+                <span className={sb.sidebarHeadTitle}>{t('Разделы')}</span>
                 <button
                   type="button"
                   className={sb.headTool}
                   disabled={!expandedCount}
-                  title="Закрыть все разделы"
-                  aria-label="Закрыть все разделы"
+                  title={t('Закрыть все разделы')}
+                  aria-label={t('Закрыть все разделы')}
                   onClick={collapseAllSections}
                 >
                   <i className="fas fa-compress-alt" aria-hidden />
@@ -1155,14 +1177,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               type="button"
               className={compact ? sb.railToggleWide : sb.headTool}
               aria-pressed={compact}
-              title={compact ? 'Развернуть меню' : 'Свернуть меню до иконок'}
-              aria-label={compact ? 'Развернуть меню' : 'Свернуть меню до иконок'}
+              title={compact ? t('Развернуть меню') : t('Свернуть меню до иконок')}
+              aria-label={compact ? t('Развернуть меню') : t('Свернуть меню до иконок')}
               onClick={() => setCompactStored(!compact)}
             >
               <i className={`fas ${compact ? 'fa-angle-double-right' : 'fa-angle-double-left'}`} aria-hidden />
             </button>
           </div>
-          <nav className={sb.navScroll} aria-label="Основная навигация">
+          <nav className={sb.navScroll} aria-label={t('Основная навигация')}>
             <SidebarNav
               idPrefix="side-nav"
               sections={visibleSections}
@@ -1190,7 +1212,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <nav className={sb.bottomBar} aria-label="Быстрые разделы" data-no-print>
+      <nav className={sb.bottomBar} aria-label={t('Быстрые разделы')} data-no-print>
         {bottomShortcuts.map((s) => {
           const active = !mobileOpen && activeSectionId === s.section;
           return (
@@ -1201,7 +1223,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               aria-current={active ? 'page' : undefined}
             >
               <i className={`fas ${NAV_SECTIONS.find((n) => n.id === s.section)?.faIcon ?? 'fa-circle'}`} aria-hidden />
-              <span>{s.label}</span>
+              <span>{t(s.label)}</span>
             </Link>
           );
         })}
@@ -1213,7 +1235,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileOpen((v) => !v)}
         >
           <i className="fas fa-ellipsis-h" aria-hidden />
-          <span>Ещё</span>
+          <span>{t('Ещё')}</span>
         </button>
       </nav>
     </div>
@@ -1222,8 +1244,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<div className={styles.loading}>Загрузка…</div>}>
-      <AppShellInner>{children}</AppShellInner>
-    </Suspense>
+    <I18nProvider>
+      <Suspense fallback={<div className={styles.loading}>Загрузка…</div>}>
+        <AppShellInner>{children}</AppShellInner>
+      </Suspense>
+    </I18nProvider>
   );
 }

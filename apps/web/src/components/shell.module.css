@@ -298,6 +298,13 @@
   transition: color 0.16s ease, background 0.16s ease;
 }
 
+.langBtn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .iconBtn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
