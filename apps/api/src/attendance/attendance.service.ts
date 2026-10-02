@@ -5700,7 +5700,8 @@ export class AttendanceService {
         ? `key:${key}`
         : `url:${createHash('sha1').update(c.photoUrl ?? '').digest('hex')}`;
       const result = await this.faceMatch.embedCached(cacheKey, async () => {
-        if (key) return this.storage.getObjectBuffer(key);
+        const stored = key ? await this.storage.getObjectBuffer(key) : null;
+        if (stored?.length) return stored;
         const b64 = await this.resolveFaceBase64(c);
         return b64 ? Buffer.from(b64, 'base64') : null;
       });
