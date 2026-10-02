@@ -11,6 +11,7 @@ import '../../core/errors/api_exception.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/security/location_guard.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/time/server_clock.dart';
 import '../../shared/widgets.dart';
 import '../home/home_screen.dart';
 import 'liveness.dart';
@@ -56,6 +57,8 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
   int _livenessMs = 0;
   Uint8List? _photo;
   Map<String, dynamic>? _result;
+  bool _clockWrong = false;
+  bool _autoTimeOff = false;
 
   bool get _isIn => widget.direction == 'IN';
   String get _title => context.t(_isIn ? 'Kirish' : 'Chiqish');
@@ -112,8 +115,11 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
       final fence = await ref
           .read(meRepositoryProvider)
           .checkGps(latitude: fix.latitude, longitude: fix.longitude);
+      final autoTime = await ServerClock.autoTimeEnabled();
       if (!mounted) return;
       setState(() {
+        _clockWrong = ServerClock.deviceClockWrong;
+        _autoTimeOff = !autoTime;
         _fix = fix;
         _fence = fence['configured'] == true ? fence : null;
         _step = _Step.located;
@@ -192,7 +198,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
       _status = context.t('Foto-hisobot tayyorlanmoqda…');
     });
     try {
-      final now = DateTime.now();
+      final now = ServerClock.now();
       String two(int v) => v.toString().padLeft(2, '0');
       final stamp =
           'HR HUB | ${_isIn ? 'KIRISH' : 'CHIQISH'} | '
@@ -408,6 +414,10 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             children: [
               StaggeredEntrance(index: 0, child: _HeroCard(isIn: _isIn)),
+              if (_clockWrong || _autoTimeOff) ...[
+                const SizedBox(height: 12),
+                _ClockWarning(clockWrong: _clockWrong),
+              ],
               const SizedBox(height: 14),
               StaggeredEntrance(
                 index: 1,
@@ -881,6 +891,55 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
+/// The punch is stamped with server time anyway; this tells the employee why the
+/// phone clock and the recorded time may differ.
+class _ClockWarning extends StatelessWidget {
+  const _ClockWarning({required this.clockWrong});
+
+  final bool clockWrong;
+
+  @override
+  Widget build(BuildContext context) {
+    final offset = ServerClock.offset;
+    final minutes = offset == null ? 0 : offset.inMinutes.abs();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warn.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.warn.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.schedule_rounded, color: AppColors.warn),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              clockWrong
+                  ? context.tr(
+                      'Telefon soati internet vaqtidan $minutes daqiqa farq qiladi. '
+                          'Belgi telefon soati bilan emas, server (internet) vaqti bilan '
+                          'qo‘yiladi. Sozlamalarda «Avtomatik vaqt»ni yoqing.',
+                      'Часы телефона отличаются от интернет-времени на $minutes мин. '
+                          'Отметка ставится не по часам телефона, а по времени сервера. '
+                          'Включите «Автоматическое время» в настройках.',
+                    )
+                  : context.tr(
+                      'Telefonda «Avtomatik vaqt» o‘chirilgan. Belgi baribir server '
+                          '(internet) vaqti bilan qo‘yiladi.',
+                      'На телефоне выключено «Автоматическое время». Отметка всё равно '
+                          'ставится по времени сервера.',
+                    ),
+              style: const TextStyle(height: 1.35, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HeroCard extends StatelessWidget {
   const _HeroCard({required this.isIn});
   final bool isIn;
@@ -888,7 +947,7 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = _directionColors(isIn);
-    final now = DateTime.now();
+    final now = ServerClock.now();
     final months = context.dateLocale == 'ru'
         ? const [
             'января',

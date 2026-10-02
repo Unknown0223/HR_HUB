@@ -2,34 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme/season.dart';
 
-/// Drifting seasonal illustration with a light veil and falling petals, leaves, or snow.
-/// [scrim] is how solid the page stays: 0 on the login art, about 0.55 behind lists.
-class SeasonalBackdrop extends StatefulWidget {
+/// Seasonal illustration with a light veil behind every page. It sits under the whole app,
+/// so it only moves when the route changes: a looping animation here would repaint the full
+/// screen every frame and keep the CPU busy on every page.
+class SeasonalBackdrop extends StatelessWidget {
   const SeasonalBackdrop({super.key, this.scrim = 0.55});
 
+  /// How solid the page stays: 0 on the login art, about 0.55 behind lists.
   final double scrim;
-
-  @override
-  State<SeasonalBackdrop> createState() => _SeasonalBackdropState();
-}
-
-class _SeasonalBackdropState extends State<SeasonalBackdrop> with SingleTickerProviderStateMixin {
-  late final AnimationController _drift = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 18),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _drift.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final season = SeasonX.now;
-    final reduce = MediaQuery.of(context).disableAnimations;
-    if (reduce && _drift.isAnimating) _drift.stop();
     final router = GoRouter.maybeOf(context);
     if (router == null) return _frame(season, Alignment.centerLeft);
 
@@ -44,53 +28,44 @@ class _SeasonalBackdropState extends State<SeasonalBackdrop> with SingleTickerPr
 
   Widget _frame(Season season, Alignment target) {
     return IgnorePointer(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(color: season.veil),
-          TweenAnimationBuilder<Alignment>(
-            tween: AlignmentTween(end: target),
-            duration: const Duration(milliseconds: 650),
-            curve: Curves.easeInOutCubic,
-            builder: (context, alignment, _) => AnimatedBuilder(
-              animation: _drift,
-              builder: (context, child) {
-                final t = Curves.easeInOut.transform(_drift.value);
-                return Transform.translate(
-                  offset: Offset(-8 + 16 * t, -12),
-                  child: Transform.scale(
-                    scale: 1.04 + 0.05 * t,
-                    alignment: alignment,
-                    child: child,
-                  ),
-                );
-              },
-              child: Image.asset(
-                season.asset,
-                fit: BoxFit.cover,
+      child: RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: season.veil),
+            TweenAnimationBuilder<Alignment>(
+              tween: AlignmentTween(end: target),
+              duration: const Duration(milliseconds: 650),
+              curve: Curves.easeInOutCubic,
+              builder: (context, alignment, _) => Transform.scale(
+                scale: 1.06,
                 alignment: alignment,
-                filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
-                frameBuilder: fadeInFrame,
+                child: Image.asset(
+                  season.asset,
+                  fit: BoxFit.cover,
+                  alignment: alignment,
+                  filterQuality: FilterQuality.medium,
+                  gaplessPlayback: true,
+                  frameBuilder: fadeInFrame,
+                ),
               ),
             ),
-          ),
-          const SeasonFall(),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  season.veil.withValues(alpha: 0.22),
-                  season.veil.withValues(alpha: widget.scrim),
-                  season.veil.withValues(alpha: (widget.scrim + 0.12).clamp(0, 0.92)),
-                ],
-                stops: const [0, 0.22, 1],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    season.veil.withValues(alpha: 0.22),
+                    season.veil.withValues(alpha: scrim),
+                    season.veil.withValues(alpha: (scrim + 0.12).clamp(0, 0.92)),
+                  ],
+                  stops: const [0, 0.22, 1],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

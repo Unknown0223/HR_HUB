@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../errors/api_exception.dart';
+import '../time/server_clock.dart';
 import 'api_config.dart';
 
 class SessionTokens {
@@ -43,17 +44,36 @@ class ApiClient {
           if (tenantId != null && tenantId.isNotEmpty) {
             options.headers['X-Tenant-Id'] = tenantId;
           }
+          options.extra[_sentAtKey] = DateTime.now();
           return handler.next(options);
         },
+        onResponse: (response, handler) {
+          _observeClock(response);
+          return handler.next(response);
+        },
         onError: (error, handler) {
+          final response = error.response;
+          if (response != null) _observeClock(response);
           return handler.next(error);
         },
       ),
     );
   }
 
+  static const _sentAtKey = 'hrhub.sentAt';
+
   final Ref _ref;
   late final Dio _dio;
+
+  static void _observeClock(Response<dynamic> response) {
+    final sentAt = response.requestOptions.extra[_sentAtKey];
+    if (sentAt is! DateTime) return;
+    ServerClock.observe(
+      response.headers.value('date'),
+      sentAt,
+      DateTime.now(),
+    );
+  }
 
   Dio get dio => _dio;
 

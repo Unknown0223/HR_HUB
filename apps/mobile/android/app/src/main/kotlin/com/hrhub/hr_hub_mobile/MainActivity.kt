@@ -46,6 +46,13 @@ class MainActivity : FlutterFragmentActivity() {
                         AppNotifier.openBiometricEnroll(this)
                         result.success(true)
                     }
+                    "autoTimeEnabled" -> result.success(
+                        android.provider.Settings.Global.getInt(
+                            contentResolver,
+                            android.provider.Settings.Global.AUTO_TIME,
+                            1,
+                        ) == 1,
+                    )
                     "takeLaunchRoute" -> {
                         result.success(pendingRoute)
                         pendingRoute = null

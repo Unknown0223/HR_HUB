@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../time/server_clock.dart';
+
 /// Device-side signals that the location may be spoofed.
 class LocationIntegrity {
   const LocationIntegrity({
@@ -78,10 +80,14 @@ class LocationGuard {
     }
   }
 
+  /// Stops as soon as [minSamples] fixes reach [targetAccuracy]; after [settleAfter]
+  /// a fix within [acceptableAccuracy] is good enough (indoors GPS rarely gets below 15 m).
   Future<PreciseFix> acquire({
-    Duration timeout = const Duration(seconds: 14),
-    double targetAccuracy = 15,
-    int minSamples = 3,
+    Duration timeout = const Duration(seconds: 10),
+    double targetAccuracy = 20,
+    Duration settleAfter = const Duration(seconds: 4),
+    double acceptableAccuracy = 50,
+    int minSamples = 2,
     void Function(Position sample, int count)? onSample,
   }) async {
     final perm = await Permission.locationWhenInUse.request();
@@ -112,23 +118,30 @@ class LocationGuard {
 
     final samples = <Position>[];
     final done = Completer<void>();
+    final started = Stopwatch()..start();
+    void checkDone() {
+      if (done.isCompleted || samples.length < minSamples) return;
+      final best = samples.map((s) => s.accuracy).reduce((a, b) => a < b ? a : b);
+      final limit = started.elapsed >= settleAfter ? acceptableAccuracy : targetAccuracy;
+      if (best <= limit) done.complete();
+    }
+
     final sub = Geolocator.getPositionStream(locationSettings: settings).listen(
       (p) {
-        if (DateTime.now().difference(p.timestamp).abs() > _maxFixAge) return;
+        if (ServerClock.now().difference(p.timestamp).abs() > _maxFixAge) return;
         samples.add(p);
         onSample?.call(p, samples.length);
-        final best = samples.map((s) => s.accuracy).reduce((a, b) => a < b ? a : b);
-        if (samples.length >= minSamples && best <= targetAccuracy && !done.isCompleted) {
-          done.complete();
-        }
+        checkDone();
       },
       onError: (Object e) {
         if (!done.isCompleted) done.completeError(e);
       },
     );
+    final settle = Timer(settleAfter, checkDone);
     try {
       await done.future.timeout(timeout, onTimeout: () {});
     } finally {
+      settle.cancel();
       await sub.cancel();
     }
 

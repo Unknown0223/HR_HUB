@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/time/server_clock.dart';
 
 /// Fades and slides [child] in after `index * step` delay.
 class StaggeredEntrance extends StatefulWidget {
@@ -284,7 +285,7 @@ class _ShimmerButtonState extends State<ShimmerButton>
   }
 }
 
-/// Ticking HH:mm:ss clock.
+/// Ticking HH:mm:ss clock in server time.
 class LiveClock extends StatefulWidget {
   const LiveClock({super.key, this.style});
   final TextStyle? style;
@@ -295,13 +296,13 @@ class LiveClock extends StatefulWidget {
 
 class _LiveClockState extends State<LiveClock> {
   late Timer _timer;
-  DateTime _now = DateTime.now();
+  DateTime _now = ServerClock.now();
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (mounted) setState(() => _now = ServerClock.now());
     });
   }
 
