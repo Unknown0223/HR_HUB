@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/app_version.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
@@ -113,7 +114,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 14),
               const Center(
                 child: Text(
-                  'HR HUB · v1.0.0',
+                  'HR HUB · v$appVersion',
                   style: TextStyle(
                     color: AppColors.inkFaint,
                     fontSize: 13,

@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
+import '../app_version.dart';
 import '../errors/api_exception.dart';
 
 /// Native side of background GPS (see TrackingService.kt).
@@ -60,7 +61,7 @@ class TrackingController {
       final res = await _api.post('/tracking/register', data: {
         'platform': 'android',
         if (status.model != null) 'model': status.model,
-        'appVersion': '1.0.0',
+        'appVersion': appVersion,
       });
       final token = res['token']?.toString();
       if (token == null || token.isEmpty) return;
