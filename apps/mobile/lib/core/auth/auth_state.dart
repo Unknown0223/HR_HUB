@@ -179,8 +179,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Keeps `loading` false: the router treats loading as app start-up and would replace the
+  /// login screen with the splash, dropping the typed fields and the error message.
   Future<void> login(String email, String password) async {
-    state = state.copyWith(loading: true, clearError: true);
+    state = state.copyWith(clearError: true);
     try {
       final res = await _api.post(
         '/auth/login',
