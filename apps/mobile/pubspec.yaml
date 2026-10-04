@@ -1,7 +1,7 @@
 name: hr_hub_mobile
 description: HR HUB — xodim va rahbar mobil ilovasi
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.2.0+3
 
 environment:
   sdk: ^3.12.1
