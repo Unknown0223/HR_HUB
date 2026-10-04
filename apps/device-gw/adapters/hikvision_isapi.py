@@ -18,6 +18,14 @@ from typing import Any, Optional
 import httpx
 
 from .base import DeviceAdapter
+from .hikvision_audit import (
+    MAJOR_OPERATION,
+    build_operation_log,
+    diff_config,
+    flatten_json,
+    flatten_xml,
+    person_entry,
+)
 
 logger = logging.getLogger("hikvision-isapi")
 
@@ -34,6 +42,17 @@ PUNCH_LOCK_MIN_SECONDS = 120
 # Hikvision ACS operation minors (MAJOR_OPERATION = 3).
 MINOR_LOCAL_LOGIN = 80  # 0x50 — admin password entered on the terminal
 MINOR_LOCAL_LOGOUT = 81
+# Config snapshot the admin-session diff is compared against.
+CONFIG_BASELINE_REFRESH = timedelta(minutes=10)
+# Report the session even if no logout event shows up (menu left open, GW missed it).
+ADMIN_AUDIT_MAX_SESSION = timedelta(minutes=15)
+SNAPSHOT_PATHS = (
+    "/ISAPI/Streaming/channels/1/picture",
+    "/ISAPI/Streaming/channels/101/picture",
+    "/ISAPI/Streaming/channels/1/picture?snapShotImageType=JPEG",
+)
+PERSONS_PAGE_SIZE = 30
+PERSONS_MAX_PAGES = 100
 
 
 def _xml_text(value: str) -> str:
@@ -169,6 +188,12 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self.auth_failed: bool = False
         self.clock_read_ok: bool = False
         self.auth_lock_until: Optional[datetime] = None
+        self._config_baseline: Optional[dict[str, Any]] = None
+        self._config_baseline_at: Optional[datetime] = None
+        # employeeNos HR HUB itself wrote since the baseline (not the admin's doing).
+        self._own_person_changes: set[str] = set()
+        self._snapshot_path: Optional[str] = None
+        self.admin_audit: Optional[dict[str, Any]] = None
         # Hikvision DigestAuth is not safe under concurrent ISAPI calls
         # (AcsEvent poll + face enroll) — serialize all adapter HTTP.
         self._http_lock = asyncio.Lock()
@@ -408,6 +433,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         emp_no = hikvision_employee_no(employee_id)
         if emp_no != str(employee_id):
             logger.info("employeeNo normalized %s -> %s", employee_id, emp_no)
+        self._own_person_changes.add(emp_no)
         safe_name = (name or emp_no)[:32]
         payload = {
             "UserInfo": {
@@ -462,6 +488,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         emp_no = hikvision_employee_no(employee_id)
         if emp_no != str(employee_id):
             logger.info("employeeNo normalized %s -> %s", employee_id, emp_no)
+        self._own_person_changes.add(emp_no)
 
         del_payload = {
             "UserInfoDelCond": {
@@ -527,6 +554,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             b64 = b64.split(",", 1)[1]
 
         emp_no = hikvision_employee_no(employee_id)
+        self._own_person_changes.add(emp_no)
         record = {
             "faceLibType": "blackFD",
             "FDID": "1",
@@ -850,6 +878,8 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             self.lock_started_at = datetime.now(timezone.utc)
             self.clock_synced_after_lock = False
             self.saw_local_logout = False
+            # Baseline was lost with the restart: the report keeps the journal only.
+            self._begin_admin_audit(None, None)
 
     async def _search_acs(
         self,
@@ -987,6 +1017,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self.clock_synced_after_lock = False
         self.time_changed_after_lock = False
         self.saw_local_logout = False
+        self._begin_admin_audit(login, self._config_baseline)
         ok = await self.set_punching_enabled(False)
         self.punch_locked = True
         self.awaiting_sync_unlock = True
@@ -1042,6 +1073,265 @@ class HikvisionIsapiAdapter(DeviceAdapter):
             self.last_admin_login_serial,
         )
         return True
+
+    # --- Admin session audit -------------------------------------------------
+
+    def _begin_admin_audit(
+        self,
+        login: Optional[dict[str, Any]],
+        baseline: Optional[dict[str, Any]],
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        login = login or {}
+        login_by = {
+            k: str(login[src])
+            for src, k in (("name", "name"), ("employeeNoString", "employeeNo"))
+            if login.get(src)
+        }
+        picture = login.get("pictureURL") or login.get("pictureUrl")
+        self.admin_audit = {
+            "serial": self.admin_login_serial,
+            "loginAt": self.admin_login_at,
+            "startedAt": now,
+            "before": baseline,
+            "baselineAt": self._config_baseline_at.isoformat()
+            if baseline is not None and self._config_baseline_at
+            else None,
+            "loginBy": login_by or None,
+            "pictureUrl": picture if isinstance(picture, str) else None,
+        }
+
+    def admin_audit_due(self) -> Optional[str]:
+        """Why the open admin session should be reported now (None = still open)."""
+        audit = self.admin_audit
+        if not audit:
+            return None
+        if not self.punch_locked:
+            return "unlocked"
+        if self.saw_local_logout:
+            return "logout"
+        if datetime.now(timezone.utc) - audit["startedAt"] > ADMIN_AUDIT_MAX_SESSION:
+            return "timeout"
+        return None
+
+    async def capture_snapshot(self) -> Optional[str]:
+        """Live JPEG from the terminal camera (base64), trying known ISAPI paths."""
+        if not self._client:
+            return None
+        paths = [self._snapshot_path] if self._snapshot_path else list(SNAPSHOT_PATHS)
+        for path in paths:
+            try:
+                resp = await self._client.get(path, timeout=8.0)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("snapshot %s failed: %s", path, exc)
+                continue
+            if resp.status_code < 400 and resp.content.startswith(b"\xff\xd8"):
+                self._snapshot_path = path
+                return base64.b64encode(resp.content).decode("ascii")
+            logger.info("snapshot %s -> %s", path, resp.status_code)
+        if self._snapshot_path:
+            self._snapshot_path = None
+        return None
+
+    async def capture_admin_snapshots(
+        self, count: int = 3, interval_s: float = 1.5
+    ) -> list[str]:
+        """Frames of whoever stands at the terminal right after the admin login."""
+        shots: list[str] = []
+        picture_url = (self.admin_audit or {}).get("pictureUrl")
+        if picture_url:
+            jpeg = await self._fetch_capture_jpeg(picture_url)
+            if jpeg:
+                shots.append(jpeg)
+        for i in range(count):
+            if i:
+                await asyncio.sleep(interval_s)
+            jpeg = await self.capture_snapshot()
+            if jpeg:
+                shots.append(jpeg)
+            elif i == 0:
+                break
+        return shots
+
+    async def _get_ok(self, path: str) -> Optional[httpx.Response]:
+        assert self._client is not None
+        try:
+            resp = await self._client.get(path, timeout=8.0)
+        except Exception as exc:  # noqa: BLE001
+            logger.info("config read %s failed: %s", path, exc)
+            return None
+        return resp if resp.status_code < 400 else None
+
+    async def _get_json(self, path: str) -> Optional[dict[str, Any]]:
+        resp = await self._get_ok(path)
+        if resp is None:
+            return None
+        try:
+            data = resp.json()
+        except ValueError:
+            return None
+        return data if isinstance(data, dict) else None
+
+    async def _read_persons(self) -> Optional[dict[str, dict[str, Any]]]:
+        """employeeNo → person; None if the list could not be read completely."""
+        assert self._client is not None
+        persons: dict[str, dict[str, Any]] = {}
+        position = 0
+        for _ in range(PERSONS_MAX_PAGES):
+            try:
+                resp = await self._client.post(
+                    "/ISAPI/AccessControl/UserInfo/Search?format=json",
+                    json={
+                        "UserInfoSearchCond": {
+                            "searchID": "hrhub-audit",
+                            "searchResultPosition": position,
+                            "maxResults": PERSONS_PAGE_SIZE,
+                        }
+                    },
+                    timeout=15.0,
+                )
+                if resp.status_code >= 400:
+                    return None
+                search = (resp.json() or {}).get("UserInfoSearch") or {}
+            except Exception as exc:  # noqa: BLE001
+                logger.info("UserInfo search failed: %s", exc)
+                return None
+            users = search.get("UserInfo") or []
+            if isinstance(users, dict):
+                users = [users]
+            for user in users:
+                if isinstance(user, dict) and user.get("employeeNo") is not None:
+                    persons[str(user["employeeNo"])] = person_entry(user)
+            status = str(search.get("responseStatusStrg") or "")
+            if status != "MORE" or not users:
+                return persons
+            position += len(users)
+        return None
+
+    async def read_config_state(self) -> Optional[dict[str, Any]]:
+        """Readable configuration sections, flattened for diffing."""
+        if not self._client:
+            return None
+        state: dict[str, Any] = {}
+        xml_sections = (
+            ("time", "/ISAPI/System/time", {"timeMode", "timeZone"}),
+            (
+                "ntp",
+                "/ISAPI/System/time/ntpServers",
+                {"addressingFormatType", "hostName", "ipAddress", "portNo", "synchronizeInterval"},
+            ),
+            (
+                "network",
+                "/ISAPI/System/Network/interfaces/1/ipAddress",
+                {"addressingType", "ipAddress", "subnetMask"},
+            ),
+            (
+                "device",
+                "/ISAPI/System/deviceInfo",
+                {"deviceName", "firmwareVersion", "firmwareReleasedDate"},
+            ),
+        )
+        for section, path, keys in xml_sections:
+            resp = await self._get_ok(path)
+            if resp is not None:
+                state[section] = flatten_xml(resp.text, keys)
+        json_sections = (
+            ("acs", "/ISAPI/AccessControl/AcsCfg?format=json", "AcsCfg"),
+            ("cardReader", "/ISAPI/AccessControl/CardReaderCfg/1?format=json", "CardReaderCfg"),
+            ("door", "/ISAPI/AccessControl/Door/param/1?format=json", "DoorParam"),
+            ("users", "/ISAPI/AccessControl/UserInfo/Count?format=json", "UserInfoCount"),
+        )
+        for section, path, root in json_sections:
+            data = await self._get_json(path)
+            if data is not None and isinstance(data.get(root), dict):
+                state[section] = flatten_json(data[root])
+        persons = await self._read_persons()
+        if persons is not None:
+            state["persons"] = persons
+        return state or None
+
+    async def refresh_config_baseline(self) -> None:
+        """Keep a recent pre-login config so the admin session can be diffed."""
+        if self.punch_locked or self.admin_audit or not self._client:
+            return
+        now = datetime.now(timezone.utc)
+        if self._config_baseline_at and now - self._config_baseline_at < CONFIG_BASELINE_REFRESH:
+            return
+        self._config_baseline_at = now
+        own_before = set(self._own_person_changes)
+        state = await self.read_config_state()
+        if state:
+            self._config_baseline = state
+            self._own_person_changes -= own_before
+
+    @staticmethod
+    def _isapi_stamp(dt: datetime) -> str:
+        offset = int((dt.utcoffset() or timedelta(0)).total_seconds())
+        sign = "+" if offset >= 0 else "-"
+        offset = abs(offset)
+        return f"{dt:%Y-%m-%dT%H:%M:%S}{sign}{offset // 3600:02d}:{offset % 3600 // 60:02d}"
+
+    async def fetch_operation_log(
+        self, login_serial: int, login_at: Optional[str]
+    ) -> list[dict[str, Any]]:
+        """Journal events of the session — around the login stamp and around the
+        device's current clock (the admin may have moved the clock meanwhile)."""
+        device_now, tz = await self._device_local_now()
+        now_dt = device_now.replace(tzinfo=self._offset_tz(tz))
+        windows = [
+            (now_dt - timedelta(minutes=60), now_dt + timedelta(minutes=1)),
+        ]
+        login_dt = self._as_dt(str(login_at or ""))
+        if login_dt:
+            windows.insert(
+                0, (login_dt - timedelta(minutes=1), login_dt + timedelta(minutes=60))
+            )
+        items: list[dict[str, Any]] = []
+        for start, end in windows:
+            items.extend(
+                await self._search_acs(
+                    MAJOR_OPERATION,
+                    None,
+                    self._isapi_stamp(start),
+                    self._isapi_stamp(end),
+                )
+            )
+        return build_operation_log(items, login_serial)
+
+    async def finish_admin_audit(self, reason: str) -> Optional[dict[str, Any]]:
+        """Close the open admin session: journal + config diff vs the pre-login baseline."""
+        audit = self.admin_audit
+        if not audit:
+            return None
+        self.admin_audit = None
+        after = await self.read_config_state()
+        operations = await self.fetch_operation_log(
+            int(audit.get("serial") or 0), audit.get("loginAt")
+        )
+        before = audit.get("before")
+        changes = diff_config(before, after, self._own_person_changes)
+        if after:
+            self._config_baseline = after
+            self._config_baseline_at = datetime.now(timezone.utc)
+            self._own_person_changes = set()
+        logger.warning(
+            "admin session audit serial=%s reason=%s operations=%s changes=%s",
+            audit.get("serial"),
+            reason,
+            len(operations),
+            len(changes),
+        )
+        return {
+            "adminLoginSerial": int(audit.get("serial") or 0),
+            "adminLoginAt": audit.get("loginAt"),
+            "loginBy": audit.get("loginBy"),
+            "endedAt": datetime.now(timezone.utc).isoformat(),
+            "endReason": reason,
+            "baselineAt": audit.get("baselineAt"),
+            "diffAvailable": bool(before and after),
+            "operations": operations,
+            "changes": changes,
+        }
 
     async def set_punching_enabled(self, enabled: bool) -> bool:
         """Best-effort: disable/enable terminal authentication via ISAPI."""

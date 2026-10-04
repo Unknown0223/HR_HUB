@@ -20,7 +20,7 @@ def adapter() -> HikvisionIsapiAdapter:
 class ClockTrustTest(unittest.TestCase):
     def test_keeps_device_time_when_skewed(self):
         a = adapter()
-        a.last_device_now_iso = "2026-08-25T10:05:00+05:00"
+        a.last_device_now_iso = "2026-08-25T08:05:00+05:00"
         drift = -2 * 3600
         punch = {"occurred_at": "2026-08-25T08:00:00+05:00"}
         a._apply_clock_trust([punch], drift)

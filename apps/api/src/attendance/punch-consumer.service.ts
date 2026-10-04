@@ -4,6 +4,7 @@ import { connect, NatsConnection, StringCodec, Subscription } from 'nats';
 import { PunchDirection } from '@prisma/client';
 import { NATS_SUBJECTS } from '@hr-hub/shared';
 import { AttendanceService } from './attendance.service';
+import { AdminAuditService } from './admin-audit.service';
 
 const SUBJECT = NATS_SUBJECTS.PUNCH_RAW;
 
@@ -16,6 +17,7 @@ export class PunchConsumerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly attendance: AttendanceService,
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   async onModuleInit() {
@@ -29,6 +31,11 @@ export class PunchConsumerService implements OnModuleInit, OnModuleDestroy {
         for await (const msg of this.sub!) {
           try {
             const raw = JSON.parse(sc.decode(msg.data));
+            if (raw.type === 'admin_audit') {
+              const { type: _type, ...audit } = raw;
+              void this.adminAudit.recordAdminAudit(audit);
+              continue;
+            }
             if (raw.type === 'heartbeat' || raw.source === 'device_heartbeat') {
               await this.attendance.recordDeviceHeartbeat({
                 tenantId: raw.tenantId ?? raw.tenant_id,

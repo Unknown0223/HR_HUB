@@ -230,6 +230,30 @@ export class IngestHeartbeatDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() timeChangedAfterLock?: boolean;
 }
 
+/**
+ * Local admin session on a terminal, reported by device-gw. `login` carries camera
+ * frames of whoever typed the admin password; `complete` the journal and config diff.
+ */
+export class IngestAdminAuditDto {
+  @ApiProperty() @IsUUID() tenantId!: string;
+  @ApiProperty() @IsString() deviceId!: string;
+  @ApiProperty({ enum: ['login', 'complete'] }) @IsIn(['login', 'complete']) phase!: 'login' | 'complete';
+  @ApiPropertyOptional() @IsOptional() @IsInt() adminLoginSerial?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() adminLoginAt?: string;
+  @ApiPropertyOptional() @IsOptional() loginBy?: { employeeNo?: string; name?: string } | null;
+  @ApiPropertyOptional({ type: [String], description: 'JPEG frames, base64' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  snapshots?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() endedAt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() endReason?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() baselineAt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() diffAvailable?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsArray() operations?: Record<string, unknown>[];
+  @ApiPropertyOptional() @IsOptional() @IsArray() changes?: Record<string, unknown>[];
+}
+
 export class AssignScheduleDto {
   @ApiProperty() @IsString() employeeId!: string;
 }

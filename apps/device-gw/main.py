@@ -199,16 +199,85 @@ async def start_realtime(device_id: str, rec: DeviceRecord) -> None:
         logger.warning("subscribe_events skipped device=%s: %s", device_id, exc)
 
 
-async def apply_admin_login_guard(rec: DeviceRecord) -> bool:
+async def apply_admin_login_guard(device_id: str, rec: DeviceRecord) -> bool:
     """Lock punching after local admin password; unlock only after a later sync cycle."""
     if not isinstance(rec.adapter, HikvisionIsapiAdapter):
         return False
     adapter = rec.adapter
     login = await adapter.detect_new_admin_login()
     if login:
+        if adapter.admin_audit:
+            await report_admin_session(device_id, rec, "next_login")
         await adapter.lock_punching(login)
         return True
     return False
+
+
+def _admin_audit_message(device_id: str, rec: DeviceRecord, phase: str) -> dict[str, Any]:
+    return {
+        "type": "admin_audit",
+        "phase": phase,
+        "tenantId": rec.info.tenant_id,
+        "deviceId": device_id,
+    }
+
+
+async def report_admin_login_snapshots(device_id: str, rec: DeviceRecord) -> None:
+    """Camera frames of whoever just entered the admin password (server identifies)."""
+    adapter = rec.adapter
+    if not isinstance(adapter, HikvisionIsapiAdapter) or not adapter.admin_audit:
+        return
+    audit = adapter.admin_audit
+    try:
+        shots = await adapter.capture_admin_snapshots()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("admin snapshot failed device=%s: %s", device_id, exc)
+        shots = []
+    logger.warning("admin login snapshots device=%s frames=%s", device_id, len(shots))
+    await publisher.publish_admin_audit(
+        {
+            **_admin_audit_message(device_id, rec, "login"),
+            "adminLoginSerial": int(audit.get("serial") or 0),
+            "adminLoginAt": audit.get("loginAt"),
+            "loginBy": audit.get("loginBy"),
+            "snapshots": shots,
+        }
+    )
+
+
+async def report_admin_session(device_id: str, rec: DeviceRecord, reason: str) -> None:
+    """Journal + config diff once the admin left the menu (or the lock ended)."""
+    adapter = rec.adapter
+    if not isinstance(adapter, HikvisionIsapiAdapter):
+        return
+    try:
+        report = await adapter.finish_admin_audit(reason)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("admin session audit failed device=%s: %s", device_id, exc)
+        return
+    if report:
+        await publisher.publish_admin_audit(
+            {**_admin_audit_message(device_id, rec, "complete"), **report}
+        )
+
+
+async def run_admin_audit_cycle(
+    device_id: str, rec: DeviceRecord, locked_this_cycle: bool
+) -> None:
+    adapter = rec.adapter
+    if not isinstance(adapter, HikvisionIsapiAdapter):
+        return
+    if locked_this_cycle:
+        await report_admin_login_snapshots(device_id, rec)
+        return
+    reason = adapter.admin_audit_due()
+    if reason:
+        await report_admin_session(device_id, rec, reason)
+        return
+    try:
+        await adapter.refresh_config_baseline()
+    except Exception as exc:  # noqa: BLE001
+        logger.info("config baseline refresh failed device=%s: %s", device_id, exc)
 
 
 async def maybe_unlock_after_sync(
@@ -257,7 +326,7 @@ async def poll_hikvision_events() -> None:
                 if rec.adapter.auth_locked():
                     continue
             try:
-                locked_this_cycle = await apply_admin_login_guard(rec)
+                locked_this_cycle = await apply_admin_login_guard(device_id, rec)
                 n = await publish_adapter_events(device_id, rec)
                 if n:
                     cycle_had_punch = True
@@ -308,6 +377,8 @@ async def poll_hikvision_events() -> None:
                         ),
                     }
                 )
+                if hb_ok:
+                    await run_admin_audit_cycle(device_id, rec, locked_this_cycle)
                 await maybe_unlock_after_sync(rec, locked_this_cycle, hb_ok)
             except Exception as exc:  # noqa: BLE001
                 rec.info.status = "offline"

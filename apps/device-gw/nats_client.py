@@ -227,6 +227,47 @@ class PunchPublisher:
         except Exception as exc:  # noqa: BLE001
             logger.warning("NATS heartbeat failed: %s", exc)
 
+    async def _publish_admin_audit_http(self, payload: dict[str, Any]) -> bool:
+        if not self.api_url:
+            return False
+        body = {k: v for k, v in payload.items() if k != "type" and v is not None}
+        headers = {"Content-Type": "application/json"}
+        if self.punch_key:
+            headers["X-Punch-Key"] = self.punch_key
+        url = f"{self.api_url}/api/attendance/devices/admin-audit/ingest"
+        try:
+            client = self._http or httpx.AsyncClient(timeout=30.0)
+            res = await client.post(url, json=body, headers=headers, timeout=30.0)
+            if self._http is None:
+                await client.aclose()
+            if res.status_code >= 400:
+                logger.warning(
+                    "HTTP admin audit ingest failed %s: %s %s",
+                    res.status_code,
+                    url,
+                    res.text[:300],
+                )
+                return False
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("HTTP admin audit ingest error: %s", exc)
+            return False
+
+    async def publish_admin_audit(self, payload: dict[str, Any]) -> None:
+        # The API stores photos and notifies on each message — deliver it once.
+        if await self._publish_admin_audit_http(payload):
+            return
+        if self._nc is None:
+            logger.warning(
+                "ADMIN AUDIT (no transport) %s",
+                {k: v for k, v in payload.items() if k != "snapshots"},
+            )
+            return
+        try:
+            await self._nc.publish(self.subject, json.dumps(payload).encode("utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("NATS admin audit failed: %s", exc)
+
     async def close(self) -> None:
         if self._http is not None:
             await self._http.aclose()

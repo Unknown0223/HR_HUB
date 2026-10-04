@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import {
   TablePrefsMenuButton,
@@ -11,6 +11,7 @@ import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../marks/page.module.css';
+import { AdminSessionDetails } from './AdminSessionDetails';
 
 type Problem = {
   id: string;
@@ -53,6 +54,7 @@ function reasonLabel(reason: string) {
   if (reason === 'mock_location') return 'Фиктивная геолокация (Fake GPS)';
   if (reason === 'gps_jump') return 'Невозможное перемещение по GPS';
   if (reason === 'gps_no_geofence') return 'GPS-отметка без геозоны';
+  if (reason === 'face_mismatch') return 'Лицо не совпало с фото профиля (отметка отклонена)';
   return reason;
 }
 
@@ -90,6 +92,7 @@ function ProblemsInner() {
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const visibleCols = prefs.columns.length
     ? prefs.columns
@@ -188,21 +191,39 @@ function ProblemsInner() {
               </tr>
             ) : (
               displayRows.map((r) => (
-                <tr key={r.id}>
-                  {visibleCols.map((key) => (
-                    <td key={key}>{problemCell(r, key) || '—'}</td>
-                  ))}
-                  <td>
-                    <button
-                      type="button"
-                      className={styles.btnBlue}
-                      disabled={busy}
-                      onClick={() => void resolve(r.id)}
-                    >
-                      Решить
-                    </button>
-                  </td>
-                </tr>
+                <Fragment key={r.id}>
+                  <tr>
+                    {visibleCols.map((key) => (
+                      <td key={key}>{problemCell(r, key) || '—'}</td>
+                    ))}
+                    <td>
+                      {r.reason === 'device_admin_login' ? (
+                        <button
+                          type="button"
+                          className={styles.btnGhost}
+                          onClick={() => setOpenId(openId === r.id ? null : r.id)}
+                        >
+                          {openId === r.id ? 'Скрыть' : 'Подробнее'}
+                        </button>
+                      ) : null}{' '}
+                      <button
+                        type="button"
+                        className={styles.btnBlue}
+                        disabled={busy}
+                        onClick={() => void resolve(r.id)}
+                      >
+                        Решить
+                      </button>
+                    </td>
+                  </tr>
+                  {openId === r.id ? (
+                    <tr>
+                      <td colSpan={colCount}>
+                        <AdminSessionDetails payload={r.payload || {}} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))
             )}
           </tbody>

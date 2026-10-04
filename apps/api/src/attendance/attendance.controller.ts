@@ -24,6 +24,7 @@ import { Role } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { DeviceCredentialAuditService } from './device-credential-audit.service';
+import { AdminAuditService } from './admin-audit.service';
 import {
   AssignScheduleDto,
   ApplyMarkSettingsDto,
@@ -40,6 +41,7 @@ import {
   CreateScheduleDto,
   DeviceIgnoreDto,
   GpsPunchDto,
+  IngestAdminAuditDto,
   IngestHeartbeatDto,
   IngestPunchDto,
   QrPunchDto,
@@ -65,7 +67,10 @@ import { PunchRateLimitGuard } from './punch-rate-limit.guard';
 @ApiTags('attendance')
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendance: AttendanceService) {}
+  constructor(
+    private readonly attendance: AttendanceService,
+    private readonly adminAudit: AdminAuditService,
+  ) {}
 
   // --- Locations ---
   @ApiBearerAuth()
@@ -1279,5 +1284,21 @@ export class AttendanceController {
   @Post('heartbeats/ingest')
   ingestHeartbeat(@Body() dto: IngestHeartbeatDto) {
     return this.attendance.recordDeviceHeartbeat(dto);
+  }
+
+  /** Device-gw report of a local admin session (who + what changed). Auth same as punches/ingest. */
+  @Public()
+  @SkipTenant()
+  @UseGuards(PunchIngestGuard, PunchRateLimitGuard)
+  @ApiHeader({
+    name: 'X-Punch-Key',
+    required: false,
+    description:
+      'Required in production and whenever PUNCH_INGEST_API_KEY is set',
+  })
+  @HttpCode(200)
+  @Post('devices/admin-audit/ingest')
+  ingestAdminAudit(@Body() dto: IngestAdminAuditDto) {
+    return this.adminAudit.recordAdminAudit(dto);
   }
 }

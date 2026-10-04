@@ -5,6 +5,7 @@ import { OfficeLinkProvisionController } from './office-link-provision.controlle
 import { AttendanceService } from './attendance.service';
 import { HikvisionReachClient } from './hikvision-reach.client';
 import { PunchConsumerService } from './punch-consumer.service';
+import { AdminAuditService } from './admin-audit.service';
 import { DeviceSyncBootstrapService } from './device-sync-bootstrap.service';
 import { PunchIngestGuard } from './punch-ingest.guard';
 import { PunchRateLimitGuard } from './punch-rate-limit.guard';
@@ -32,6 +33,7 @@ import { FaceModule } from '../face/face.module';
     AttendanceService,
     HikvisionReachClient,
     PunchConsumerService,
+    AdminAuditService,
     DeviceSyncBootstrapService,
     PunchIngestGuard,
     PunchRateLimitGuard,
