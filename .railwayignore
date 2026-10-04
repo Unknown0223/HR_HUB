@@ -1,0 +1,6 @@
+# `railway up` uploads are size-limited; Dockerfile.api / Dockerfile.web never read these.
+apps/mobile
+apps/device-gw
+tools
+infra/data
+docs
