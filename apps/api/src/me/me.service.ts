@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -47,6 +48,7 @@ import { runUnscoped } from '../common/data-scope';
 import { checkGpsJump } from '../tracking/gps-jump';
 import { StorageService } from '../storage/storage.service';
 import { summarizePayroll } from './payroll-summary';
+import { decodeDataUrl, photoRef } from './photo-ref';
 
 const MAX_GPS_ACCURACY_M = 100;
 /** ~15 KB JPEG — anything smaller cannot hold a back photo plus a selfie inset. */
@@ -837,7 +839,7 @@ export class MeService {
   }
 
   /** Face-profile photo first (what the web card shows), then the person's photo. */
-  private async employeePhoto(tenantId: string, employeeId: string): Promise<string | null> {
+  private async employeePhotoRaw(tenantId: string, employeeId: string): Promise<string | null> {
     const row = await runUnscoped(() =>
       this.prisma.employee.findFirst({
         where: { tenantId, id: employeeId },
@@ -851,6 +853,24 @@ export class MeService {
       row?.faceProfile?.photoKey,
       row?.faceProfile?.photoUrl ?? row?.person?.photoUrl,
     );
+  }
+
+  private async employeePhoto(tenantId: string, employeeId: string): Promise<string | null> {
+    return photoRef(employeeId, await this.employeePhotoRaw(tenantId, employeeId));
+  }
+
+  /** Bytes behind a `photoRef` link: the caller's own photo, their team's, or any for HR. */
+  async photo(user: AuthUser, employeeId: string) {
+    const { tenantId, employee } = await this.resolveEmployee(user);
+    const staff = user.role === Role.platform_admin || user.role === Role.tenant_admin || user.role === Role.hr;
+    if (!staff && employee?.id !== employeeId) {
+      const team = employee ? await this.subordinateIds(tenantId, employee.id) : [];
+      if (!team.includes(employeeId)) throw new ForbiddenException();
+    }
+    const url = await this.employeePhotoRaw(tenantId, employeeId);
+    const decoded = url ? decodeDataUrl(url) : null;
+    if (!decoded?.body.length) throw new NotFoundException('Фото не найдено');
+    return decoded;
   }
 
   /**

@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DayStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MeService } from '../me/me.service';
+import { photoRef } from '../me/photo-ref';
 import { StorageService } from '../storage/storage.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { runUnscoped } from '../common/data-scope';
@@ -308,7 +309,10 @@ export class TeamService {
       phone: m.phone,
       position: m.position?.name ?? null,
       division: m.division?.name ?? null,
-      photoUrl: this.storage.mediaUrl(m.faceProfile?.photoKey, m.faceProfile?.photoUrl ?? m.person?.photoUrl),
+      photoUrl: photoRef(
+        m.id,
+        this.storage.mediaUrl(m.faceProfile?.photoKey, m.faceProfile?.photoUrl ?? m.person?.photoUrl),
+      ),
       schedule: m.schedule
         ? { name: m.schedule.name, startTime: m.schedule.startTime, endTime: m.schedule.endTime }
         : null,

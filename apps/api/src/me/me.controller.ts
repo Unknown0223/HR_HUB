@@ -4,10 +4,13 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiQuery, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../auth/decorators';
@@ -49,6 +52,18 @@ export class MeController {
   @Get('details')
   details(@CurrentUser() user: AuthUser) {
     return this.me.getDetails(user);
+  }
+
+  @Get('photos/:employeeId')
+  async photo(
+    @CurrentUser() user: AuthUser,
+    @Param('employeeId', ParseUUIDPipe) employeeId: string,
+    @Res() res: Response,
+  ) {
+    const { contentType, body } = await this.me.photo(user, employeeId);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=604800, immutable');
+    res.send(body);
   }
 
   @Get('attendance/today')
