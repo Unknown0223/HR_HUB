@@ -2,7 +2,7 @@
 
 import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import {
   TablePrefsMenuButton,
@@ -170,7 +170,7 @@ function ClearanceSheetsPageInner() {
       });
     }
     if (statusFilter) list = list.filter((r) => r.status === statusFilter);
-    if (employeeIdFilter) list = list.filter((r) => r.employeeId === employeeIdFilter);
+    if (employeeIdFilter) list = list.filter((r) => matchesFilterValue(employeeIdFilter, r.employeeId));
     if (from) {
       const f = new Date(from).getTime();
       list = list.filter((r) => new Date(r.documentDate || r.createdAt).getTime() >= f);

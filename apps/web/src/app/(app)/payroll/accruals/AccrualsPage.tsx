@@ -4,7 +4,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { confirm } from '@/lib/dialogs';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { apiFetch } from '@/lib/api';
@@ -112,7 +112,11 @@ function AccrualsInner() {
       if (filters.posted === 'yes' && r.status !== 'posted') return false;
       if (filters.posted === 'no' && r.status === 'posted') return false;
       if (month && !String(r.month).startsWith(month.slice(0, 7))) return false;
-      if (filters.divisionId && r.divisionId !== filters.divisionId && r.division?.id !== filters.divisionId) {
+      if (
+        filters.divisionId &&
+        !matchesFilterValue(filters.divisionId, r.divisionId) &&
+        !matchesFilterValue(filters.divisionId, r.division?.id)
+      ) {
         return false;
       }
       if (filters.from && r.docDate.slice(0, 10) < filters.from) return false;

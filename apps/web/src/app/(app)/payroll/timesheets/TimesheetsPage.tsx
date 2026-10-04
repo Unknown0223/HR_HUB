@@ -4,7 +4,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { confirm } from '@/lib/dialogs';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import { runListBulk, togglePage, toggleSelect } from '@/components/ListBulkBar';
 import { apiFetch } from '@/lib/api';
@@ -135,7 +135,7 @@ function TimesheetsInner() {
       if (filters.number && !String(r.number || '').includes(filters.number.trim())) return false;
       if (filters.posted === 'yes' && r.status !== 'posted') return false;
       if (filters.posted === 'no' && r.status === 'posted') return false;
-      if (filters.divisionId && r.divisionId !== filters.divisionId) return false;
+      if (!matchesFilterValue(filters.divisionId, r.divisionId)) return false;
       if (monthFilter) {
         const m = monthFilter.slice(0, 7);
         if (r.month.slice(0, 7) !== m && r.docDate.slice(0, 7) !== m) return false;
@@ -156,7 +156,7 @@ function TimesheetsInner() {
       if (filters.number && !String(r.number || '').includes(filters.number.trim())) return false;
       if (filters.posted === 'yes' && r.status !== 'posted') return false;
       if (filters.posted === 'no' && r.status === 'posted') return false;
-      if (filters.divisionId && r.divisionId !== filters.divisionId) return false;
+      if (!matchesFilterValue(filters.divisionId, r.divisionId)) return false;
       if (monthFilter) {
         const m = monthFilter.slice(0, 7);
         if (r.periodFrom.slice(0, 7) !== m && r.documentDate.slice(0, 7) !== m) return false;

@@ -4,7 +4,7 @@ import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { MonthPeriodPicker } from '@/components/MonthPeriodPicker';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
@@ -227,8 +227,8 @@ function GphServicesPageInner() {
     if (divisionIdFilter) {
       list = list.filter(
         (r) =>
-          r.contract?.division?.id === divisionIdFilter ||
-          r.contract?.employee?.division?.id === divisionIdFilter,
+          matchesFilterValue(divisionIdFilter, r.contract?.division?.id) ||
+          matchesFilterValue(divisionIdFilter, r.contract?.employee?.division?.id),
       );
     }
     if (statusFilter) {
@@ -561,6 +561,7 @@ function GphServicesPageInner() {
                 type: 'select',
                 key: 'contractId',
                 label: 'Договор',
+                multiple: false,
                 options: contracts.map((c) => ({
                   value: c.id,
                   label: c.number + (c.title ? ` — ${c.title}` : ''),

@@ -3,7 +3,7 @@
 import { confirm } from '@/lib/dialogs';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import {
@@ -61,8 +61,8 @@ function FinePoliciesInner() {
       }
       if (filters.isActive === '1' && r.isActive === false) return false;
       if (filters.isActive === '0' && r.isActive !== false) return false;
-      if (filters.divisionId && r.divisionId !== filters.divisionId) return false;
-      if (filters.positionId && r.positionId !== filters.positionId) return false;
+      if (!matchesFilterValue(filters.divisionId, r.divisionId)) return false;
+      if (!matchesFilterValue(filters.positionId, r.positionId)) return false;
       if (!qq) return true;
       const emp = (r.employees || []).map((e) => e.label).join(' ');
       return [formatMonthRu(r.month), r.name, r.division?.name, r.position?.name, emp]

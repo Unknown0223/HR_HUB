@@ -5,7 +5,7 @@ import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import {
   TablePrefsMenuButton,
@@ -219,7 +219,7 @@ function LocationsInner() {
       }
       if (statusFilter === 'active' && !r.isActive) return false;
       if (statusFilter === 'inactive' && r.isActive) return false;
-      if (typeFilter && (r.locationType?.id || r.locationTypeId || '') !== typeFilter) {
+      if (!matchesFilterValue(typeFilter, r.locationType?.id || r.locationTypeId)) {
         return false;
       }
       return true;

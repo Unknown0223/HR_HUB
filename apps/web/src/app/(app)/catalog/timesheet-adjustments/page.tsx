@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import {
   TablePrefsMenuButton,
@@ -187,10 +187,10 @@ function TimesheetAdjustmentsInner() {
       list = list.filter((r) => String(r.number || '').toLowerCase().includes(nq));
     }
     if (divisionIdFilter) {
-      list = list.filter((r) => r.divisionId === divisionIdFilter);
+      list = list.filter((r) => matchesFilterValue(divisionIdFilter, r.divisionId));
     }
     if (employeeIdFilter) {
-      list = list.filter((r) => (r.lines || []).some((l) => l.employeeId === employeeIdFilter));
+      list = list.filter((r) => (r.lines || []).some((l) => matchesFilterValue(employeeIdFilter, l.employeeId)));
     }
     if (postedFilter === 'yes') list = list.filter((r) => isPosted(r));
     else if (postedFilter === 'no') list = list.filter((r) => !isPosted(r));

@@ -153,6 +153,14 @@ export type FilterPanelProps = {
   variant?: 'bar' | 'modal';
 };
 
+/** Multi-select filter values arrive comma-separated ("id1,id2"); true when `value` is one of them. */
+export function matchesFilterValue(filter: string | null | undefined, value: unknown): boolean {
+  if (!filter) return true;
+  const v = value == null ? '' : String(value);
+  if (!v) return false;
+  return filter.split(',').some((x) => x.trim() === v);
+}
+
 /** Read current filter keys from the URL query string. */
 export function useFilterFromUrl(keys: readonly string[]): Record<string, string> {
   const searchParams = useSearchParams();

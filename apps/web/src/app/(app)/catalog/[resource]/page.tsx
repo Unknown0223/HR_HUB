@@ -16,7 +16,13 @@ import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import { CATALOG_SIBLING_KEY } from '@/lib/form-siblings';
 import { downloadCsv, flattenRow } from '@/lib/csv';
 import { downloadXlsxViaApi } from '@/lib/excel';
-import { FilterPanel, FilterFieldDef, useFilterFromUrl, filterFieldKeys } from '@/components/FilterPanel';
+import {
+  FilterPanel,
+  FilterFieldDef,
+  matchesFilterValue,
+  useFilterFromUrl,
+  filterFieldKeys,
+} from '@/components/FilterPanel';
 import { ImportPanel } from '@/components/ImportPanel';
 import { PrintArea } from '@/components/PrintArea';
 import { PrintButton } from '@/components/PrintButton';
@@ -604,34 +610,34 @@ export default function CatalogResourcePage() {
       list = list.filter((r) => JSON.stringify(r).toLowerCase().includes(qq));
     }
     if (employeeIdFilter) {
-      list = list.filter((r) => String(r.employeeId ?? '') === employeeIdFilter);
+      list = list.filter((r) => matchesFilterValue(employeeIdFilter, r.employeeId));
     }
     if (divisionIdFilter) {
       list = list.filter(
         (r) =>
-          String(r.divisionId ?? '') === divisionIdFilter ||
-          String((r.division as { id?: string } | undefined)?.id ?? '') === divisionIdFilter,
+          matchesFilterValue(divisionIdFilter, r.divisionId) ||
+          matchesFilterValue(divisionIdFilter, (r.division as { id?: string } | undefined)?.id),
       );
     }
     if (positionIdFilter) {
       list = list.filter(
         (r) =>
-          String(r.positionId ?? '') === positionIdFilter ||
-          String((r.position as { id?: string } | undefined)?.id ?? '') === positionIdFilter,
+          matchesFilterValue(positionIdFilter, r.positionId) ||
+          matchesFilterValue(positionIdFilter, (r.position as { id?: string } | undefined)?.id),
       );
     }
     if (gradeIdFilter) {
       list = list.filter(
         (r) =>
-          String(r.gradeId ?? '') === gradeIdFilter ||
-          String((r.grade as { id?: string } | undefined)?.id ?? '') === gradeIdFilter,
+          matchesFilterValue(gradeIdFilter, r.gradeId) ||
+          matchesFilterValue(gradeIdFilter, (r.grade as { id?: string } | undefined)?.id),
       );
     }
     if (scheduleIdFilter) {
-      list = list.filter((r) => String(r.scheduleId ?? '') === scheduleIdFilter);
+      list = list.filter((r) => matchesFilterValue(scheduleIdFilter, r.scheduleId));
     }
     if (locationIdFilter) {
-      list = list.filter((r) => String(r.locationId ?? '') === locationIdFilter);
+      list = list.filter((r) => matchesFilterValue(locationIdFilter, r.locationId));
     }
     if (numberFilter.trim()) {
       const nq = numberFilter.trim().toLowerCase();

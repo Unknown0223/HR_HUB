@@ -4,7 +4,7 @@ import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -656,7 +656,7 @@ function DivisionsPageInner() {
     return divisions.filter((d) => {
       if (codeF && !(d.code || '').toLowerCase().includes(codeF)) return false;
       if (nameF && !(d.name || '').toLowerCase().includes(nameF)) return false;
-      if (groupF && d.divisionGroup?.id !== groupF) return false;
+      if (!matchesFilterValue(groupF, d.divisionGroup?.id)) return false;
       if (
         createdByF &&
         !(d.createdByLabel || 'Admin').toLowerCase().includes(createdByF)

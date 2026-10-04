@@ -72,8 +72,8 @@ function stripDataUrl(b64: string): string {
 }
 
 function faceMobileMockEnabled(): boolean {
-  const v = (process.env.FACE_MOBILE_MOCK ?? '1').trim().toLowerCase();
-  return v !== '0' && v !== 'false' && v !== 'off';
+  const v = (process.env.FACE_MOBILE_MOCK ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on';
 }
 
 @Injectable()
@@ -649,11 +649,13 @@ export class MeService {
   }
 
   /**
-   * In-app Face ID punch. Uses enrolled FaceProfile metadata when present;
-   * otherwise (or when FACE_MOBILE_MOCK≠0) accepts a camera selfie / mock
-   * so emulators and demos work without Hikvision/ZK hardware.
+   * Demo-only Face ID punch: no face comparison is performed, so it is disabled unless
+   * FACE_MOBILE_MOCK=1. Real mobile punches go through punchMobile (photo + liveness + GPS checks).
    */
   async punchFace(user: AuthUser, dto: MeFacePunchDto) {
+    if (!faceMobileMockEnabled()) {
+      throw new ForbiddenException('Face punch is disabled on this server');
+    }
     const { tenantId, employee } = await this.requireEmployee(user);
     await this.assertMarksAllowed(tenantId, employee.id);
     const today = await this.todayAttendance(user);
@@ -669,19 +671,14 @@ export class MeService {
         ? rawImage.slice(rawImage.indexOf(',') + 1)
         : rawImage;
     const hasImage = image.length >= 80;
-    const mockOk = faceMobileMockEnabled() || dto.mock === true;
 
     let mode: string;
     if (hasImage && face?.photoUrl) {
       mode = 'mobile_camera_vs_profile_mock';
     } else if (hasImage) {
       mode = 'mobile_camera_mock';
-    } else if (mockOk) {
-      mode = 'mock_no_camera';
     } else {
-      throw new BadRequestException(
-        'Face selfie required (set FACE_MOBILE_MOCK=1 for emulator demo)',
-      );
+      mode = 'mock_no_camera';
     }
 
     const occurredAt = new Date().toISOString();

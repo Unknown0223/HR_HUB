@@ -5,7 +5,7 @@ import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { PageSubnav } from '@/components/PageSubnav';
 import {
   TablePrefsMenuButton,
@@ -206,7 +206,11 @@ function ApprovalsInner() {
     return rows.filter((r) => {
       if (numF && !(r.documentNumber || '').toLowerCase().includes(numF))
         return false;
-      if (groupF && r.tariffGroupId !== groupF && r.tariffGroup?.id !== groupF)
+      if (
+        groupF &&
+        !matchesFilterValue(groupF, r.tariffGroupId) &&
+        !matchesFilterValue(groupF, r.tariffGroup?.id)
+      )
         return false;
       if (statusF && r.status !== statusF) return false;
       const dateVal = r.documentDate || r.createdAt;

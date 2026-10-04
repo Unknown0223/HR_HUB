@@ -4,7 +4,7 @@ import { confirm } from '@/lib/dialogs';
 import Link from 'next/link';
 import { FormEvent, Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -233,7 +233,7 @@ function AbsencesPageInner() {
       list = list.filter((r) => rowNumber(r).toLowerCase().includes(nq));
     }
     if (employeeIdFilter) {
-      list = list.filter((r) => r.employeeId === employeeIdFilter);
+      list = list.filter((r) => matchesFilterValue(employeeIdFilter, r.employeeId));
     }
     if (documentTypeFilter.trim()) {
       const dq = documentTypeFilter.trim().toLowerCase();

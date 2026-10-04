@@ -225,8 +225,7 @@ export class MeQrPunchDto {
 }
 
 /**
- * Mobile Face ID punch — camera selfie (base64) or mock when hardware/ML is absent.
- * Set FACE_MOBILE_MOCK=0 to require a non-empty faceImageBase64.
+ * Demo Face ID punch — no face comparison; the endpoint only works when FACE_MOBILE_MOCK=1.
  */
 export class MeFacePunchDto {
   @ApiPropertyOptional({
@@ -242,7 +241,7 @@ export class MeFacePunchDto {
   direction?: PunchDirection;
 
   @ApiPropertyOptional({
-    description: 'Force mock accept even without image (dev / emulator)',
+    description: 'Deprecated, ignored',
   })
   @IsOptional()
   @IsBoolean()

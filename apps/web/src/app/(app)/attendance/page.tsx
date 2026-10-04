@@ -518,28 +518,6 @@ export default function AttendancePage() {
     await load();
   }
 
-  async function ingestDemoPunch() {
-    const session = getSession();
-    const tenantId = session?.tenant?.id;
-    if (!tenantId) {
-      setError('Tenant не найден — войдите снова');
-      return;
-    }
-    await apiFetch('/api/attendance/punches/ingest', {
-      method: 'POST',
-      body: JSON.stringify({
-        tenantId,
-        employeeExternalId: 'face-0001',
-        direction: 'IN',
-        occurredAt: new Date().toISOString(),
-        source: 'manual',
-        serialNumber: 'MOCK-001',
-      }),
-    });
-    setTab('marks');
-    await load();
-  }
-
   const rows = data as Record<string, unknown>[];
 
   const displayRows = useMemo(() => {
@@ -602,9 +580,6 @@ export default function AttendancePage() {
           ) : null}
           <button type="button" className={styles.btnSecondary} onClick={markAbsents}>
             Отметить отсутствующих
-          </button>
-          <button type="button" className={styles.btn} onClick={ingestDemoPunch}>
-            Демо-отметка (Ali)
           </button>
         </div>
       </header>

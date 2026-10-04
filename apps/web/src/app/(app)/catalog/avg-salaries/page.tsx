@@ -3,7 +3,7 @@
 import { confirm } from '@/lib/dialogs';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FilterPanel, useFilterFromUrl } from '@/components/FilterPanel';
+import { FilterPanel, matchesFilterValue, useFilterFromUrl } from '@/components/FilterPanel';
 import { FormModal } from '@/components/FormModal';
 import modal from '@/components/form-modal.module.css';
 import { PageSubnav } from '@/components/PageSubnav';
@@ -152,8 +152,8 @@ function AvgSalariesPageInner() {
     const posF = filters.positionId;
     const gradeF = filters.gradeId;
     return rows.filter((r) => {
-      if (posF && r.meta?.positionId !== posF) return false;
-      if (gradeF && r.meta?.gradeId !== gradeF) return false;
+      if (!matchesFilterValue(posF, r.meta?.positionId)) return false;
+      if (!matchesFilterValue(gradeF, r.meta?.gradeId)) return false;
       if (filters.isActive === '1' && r.isActive === false) return false;
       if (filters.isActive === '0' && r.isActive !== false) return false;
       if (!qq) return true;
