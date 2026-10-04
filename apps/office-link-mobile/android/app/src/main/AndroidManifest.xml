@@ -9,7 +9,7 @@
         android:usesPermissionFlags="neverForLocation" />
 
     <application
-        android:label="HR HUB Link"
+        android:label="Worklyn Link"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"

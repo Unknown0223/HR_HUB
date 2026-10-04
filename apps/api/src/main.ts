@@ -123,7 +123,7 @@ async function bootstrap() {
   }
 
   const config = new DocumentBuilder()
-    .setTitle('HR HUB API')
+    .setTitle('Worklyn API')
     .setDescription('Multi-tenant HR + attendance + payroll platform')
     .setVersion('0.1.0')
     .addBearerAuth()
@@ -135,7 +135,7 @@ async function bootstrap() {
   // Railway / PaaS inject PORT; local/dev still use API_PORT.
   const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3002);
   await app.listen(port, '0.0.0.0');
-  logger.log(`HR HUB API listening on http://0.0.0.0:${port}`);
+  logger.log(`Worklyn API listening on http://0.0.0.0:${port}`);
   logger.log(`Swagger: http://localhost:${port}/docs`);
   logger.log(`CORS origins: ${corsOrigins.join(', ')}`);
 }

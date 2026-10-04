@@ -46,7 +46,7 @@ def save_device_credential(
         "phase": phase,
         "savedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "note": (
-            "HR HUB Link recovery — новый admin-пароль. "
+            "Worklyn Link recovery — новый admin-пароль. "
             "Если Web vault не работает — восстановите из этого файла. "
             "Меню Admin: «Показать сохранённый пароль»."
         ),

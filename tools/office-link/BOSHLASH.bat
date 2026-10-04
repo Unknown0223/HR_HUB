@@ -1,5 +1,5 @@
 @echo off
-REM HR HUB — qurilmani ulash (konsolsiz GUI)
+REM Worklyn — qurilmani ulash (konsolsiz GUI)
 REM Smart App Control imzosiz EXE ni bloklaydi — avvalo pythonw.
 cd /d "%~dp0"
 

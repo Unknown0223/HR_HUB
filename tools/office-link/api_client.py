@@ -1,4 +1,4 @@
-"""HR HUB office-link HTTP client (stdlib). Never prints the link key."""
+"""Worklyn office-link HTTP client (stdlib). Never prints the link key."""
 from __future__ import annotations
 
 import http.client

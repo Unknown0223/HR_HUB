@@ -84,7 +84,7 @@ export default function LoginPage() {
             </svg>
           </span>
           <span>
-            <span className={styles.brandTitle}>HR HUB</span>
+            <span className={styles.brandTitle}>Worklyn</span>
             <span className={styles.brandTag}>Давомат · GPS · Кадры</span>
           </span>
         </header>

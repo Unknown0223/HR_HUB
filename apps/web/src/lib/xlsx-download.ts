@@ -83,7 +83,7 @@ function applyBorder(cell: Cell) {
 export async function downloadStyledXlsx(input: XlsxTableExport): Promise<void> {
   const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   wb.created = new Date();
   const ws = wb.addWorksheet(
     (input.sheetName || 'Отчет').replace(/[\\/*?:[\]]/g, '_').slice(0, 31) || 'Sheet1',
@@ -200,7 +200,7 @@ export async function downloadAttendanceLikeXlsx(opts: {
 }): Promise<void> {
   const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   const ws = wb.addWorksheet('Посещения');
 
   const colCount = opts.subHeader.length;
@@ -306,7 +306,7 @@ export async function downloadAttendanceLikeXlsx(opts: {
   URL.revokeObjectURL(url);
 }
 
-/** Pivot matrix: date lines + rotated column headers (HR HUB dismissal report). */
+/** Pivot matrix: date lines + rotated column headers (Worklyn dismissal report). */
 export async function downloadMatrixXlsx(opts: {
   filename: string;
   sheetName?: string;
@@ -318,7 +318,7 @@ export async function downloadMatrixXlsx(opts: {
 }): Promise<void> {
   const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   const ws = wb.addWorksheet((opts.sheetName || 'Отчет').replace(/[\\/*?:[\]]/g, '_').slice(0, 31) || 'Sheet1');
   const colCount = 1 + opts.columns.length;
   let r = 1;
@@ -405,7 +405,7 @@ export type XlsxSheetExport = {
   colWidths?: number[];
 };
 
-/** HR HUB multi-sheet reports: empty row, merged date line, header, grouped first column. */
+/** Worklyn multi-sheet reports: empty row, merged date line, header, grouped first column. */
 export async function downloadMultiSheetXlsx(opts: {
   filename: string;
   dateLine?: string;
@@ -413,7 +413,7 @@ export async function downloadMultiSheetXlsx(opts: {
 }): Promise<void> {
   const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   wb.created = new Date();
 
   for (const sheet of opts.sheets) {
@@ -496,7 +496,7 @@ export async function downloadMultiSheetXlsx(opts: {
   URL.revokeObjectURL(url);
 }
 
-/** KPI + titled tables on one sheet (employee movement / similar HR HUB reports). */
+/** KPI + titled tables on one sheet (employee movement / similar Worklyn reports). */
 export async function downloadSectionedXlsx(opts: {
   filename: string;
   sheetName?: string;
@@ -506,7 +506,7 @@ export async function downloadSectionedXlsx(opts: {
 }): Promise<void> {
   const ExcelJS = await loadExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   wb.created = new Date();
   const ws = wb.addWorksheet(
     (opts.sheetName || 'Отчет').replace(/[\\/*?:[\]]/g, '_').slice(0, 31) || 'Sheet1',

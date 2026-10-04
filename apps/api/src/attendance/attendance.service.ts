@@ -180,7 +180,7 @@ export class AttendanceService {
     ) {
       msg =
         'Связь с терминалом недоступна (Cloudflare tunnel / office-link). ' +
-        'Запустите HR HUB Link и повторите.';
+        'Запустите Worklyn Link и повторите.';
     }
     const status =
       e && typeof e === 'object' && 'status' in e
@@ -4574,7 +4574,7 @@ export class AttendanceService {
     const safeTenant = bind.tenantCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
 
     const setupReadme = [
-      'HR HUB Link — Windows o‘rnatuvchi (Setup)',
+      'Worklyn Link — Windows o‘rnatuvchi (Setup)',
       '========================================',
       '',
       `Web:    ${bind.webUrl}`,
@@ -4604,7 +4604,7 @@ export class AttendanceService {
       }
       if (!license) {
         license =
-          'HR HUB Link — Setup ni ishga tushirib shartlarga rozilik bering.\n';
+          'Worklyn Link — Setup ni ishga tushirib shartlarga rozilik bering.\n';
       }
       const zip = buildStoreZip([
         { name: 'HRHUB-Link-Setup.exe', content: setup.buf },
@@ -4622,7 +4622,7 @@ export class AttendanceService {
     }
 
     const fullReadme = [
-      'HR HUB Link — ushbu webga bog‘langan TO‘LIQ ilova',
+      'Worklyn Link — ushbu webga bog‘langan TO‘LIQ ilova',
       '================================================',
       '',
       `Web:    ${bind.webUrl}`,
@@ -4656,7 +4656,7 @@ export class AttendanceService {
     }
 
     const configOnlyReadme = [
-      'HR HUB Link — ushbu webga bog‘langan ulanish to‘plami',
+      'Worklyn Link — ushbu webga bog‘langan ulanish to‘plami',
       '====================================================',
       '',
       `Web:    ${bind.webUrl}`,

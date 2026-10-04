@@ -111,7 +111,7 @@ export class SettlementsService {
         eventType,
         userName,
         organization: 'Demo',
-        product: 'HR HUB',
+        product: 'Worklyn',
       },
     });
   }

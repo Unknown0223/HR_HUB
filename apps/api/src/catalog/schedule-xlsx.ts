@@ -1,5 +1,5 @@
 /**
- * HR HUB «Индивидуальный-график-(создание)» xlsx layout.
+ * Worklyn «Индивидуальный-график-(создание)» xlsx layout.
  * Sheets: data (row per employee/position) + metadata (shift definitions).
  */
 import ExcelJS from 'exceljs';
@@ -50,7 +50,7 @@ function daysInMonth(year: number, monthIndex: number) {
   return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 }
 
-/** Build HR HUB-compatible template workbook buffer. */
+/** Build Worklyn-compatible template workbook buffer. */
 export async function buildIndividualScheduleTemplateBuffer(opts: {
   year: number;
   monthIndex: number;
@@ -60,7 +60,7 @@ export async function buildIndividualScheduleTemplateBuffer(opts: {
   const { year, monthIndex } = opts;
   const dim = daysInMonth(year, monthIndex);
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   wb.created = new Date();
 
   const data = wb.addWorksheet('data');
@@ -154,7 +154,7 @@ export async function buildIndividualScheduleTemplateBuffer(opts: {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-/** Parse HR HUB individual-schedule workbook (data + metadata sheets). */
+/** Parse Worklyn individual-schedule workbook (data + metadata sheets). */
 export async function parseIndividualScheduleWorkbook(
   buffer: Buffer,
 ): Promise<ParsedCatalogSchedule> {

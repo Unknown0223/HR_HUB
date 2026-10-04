@@ -1,5 +1,5 @@
 """
-HR HUB Link — self-contained Windows package → release/HRHUB-Link (+ portable ZIP).
+Worklyn Link — self-contained Windows package → release/HRHUB-Link (+ portable ZIP).
 
 The package ships its own Python (python.org embeddable build, PSF-signed so
 Smart App Control allows it) with every library preinstalled. After unpacking /
@@ -169,7 +169,7 @@ def write_launchers(rel: Path) -> None:
         crlf.join(
             [
                 "@echo off",
-                "REM HR HUB Link — ilovani ochish (ichki Python, tashqi dastur kerak emas).",
+                "REM Worklyn Link — ilovani ochish (ichki Python, tashqi dastur kerak emas).",
                 'cd /d "%~dp0"',
                 'if exist "%~dp0runtime\\python\\pythonw.exe" (',
                 '  start "" /D "%~dp0" "%~dp0runtime\\python\\pythonw.exe" "%~dp0office_link_app.py"',
@@ -217,7 +217,7 @@ def write_launchers(rel: Path) -> None:
     (rel / "OQISH.txt").write_text(
         crlf.join(
             [
-                "HR HUB Link — OFIS PAKETI",
+                "Worklyn Link — OFIS PAKETI",
                 "========================",
                 "",
                 "1) BOSHLASH.bat — ilovani ochish",

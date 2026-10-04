@@ -602,5 +602,5 @@ export class TimesheetCatalogService {
     });
   }
 
-  // ─── Individual schedules (HR HUB «Индивидуальные графики») ───────────────
+  // ─── Individual schedules (Worklyn «Индивидуальные графики») ───────────────
 }

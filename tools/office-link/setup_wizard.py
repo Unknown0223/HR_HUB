@@ -1,5 +1,5 @@
 """
-HR HUB Link — Windows o‘rnatish ustasi (bitta Setup.exe).
+Worklyn Link — Windows o‘rnatish ustasi (bitta Setup.exe).
 
 EULA → papka → nusxalash → Start Menu / Desktop → Apps & Features (Uninstall).
 """
@@ -14,8 +14,9 @@ from tkinter import filedialog, messagebox
 import tkinter as tk
 from tkinter import ttk
 
-APP_NAME = "HR HUB Link"
-APP_PUBLISHER = "HR HUB"
+APP_NAME = "Worklyn Link"
+LEGACY_APP_NAME = "HR HUB Link"
+APP_PUBLISHER = "Worklyn"
 APP_VERSION = "1.3.0"
 APP_GUID = "{8F3C2A1B-9D4E-4B6A-A7C1-HRHUB-LINK-01}"
 DEFAULT_DIR = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "HRHUB-Link"
@@ -50,7 +51,7 @@ def _read_license() -> str:
                 except OSError:
                     pass
     return (
-        "HR HUB Link — foydalanish shartlari.\n\n"
+        "Worklyn Link — foydalanish shartlari.\n\n"
         "Davom etish orqali siz shartlarga rozilik bildirasiz.\n"
     )
 
@@ -91,7 +92,7 @@ def _write_uninstall_script(dest: Path) -> Path:
                 "@echo off",
                 "setlocal",
                 f'title {APP_NAME} — o‘chirish',
-                "echo HR HUB Link o‘chirilmoqda...",
+                "echo Worklyn Link o‘chirilmoqda...",
                 f'if exist "{dest}\\uninstall-service.bat" call "{dest}\\uninstall-service.bat"',
                 r'schtasks /Delete /TN "HRHUB-OfficeLink" /F >nul 2>&1',
                 r'schtasks /Delete /TN "HRHUB-OfficeLink-Tunnel" /F >nul 2>&1',
@@ -182,6 +183,16 @@ def _shortcuts(dest: Path, target: Path, args: str, desktop: bool) -> None:
     programs = Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / (
         r"Microsoft\Windows\Start Menu\Programs"
     )
+    for old in (
+        programs,
+        Path(os.environ.get("APPDATA", "")) / r"Microsoft\Windows\Start Menu\Programs",
+        Path.home() / "Desktop",
+        Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop",
+    ):
+        try:
+            (old / f"{LEGACY_APP_NAME}.lnk").unlink(missing_ok=True)
+        except OSError:
+            pass
     programs.mkdir(parents=True, exist_ok=True)
     write_lnk(programs / f"{APP_NAME}.lnk", dest)
     user_programs = (

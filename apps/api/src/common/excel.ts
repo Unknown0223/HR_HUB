@@ -10,7 +10,7 @@ export type ExcelSheetInput = {
 /** Build xlsx Buffer from flat row objects keyed by column names. */
 export async function buildExcelBuffer(input: ExcelSheetInput): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   const ws = wb.addWorksheet(sanitizeSheetName(input.sheetName));
   const header = ws.addRow(input.columns);
   header.font = { bold: true, color: { argb: 'FF3F4254' } };

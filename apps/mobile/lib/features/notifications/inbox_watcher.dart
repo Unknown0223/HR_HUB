@@ -212,7 +212,7 @@ class _InboxWatcherState extends ConsumerState<InboxWatcher>
         for (final m in shown) {
           await showSystemNotification(
             id: m['id'].toString().hashCode & 0x7fffffff,
-            title: m['title']?.toString() ?? 'HR HUB',
+            title: m['title']?.toString() ?? 'Worklyn',
             body: m['body']?.toString(),
           );
         }

@@ -1,4 +1,4 @@
-/** Shared HR HUB constants & types — used by API (and eventually web/mobile). */
+/** Shared Worklyn constants & types — used by API (and eventually web/mobile). */
 
 export const ROLES = [
   'platform_admin',

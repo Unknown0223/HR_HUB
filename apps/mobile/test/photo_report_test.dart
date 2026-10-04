@@ -17,7 +17,7 @@ void main() {
     final bytes = await composePhotoReport(
       backPath: backFile.path,
       selfiePath: selfieFile.path,
-      stamp: 'HR HUB | KIRISH | 01.01.2026 09:00:00',
+      stamp: 'Worklyn | KIRISH | 01.01.2026 09:00:00',
     );
     final out = img.decodeJpg(bytes)!;
 

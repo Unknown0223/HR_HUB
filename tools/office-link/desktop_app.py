@@ -1,4 +1,4 @@
-"""Native-feeling Windows desktop shell (WebView2) for HR HUB Link."""
+"""Native-feeling Windows desktop shell (WebView2) for Worklyn Link."""
 from __future__ import annotations
 
 import ctypes
@@ -13,7 +13,7 @@ from paths import bound_web_label, find_root, load_config, read_pairing_token, r
 from session import OfficeLinkSession, SubmitResult
 from auth_lock import CONFIRM, LOCKED
 
-APP_TITLE = "HR HUB Link"
+APP_TITLE = "Worklyn Link"
 APP_AUMID = "HRHUB.OfficeLink.Desktop"
 
 # Win32 helpers for frameless chrome (min/max/resize).
@@ -240,7 +240,7 @@ class LinkApi:
             "alert": {
                 "text": (
                     "Блокировка снята. Нужен текущий пароль администратора "
-                    "на терминале Hikvision (не пароль Web HR HUB)."
+                    "на терминале Hikvision (не пароль Web Worklyn)."
                 ),
                 "kind": "ok",
             },

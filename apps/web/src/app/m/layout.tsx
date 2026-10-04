@@ -3,13 +3,13 @@ import { SeasonalBackdrop } from '@/components/SeasonalBackdrop';
 import MobileBodyFlag from './_components/MobileBodyFlag';
 
 export const metadata: Metadata = {
-  title: 'HR HUB Mobile',
+  title: 'Worklyn Mobile',
   description:
     'Legacy PWA prototip. Asosiy mobil ilova: apps/mobile (qarang docs/MOBILE_SOURCE_OF_TRUTH.md)',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    title: 'HR HUB',
+    title: 'Worklyn',
     statusBarStyle: 'default',
   },
 };

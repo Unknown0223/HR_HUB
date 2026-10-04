@@ -913,7 +913,7 @@ th,td{border:1px solid #cfd3da;padding:2px 4px;text-align:center}
 th{background:#eef0f4}
 .name{text-align:left;white-space:normal}.num{text-align:right}
 </style></head><body>
-<div class="top"><div><span class="brand">HR Hub</span><strong>${escapeHtml(TITLE)}</strong></div></div>
+<div class="top"><div><span class="brand">Worklyn</span><strong>${escapeHtml(TITLE)}</strong></div></div>
 <div style="padding:10px 16px">${escapeHtml(report.periodLine)}<br/>${escapeHtml(report.positionTypeLabel)}</div>
 <div style="padding:0 16px 16px;overflow:auto"><table><thead><tr>${head1}</tr><tr>${head2}</tr></thead>
 <tbody>${body || `<tr><td colspan="${cols.length}">Нет данных</td></tr>`}</tbody></table></div>

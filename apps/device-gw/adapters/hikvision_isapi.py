@@ -190,7 +190,7 @@ class HikvisionIsapiAdapter(DeviceAdapter):
         self.auth_lock_until: Optional[datetime] = None
         self._config_baseline: Optional[dict[str, Any]] = None
         self._config_baseline_at: Optional[datetime] = None
-        # employeeNos HR HUB itself wrote since the baseline (not the admin's doing).
+        # employeeNos Worklyn itself wrote since the baseline (not the admin's doing).
         self._own_person_changes: set[str] = set()
         self._snapshot_path: Optional[str] = None
         self.admin_audit: Optional[dict[str, Any]] = None

@@ -471,7 +471,7 @@ export class TelegramService {
       if (!code) {
         await this.sendMessage(
           chatId,
-          'HR HUB bot. Qo‘shilish uchun HR bergan havola orqali /start QODNI yuboring.',
+          'Worklyn bot. Qo‘shilish uchun HR bergan havola orqali /start QODNI yuboring.',
         );
         return { ok: true };
       }

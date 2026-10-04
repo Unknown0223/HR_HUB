@@ -8,7 +8,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
- * Payload from Google Form → Apps Script → HR HUB.
+ * Payload from Google Form → Apps Script → Worklyn.
  * Field names are stable English keys; form titles can be RU/UZ.
  */
 export class EmployeeFormIngestDto {

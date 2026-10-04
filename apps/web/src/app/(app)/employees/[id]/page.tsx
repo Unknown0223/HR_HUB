@@ -869,7 +869,7 @@ function plannedWorkMinutes(schedule?: Detail['schedule'] | null) {
   const end = schedule?.endTime || '18:00';
   let mins = parseHm(end) - parseHm(start);
   if (mins <= 0) mins += 24 * 60;
-  // HR HUB odatda tushlikni hisobga oladi (~1 soat) — 09-18 → 8 soat net
+  // Worklyn odatda tushlikni hisobga oladi (~1 soat) — 09-18 → 8 soat net
   if (mins >= 8 * 60) mins -= 60;
   return mins;
 }

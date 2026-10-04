@@ -1,4 +1,4 @@
-# HR HUB ofis skripti — boshqa PCda Node/Git shart emas.
+# Worklyn ofis skripti — boshqa PCda Node/Git shart emas.
 # Admin:  ADMIN-PAROL.bat  (parolni bir marta o‘rnatadi, joyidagi odam ko‘rmaydi)
 # Joyida: BOSHLASH.bat     (faqat qurilma paroli so‘raladi)
 param(
@@ -62,7 +62,7 @@ function Copy-GwSources {
     Copy-Item (Join-Path $src "adapters\*.py") (Join-Path $gwDir "adapters") -Force
   }
   if (-not (Test-Path (Join-Path $gwDir "main.py"))) {
-    throw "Gateway kodlari yo‘q. Avval ADMIN-PAROL.bat ni HR HUB kompyuterida ishga tushiring, keyin shu papkani to‘liq nusxalang."
+    throw "Gateway kodlari yo‘q. Avval ADMIN-PAROL.bat ni Worklyn kompyuterida ishga tushiring, keyin shu papkani to‘liq nusxalang."
   }
 }
 

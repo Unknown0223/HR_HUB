@@ -1,4 +1,4 @@
-/** HR HUB «Расчет зарплаты» — TenantSetting.extras.payrollCalc */
+/** Worklyn «Расчет зарплаты» — TenantSetting.extras.payrollCalc */
 
 export type TaxBlockSettings = {
   /** Облагается */

@@ -36,7 +36,7 @@ export type FilterFieldDef = {
   label?: string;
   options?: FilterSelectOption[];
   placeholder?: string;
-  /** Operator shown in HR HUB row (default =) — modal only */
+  /** Operator shown in Worklyn row (default =) — modal only */
   operator?: string;
   /** Allow selecting several values (stored as comma-separated) */
   multiple?: boolean;

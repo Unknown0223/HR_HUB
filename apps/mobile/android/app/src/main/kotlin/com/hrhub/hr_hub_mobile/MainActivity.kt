@@ -32,7 +32,7 @@ class MainActivity : FlutterFragmentActivity() {
                         AppNotifier.show(
                             this,
                             call.argument<Int>("id") ?: 0,
-                            call.argument<String>("title") ?: "HR HUB",
+                            call.argument<String>("title") ?: "Worklyn",
                             call.argument<String>("body"),
                         )
                         result.success(true)

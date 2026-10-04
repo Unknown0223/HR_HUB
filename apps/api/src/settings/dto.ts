@@ -160,14 +160,14 @@ export class UpdateSystemSettingsDto {
 }
 
 export class UpdatePayrollCalcDto {
-  @ApiPropertyOptional({ description: 'HR HUB payroll calculation settings body' })
+  @ApiPropertyOptional({ description: 'Worklyn payroll calculation settings body' })
   @IsOptional()
   @IsObject()
   payrollCalc?: Record<string, unknown>;
 }
 
 export class UpdateAccountSettingsDto {
-  @ApiPropertyOptional({ description: 'HR HUB account settings mappings' })
+  @ApiPropertyOptional({ description: 'Worklyn account settings mappings' })
   @IsOptional()
   @IsObject()
   accountSettings?: Record<string, string>;

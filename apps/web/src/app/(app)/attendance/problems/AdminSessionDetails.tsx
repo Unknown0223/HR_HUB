@@ -181,7 +181,7 @@ export function AdminSessionDetails({ payload }: { payload: Record<string, unkno
                   <li key={i} className={c.byServer ? styles.server : undefined}>
                     <span className={styles.section}>{SECTION_LABEL[c.section] ?? c.section}</span>
                     {changeText(c)}
-                    {c.byServer ? <span className={styles.tag}>синхронизация HR HUB</span> : null}
+                    {c.byServer ? <span className={styles.tag}>синхронизация Worklyn</span> : null}
                   </li>
                 ))}
               </ul>

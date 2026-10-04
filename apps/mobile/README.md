@@ -1,6 +1,6 @@
-# HR HUB — Flutter mobile
+# Worklyn — Flutter mobile
 
-Brand: **HR HUB**. API: Nest `:3002` (kanon).
+Brand: **Worklyn**. API: Nest `:3002` (kanon).
 
 > Source of truth: [docs/MOBILE_SOURCE_OF_TRUTH.md](../../docs/MOBILE_SOURCE_OF_TRUTH.md)
 

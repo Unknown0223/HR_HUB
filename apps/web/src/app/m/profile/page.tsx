@@ -64,14 +64,14 @@ export default function MobileProfilePage() {
     : [];
 
   return (
-    <MobileFrame title="Profil" subtitle="HR HUB">
+    <MobileFrame title="Profil" subtitle="Worklyn">
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.profileHead}>
         <span className={styles.avatar}>{initials(profile?.fullName)}</span>
         <span className={styles.profileMeta}>
           <strong>{profile?.fullName ?? '—'}</strong>
-          <small>{profile?.tenant?.name ?? 'HR HUB'}</small>
+          <small>{profile?.tenant?.name ?? 'Worklyn'}</small>
         </span>
       </div>
 

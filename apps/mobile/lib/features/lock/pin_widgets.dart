@@ -146,7 +146,7 @@ class _BrandBackdropState extends State<BrandBackdrop>
   }
 }
 
-/// "HR HUB" mark in a frosted pill, readable on top of the illustration.
+/// "Worklyn" mark in a frosted pill, readable on top of the illustration.
 class BrandChip extends StatelessWidget {
   const BrandChip({super.key});
 
@@ -173,7 +173,7 @@ class BrandChip extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'HR HUB',
+                    'Worklyn',
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w900,

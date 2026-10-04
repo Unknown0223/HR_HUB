@@ -31,7 +31,7 @@ export class CreateLocationDto {
   @IsOptional()
   @IsBoolean()
   isGlobal?: boolean;
-  @ApiPropertyOptional({ description: 'HR HUB location extras JSON' })
+  @ApiPropertyOptional({ description: 'Worklyn location extras JSON' })
   @IsOptional()
   meta?: Record<string, unknown>;
 }
@@ -49,7 +49,7 @@ export class UpdateScheduleDto {
   @IsOptional()
   @IsString()
   kind?: string;
-  @ApiPropertyOptional({ description: 'HR HUB schedule settings JSON' })
+  @ApiPropertyOptional({ description: 'Worklyn schedule settings JSON' })
   @IsOptional()
   settings?: Record<string, unknown>;
 }
@@ -133,7 +133,7 @@ export class CreateDeviceDto {
   @ApiPropertyOptional() @IsOptional() @IsString() password?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() gatewayRef?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
-  @ApiPropertyOptional({ description: 'HR HUB device settings JSON' })
+  @ApiPropertyOptional({ description: 'Worklyn device settings JSON' })
   @IsOptional()
   meta?: Record<string, unknown>;
 }

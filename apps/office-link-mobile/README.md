@@ -1,6 +1,6 @@
-# HR HUB Link (Android)
+# Worklyn Link (Android)
 
-Ofis Face ID terminalini HR HUB platformasiga ulash — Windows [tools/office-link](../../tools/office-link) bilan **bir xil** pairing / Ulash / Web tasdiq / **Cloudflare tunnel** oqimi.
+Ofis Face ID terminalini Worklyn platformasiga ulash — Windows [tools/office-link](../../tools/office-link) bilan **bir xil** pairing / Ulash / Web tasdiq / **Cloudflare tunnel** oqimi.
 
 ## Tunnel (APK)
 

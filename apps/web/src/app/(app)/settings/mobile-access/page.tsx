@@ -222,7 +222,7 @@ export default function MobileAccessPage() {
 
   function bulkText(r: BulkResult) {
     return [
-      `HR HUB mobil ilova — Server: ${serverLink}`,
+      `Worklyn mobil ilova — Server: ${serverLink}`,
       ...r.issued.map((i) => `${i.fullName}\tLogin: ${i.login}\tParol: ${i.password}`),
     ].join('\n');
   }
@@ -231,7 +231,7 @@ export default function MobileAccessPage() {
     await downloadStyledXlsx({
       filename: `mobile-logins-${new Date().toISOString().slice(0, 10)}.xlsx`,
       sheetName: 'Логины',
-      title: 'HR HUB — вход в мобильное приложение',
+      title: 'Worklyn — вход в мобильное приложение',
       subtitle: `Server: ${serverLink} · выдано ${r.issuedAt} · пароли одноразовые: при первом входе приложение попросит задать свой`,
       columns: ['Таб. №', 'Сотрудник', 'Подразделение', 'Должность', 'Логин', 'Одноразовый пароль'],
       rows: r.issued.map((i) => [
@@ -249,7 +249,7 @@ export default function MobileAccessPage() {
   const issuedText = useMemo(
     () =>
       issued
-        ? `HR HUB mobil ilova\nServer: ${issued.server}\nLogin: ${issued.login}\nParol: ${issued.password}`
+        ? `Worklyn mobil ilova\nServer: ${issued.server}\nLogin: ${issued.login}\nParol: ${issued.password}`
         : '',
     [issued],
   );

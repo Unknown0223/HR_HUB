@@ -159,7 +159,7 @@ export const CATALOG_NAV: NavGroup[] = [
 ];
 
 /** Field labels for generic catalog forms */
-/** Field labels for generic catalog forms — Russian HR HUB 1:1 */
+/** Field labels for generic catalog forms — Russian Worklyn 1:1 */
 export type FieldDef = {
   name: string;
   label: string;

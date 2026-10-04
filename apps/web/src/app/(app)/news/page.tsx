@@ -187,12 +187,12 @@ export default function NewsFeedPage() {
     const seen = new Set<string>();
     const list: string[] = [];
     for (const item of items) {
-      const name = item.authorName?.trim() || 'HR HUB';
+      const name = item.authorName?.trim() || 'Worklyn';
       if (seen.has(name)) continue;
       seen.add(name);
       list.push(name);
     }
-    return list.length ? list : ['HR HUB'];
+    return list.length ? list : ['Worklyn'];
   }, [items]);
 
   async function load() {
@@ -320,7 +320,7 @@ export default function NewsFeedPage() {
             ) : null}
 
             {items.map((item) => {
-              const author = item.authorName?.trim() || 'HR HUB';
+              const author = item.authorName?.trim() || 'Worklyn';
               return (
                 <article key={item.id} className={css.post}>
                   <div className={css.postInner}>

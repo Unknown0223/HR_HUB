@@ -120,7 +120,7 @@ def provision_hosts(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description=f"HR HUB Link — bulk provision (max {MAX_HOSTS} host)"
+        description=f"Worklyn Link — bulk provision (max {MAX_HOSTS} host)"
     )
     parser.add_argument(
         "--hosts",

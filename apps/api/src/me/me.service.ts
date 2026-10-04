@@ -692,7 +692,7 @@ export class MeService {
       occurredAt,
       source: 'mobile_face',
       raw: {
-        product: 'HR HUB',
+        product: 'Worklyn',
         verified: true,
         mode,
         faceProfileId: face?.id ?? null,

@@ -56,7 +56,7 @@ const Map<String, String> ruAuth = {
   'Barcha ruxsatlar berilmaguncha ilovadan foydalanib bo‘lmaydi':
       'Пока не выданы все разрешения, приложением пользоваться нельзя',
   'Ruxsatlar kerak': 'Нужны разрешения',
-  'HR HUB ishlashi uchun {0} ta ruxsat zarur': 'Для работы HR HUB нужны разрешения: {0}',
+  'Worklyn ishlashi uchun {0} ta ruxsat zarur': 'Для работы Worklyn нужны разрешения: {0}',
   '{0} / {1} berildi': 'Выдано: {0} / {1}',
   'Sozlamalar': 'Настройки',
   'Berish': 'Разрешить',

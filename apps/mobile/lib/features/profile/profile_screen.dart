@@ -114,7 +114,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 14),
               const Center(
                 child: Text(
-                  'HR HUB · v$appVersion',
+                  'Worklyn · v$appVersion',
                   style: TextStyle(
                     color: AppColors.inkFaint,
                     fontSize: 13,

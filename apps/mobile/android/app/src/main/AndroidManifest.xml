@@ -20,7 +20,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.fingerprint" android:required="false"/>
     <application
-        android:label="HR HUB"
+        android:label="Worklyn"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

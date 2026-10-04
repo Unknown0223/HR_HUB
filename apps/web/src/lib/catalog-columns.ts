@@ -1,6 +1,6 @@
 /**
- * Grid columns 1:1 with HR HUB `:table` request `column` arrays,
- * mapped onto HR HUB Prisma field paths (flattenRow keys).
+ * Grid columns 1:1 with Worklyn `:table` request `column` arrays,
+ * mapped onto Worklyn Prisma field paths (flattenRow keys).
  * Order + Russian labels must match the captured screens.
  */
 
@@ -9,11 +9,11 @@ import { COLUMN_LABEL_OVERRIDES } from './employee-fields';
 export type ColumnDef = {
   /** flattenRow / API field path */
   key: string;
-  /** Russian header (HR HUB UI) */
+  /** Russian header (Worklyn UI) */
   label: string;
 };
 
-/** Общие label map for common keys (HR HUB employee fields merged in). */
+/** Общие label map for common keys (Worklyn employee fields merged in). */
 export const COLUMN_LABELS: Record<string, string> = {
   tabNumber: 'Табельный номер',
   employee_number: 'Табельный номер',

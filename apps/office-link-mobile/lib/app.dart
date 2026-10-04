@@ -11,7 +11,7 @@ class OfficeLinkApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       child: MaterialApp(
-        title: 'HR HUB Link',
+        title: 'Worklyn Link',
         debugShowCheckedModeBanner: false,
         theme: buildLinkTheme(),
         home: const LinkScreen(),

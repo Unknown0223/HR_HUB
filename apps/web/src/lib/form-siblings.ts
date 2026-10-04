@@ -1,5 +1,5 @@
 /**
- * HR HUB formSiblings — second-row subheader links under page title.
+ * Worklyn formSiblings — second-row subheader links under page title.
  * Source: output/run_20260725_222506 clone pages (data-doc-subnav).
  */
 
@@ -13,7 +13,7 @@ export type SiblingGroup = {
   siblings: SiblingLink[];
 };
 
-/** Map HR HUB page title → sibling links (HR HUB routes). */
+/** Map Worklyn page title → sibling links (Worklyn routes). */
 export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
   employees: {
     title: 'Сотрудники',

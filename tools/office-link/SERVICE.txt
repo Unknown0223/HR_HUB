@@ -1,4 +1,4 @@
-HR HUB Link — Windows Service (Faza 2)
+Worklyn Link — Windows Service (Faza 2)
 ======================================
 
 Maqsad
@@ -16,7 +16,7 @@ Auto-heal
 Tayyorgarlik
 ------------
 1. Web → Устройства → Связь с офисом — pairing token
-2. HR HUB Link (BOSHLASH.bat) — token, lokatsiya, «Ulash» (muvaffaqiyatli)
+2. Worklyn Link (BOSHLASH.bat) — token, lokatsiya, «Ulash» (muvaffaqiyatli)
 3. data\service.json avtomatik yoziladi; data\link.key bo‘lishi kerak
 
 O‘rnatish

@@ -313,7 +313,7 @@ export function DisciplineReportSheet({
     <div className={styles.sheet}>
       <div className={styles.top}>
         <div className={styles.brandRow}>
-          <span className={styles.brand}>HR Hub</span>
+          <span className={styles.brand}>Worklyn</span>
           <h1 className={styles.title}>
             {title}
             {gen ? ` (${gen})` : ''}

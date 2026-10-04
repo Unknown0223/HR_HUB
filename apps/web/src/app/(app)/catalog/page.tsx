@@ -46,7 +46,7 @@ export default function CatalogIndexPage() {
         <div>
           <h1 className={styles.title}>Каталог модулей</h1>
           <p className={shared.lead}>
-            Все разделы HR HUB, доступные вашей роли, в одном списке — с теми же группами, что и в
+            Все разделы Worklyn, доступные вашей роли, в одном списке — с теми же группами, что и в
             боковом меню.
           </p>
         </div>

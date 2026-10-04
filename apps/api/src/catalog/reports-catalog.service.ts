@@ -28,7 +28,7 @@ export class ReportsCatalogService {
   }
 
   /**
-   * HR HUB «Статистика работы подразделений»
+   * Worklyn «Статистика работы подразделений»
    * Статусы: режим не задан | не по графику | по графику
    */
   async divisionWorkDashboard(
@@ -4562,7 +4562,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Отчет по штрафам»
+   * Worklyn «Отчет по штрафам»
    * Matrix: employee + schedule | day amounts | Итог
    */
   async penaltiesReport(
@@ -5227,7 +5227,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Расходы по подразделениям»
+   * Worklyn «Расходы по подразделениям»
    * Views: Развернутый по сотрудникам | Дополнительный по сотрудникам | По подразделениям
    */
   async divisionExpensesReport(
@@ -5473,7 +5473,7 @@ ORDER BY pp.month;`,
         let h = 0;
         if (rec) {
           if (cfg.showUserPlanFact !== false && rec.plan > 0 && rec.worked <= 0) {
-            // keep fact; user-plan toggle mainly affects display preference in HR HUB
+            // keep fact; user-plan toggle mainly affects display preference in Worklyn
             h = rec.worked;
           } else {
             h = rec.worked;
@@ -5859,7 +5859,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Оборотно-сальдовая ведомость по счету»
+   * Worklyn «Оборотно-сальдовая ведомость по счету»
    * Builds OSV-style rows from payroll lines in the period (HR approximation of GL).
    */
   async accountBalanceReport(
@@ -6029,7 +6029,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Оборотно-сальдовая ведомость» (общая, без выбора счёта).
+   * Worklyn «Оборотно-сальдовая ведомость» (общая, без выбора счёта).
    */
   async trialBalanceReport(
     tenantId: string,
@@ -6180,7 +6180,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Отчет по предварительному окладу»
+   * Worklyn «Отчет по предварительному окладу»
    * Columns: № | Сотрудник | Подразделение | Должность | График работы |
    *          Начисление | Удержание | ИТОГО | Выплачено | Осталось
    */
@@ -6485,7 +6485,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «ФОТ отчет»
+   * Worklyn «ФОТ отчет»
    * Views: По сотрудникам | По локациям сотрудника | По локациям
    */
   async fotReport(
@@ -6741,7 +6741,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Отчет по оплатам»
+   * Worklyn «Отчет по оплатам»
    * Columns: Сотрудник | Должность | Подразделение | Наличные | Безналичные | Итого
    */
   async paymentsReport(
@@ -6928,7 +6928,7 @@ ORDER BY pp.month;`,
       })
       .filter((r) => r.total !== 0 || employeeIds.length > 0 || selectedDivs.length > 0);
 
-    // If nothing paid and no filters — still return empty list (HR HUB style). With filters show zeros.
+    // If nothing paid and no filters — still return empty list (Worklyn style). With filters show zeros.
     const showRows =
       rows.length === 0 && (employeeIds.length > 0 || selectedDivs.length > 0)
         ? filtered.map((e) => ({
@@ -8259,7 +8259,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Причины увольнений» dashboard — one query + in-memory aggregates.
+   * Worklyn «Причины увольнений» dashboard — one query + in-memory aggregates.
    */
   async dismissalDashboard(tenantId: string, from?: string, to?: string) {
     const gte = from ? parseDateParam(from, new Date(0), 'from') : undefined;
@@ -8440,7 +8440,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Кадровые изменения» — one employee load + in-memory series.
+   * Worklyn «Кадровые изменения» — one employee load + in-memory series.
    */
   async personnelChangesDashboard(
     tenantId: string,
@@ -10159,7 +10159,7 @@ ORDER BY pp.month;`,
   }
 
   /**
-   * HR HUB «Итоговый отчет по начислениям с группировками»
+   * Worklyn «Итоговый отчет по начислениям с группировками»
    * Three views: main employee grid, employees-by-division column order, division aggregates.
    */
   async payrollGroupedReport(

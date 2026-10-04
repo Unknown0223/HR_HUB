@@ -17,7 +17,7 @@ object AppNotifier {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(CHANNEL_ID, "HR HUB xabarlari", NotificationManager.IMPORTANCE_HIGH)
+        val channel = NotificationChannel(CHANNEL_ID, "Worklyn xabarlari", NotificationManager.IMPORTANCE_HIGH)
         channel.description = "So‘rovlar, avans, davomat va e’lonlar"
         nm.createNotificationChannel(channel)
     }

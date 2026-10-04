@@ -1403,7 +1403,7 @@ export class SettingsService {
   }
 
   /**
-   * Настройки маппинга Excel → персональные документы (HR HUB 1:1).
+   * Настройки маппинга Excel → персональные документы (Worklyn 1:1).
    */
   async getPersonDocsImport(tenantId: string) {
     const { settings } = await this.getOrg(tenantId);

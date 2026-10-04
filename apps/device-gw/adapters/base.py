@@ -19,7 +19,7 @@ class PunchEvent(BaseModel):
 
 
 class DeviceAdapter(ABC):
-    """Universal device adapter interface (HR HUB Phase 0)."""
+    """Universal device adapter interface (Worklyn Phase 0)."""
 
     @abstractmethod
     async def connect(self) -> None: ...

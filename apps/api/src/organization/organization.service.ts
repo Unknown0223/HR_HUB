@@ -5,7 +5,7 @@ import { CreateDivisionDto, CreatePositionDto, UpdateDivisionDto, UpdatePosition
 import { buildCsvBuffer, buildExcelBuffer } from '../common/excel';
 import type { ImportResult } from '../common/import.dto';
 
-/** HR HUB import template column headers (order = default column numbers 1..9). */
+/** Worklyn import template column headers (order = default column numbers 1..9). */
 export const DIVISION_IMPORT_HEADERS = [
   'Название подразделения',
   'Код',

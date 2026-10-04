@@ -1,16 +1,16 @@
 @echo off
-REM HR HUB Link — GW + Cloudflare tunnel (headless). Keep this window open.
+REM Worklyn Link — GW + Cloudflare tunnel (headless). Keep this window open.
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-echo === HR HUB Office Link — gateway + tunnel ===
+echo === Worklyn Office Link — gateway + tunnel ===
 echo Papka: %CD%
 echo.
 
 set "PY=%CD%\runtime\python\python.exe"
 if not exist "%PY%" (
   where python >nul 2>&1 || (
-    echo [XATO] runtime\python topilmadi. HR HUB Link ni qayta o'rnating.
+    echo [XATO] runtime\python topilmadi. Worklyn Link'ni qayta o'rnating.
     pause
     exit /b 1
   )

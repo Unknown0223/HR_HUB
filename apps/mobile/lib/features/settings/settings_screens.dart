@@ -228,7 +228,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  context.t('HR HUB mobile · Face ID + barmoq izi'),
+                  context.t('Worklyn mobile · Face ID + barmoq izi'),
                   style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
                 ),
               ),
@@ -374,7 +374,7 @@ class _NotificationSettingsScreenState
     if (!mounted) return;
     await showSystemNotification(
       id: 1,
-      title: context.tr('HR HUB — sinov xabari', 'HR HUB — тестовое уведомление'),
+      title: context.tr('Worklyn — sinov xabari', 'Worklyn — тестовое уведомление'),
       body: context.tr(
         'Bildirishnomalar ishlayapti. Yangi xabarlar shu tarzda chiqadi.',
         'Уведомления работают. Новые сообщения будут приходить так же.',
@@ -423,8 +423,8 @@ class _NotificationSettingsScreenState
                       Expanded(
                         child: Text(
                           context.tr(
-                            'Telefon sozlamalarida HR HUB bildirishnomalari o‘chirilgan',
-                            'В настройках телефона уведомления HR HUB отключены',
+                            'Telefon sozlamalarida Worklyn bildirishnomalari o‘chirilgan',
+                            'В настройках телефона уведомления Worklyn отключены',
                           ),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),

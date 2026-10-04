@@ -13,7 +13,7 @@ export const KIND_LABELS: Record<HrChangeKind, string> = {
   dismiss: 'Увольнение',
 };
 
-/** HR HUB page titles: «Заявка на … (создание|изменение|просмотр)» */
+/** Worklyn page titles: «Заявка на … (создание|изменение|просмотр)» */
 export function formPageTitle(
   kind: HrChangeKind,
   mode: 'create' | 'edit',

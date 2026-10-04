@@ -4,7 +4,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $out = New-Object System.Collections.Generic.List[string]
 function Say([string]$s) { Write-Host $s; $out.Add($s) }
 
-Say "=== HR HUB: Hikvision qurilma tekshiruvi ==="
+Say "=== Worklyn: Hikvision qurilma tekshiruvi ==="
 Say ("Sana: " + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + "   Qurilma IP: $Ip")
 Say ""
 

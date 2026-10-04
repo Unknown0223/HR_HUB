@@ -455,7 +455,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
                     Пользователь: h.meta?.userName || '',
                     'Тип события': histEventLabel(h.action),
                     Организация: orgName,
-                    Продукт: 'HR HUB',
+                    Продукт: 'Worklyn',
                   })),
                 )
               }
@@ -516,7 +516,7 @@ function CountriesInner({ historyMode }: { historyMode?: boolean }) {
                       <td>{h.meta?.userName || '—'}</td>
                       <td>{histEventLabel(h.action)}</td>
                       <td>{orgName}</td>
-                      <td>HR HUB</td>
+                      <td>Worklyn</td>
                     </tr>
                   );
                 })

@@ -800,7 +800,7 @@ function Inner() {
       return `<!doctype html><html lang="ru"><head><meta charset="utf-8"/><title>${escapeHtml(payload.title)}</title>
 <style>body{font-family:Arial,sans-serif;color:#181c32;margin:16px}table{border-collapse:collapse;font-size:11px}th,td{border:1px solid #d8dbe0;padding:4px 6px;text-align:center}th{background:#eef0f4}.name{text-align:left}.off,.В{background:#e7f3ff}.absent{background:#fce4ec}.late{background:#fff2cc}.btn{border:1px solid #e4e6ef;background:#fff;padding:6px 10px;margin-left:6px;cursor:pointer}</style></head>
 <body>
-<div style="display:flex;justify-content:space-between;align-items:center"><h1>HR Hub · ${escapeHtml(payload.title)}</h1><div><button class="btn" id="btnPrint">Печать</button><button class="btn" id="btnExcel">Excel</button></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><h1>Worklyn · ${escapeHtml(payload.title)}</h1><div><button class="btn" id="btnPrint">Печать</button><button class="btn" id="btnExcel">Excel</button></div></div>
 <p>${escapeHtml(periodLine(payload))}</p>
 <table>
 <tr><th rowspan="2">Подразделение</th>${extraTh}<th rowspan="2">График работы</th>${dayTop}<th rowspan="2">Итого отсутствия</th></tr>
@@ -826,7 +826,7 @@ ${body}${total}
     return `<!doctype html><html lang="ru"><head><meta charset="utf-8"/><title>${escapeHtml(payload.title)}</title>
 <style>body{font-family:Arial,sans-serif;color:#181c32;margin:16px}table{border-collapse:collapse;font-size:11px}th,td{border:1px solid #d8dbe0;padding:4px 6px;text-align:center}th{background:#eef0f4}.name{text-align:left}.off{background:#e7f3ff}.btn{border:1px solid #e4e6ef;background:#fff;padding:6px 10px;margin-left:6px;cursor:pointer}</style></head>
 <body>
-<div style="display:flex;justify-content:space-between;align-items:center"><h1>HR Hub · ${escapeHtml(payload.title)}</h1><div><button class="btn" id="btnPrint">Печать</button><button class="btn" id="btnExcel">Excel</button></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><h1>Worklyn · ${escapeHtml(payload.title)}</h1><div><button class="btn" id="btnPrint">Печать</button><button class="btn" id="btnExcel">Excel</button></div></div>
 <p>${escapeHtml(periodLine(payload))}</p>
 <table>
 <tr><th rowspan="2">№</th><th rowspan="2">Подразделение</th><th rowspan="2">График работы</th>${dayTop}</tr>

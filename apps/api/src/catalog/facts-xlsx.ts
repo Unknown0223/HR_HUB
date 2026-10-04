@@ -1,12 +1,12 @@
 /**
- * HR HUB «Импорт фактов» xlsx — template matching
+ * Worklyn «Импорт фактов» xlsx — template matching
  * sheet «Факты»: person_name, division_name, fact_type_name, fact_value, fact_date
  */
 import ExcelJS from 'exceljs';
 
 export async function buildFactsImportTemplateBuffer(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'HR HUB';
+  wb.creator = 'Worklyn';
   wb.created = new Date();
 
   const sheet = wb.addWorksheet('Факты');

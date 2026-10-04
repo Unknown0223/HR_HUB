@@ -314,7 +314,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
       final now = ServerClock.now();
       String two(int v) => v.toString().padLeft(2, '0');
       final stamp =
-          'HR HUB | ${_isIn ? 'KIRISH' : 'CHIQISH'} | '
+          'Worklyn | ${_isIn ? 'KIRISH' : 'CHIQISH'} | '
           '${two(now.day)}.${two(now.month)}.${now.year} '
           '${two(now.hour)}:${two(now.minute)}:${two(now.second)}\n'
           'GPS ${fix.latitude.toStringAsFixed(5)}, ${fix.longitude.toStringAsFixed(5)} '

@@ -52,7 +52,7 @@ LOCAL_OPERATION_MINORS = {0x50, 0x51, 0x5A, 0x40A, 0x416}
 MAX_OPERATIONS = 200
 MAX_LIST_ITEMS = 50
 
-# Values that change on their own or that HR HUB toggles itself during the lock.
+# Values that change on their own or that Worklyn toggles itself during the lock.
 VOLATILE_KEYS: dict[str, set[str]] = {
     "time": {"localTime"},
     "cardReader": {"enable"},

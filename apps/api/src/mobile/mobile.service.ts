@@ -53,7 +53,7 @@ export class MobileService {
       : 0;
 
     return {
-      product: 'HR HUB',
+      product: 'Worklyn',
       date: this.isoDate(new Date()),
       linked,
       profile,
@@ -143,7 +143,7 @@ export class MobileService {
     const cal = await this.calendar(user, year, month);
     if (!cal.linked) {
       return {
-        product: 'HR HUB',
+        product: 'Worklyn',
         ...cal,
         marks: [],
         summary: {
@@ -176,7 +176,7 @@ export class MobileService {
     };
 
     return {
-      product: 'HR HUB',
+      product: 'Worklyn',
       ...cal,
       marks,
       summary,

@@ -1,7 +1,7 @@
 {
-  "name": "HR HUB Mobile",
-  "short_name": "HR HUB",
-  "description": "Qatnashish, so‘rovlar, kalendar va to‘lov — HR HUB mobil mijozi",
+  "name": "Worklyn Mobile",
+  "short_name": "Worklyn",
+  "description": "Qatnashish, so‘rovlar, kalendar va to‘lov — Worklyn mobil mijozi",
   "start_url": "/m",
   "scope": "/m",
   "display": "standalone",

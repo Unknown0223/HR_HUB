@@ -238,7 +238,7 @@ async function main() {
   const web = await fetch(`${WEB}/payroll/accruals`);
   assert(web.ok, `web list ${web.status}`);
   const html = await web.text();
-  assert(html.includes('HR HUB') || html.includes('__NEXT_DATA__') || html.length > 200, 'web html empty');
+  assert(html.includes('Worklyn') || html.includes('__NEXT_DATA__') || html.length > 200, 'web html empty');
 
   const webNew = await fetch(`${WEB}/payroll/accruals/new?kind=all_types`);
   assert(webNew.ok, `web new ${webNew.status}`);

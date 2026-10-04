@@ -1,4 +1,4 @@
-"""Discover Hikvision on LAN and register it on HR HUB. Never prints the link key."""
+"""Discover Hikvision on LAN and register it on Worklyn. Never prints the link key."""
 from __future__ import annotations
 
 import argparse

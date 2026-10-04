@@ -472,7 +472,7 @@ export class SchedulesCatalogService {
     };
   }
 
-  // ─── Position schedules (HR HUB «Индивидуальные графики для позиций») ─────
+  // ─── Position schedules (Worklyn «Индивидуальные графики для позиций») ─────
 
   private positionScheduleDocInclude() {
     return {
@@ -980,7 +980,7 @@ export class SchedulesCatalogService {
     return days;
   }
 
-  /** Download HR HUB xlsx template (optionally prefilled). */
+  /** Download Worklyn xlsx template (optionally prefilled). */
   async downloadScheduleTemplate(
     tenantId: string,
     opts: {
@@ -1142,7 +1142,7 @@ export class SchedulesCatalogService {
     };
   }
 
-  /** Import HR HUB xlsx into line drafts (or attach to existing draft). */
+  /** Import Worklyn xlsx into line drafts (or attach to existing draft). */
   async importScheduleTemplate(
     tenantId: string,
     opts: {
@@ -1364,7 +1364,7 @@ export class SchedulesCatalogService {
     };
   }
 
-  // ─── Work rosters (HR HUB «Расписание») ───────────────────────────────────
+  // ─── Work rosters (Worklyn «Расписание») ───────────────────────────────────
 
   private workRosterInclude() {
     return {

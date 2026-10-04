@@ -29,7 +29,7 @@ export function FlowDiagram({
       : deviceHost && deviceHost !== "—"
         ? deviceHost
         : "ещё не выбран";
-  const server = serverLabel && serverLabel !== "—" ? serverLabel.replace(/^https?:\/\//, "") : "HR HUB";
+  const server = serverLabel && serverLabel !== "—" ? serverLabel.replace(/^https?:\/\//, "") : "Worklyn";
 
   return (
     <section className="rounded-lg border border-[#E5E5E5] bg-white px-4 py-3">
@@ -50,11 +50,11 @@ export function FlowDiagram({
           </div>
           <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#E5E5E5] bg-[#FAFAFA] px-2 py-[2px] text-[10.5px] text-[#605E5C]">
             <LinkIcon width={11} height={11} />
-            HR HUB Link · настраивает один раз
+            Worklyn Link · настраивает один раз
           </span>
         </div>
 
-        <Node icon={<CloudIcon width={22} height={22} />} title="Сервер HR HUB" sub={server} />
+        <Node icon={<CloudIcon width={22} height={22} />} title="Сервер Worklyn" sub={server} />
       </div>
     </section>
   );

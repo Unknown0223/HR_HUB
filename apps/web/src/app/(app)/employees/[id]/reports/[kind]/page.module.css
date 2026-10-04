@@ -226,7 +226,7 @@
   font-weight: 600;
 }
 
-/* —— HR HUB print/report sheet —— */
+/* —— Worklyn print/report sheet —— */
 .reportSheet {
   background: var(--surface);
   border: 1px solid var(--tint-line, #e4e6ef);

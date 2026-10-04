@@ -287,7 +287,7 @@ export function SystemSettingsPanel() {
           </span>
           <div>
             <h1 className={styles.pageTitle}>Настройки системы</h1>
-            <p className={styles.pageSub}>Основные параметры HR HUB и кадрового учёта</p>
+            <p className={styles.pageSub}>Основные параметры Worklyn и кадрового учёта</p>
           </div>
         </div>
         <div className={styles.toolbar}>
@@ -1178,7 +1178,7 @@ function HrStaffSettingsForm({
   );
 }
 
-/* ─── Timepad (matches HR HUB «Настройки для Timepad») ──────────────────── */
+/* ─── Timepad (matches Worklyn «Настройки для Timepad») ──────────────────── */
 
 function TimepadSettingsForm({
   value,
@@ -1275,7 +1275,7 @@ function TimepadSettingsForm({
   );
 }
 
-/* ─── Required fields (HR HUB «Настройки обязательных полей») ───────────── */
+/* ─── Required fields (Worklyn «Настройки обязательных полей») ───────────── */
 
 type Section = Record<string, unknown>;
 
@@ -1391,7 +1391,7 @@ function RequiredFieldsSettingsForm({
   );
 }
 
-/* ─── Recruitment (HR HUB «Настройки рекрутинга») ───────────────────────── */
+/* ─── Recruitment (Worklyn «Настройки рекрутинга») ───────────────────────── */
 
 type PayLine = { id: string; name: string; indicators: string };
 

@@ -83,7 +83,7 @@ class _HrHubAppState extends ConsumerState<HrHubApp>
     final router = ref.watch(appRouterProvider);
     final lang = ref.watch(appLangProvider);
     return MaterialApp.router(
-      title: 'HR HUB',
+      title: 'Worklyn',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,

@@ -1,4 +1,4 @@
-/** Mega-nav `?dict=` / admin `?panel=` codes → Dictionary seed (HR HUB Справочники). */
+/** Mega-nav `?dict=` / admin `?panel=` codes → Dictionary seed (Worklyn Справочники). */
 export type KnownDictItem = {
   code: string;
   name: string;
@@ -608,7 +608,7 @@ export const KNOWN_DICTIONARIES: KnownDict[] = [
     name: 'Новостная лента',
     kind: 'extra',
     items: [
-      { code: 'WELCOME', name: 'Добро пожаловать в HR HUB' },
+      { code: 'WELCOME', name: 'Добро пожаловать в Worklyn' },
     ],
   },
 

@@ -816,7 +816,7 @@ function BillzInner({ section }: { section: BillzSection }) {
                 'billz-divisions.csv',
                 filteredDivs.map((d) => ({
                   'Название подразделения в Billz': d.billzName,
-                  'Подразделение HR HUB': d.divisionName || '',
+                  'Подразделение Worklyn': d.divisionName || '',
                   'Имеет наименования': d.divisionId ? 'Да' : 'Нет',
                 })),
               ),
@@ -861,7 +861,7 @@ function BillzInner({ section }: { section: BillzSection }) {
                   />
                 </th>
                 <th>Название подразделения в Billz</th>
-                <th>Подразделение HR HUB</th>
+                <th>Подразделение Worklyn</th>
                 <th>Имеет наименования</th>
               </tr>
             </thead>

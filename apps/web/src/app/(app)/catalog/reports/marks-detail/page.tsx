@@ -795,7 +795,7 @@ th{background:#eef0f4}
 @media print{.btn{display:none}}
 </style></head>
 <body>
-<div class="top"><div><span class="brand">HR Hub</span><h1>${escapeHtml(TITLE)}</h1></div>
+<div class="top"><div><span class="brand">Worklyn</span><h1>${escapeHtml(TITLE)}</h1></div>
 <div><button class="btn" id="btnPrint">Печать</button> <button class="btn" id="btnExcel">Excel</button></div></div>
 <p style="padding:0 16px">${escapeHtml(data.divisionLine)}<br/>${escapeHtml(data.periodLine)}</p>
 <div class="wrap"><table>

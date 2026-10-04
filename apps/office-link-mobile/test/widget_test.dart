@@ -6,6 +6,6 @@ void main() {
     await tester.pumpWidget(const OfficeLinkApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.textContaining('HR HUB'), findsWidgets);
+    expect(find.textContaining('Worklyn'), findsWidgets);
   });
 }

@@ -57,7 +57,7 @@ export default function GoogleFormEmployeesPage() {
         <div>
           <h1 className={styles.title}>Google Form — yangi xodim</h1>
           <p className={styles.subtitle}>
-            Form to‘ldiriladi → Apps Script → HR HUB bazaga xodim yoziladi
+            Form to‘ldiriladi → Apps Script → Worklyn bazaga xodim yoziladi
           </p>
         </div>
       </div>

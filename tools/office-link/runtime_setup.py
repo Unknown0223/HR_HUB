@@ -301,7 +301,7 @@ def install_gw_deps(root: Path | None = None, cb: StatusFn | None = None) -> Non
         return
     if bundled_python(root) is not None:
         raise RuntimeError(
-            "Ilova ichidagi kutubxonalar shikastlangan. HR HUB Link ni qayta o‘rnating."
+            "Ilova ichidagi kutubxonalar shikastlangan. Worklyn Link’ni qayta o‘rnating."
         )
     _status(cb, "Kerakli kutubxonalar o‘rnatilmoqda… (1–2 daqiqa)")
     try:

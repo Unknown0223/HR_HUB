@@ -54,7 +54,7 @@ def main() -> None:
     except ImportError as exc:
         # The bundled embeddable Python has no tkinter: the WebView2 window is the only UI.
         _fatal(
-            "HR HUB Link oynasi ochilmadi.\n\n"
+            "Worklyn Link oynasi ochilmadi.\n\n"
             f"{webview_error or exc}\n\n"
             "Microsoft Edge WebView2 Runtime o‘rnatilganini tekshiring "
             "(https://go.microsoft.com/fwlink/p/?LinkId=2124703) va qayta oching."
@@ -71,7 +71,7 @@ def _fatal(message: str) -> None:
     if sys.platform == "win32":
         import ctypes
 
-        ctypes.windll.user32.MessageBoxW(None, message, "HR HUB Link", 0x10)
+        ctypes.windll.user32.MessageBoxW(None, message, "Worklyn Link", 0x10)
 
 
 if __name__ == "__main__":

@@ -290,7 +290,7 @@ export function ConnectTab({ session }: { session: LinkSession }) {
           step={5}
           label="Текущий пароль администратора"
           done={s.checks[3].ok}
-          help="Пароль от терминала Hikvision, не от HR HUB"
+          help="Пароль от терминала Hikvision, не от Worklyn"
           status={
             <StatusText ok={s.pwdVerified}>
               {s.pwdVerified ? "проверен" : "не проверен"}

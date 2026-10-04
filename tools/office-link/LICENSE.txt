@@ -1,10 +1,10 @@
-# HR HUB Link — foydalanish shartlari (EULA)
+# Worklyn Link — foydalanish shartlari (EULA)
 #
-# Ushbu dastur ("HR HUB Link") ofis Face ID terminallarini HR HUB
+# Ushbu dastur ("Worklyn Link") ofis Face ID terminallarini Worklyn
 # platformasiga ulash uchun mo‘ljallangan.
 #
 # 1. Litsenziya
-#    Dastur faqat HR HUB mijozlari / tenantlari uchun beriladi.
+#    Dastur faqat Worklyn mijozlari / tenantlari uchun beriladi.
 #    Qayta tarqatish, decompile yoki boshqa mijoz webiga bog‘lash
 #    taqiqlanadi (har bir web o‘z to‘plamini yuklab oladi).
 #
@@ -18,11 +18,11 @@
 #
 # 4. Xizmat (ixtiyoriy)
 #    Windows Service o‘rnatilsa, tunnel va gateway fonda ishlaydi.
-#    O‘chirish: «HR HUB Link» → O‘chirish yoki uninstall-service.bat.
+#    O‘chirish: «Worklyn Link» → O‘chirish yoki uninstall-service.bat.
 #
 # 5. Mas’uliyat
 #    Noto‘g‘ri konfiguratsiya yoki uchinchi tomon qurilma xatolari uchun
-#    HR HUB kafolat bermaydi. Productionda o‘zgartirishlardan oldin
+#    Worklyn kafolat bermaydi. Productionda o‘zgartirishlardan oldin
 #    zaxira nusxa tavsiya etiladi.
 #
 # «Roziman» tugmasini bosish orqali siz yuqoridagi shartlarni o‘qiganingizni

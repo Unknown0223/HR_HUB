@@ -373,7 +373,7 @@ export class ReportsService {
   async attendanceT13Xlsx(tenantId: string, year: number, month: number) {
     const data = await this.attendanceT13(tenantId, year, month);
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'HR HUB';
+    wb.creator = 'Worklyn';
     const ws = wb.addWorksheet('T-13');
     const days = data.daysInMonth;
     const header = [
@@ -411,7 +411,7 @@ export class ReportsService {
   async fotXlsx(tenantId: string, periodId?: string) {
     const data = await this.fot(tenantId, periodId);
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'HR HUB';
+    wb.creator = 'Worklyn';
     const ws = wb.addWorksheet('FOT');
     ws.addRow(['Metrika', 'Qiymat']);
     ws.getRow(1).font = { bold: true };
@@ -446,7 +446,7 @@ export class ReportsService {
   async latenessXlsx(tenantId: string, from?: string, to?: string) {
     const data = await this.lateness(tenantId, from, to);
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'HR HUB';
+    wb.creator = 'Worklyn';
     const summary = wb.addWorksheet('Summary');
     summary.addRow(['Xodim', 'Tab№', 'Bo‘lim', 'Kunlar', 'Jami min']);
     summary.getRow(1).font = { bold: true };
@@ -479,7 +479,7 @@ export class ReportsService {
   async markDetailsXlsx(tenantId: string, from?: string, to?: string) {
     const data = await this.markDetails(tenantId, from, to);
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'HR HUB';
+    wb.creator = 'Worklyn';
     const meta = wb.addWorksheet('Overview');
     meta.addRow(['Metrika', 'Qiymat']);
     meta.getRow(1).font = { bold: true };
@@ -509,7 +509,7 @@ export class ReportsService {
   async hrMovementXlsx(tenantId: string, year?: number) {
     const data = await this.hrMovement(tenantId, year);
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'HR HUB';
+    wb.creator = 'Worklyn';
     const summary = wb.addWorksheet('Summary');
     summary.addRow(['Metrika', 'Qiymat']);
     summary.getRow(1).font = { bold: true };

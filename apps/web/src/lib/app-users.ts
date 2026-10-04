@@ -79,7 +79,7 @@ export type AppRole = {
   meta?: RoleMeta | null;
 };
 
-export const PRODUCTS = [{ id: 'hrhub', label: 'HR HUB' }] as const;
+export const PRODUCTS = [{ id: 'hrhub', label: 'Worklyn' }] as const;
 
 export const AUTH_ROLE_LABEL: Record<string, string> = {
   tenant_admin: 'Администратор',

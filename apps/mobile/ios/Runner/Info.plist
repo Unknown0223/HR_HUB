@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>HR HUB</string>
+	<string>Worklyn</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>GPS belgi uchun joylashuv kerak</string>
 	<key>NSCameraUsageDescription</key>

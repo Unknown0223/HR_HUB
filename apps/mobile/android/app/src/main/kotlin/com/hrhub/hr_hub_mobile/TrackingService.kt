@@ -498,7 +498,7 @@ class TrackingService : Service() {
         else @Suppress("DEPRECATION") Notification.Builder(this)
         return builder
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("HR HUB · GPS")
+            .setContentTitle("Worklyn · GPS")
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

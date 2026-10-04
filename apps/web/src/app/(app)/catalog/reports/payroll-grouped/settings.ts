@@ -4,7 +4,7 @@ export type NamedGroup = {
   itemIds: string[];
 };
 
-/** HR HUB «группа итогов»: сложение / вычитание — items, groups, flags */
+/** Worklyn «группа итогов»: сложение / вычитание — items, groups, flags */
 export type TotalSide = {
   itemIds: string[];
   groupIds: string[];
@@ -25,7 +25,7 @@ export type GroupedSettings = {
   divisionGroup: boolean;
   divisionCode: boolean;
   division: boolean;
-  /** HR HUB «Отдел» */
+  /** Worklyn «Отдел» */
   orgUnit: boolean;
   position: boolean;
   positionType: boolean;

@@ -78,8 +78,8 @@ const Map<String, String> ruHome = {
 
   // Settings
   'Barmoq izi bilan ochishni tasdiqlang': 'Подтвердите вход по отпечатку пальца',
-  'HR HUB mobile · Face ID + barmoq izi':
-      'HR HUB mobile · Face ID + отпечаток пальца',
+  'Worklyn mobile · Face ID + barmoq izi':
+      'Worklyn mobile · Face ID + отпечаток пальца',
   'Mavzu': 'Тема',
   'Ilova ko‘rinishi yil fasliga qarab o‘zi almashadi: fon rasmi va ranglar '
           'har faslda yangilanadi. Qo‘lda tanlash shart emas.':

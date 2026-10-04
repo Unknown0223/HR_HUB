@@ -73,7 +73,7 @@ export function TitleBar({
       <div className="flex h-8 items-stretch">
         <div className="pywebview-drag-region flex flex-1 items-center gap-2 pl-3 pr-2">
           <AppIcon />
-          <span className="text-[12px] text-[#1A1A1A]">HR HUB Link</span>
+          <span className="text-[12px] text-[#1A1A1A]">Worklyn Link</span>
         </div>
 
         <div className="relative flex items-center" ref={menuRef}>
@@ -117,7 +117,7 @@ export function TitleBar({
                 onClick={() => setMenuOpen(false)}
                 className="block w-full rounded px-3 py-1.5 text-left text-[#1A1A1A] hover:bg-[#00000010]"
               >
-                О программе · HR HUB Link
+                О программе · Worklyn Link
               </button>
             </div>
           )}

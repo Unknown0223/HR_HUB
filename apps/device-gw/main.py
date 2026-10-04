@@ -1,4 +1,4 @@
-"""HR HUB Device Gateway — FastAPI + Hikvision / ZKTeco / Mock adapters."""
+"""Worklyn Device Gateway — FastAPI + Hikvision / ZKTeco / Mock adapters."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 app = FastAPI(
-    title="HR HUB Device Gateway",
+    title="Worklyn Device Gateway",
     version="0.2.0",
     description="Hikvision ISAPI + ZKTeco Push + Mock adapters for Face ID punch events",
 )
@@ -316,7 +316,7 @@ async def poll_hikvision_events() -> None:
         for device_id, rec in list(devices.items()):
             if rec.info.adapter != AdapterType.hikvision_isapi:
                 continue
-            # HR HUB catalog rows often register without LAN host → would poll 127.0.0.1
+            # Worklyn catalog rows often register without LAN host → would poll 127.0.0.1
             # and block the heartbeat loop for real terminals.
             if isinstance(rec.adapter, HikvisionIsapiAdapter):
                 host = (rec.adapter.host or "").strip().lower()

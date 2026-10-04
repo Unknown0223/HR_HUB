@@ -1,11 +1,11 @@
 @echo off
-REM HR HUB Link — Windows Service o'rnatish (GW + tunnel)
+REM Worklyn Link — Windows Service o'rnatish (GW + tunnel)
 REM ADMIN huquqi bilan ishga tushiring.
 REM Avval: GUI «Ulash» muvaffaqiyatli (data\service.json yoziladi).
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-echo === HR HUB Link — Service o'rnatish ===
+echo === Worklyn Link — Service o'rnatish ===
 echo Papka: %CD%
 echo.
 
@@ -32,7 +32,7 @@ if not defined PYTHONW (
 )
 if not defined PYTHONW (
   echo [XATO] runtime\python\pythonw.exe topilmadi.
-  echo HR HUB Link ni qayta o'rnating yoki paketni qayta oching.
+  echo Worklyn Link'ni qayta o'rnating yoki paketni qayta oching.
   pause
   exit /b 1
 )
@@ -62,7 +62,7 @@ if defined NSSM (
     goto :fallback_hint
   )
   "%NSSM%" set "%SVC_NAME%" AppDirectory "%CD%"
-  "%NSSM%" set "%SVC_NAME%" DisplayName "HR HUB Office Link"
+  "%NSSM%" set "%SVC_NAME%" DisplayName "Worklyn Office Link"
   "%NSSM%" set "%SVC_NAME%" Description "Device gateway + Cloudflare tunnel (office-link)"
   "%NSSM%" set "%SVC_NAME%" Start SERVICE_AUTO_START
   "%NSSM%" set "%SVC_NAME%" AppRestartDelay 5000
@@ -83,7 +83,7 @@ echo.
 
 sc stop "%SVC_NAME%" >nul 2>&1
 sc delete "%SVC_NAME%" >nul 2>&1
-sc create "%SVC_NAME%" binPath= "\"%PYTHONW%\" \"%WORKER%\"" start= auto DisplayName= "HR HUB Office Link"
+sc create "%SVC_NAME%" binPath= "\"%PYTHONW%\" \"%WORKER%\"" start= auto DisplayName= "Worklyn Office Link"
 if errorlevel 1 (
   echo [XATO] sc create muvaffaqiyatsiz.
   goto :fallback_hint

@@ -1,4 +1,4 @@
-/** HR HUB data types for dynamic fields */
+/** Worklyn data types for dynamic fields */
 
 export const DYNAMIC_FIELD_TYPES = [
   { value: 'number', label: 'номер' },

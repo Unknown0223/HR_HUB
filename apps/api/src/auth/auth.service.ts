@@ -156,7 +156,7 @@ export class AuthService {
     return this.tokenResponse(user, user.tenant, sid);
   }
 
-  /** HR HUB: «Закрыть доступ к системе» — linked employee cannot sign in. */
+  /** Worklyn: «Закрыть доступ к системе» — linked employee cannot sign in. */
   private async assertEmployeeAccess(user: {
     tenantId: string | null;
     role: Role;

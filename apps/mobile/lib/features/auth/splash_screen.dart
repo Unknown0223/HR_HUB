@@ -6,7 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../lock/pin_widgets.dart';
 
 const _deepGreen = Color(0xFF1F6F3A);
-const _title = 'HR HUB';
+const _title = 'Worklyn';
 
 /// Startup screen while the session and permissions are checked: the logo pops in with
 /// pulsing rings, the name rises letter by letter, and a dot loader runs underneath.

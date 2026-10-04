@@ -262,7 +262,7 @@ export default function DeviceLinkPage() {
           <i className="fas fa-link" />
         </span>
         <div>
-          <h1 className={shared.pageTitle}>Связь с офисом (HR HUB Link)</h1>
+          <h1 className={shared.pageTitle}>Связь с офисом (Worklyn Link)</h1>
           <p className={shared.pageSubtitle}>
             Скачайте программу, создайте pairing-токен и следите за подключением терминала
           </p>
@@ -286,7 +286,7 @@ export default function DeviceLinkPage() {
 
       <div className={styles.grid}>
         <section className={styles.card}>
-          <h2 className={styles.cardTitle}>1. Скачать HR HUB Link</h2>
+          <h2 className={styles.cardTitle}>1. Скачать Worklyn Link</h2>
           <p className={styles.cardHint}>
             Har bir web o‘z ilovasini beradi: yuklab olgan to‘plam shu platformaga
             (API + tenant) bog‘lanadi. Boshqa mijoz webiga ulash uchun o‘sha webdan
@@ -363,7 +363,7 @@ export default function DeviceLinkPage() {
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>2. Pairing-токен</h2>
           <p className={styles.cardHint}>
-            Токен действует ~15 минут. Вставьте его в HR HUB Link (поле «Pairing token»).
+            Токен действует ~15 минут. Вставьте его в Worklyn Link (поле «Pairing token»).
             При привязке сессии клиент может получить field link key для gateway.
             Альтернатива: ADMIN-PAROL.bat + DEVICE_LINK_KEY (без показа оператору).
           </p>
@@ -427,7 +427,7 @@ export default function DeviceLinkPage() {
               {sessions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={styles.empty}>
-                    Пока нет сессий — создайте токен и запустите HR HUB Link
+                    Пока нет сессий — создайте токен и запустите Worklyn Link
                   </td>
                 </tr>
               ) : (

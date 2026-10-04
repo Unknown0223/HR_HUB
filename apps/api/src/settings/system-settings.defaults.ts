@@ -1,4 +1,4 @@
-/** HR HUB «Настройки системы» — defaults for TenantSetting.extras.system */
+/** Worklyn «Настройки системы» — defaults for TenantSetting.extras.system */
 import {
   DEFAULT_LATENESS_RULES,
   normalizeLatenessRules,
@@ -72,7 +72,7 @@ export type SystemSettings = {
   checkAdultAge18: boolean;
   hideInitialBalance: boolean;
 
-  // Nested HR HUB sub-panels
+  // Nested Worklyn sub-panels
   hrStaff: HrStaffSettings;
   timepad: TimepadSettings;
   requiredFields: RequiredFieldsSettings;
@@ -144,7 +144,7 @@ export function mergeDocumentTypeNotifications(
   };
 }
 
-/** HR HUB «Настройки рекрутинга» — line in accrual/deduction tables */
+/** Worklyn «Настройки рекрутинга» — line in accrual/deduction tables */
 export type RecruitmentPayLine = {
   id: string;
   /** Наименование начисления / удержания */
@@ -358,7 +358,7 @@ export function markPhotoKindFromMarkType(
   return markPhotoKindFromDirection(direction);
 }
 
-/** HR HUB «Настройки обязательных полей» */
+/** Worklyn «Настройки обязательных полей» */
 export type RequiredFieldsSettings = {
   employee: {
     lastName: boolean;

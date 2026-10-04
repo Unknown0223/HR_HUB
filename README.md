@@ -1,4 +1,4 @@
-# HR HUB
+# Worklyn
 
 > Papka: `d:\hr-hub` (workspace root)
 
@@ -215,4 +215,4 @@ curl -X POST "http://localhost:8800/devices/<NEST_DEVICE_UUID>/emit-mock-punch?e
 **Done (navbar MVP):** Phase 0–7 — auth, HR (+ filters/bulk dismiss), Face ID + retention purge, QR/GPS, payroll, reports CSV+Excel, settings, ZKTeco, compose prod + DEPLOY.
 
 **Mahsulot ~99–100%.**  
-**Out of MVP:** formal third-party pentest engagement, K8s, real Hikvision hardware UAT, out-of-nav HR HUB katalog.
+**Out of MVP:** formal third-party pentest engagement, K8s, real Hikvision hardware UAT, out-of-nav Worklyn katalog.

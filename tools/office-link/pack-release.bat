@@ -5,7 +5,7 @@ REM Ofis PCga hech narsa o'rnatish shart emas (Python ham).
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-echo === HR HUB Link — release paket ===
+echo === Worklyn Link — release paket ===
 where python >nul 2>&1
 if errorlevel 1 (
   echo [XATO] Yig'ish uchun shu kompyuterda python kerak ^(ofis PCga emas^).

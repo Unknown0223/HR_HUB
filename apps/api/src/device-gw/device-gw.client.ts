@@ -564,7 +564,7 @@ function gwDetail(text: string, fallback: string): string {
   ) {
     return (
       'Связь с терминалом недоступна (Cloudflare tunnel / office-link). ' +
-      'Запустите HR HUB Link и повторите.'
+      'Запустите Worklyn Link и повторите.'
     );
   }
   return raw.length > 400 ? `${raw.slice(0, 400)}…` : raw;

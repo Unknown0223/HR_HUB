@@ -187,7 +187,7 @@ function printDocumentHtml(report: GenderPayload) {
 </style></head>
 <body>
   <div class="top">
-    <div><span class="brand">HR Hub</span><h1>${escapeHtml(report.title)}${gen ? ` (${escapeHtml(gen)})` : ''}</h1></div>
+    <div><span class="brand">Worklyn</span><h1>${escapeHtml(report.title)}${gen ? ` (${escapeHtml(gen)})` : ''}</h1></div>
     <div class="actions">
       <button class="btn" id="btnPrint">Печать</button>
       <div>

@@ -192,7 +192,7 @@ class CredentialStore {
       'phase': phase,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
       'note':
-          'HR HUB Link recovery — yangi admin parol. Web vault ishlamasa shu yerdan tiklang.',
+          'Worklyn Link recovery — yangi admin parol. Web vault ishlamasa shu yerdan tiklang.',
     };
   }
 

@@ -1,7 +1,7 @@
 import type { TableFieldDef, TablePrefsConfig } from '@/components/table-prefs';
 import { EMPLOYEE_FIELDS } from '@/lib/employee-fields';
 
-/** HR HUB employee_list + dashboard identity columns */
+/** Worklyn employee_list + dashboard identity columns */
 export const EMPLOYEE_LIST_FIELDS: TableFieldDef[] = [
   ...EMPLOYEE_FIELDS.filter((f) => !f.attendance).map((f) => ({
     key: f.key,
@@ -52,7 +52,7 @@ export const personListPrefs: TablePrefsConfig = {
   defaultSort: [{ key: 'fullName', dir: 'asc' }],
 };
 
-/** HR HUB location_list */
+/** Worklyn location_list */
 export const LOCATION_LIST_FIELDS: TableFieldDef[] = [
   { key: 'name', label: 'Локация', searchable: true },
   { key: 'code', label: 'Код', searchable: true },

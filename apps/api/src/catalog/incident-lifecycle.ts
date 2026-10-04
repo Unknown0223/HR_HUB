@@ -1,4 +1,4 @@
-/** Incident lifecycle helpers (HR HUB P1 / F4). */
+/** Incident lifecycle helpers (Worklyn P1 / F4). */
 
 export type IncidentLifecycleStatus =
   | 'open'

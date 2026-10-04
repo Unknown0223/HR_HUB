@@ -13,7 +13,7 @@ if not exist "%REL%\runtime\python\pythonw.exe" (
   exit /b 1
 )
 
-echo === HR HUB Link — Setup.exe ===
+echo === Worklyn Link — Setup.exe ===
 python -m pip install --disable-pip-version-check -q pyinstaller
 if errorlevel 1 (
   echo [XATO] PyInstaller o'rnatilmadi.

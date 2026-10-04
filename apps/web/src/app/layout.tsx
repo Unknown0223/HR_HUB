@@ -14,7 +14,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: 'HR HUB',
+  title: 'Worklyn',
   description: 'Multi-tenant HR + attendance + payroll',
 };
 

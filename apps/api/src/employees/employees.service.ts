@@ -616,7 +616,7 @@ export class EmployeesService {
     const personDocuments = personDocs.map((r) => this.mapPersonDocument(r));
 
     // Location attachments live in EmployeeAccessGrant (accessType=location).
-    // resource = location.id; note = auto|manual (HR HUB «Тип прикрепления»).
+    // resource = location.id; note = auto|manual (Worklyn «Тип прикрепления»).
     const locGrants = emp.accessGrants.filter(
       (g) => g.accessType === 'location' && g.isActive,
     );
@@ -1307,7 +1307,7 @@ export class EmployeesService {
     };
   }
 
-  /** Attendance rollup for HR HUB «Статистика посещений». */
+  /** Attendance rollup for Worklyn «Статистика посещений». */
   private buildVisitStats(
     days: {
       workDate: Date;
@@ -1808,7 +1808,7 @@ export class EmployeesService {
     };
   }
 
-  /** HR HUB «Прием на работу (просмотр)» — real hire doc or synthetic from employee. */
+  /** Worklyn «Прием на работу (просмотр)» — real hire doc or synthetic from employee. */
   async hireDocumentView(tenantId: string, employeeId: string) {
     const emp = await this.findOne(tenantId, employeeId);
     const hire =
@@ -3685,7 +3685,7 @@ export class EmployeesService {
         const absenceReasonLabel =
           isLeave && absenceCover ? absenceCover.absenceType.name : null;
 
-        // HR HUB Excel template fields
+        // Worklyn Excel template fields
         let factIn: string | Date | null = d?.firstInAt ?? null;
         let factOut: string | Date | null = d?.lastOutAt ?? null;
         let hoursWorked: number | null = null;
@@ -4089,7 +4089,7 @@ export class EmployeesService {
     return round ? Math.round(h * 10) / 10 : Math.round(h * 100) / 100;
   }
 
-  /** HR HUB «Вовремя»: окно [max(in,planStart), min(out,planEnd)] минус обед 13–14. */
+  /** Worklyn «Вовремя»: окно [max(in,planStart), min(out,planEnd)] минус обед 13–14. */
   private creditedOnTimeHours(
     firstIn: Date,
     lastOut: Date,

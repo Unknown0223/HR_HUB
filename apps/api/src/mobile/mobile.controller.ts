@@ -49,7 +49,7 @@ export class MobileController {
   health(@CurrentTenant() tenantId: string | null) {
     return {
       ok: true,
-      product: 'HR HUB',
+      product: 'Worklyn',
       api: 'mobile/v1',
       tenantBound: !!tenantId,
       client: '/m (responsive PWA shell)',

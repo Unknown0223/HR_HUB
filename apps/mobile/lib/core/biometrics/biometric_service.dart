@@ -48,7 +48,7 @@ class BiometricService {
   /// Prompts fingerprint / device credential. Returns true on success.
   /// When [allowSkipIfUnavailable] is true (emulator), returns true if no hardware.
   Future<bool> authenticate({
-    String reason = 'HR HUB — biometrik tasdiq',
+    String reason = 'Worklyn — biometrik tasdiq',
     bool allowSkipIfUnavailable = true,
   }) async {
     try {
@@ -67,7 +67,7 @@ class BiometricService {
         localizedReason: reason,
         authMessages: const [
           AndroidAuthMessages(
-            signInTitle: 'HR HUB',
+            signInTitle: 'Worklyn',
             biometricHint: 'Barmoq izingizni sensorga tekkizing',
             biometricNotRecognized: 'Barmoq izi tanilmadi, qayta urinib ko‘ring',
             biometricSuccess: 'Tasdiqlandi',

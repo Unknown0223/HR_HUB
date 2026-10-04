@@ -895,7 +895,7 @@ function EmployeeReportInner() {
         ) : (
         <div className={styles.reportSheet}>
           <div className={styles.reportTop}>
-            <div className={styles.reportBrand}>HR Hub</div>
+            <div className={styles.reportBrand}>Worklyn</div>
             <h1 className={styles.reportTitle}>
               {data.title || KIND_LABELS[kind] || 'Отчет'} ({genLabel}) (
               {data.employee.fullName})

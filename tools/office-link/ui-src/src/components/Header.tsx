@@ -24,7 +24,7 @@ export function Header({
           <LinkIcon width={22} height={22} strokeWidth={1.4} />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">HR HUB Link</h1>
+          <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Worklyn Link</h1>
           <p className="mt-1 text-[12.5px] leading-snug text-white/85">
             Одноразовая привязка терминала · дальше отметки идут без этой программы
           </p>

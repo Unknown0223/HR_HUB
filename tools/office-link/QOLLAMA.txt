@@ -1,4 +1,4 @@
-HR HUB Link — oddiy qo‘llanma (Faza 1 + Faza 2)
+Worklyn Link — oddiy qo‘llanma (Faza 1 + Faza 2)
 ===============================================
 
 ADMIN (5 qadam)
@@ -19,7 +19,7 @@ ADMIN (5 qadam)
 OPERATOR (7 qadam)
 ------------------
 1) PC va Face ID terminal BIR tarmoqda (WiFi yoki LAN)
-2) «HR HUB Link» yorlig‘i yoki BOSHLASH.bat ni oching
+2) «Worklyn Link» yorlig‘i yoki BOSHLASH.bat ni oching
 3) Bo‘lim «1. Подключение»: pairing token → «Saqlash»
 4) Lokatsiyani tanlang (majburiy)
 5) Qurilma topilmasa IP yozing → «Qidirish»

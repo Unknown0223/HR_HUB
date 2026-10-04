@@ -1823,7 +1823,7 @@ button.calCell {
 }
 
 
-/* —— HR HUB passport modal —— */
+/* —— Worklyn passport modal —— */
 .modalBackdrop {
   position: fixed;
   inset: 0;
@@ -4075,7 +4075,7 @@ button.calCell {
   background: #ffc700;
 }
 
-/* —— HR HUB «Отметки (создание)» page —— */
+/* —— Worklyn «Отметки (создание)» page —— */
 .markCreatePage {
   position: fixed;
   inset: 0;

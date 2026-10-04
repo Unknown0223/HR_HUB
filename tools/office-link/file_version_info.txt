@@ -18,13 +18,13 @@ VSVersionInfo(
         StringTable(
           u'040904B0',
           [
-            StringStruct(u'CompanyName', u'HR HUB'),
-            StringStruct(u'FileDescription', u'HR HUB Link'),
+            StringStruct(u'CompanyName', u'Worklyn'),
+            StringStruct(u'FileDescription', u'Worklyn Link'),
             StringStruct(u'FileVersion', u'1.2.1'),
             StringStruct(u'InternalName', u'HRHUB-Qurilma'),
-            StringStruct(u'LegalCopyright', u'Copyright (c) HR HUB'),
+            StringStruct(u'LegalCopyright', u'Copyright (c) Worklyn'),
             StringStruct(u'OriginalFilename', u'HRHUB-Qurilma.exe'),
-            StringStruct(u'ProductName', u'HR HUB Link'),
+            StringStruct(u'ProductName', u'Worklyn Link'),
             StringStruct(u'ProductVersion', u'1.2.1'),
           ]
         )

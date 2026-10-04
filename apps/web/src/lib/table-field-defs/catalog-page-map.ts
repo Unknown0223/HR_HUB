@@ -1,5 +1,5 @@
 /**
- * HR HUB form → HR Hub page mapping.
+ * Worklyn form → Worklyn page mapping.
  * TablePrefs (Сортировка / Настройка таблицы / Excel) adoption status.
  */
 export const CATALOG_PAGE_MAP = [

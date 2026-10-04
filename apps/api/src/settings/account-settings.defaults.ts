@@ -1,5 +1,5 @@
 /**
- * HR HUB «Настройки счетов» — TenantSetting.extras.accountSettings
+ * Worklyn «Настройки счетов» — TenantSetting.extras.accountSettings
  * Order = display order (2-column CSS grid: left/right by odd/even).
  */
 

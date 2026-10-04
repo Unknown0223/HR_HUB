@@ -41,7 +41,7 @@ function minutesCell(v: number | null | undefined): string {
   return v == null ? '' : formatMinutes(v);
 }
 
-/** Resolve a HR HUB table field value from an attendance/employee row. */
+/** Resolve a Worklyn table field value from an attendance/employee row. */
 export function cellValue(
   r: AttRowLike,
   key: EmployeeFieldKey,

@@ -397,7 +397,7 @@ th{background:#f5f8fa}
 @media print{.btn{display:none}}
 </style></head>
 <body>
-<div class="top"><div><span class="brand">HR Hub</span><h1>${escapeHtml(report.printTitle)}${gen ? ` (${escapeHtml(gen)})` : ''}</h1></div>
+<div class="top"><div><span class="brand">Worklyn</span><h1>${escapeHtml(report.printTitle)}${gen ? ` (${escapeHtml(gen)})` : ''}</h1></div>
 <div><button class="btn" id="btnPrint">Печать</button> <button class="btn" id="btnExcel">Excel</button></div></div>
 <div class="meta"><span>Дата начала</span><span>${escapeHtml(fmtRu(report.from))}</span><span>Дата окончания</span><span>${escapeHtml(fmtRu(report.to))}</span></div>
 <div class="wrap">${tableInner(report)}</div>

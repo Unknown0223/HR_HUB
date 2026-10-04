@@ -435,7 +435,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
           'Lokatsiya: ${_locationLabel()}\n'
           'Tiklanish: ${_session!.config.recoveryEmail}\n\n'
           'Parol terminalda almashtiriladi va Webga yuboriladi.\n'
-          'Yuz sinxroni uchun ofisda PC HR HUB Link (tunnel) ishlashi kerak.',
+          'Yuz sinxroni uchun ofisda PC Worklyn Link (tunnel) ishlashi kerak.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor')),
@@ -855,7 +855,7 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
             title: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('HR HUB Link', style: TextStyle(fontWeight: FontWeight.w700)),
+                Text('Worklyn Link', style: TextStyle(fontWeight: FontWeight.w700)),
                 Text(
                   'Ofis Face ID terminalini platformaga ulash',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),

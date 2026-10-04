@@ -175,7 +175,7 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  context.t('HR HUB ishlashi uchun {0} ta ruxsat zarur', [total]),
+                  context.t('Worklyn ishlashi uchun {0} ta ruxsat zarur', [total]),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 13,

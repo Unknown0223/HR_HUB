@@ -1,4 +1,4 @@
-﻿HR HUB Link — Android
+﻿Worklyn Link — Android
 
 APK:
   D:\hr-hub\apps\office-link-mobile\release\HRHUB-Link-Android.apk
@@ -6,7 +6,7 @@ APK:
 O'rnatish:
   1) APK ni telefonga nusxa qiling
   2) "Noma'lum manbalar" dan o'rnatishga ruxsat bering
-  3) HR HUB Link ni oching
+  3) Worklyn Link’ni oching
 
 Parol saqlash (Ulashdan keyin):
   Encrypted storage + fayl:

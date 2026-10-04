@@ -547,7 +547,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     if (pathname.match(/\/employees\/[^/]+\/schedule/))
       return 'Обычный график работы (изменение)';
     if (pathname.startsWith('/employees/')) return 'Сотрудник';
-    return 'HR HUB';
+    return 'Worklyn';
   }, [pathname, search, activeItem, activeReport, siblingGroup]);
 
   function logout() {
@@ -652,7 +652,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               </svg>
             </span>
             <span className={styles.brandText}>
-              <strong>HR HUB</strong>
+              <strong>Worklyn</strong>
               <small>{session.tenant?.name ?? 'Platform'}</small>
             </span>
           </Link>
@@ -1220,7 +1220,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           >
             <div className={sb.drawerHead}>
               <div>
-                <strong>HR HUB</strong>
+                <strong>Worklyn</strong>
                 <small>{session.tenant?.name ?? 'Platform'}</small>
               </div>
               <button

@@ -13,7 +13,7 @@ from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
 from paths import find_root, read_link_key, read_pairing_token
 from session import RECONNECT_STEPS, OfficeLinkSession, SubmitResult
 
-TITLE = "HR HUB Link"
+TITLE = "Worklyn Link"
 
 _RECONNECT_STEP_LABELS = {
     "web": "Веб",
@@ -311,7 +311,7 @@ class OfficeLinkApp:
         header.pack_propagate(False)
         head_inner = ttk.Frame(header, style="Header.TFrame")
         head_inner.pack(fill=tk.BOTH, expand=True, padx=18, pady=12)
-        ttk.Label(head_inner, text="HR HUB Link", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(head_inner, text="Worklyn Link", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             head_inner,
             text="Одноразовая привязка терминала · дальше отметки идут без этой программы",

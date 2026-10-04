@@ -64,7 +64,7 @@ enum RequestType {
   hr_change
 }
 
-/// HR HUB «Заявки на кадровые изменения» kinds
+/// Worklyn «Заявки на кадровые изменения» kinds
 enum HrChangeKind {
   open_position
   hire
@@ -95,7 +95,7 @@ enum PayrollPeriodStatus {
   closed
 }
 
-/// HR HUB document «провести» lifecycle (draft → posted)
+/// Worklyn document «провести» lifecycle (draft → posted)
 enum DocumentLifecycle {
   draft
   posted
@@ -119,7 +119,7 @@ enum PayrollLineType {
   other
 }
 
-/// HR HUB «Все начисления» document kinds
+/// Worklyn «Все начисления» document kinds
 enum PayrollAccrualKind {
   salary_contributions
   sick_leave
@@ -163,7 +163,7 @@ enum IncidentStatus {
   closed
 }
 
-/// HR HUB: Действия по инциденту
+/// Worklyn: Действия по инциденту
 enum IncidentAction {
   verbal_warning
   written_warning
@@ -308,7 +308,7 @@ model User {
   fullName     String   @map("full_name")
   role         Role     @default(employee)
   isActive     Boolean  @default(true) @map("is_active")
-  /// HR HUB profile: login, photo, orgs, catalog roles, phone…
+  /// Worklyn profile: login, photo, orgs, catalog roles, phone…
   meta         Json?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -470,7 +470,7 @@ model Person {
   passport   String?
   phone      String?
   email      String?
-  /// HR HUB directory fields
+  /// Worklyn directory fields
   code                 String?  @map("code")
   inn                  String?
   inps                 String?
@@ -522,7 +522,7 @@ model Employee {
   employmentType EmploymentType   @default(staff) @map("employment_type")
   hiredAt        DateTime?        @map("hired_at") @db.Date
   dismissedAt    DateTime?        @map("dismissed_at") @db.Date
-  /// Откуда пришел (HR HUB analytics)
+  /// Откуда пришел (Worklyn analytics)
   employmentSource String?        @map("employment_source")
   /// Куда ушел после увольнения
   dismissalDestination String?    @map("dismissal_destination")
@@ -617,7 +617,7 @@ model Employee {
   @@map("employees")
 }
 
-/// HR HUB: ordinary | hourly | advanced | multi_shift | advanced_multi_shift
+/// Worklyn: ordinary | hourly | advanced | multi_shift | advanced_multi_shift
 enum WorkScheduleKind {
   ordinary
   hourly
@@ -635,7 +635,7 @@ model WorkSchedule {
   startTime String           @default("09:00") @map("start_time")
   endTime   String           @default("18:00") @map("end_time")
   graceMinutes Int           @default(15) @map("grace_minutes")
-  /// HR HUB schedule knobs: weekPattern, graceOut, trackLate/Early, delayMode, yearGrid, …
+  /// Worklyn schedule knobs: weekPattern, graceOut, trackLate/Early, delayMode, yearGrid, …
   settings  Json?
   isActive  Boolean          @default(true) @map("is_active")
   createdAt DateTime         @default(now()) @map("created_at")
@@ -660,7 +660,7 @@ model WorkSchedule {
   @@map("work_schedules")
 }
 
-/// HR HUB «Производственные календари»
+/// Worklyn «Производственные календари»
 model ProductionCalendar {
   id                   String   @id @default(uuid()) @db.Uuid
   tenantId             String   @map("tenant_id") @db.Uuid
@@ -724,7 +724,7 @@ model Location {
   longitude      Float?
   geoRadiusM     Int      @default(150) @map("geo_radius_m")
   isActive       Boolean  @default(true) @map("is_active")
-  /// HR HUB extras: region, bssid, restrictMarks, polygonalAnalysis,
+  /// Worklyn extras: region, bssid, restrictMarks, polygonalAnalysis,
   /// createdByLabel, updatedByLabel, changeHistory[]
   meta           Json?
   createdAt      DateTime @default(now()) @map("created_at")
@@ -776,7 +776,7 @@ model Device {
   lastSeenAt   DateTime? @map("last_seen_at")
   gatewayRef   String?   @map("gateway_ref")
   isActive     Boolean   @default(true) @map("is_active")
-  /// HR HUB extras: deviceType, timezone, battery, trackingType, autoIn/Out,
+  /// Worklyn extras: deviceType, timezone, battery, trackingType, autoIn/Out,
   /// hikCentral {gatewayHost,gatewayPort,deviceId,isupKey}, ignoredPersonIds[],
   /// ignoredDivisionIds[], commands[]
   meta         Json?
@@ -973,7 +973,7 @@ model AbsenceType {
   timeTypeId  String?  @map("time_type_id") @db.Uuid
   paid        Boolean  @default(true)
   isActive    Boolean  @default(true) @map("is_active")
-  /// HR HUB: allow employees to create requests for this type
+  /// Worklyn: allow employees to create requests for this type
   allowEmployeeRequest Boolean @default(true) @map("allow_employee_request")
   /// Учитывать неиспользованное время
   trackUnusedTime Boolean @default(false) @map("track_unused_time")
@@ -1002,7 +1002,7 @@ model AbsenceType {
   @@map("absence_types")
 }
 
-/// HR HUB: Вид отсутствия (сотрудники) — assigned employees + accrual period
+/// Worklyn: Вид отсутствия (сотрудники) — assigned employees + accrual period
 model AbsenceTypeEmployee {
   id            String    @id @default(uuid()) @db.Uuid
   tenantId      String    @map("tenant_id") @db.Uuid
@@ -1040,7 +1040,7 @@ model Absence {
   status        RequestStatus @default(pending)
   note          String?
   managerNote   String?       @map("manager_note")
-  /// Extra HR HUB fields: number, requestKind, completed, audit names…
+  /// Extra Worklyn fields: number, requestKind, completed, audit names…
   meta          Json?
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
@@ -1191,7 +1191,7 @@ model PayrollPolicy {
   @@map("payroll_policies")
 }
 
-/// HR HUB «Политики штрафов» — scoped monthly rules (company / division / position / employee)
+/// Worklyn «Политики штрафов» — scoped monthly rules (company / division / position / employee)
 model FinePolicy {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -1218,7 +1218,7 @@ model FinePolicy {
   @@map("fine_policies")
 }
 
-/// HR HUB «Политика доплат» — scoped monthly overtime/surcharge coefficients
+/// Worklyn «Политика доплат» — scoped monthly overtime/surcharge coefficients
 model AllowancePolicy {
   id         String   @id @default(uuid()) @db.Uuid
   tenantId   String   @map("tenant_id") @db.Uuid
@@ -1447,7 +1447,7 @@ model PayrollSheetAudit {
   userName     String   @map("user_name")
   eventType    String   @map("event_type")
   organization String   @default("Demo")
-  product      String   @default("HR HUB")
+  product      String   @default("Worklyn")
 
   tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sheet  PayrollSheet? @relation(fields: [sheetId], references: [id], onDelete: Cascade)
@@ -1526,7 +1526,7 @@ model PayrollManualAudit {
   userName     String   @map("user_name")
   eventType    String   @map("event_type")
   organization String   @default("Demo")
-  product      String   @default("HR HUB")
+  product      String   @default("Worklyn")
 
   tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   op     PayrollManualOp? @relation(fields: [opId], references: [id], onDelete: Cascade)
@@ -1535,7 +1535,7 @@ model PayrollManualAudit {
   @@map("payroll_manual_audits")
 }
 
-/// HR HUB «Все начисления» — document header
+/// Worklyn «Все начисления» — document header
 model PayrollAccrualDoc {
   id             String             @id @default(uuid()) @db.Uuid
   tenantId       String             @map("tenant_id") @db.Uuid
@@ -1615,7 +1615,7 @@ model PayrollAccrualDeduction {
   @@map("payroll_accrual_deductions")
 }
 
-/// HR HUB «Проводки» / transactions.xlsx journal
+/// Worklyn «Проводки» / transactions.xlsx journal
 model PayrollLedgerEntry {
   id             String   @id @default(uuid()) @db.Uuid
   tenantId       String   @map("tenant_id") @db.Uuid
@@ -1696,7 +1696,7 @@ model Dictionary {
   @@map("dictionaries")
 }
 
-/// HR HUB «Динамические поля»
+/// Worklyn «Динамические поля»
 model DynamicField {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
@@ -1722,7 +1722,7 @@ model DynamicField {
   @@map("dynamic_fields")
 }
 
-/// HR HUB «Объекты» / «Факты» — сущности с динамическими полями
+/// Worklyn «Объекты» / «Факты» — сущности с динамическими полями
 model DynamicObject {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
@@ -1760,7 +1760,7 @@ model DictionaryItem {
   @@map("dictionary_items")
 }
 
-/// HR HUB «Исключения по документам при приеме»
+/// Worklyn «Исключения по документам при приеме»
 model HireDocumentException {
   id         String   @id @default(uuid()) @db.Uuid
   tenantId   String   @map("tenant_id") @db.Uuid
@@ -1841,7 +1841,7 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-/// HR HUB: Шаблоны обходных листов
+/// Worklyn: Шаблоны обходных листов
 model ClearanceTemplate {
   id                       String   @id @default(uuid()) @db.Uuid
   tenantId                 String   @map("tenant_id") @db.Uuid
@@ -1882,7 +1882,7 @@ model ClearanceTemplateItem {
   @@map("clearance_template_items")
 }
 
-/// Employees who must sign on this template (HR HUB nested table)
+/// Employees who must sign on this template (Worklyn nested table)
 model ClearanceTemplateEmployee {
   id         String @id @default(uuid()) @db.Uuid
   templateId String @map("template_id") @db.Uuid
@@ -1898,7 +1898,7 @@ model ClearanceTemplateEmployee {
   @@map("clearance_template_employees")
 }
 
-/// HR HUB: Обходные листы (exit checklist)
+/// Worklyn: Обходные листы (exit checklist)
 model ClearanceSheet {
   id           String          @id @default(uuid()) @db.Uuid
   tenantId     String          @map("tenant_id") @db.Uuid
@@ -1940,7 +1940,7 @@ model ClearanceSheetItem {
   @@map("clearance_sheet_items")
 }
 
-/// HR HUB: Типы инцидента
+/// Worklyn: Типы инцидента
 model IncidentType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -1960,7 +1960,7 @@ model IncidentType {
   @@map("incident_types")
 }
 
-/// HR HUB: Инциденты
+/// Worklyn: Инциденты
 model Incident {
   id               String           @id @default(uuid()) @db.Uuid
   tenantId         String           @map("tenant_id") @db.Uuid
@@ -2091,7 +2091,7 @@ model PositionGroup {
   @@map("position_groups")
 }
 
-/// HR HUB «Шаблоны должностей» — шаблон позиции с графиком, разрядом и оплатой
+/// Worklyn «Шаблоны должностей» — шаблон позиции с графиком, разрядом и оплатой
 model PositionTemplate {
   id            String   @id @default(uuid()) @db.Uuid
   tenantId      String   @map("tenant_id") @db.Uuid
@@ -2579,7 +2579,7 @@ model TimesheetAdjustment {
   @@map("timesheet_adjustments")
 }
 
-/// Корректировка табеля (HR HUB document)
+/// Корректировка табеля (Worklyn document)
 model TimesheetCorrection {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2628,7 +2628,7 @@ model TimesheetCorrectionLine {
   @@map("timesheet_correction_lines")
 }
 
-/// Табель (HR HUB document — monthly timesheet)
+/// Табель (Worklyn document — monthly timesheet)
 model TimesheetSheet {
   id         String            @id @default(uuid()) @db.Uuid
   tenantId   String            @map("tenant_id") @db.Uuid
@@ -2705,7 +2705,7 @@ model ScheduleShift {
   @@map("schedule_shifts")
 }
 
-/// HR HUB «Список смен расписания» — назначения смен сотрудникам (оперативный список)
+/// Worklyn «Список смен расписания» — назначения смен сотрудникам (оперативный список)
 model ScheduleShiftAssignment {
   id           String   @id @default(uuid()) @db.Uuid
   tenantId     String   @map("tenant_id") @db.Uuid
@@ -2761,7 +2761,7 @@ model EmployeeScheduleOverride {
   @@map("employee_schedule_overrides")
 }
 
-/// HR HUB «Индивидуальные графики» — monthly plan document (header)
+/// Worklyn «Индивидуальные графики» — monthly plan document (header)
 model IndividualSchedule {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2814,7 +2814,7 @@ model IndividualScheduleLine {
   @@map("individual_schedule_lines")
 }
 
-/// HR HUB «Расписание» — monthly roster document (assign template schedule to employees)
+/// Worklyn «Расписание» — monthly roster document (assign template schedule to employees)
 model WorkRoster {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2880,7 +2880,7 @@ model PositionSchedule {
   @@map("position_schedules")
 }
 
-/// HR HUB «Индивидуальные графики для позиций» — monthly document
+/// Worklyn «Индивидуальные графики для позиций» — monthly document
 model PositionScheduleDoc {
   id           String            @id @default(uuid()) @db.Uuid
   tenantId     String            @map("tenant_id") @db.Uuid
@@ -2940,7 +2940,7 @@ model PositionScheduleDocLine {
 }
 
 /// Внутренняя командировка
-/// HR HUB «Внутренняя командировка» — request + trip lifecycle
+/// Worklyn «Внутренняя командировка» — request + trip lifecycle
 model InternalTrip {
   id                   String        @id @default(uuid()) @db.Uuid
   tenantId             String        @map("tenant_id") @db.Uuid
@@ -3180,7 +3180,7 @@ model SettlementAudit {
   userName     String   @map("user_name")
   eventType    String   @map("event_type")
   organization String   @default("")
-  product      String   @default("HR HUB")
+  product      String   @default("Worklyn")
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   settlement Settlement? @relation(fields: [settlementId], references: [id], onDelete: Cascade)
@@ -3266,7 +3266,7 @@ model SalesCommissionLine {
   @@map("sales_commission_lines")
 }
 
-/// HR HUB «Разовые начисления / удержания»
+/// Worklyn «Разовые начисления / удержания»
 model OneTimeAccrualDoc {
   id            String            @id @default(uuid()) @db.Uuid
   tenantId      String            @map("tenant_id") @db.Uuid
@@ -3323,7 +3323,7 @@ model OneTimeAccrualLine {
   @@map("one_time_accrual_lines")
 }
 
-/// HR HUB «Бонусные начисления» — Факт / КПЭ
+/// Worklyn «Бонусные начисления» — Факт / КПЭ
 model BonusAccrualDoc {
   id              String            @id @default(uuid()) @db.Uuid
   tenantId        String            @map("tenant_id") @db.Uuid
@@ -3374,7 +3374,7 @@ model BonusAccrualLine {
   @@map("bonus_accrual_lines")
 }
 
-/// HR HUB «Начисления» — виды начислений (справочник зарплаты)
+/// Worklyn «Начисления» — виды начислений (справочник зарплаты)
 model AccrualType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3412,7 +3412,7 @@ model AccrualType {
   @@map("accrual_types")
 }
 
-/// HR HUB «Удержания» — виды удержаний (справочник зарплаты)
+/// Worklyn «Удержания» — виды удержаний (справочник зарплаты)
 model DeductionType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3447,7 +3447,7 @@ model DeductionType {
   @@map("deduction_types")
 }
 
-/// HR HUB «Типы фактов» (продажи Billz/iiko и др.)
+/// Worklyn «Типы фактов» (продажи Billz/iiko и др.)
 model FactType {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3475,7 +3475,7 @@ model FactType {
   @@map("fact_types")
 }
 
-/// HR HUB «Факты» — факт по сотруднику (импорт Excel)
+/// Worklyn «Факты» — факт по сотруднику (импорт Excel)
 model Fact {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
@@ -3500,7 +3500,7 @@ model Fact {
   @@map("facts")
 }
 
-/// Займы — HR HUB «Займы» / «Заем (создание)»
+/// Займы — Worklyn «Займы» / «Заем (создание)»
 model EmployeeLoan {
   id             String     @id @default(uuid()) @db.Uuid
   tenantId       String     @map("tenant_id") @db.Uuid
@@ -3602,7 +3602,7 @@ model Candidate {
   email           String?
   status          String   @default("new")
   note            String?
-  /// HR HUB «Дата введения»
+  /// Worklyn «Дата введения»
   introducedAt    DateTime? @map("introduced_at") @db.Date
   category        String?
   education       String?
@@ -3649,7 +3649,7 @@ model EmployeeRelative {
   relation   String
   birthDate  DateTime? @map("birth_date") @db.Date
   phone      String?
-  /// Мужской / Женский (HR HUB «Пол»)
+  /// Мужской / Женский (Worklyn «Пол»)
   gender     String?
   /// Рабочее место родственника
   workplace  String?
@@ -3666,7 +3666,7 @@ model EmployeeRelative {
   @@map("employee_relatives")
 }
 
-/// HR HUB employee «Справки»
+/// Worklyn employee «Справки»
 model EmployeeCertificate {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
@@ -3688,7 +3688,7 @@ model EmployeeCertificate {
   @@map("employee_certificates")
 }
 
-/// HR HUB employee «Стаж»
+/// Worklyn employee «Стаж»
 model EmployeeTenure {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
@@ -3706,7 +3706,7 @@ model EmployeeTenure {
   @@map("employee_tenures")
 }
 
-/// HR HUB employee «Места работы»
+/// Worklyn employee «Места работы»
 model EmployeeWorkplace {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
@@ -3727,7 +3727,7 @@ model EmployeeWorkplace {
   @@map("employee_workplaces")
 }
 
-/// HR HUB employee «Награды»
+/// Worklyn employee «Награды»
 model EmployeeAward {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
@@ -3746,7 +3746,7 @@ model EmployeeAward {
   @@map("employee_awards")
 }
 
-/// HR HUB employee «Файлы»
+/// Worklyn employee «Файлы»
 model EmployeeFile {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3768,7 +3768,7 @@ model EmployeeFile {
   @@map("employee_files")
 }
 
-/// HR HUB employee «Инвентарь»
+/// Worklyn employee «Инвентарь»
 model EmployeeInventory {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid
@@ -3794,7 +3794,7 @@ model EmployeeInventory {
   @@map("employee_inventory")
 }
 
-/// HR HUB employee «Список машин»
+/// Worklyn employee «Список машин»
 model EmployeeCar {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
@@ -3813,7 +3813,7 @@ model EmployeeCar {
   @@map("employee_cars")
 }
 
-/// HR HUB «Периоды блокировки отметок»
+/// Worklyn «Периоды блокировки отметок»
 model EmployeeMarkBlock {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
@@ -3831,7 +3831,7 @@ model EmployeeMarkBlock {
   @@map("employee_mark_blocks")
 }
 
-/// HR HUB employee «Расчетные счета»
+/// Worklyn employee «Расчетные счета»
 model EmployeeBankAccount {
   id            String   @id @default(uuid()) @db.Uuid
   tenantId      String   @map("tenant_id") @db.Uuid
@@ -3859,7 +3859,7 @@ model EmployeeBankAccount {
   @@map("employee_bank_accounts")
 }
 
-/// HR HUB employee «Банковские карты»
+/// Worklyn employee «Банковские карты»
 model EmployeeBankCard {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid
@@ -3936,7 +3936,7 @@ model TimeType {
   @@map("time_types")
 }
 
-/// Шаблоны отчётов / документов (HR HUB «Шаблоны отчетов»)
+/// Шаблоны отчётов / документов (Worklyn «Шаблоны отчетов»)
 model ReportTemplate {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
