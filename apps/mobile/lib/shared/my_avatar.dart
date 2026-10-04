@@ -25,7 +25,10 @@ class MyAvatar extends ConsumerWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.white,
-      backgroundImage: MemoryImage(bytes),
+      backgroundImage: ResizeImage(
+        MemoryImage(bytes),
+        width: (radius * 2 * MediaQuery.devicePixelRatioOf(context)).round(),
+      ),
     );
   }
 }

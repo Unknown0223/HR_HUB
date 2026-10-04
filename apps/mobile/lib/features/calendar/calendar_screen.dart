@@ -437,7 +437,12 @@ class _MarkThumb extends ConsumerWidget {
                   color: AppColors.bgSoft,
                   child: Icon(Icons.image_not_supported_outlined, size: 18),
                 )
-              : Image.memory(b, fit: BoxFit.cover, gaplessPlayback: true),
+              : Image.memory(
+                  b,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+                ),
           loading: () => const ColoredBox(color: AppColors.bgSoft),
           error: (_, _) => const ColoredBox(color: AppColors.bgSoft),
         ),

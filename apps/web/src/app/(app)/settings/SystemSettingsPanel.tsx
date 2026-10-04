@@ -1002,6 +1002,16 @@ function HrStaffSettingsForm({
           checked={asBool(h.stageEmotionSmile, true)}
           onChange={(v) => setH('stageEmotionSmile', v)}
         />
+        <label className={styles.field}>
+          Проверка живого лица — направления поворота головы
+          <select
+            value={String(asNum(h.livenessDirections, 8) === 4 ? 4 : 8)}
+            onChange={(e) => setH('livenessDirections', Number(e.target.value))}
+          >
+            <option value="8">8 направлений (с диагоналями — надёжнее)</option>
+            <option value="4">4 направления (влево, вправо, вверх, вниз — проще)</option>
+          </select>
+        </label>
 
         <p className={styles.sectionTitle}>Настройки запросов</p>
         <Check

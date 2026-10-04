@@ -70,6 +70,9 @@ const Map<String, String> ruAttendance = {
       'Низкая точность GPS ({0} м). '
       'Выйдите на открытое место и попробуйте снова.',
   'Soxta lokatsiya aniqlandi': 'Обнаружена поддельная геолокация',
+  'Yuz mos kelmadi': 'Лицо не совпало',
+  'Yuz tekshirilmoqda…': 'Проверка лица…',
+  'Yuz aniqlanmadi': 'Лицо не найдено',
   'Tushundim': 'Понятно',
   'Foto-hisobot tayyorlanmoqda…': 'Подготовка фотоотчёта…',
   'Foto-hisobot tayyorlanmadi: {0}': 'Не удалось подготовить фотоотчёт: {0}',
@@ -144,6 +147,10 @@ const Map<String, String> ruAttendance = {
   'Tekshiruv boshlanmoqda': 'Проверка начинается',
   'Boshingizni {0} buring': 'Поверните голову {0}',
   'Strelka yo‘nalishida sekin buriling': 'Медленно поворачивайтесь по стрелке',
+  'Yonga burilib, iyagingizni biroz ko‘taring':
+      'Повернитесь в сторону и слегка поднимите подбородок',
+  'Yonga burilib, iyagingizni biroz tushiring':
+      'Повернитесь в сторону и слегка опустите подбородок',
   'Yana to‘g‘ri qarang': 'Снова смотрите прямо',
   'Boshingizni markazga qaytaring': 'Верните голову в центр',
   'To‘g‘ri qarang': 'Смотрите прямо',

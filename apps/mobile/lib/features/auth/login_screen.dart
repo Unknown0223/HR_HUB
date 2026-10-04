@@ -11,6 +11,7 @@ import '../../core/errors/api_exception.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/season.dart';
+import '../../shared/ambient_motion.dart';
 import '../../shared/seasonal_backdrop.dart';
 import '../lock/pin_widgets.dart';
 import 'login_widgets.dart';
@@ -22,7 +23,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with TickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _intro = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
@@ -30,7 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   late final AnimationController _ambient = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 14),
-  )..repeat(reverse: true);
+  );
   late final AnimationController _shake = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 450),
@@ -150,8 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.of(context).disableAnimations;
-    if (reduceMotion && _ambient.isAnimating) _ambient.stop();
+    syncAmbient(_ambient, reverse: true);
 
     return Scaffold(
       backgroundColor: Colors.transparent,

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/api/screen_cache.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
 /// Company news (Настройки → Главное on the web) and colleagues' upcoming birthdays.
 final newsFeedProvider = FutureProvider.autoDispose((ref) async {
+  ref.cacheFor(screenCacheTtl);
   final repo = ref.read(meRepositoryProvider);
   final results = await Future.wait([repo.news(), repo.birthdays()]);
   return (news: results[0], birthdays: results[1]);

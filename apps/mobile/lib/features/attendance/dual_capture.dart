@@ -147,7 +147,12 @@ class _DualCaptureState extends State<DualCapture> {
 
     Widget base;
     if (_backShot != null) {
-      base = Image.file(File(_backShot!.path), fit: BoxFit.cover);
+      base = Image.file(
+        File(_backShot!.path),
+        fit: BoxFit.cover,
+        cacheWidth: 1080,
+        gaplessPlayback: true,
+      );
     } else if (back != null && back.value.isInitialized) {
       base = _cover(back);
     } else {
@@ -166,7 +171,12 @@ class _DualCaptureState extends State<DualCapture> {
 
     final inset = front != null && front.value.isInitialized
         ? _cover(front)
-        : Image.file(File(widget.livenessSelfie.path), fit: BoxFit.cover);
+        : Image.file(
+            File(widget.livenessSelfie.path),
+            fit: BoxFit.cover,
+            cacheWidth: 360,
+            gaplessPlayback: true,
+          );
 
     final hint = switch (_phase) {
       _Phase.preview => context.t('Ish joyingizni kadrga oling va tugmani bosing'),

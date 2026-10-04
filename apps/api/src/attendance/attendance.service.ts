@@ -26,7 +26,7 @@ import {
 } from './device-credential-audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
-import { FaceMatchService, SFACE_MATCH_THRESHOLD } from '../face/face-match.service';
+import { FaceMatchService } from '../face/face-match.service';
 import {
   markPhotoKindFromDirection,
   markPhotoKindFromMarkType,
@@ -101,6 +101,19 @@ const GPS_OUTSIDE_COMMENT_MIN = 3;
 const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import']);
 /** Terminals sync old events after an outage; those must not ping the phone as "today". */
 const TERMINAL_NOTICE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+const FACE_MISMATCH_MESSAGE =
+  'Yuzingiz profil rasmiga mos kelmadi — belgi qabul qilinmadi. Qayta urinib ko‘ring yoki HR bilan bog‘laning.';
+const FACE_NOT_FOUND_MESSAGE =
+  'Selfida yuz aniqlanmadi — yorug‘ joyda yuzingizni kameraga to‘g‘ri qarating';
+
+type MobileFaceMatch = {
+  status: 'match' | 'mismatch' | 'no_avatar' | 'no_face_avatar' | 'no_face_selfie' | 'error';
+  score?: number;
+  source?: 'selfie' | 'report';
+  threshold: number;
+  checkedAt: string;
+};
 
 @Injectable()
 export class AttendanceService {
@@ -5490,7 +5503,8 @@ export class AttendanceService {
 
   /**
    * Phone check-in/out: liveness-verified composite photo report + GPS.
-   * The fence is optional here — without one the punch is accepted as-is.
+   * The selfie must match the employee's profile photo before anything is stored;
+   * the fence is optional — without one the punch is accepted as-is.
    */
   async punchMobile(
     tenantId: string,
@@ -5518,6 +5532,26 @@ export class AttendanceService {
         distanceM: fence.distanceM,
         radiusM: fence.radiusM,
         locationName: fence.locationName,
+      });
+    }
+
+    const faceMatch = await this.checkMobileFace(tenantId, dto.employeeId, {
+      selfieBase64: dto.selfieBase64,
+      reportBase64: dto.photoBase64,
+    });
+    if (faceMatch.status === 'no_face_selfie') {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'FACE_NOT_FOUND',
+        message: FACE_NOT_FOUND_MESSAGE,
+      });
+    }
+    if (faceMatch.status === 'mismatch') {
+      await this.recordFaceMismatch(tenantId, dto.employeeId, dto.direction, faceMatch, dto.photoBase64);
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'FACE_MISMATCH',
+        message: FACE_MISMATCH_MESSAGE,
       });
     }
 
@@ -5569,6 +5603,7 @@ export class AttendanceService {
             }
           : {}),
         ...(dto.integrity ? { locationIntegrity: dto.integrity } : {}),
+        faceMatch,
       },
     });
 
@@ -5577,14 +5612,6 @@ export class AttendanceService {
       throw new BadRequestException(
         'Oxirgi belgidan beri 1 daqiqa o‘tmadi — birozdan so‘ng qayta urinib ko‘ring',
       );
-    }
-
-    const markId = (result as { markId?: string }).markId;
-    if (markId) {
-      void this.verifyMobileFace(tenantId, dto.employeeId, markId, {
-        selfieBase64: dto.selfieBase64,
-        reportBase64: dto.photoBase64,
-      });
     }
 
     return {
@@ -5600,87 +5627,158 @@ export class AttendanceService {
   }
 
   /**
-   * Compares the phone selfie with the employee's reference photo and records the
-   * verdict on the mark; a mismatch keeps the punch but alerts approvers.
+   * Compares the phone selfie with the employee's reference photo. Without a usable
+   * reference (no avatar, no face on it) or on an internal error the punch cannot be
+   * verified and is let through with that status, so HR sees it on the mark.
    */
-  private async verifyMobileFace(
+  private async checkMobileFace(
     tenantId: string,
     employeeId: string,
-    markId: string,
     photos: { selfieBase64?: string; reportBase64: string },
-  ) {
-    let faceMatch: Record<string, unknown>;
-    let employeeName = '';
+  ): Promise<MobileFaceMatch> {
+    const threshold = this.faceMatch.threshold;
+    const checkedAt = new Date().toISOString();
     try {
       const emp = await this.prisma.employee.findFirst({
         where: { tenantId, id: employeeId },
         select: {
-          firstName: true,
-          lastName: true,
           faceProfile: { select: { photoKey: true, photoUrl: true } },
           person: { select: { photoUrl: true } },
         },
       });
-      employeeName = [emp?.lastName, emp?.firstName].filter(Boolean).join(' ');
       const ref = await this.loadReferenceFace(emp);
-      if (!ref) {
-        faceMatch = { status: 'no_avatar' };
-      } else if (!ref.ok) {
-        faceMatch = { status: 'no_face_avatar' };
-      } else {
-        const probe = await this.embedPunchSelfie(photos);
-        if (!probe.ok) {
-          faceMatch = { status: 'no_face_selfie', source: probe.source };
-        } else {
-          const score = this.faceMatch.similarity(probe.embedding, ref.embedding);
-          faceMatch = {
-            status: score >= SFACE_MATCH_THRESHOLD ? 'match' : 'mismatch',
-            score: Math.round(score * 1000) / 1000,
-            source: probe.source,
-          };
-        }
-      }
+      if (!ref) return { status: 'no_avatar', threshold, checkedAt };
+      if (!ref.ok) return { status: 'no_face_avatar', threshold, checkedAt };
+      const probe = await this.embedPunchSelfie(photos);
+      if (!probe.ok) return { status: 'no_face_selfie', source: probe.source, threshold, checkedAt };
+      const score = Math.round(this.faceMatch.similarity(probe.embedding, ref.embedding) * 1000) / 1000;
+      return {
+        status: score >= threshold ? 'match' : 'mismatch',
+        score,
+        source: probe.source,
+        threshold,
+        checkedAt,
+      };
     } catch (e) {
-      this.logger.warn(`face match failed mark=${markId}: ${e instanceof Error ? e.message : e}`);
-      faceMatch = { status: 'error' };
-    }
-    faceMatch = {
-      ...faceMatch,
-      threshold: SFACE_MATCH_THRESHOLD,
-      checkedAt: new Date().toISOString(),
-    };
-
-    try {
-      const mark = await this.prisma.attendanceMark.findFirst({
-        where: { tenantId, id: markId },
-        select: { rawPayload: true },
-      });
-      if (!mark) return;
-      const payload =
-        mark.rawPayload && typeof mark.rawPayload === 'object' && !Array.isArray(mark.rawPayload)
-          ? (mark.rawPayload as Record<string, unknown>)
-          : {};
-      await this.prisma.attendanceMark.update({
-        where: { id: markId },
-        data: { rawPayload: { ...payload, faceMatch } as Prisma.InputJsonValue },
-      });
-      if (faceMatch.status === 'mismatch') {
-        const pct = Math.round(Math.max(0, Number(faceMatch.score)) * 100);
-        await this.notifications.notifyApprovers(tenantId, {
-          kind: NotificationKind.alert,
-          title: `Yuz mos emas: ${employeeName || 'xodim'}`,
-          body: `Telefon orqali belgida selfi profil rasmiga mos kelmadi (o‘xshashlik ${pct}%). Foto-hisobotni tekshiring.`,
-          entity: 'attendance_mark',
-          entityId: markId,
-          href: `/attendance/marks/${markId}`,
-        });
-      }
-    } catch (e) {
-      this.logger.warn(`face match save failed mark=${markId}: ${e instanceof Error ? e.message : e}`);
+      this.logger.warn(
+        `face match failed employee=${employeeId}: ${e instanceof Error ? e.message : e}`,
+      );
+      return { status: 'error', threshold, checkedAt };
     }
   }
 
-  private async loadReferenceFace(
+  /**
+   * The employee's own reference embedding for the phone's instant pre-check. The phone
+   * only uses it to fail fast; every punch is still verified here.
+   */
+  async faceReference(tenantId: string, employeeId: string) {
+    const emp = await this.prisma.employee.findFirst({
+      where: { tenantId, id: employeeId },
+      select: {
+        faceProfile: { select: { photoKey: true, photoUrl: true } },
+        person: { select: { photoUrl: true } },
+      },
+    });
+    const ref = await this.loadReferenceFace(emp);
+    const base = { model: 'sface-2021dec', threshold: this.faceMatch.threshold };
+    if (!ref) return { ...base, available: false, reason: 'no_avatar' as const };
+    if (!ref.ok) return { ...base, available: false, reason: 'no_face_avatar' as const };
+    return {
+      ...base,
+      available: true,
+      embedding: Array.from(ref.embedding, (v) => Math.round(v * 1e5) / 1e5),
+    };
+  }
+
+  /**
+   * The phone's pre-check rejected this selfie. Re-checks it with the full model: a
+   * confirmed mismatch is recorded for HR like a rejected punch, anything else lets
+   * the employee continue to the photo report (the punch is verified again anyway).
+   */
+  async verifyFaceAttempt(
+    tenantId: string,
+    employeeId: string,
+    direction: PunchDirection,
+    selfieBase64: string,
+  ) {
+    const faceMatch = await this.checkMobileFace(tenantId, employeeId, {
+      selfieBase64,
+      reportBase64: selfieBase64,
+    });
+    if (faceMatch.status === 'mismatch') {
+      await this.recordFaceMismatch(tenantId, employeeId, direction, faceMatch, selfieBase64);
+      return { status: faceMatch.status, message: FACE_MISMATCH_MESSAGE };
+    }
+    if (faceMatch.status === 'no_face_selfie') {
+      return { status: faceMatch.status, message: FACE_NOT_FOUND_MESSAGE };
+    }
+    return { status: faceMatch.status };
+  }
+
+  /**
+   * Keeps the rejected attempt (with its photo report as evidence) and alerts approvers,
+   * at most once per employee per 10 minutes.
+   */
+  private async recordFaceMismatch(
+    tenantId: string,
+    employeeId: string,
+    direction: string,
+    faceMatch: MobileFaceMatch,
+    reportBase64: string,
+  ) {
+    try {
+      const emp = await this.prisma.employee.findFirst({
+        where: { tenantId, id: employeeId },
+        select: { firstName: true, lastName: true, tabNumber: true },
+      });
+      const name = [emp?.lastName, emp?.firstName].filter(Boolean).join(' ') || 'xodim';
+      const recent = await this.prisma.problemMark.findFirst({
+        where: {
+          tenantId,
+          reason: 'face_mismatch',
+          createdAt: { gte: new Date(Date.now() - 10 * 60_000) },
+          payload: { path: ['employeeId'], equals: employeeId },
+        },
+        select: { id: true },
+      });
+      const evidence = await this.storeCapturePhoto(tenantId, reportBase64, {
+        maxEdge: 1280,
+        quality: 75,
+      });
+      await this.prisma.problemMark.create({
+        data: {
+          tenantId,
+          reason: 'face_mismatch',
+          payload: {
+            employeeId,
+            employeeName: name,
+            tabNumber: emp?.tabNumber ?? null,
+            deviceType: 'Телефон',
+            markType: direction === 'OUT' ? 'Уход' : 'Приход',
+            faceMatch,
+            photoKey: evidence?.key ?? null,
+            photoUrl: evidence?.url ?? null,
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
+      if (!recent) {
+        const pct = Math.round(Math.max(0, faceMatch.score ?? 0) * 100);
+        await this.notifications.notifyApprovers(tenantId, {
+          kind: NotificationKind.alert,
+          title: `Begona yuz bilan belgi urinishi: ${name}`,
+          body: `Telefon orqali belgi rad etildi — selfi profil rasmiga mos kelmadi (o‘xshashlik ${pct}%).`,
+          entity: 'employee',
+          entityId: employeeId,
+        });
+      }
+    } catch (e) {
+      this.logger.warn(
+        `face mismatch record failed employee=${employeeId}: ${e instanceof Error ? e.message : e}`,
+      );
+    }
+  }
+
+  async loadReferenceFace(
     emp: {
       faceProfile: { photoKey: string | null; photoUrl: string | null } | null;
       person: { photoUrl: string | null } | null;
@@ -7642,6 +7740,16 @@ export class AttendanceService {
     }
   }
 
+  /** Head-turn directions the phone liveness check draws from (company setting). */
+  async livenessDirections(tenantId: string): Promise<4 | 8> {
+    try {
+      const { system } = await this.settings.getSystemSettings(tenantId);
+      return system.hrStaff.livenessDirections;
+    } catch {
+      return 8;
+    }
+  }
+
   private async getEstimatedOutPhotoPolicy(
     tenantId: string,
   ): Promise<{ enabled: boolean }> {
@@ -7871,7 +7979,7 @@ export class AttendanceService {
     return { scanned, purged, errors };
   }
 
-  private async storeCapturePhoto(
+  async storeCapturePhoto(
     tenantId: string,
     jpegB64: string,
     compressOverride?: { maxEdge: number; quality: number },

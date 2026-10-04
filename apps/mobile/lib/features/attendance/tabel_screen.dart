@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/api/screen_cache.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
@@ -10,6 +11,7 @@ import '../../shared/widgets.dart';
 final tabelProvider =
     FutureProvider.autoDispose.family<Map<String, dynamic>, (int, int)>(
   (ref, ym) {
+    ref.cacheFor(screenCacheTtl);
     return ref.read(meRepositoryProvider).tabel(year: ym.$1, month: ym.$2);
   },
 );

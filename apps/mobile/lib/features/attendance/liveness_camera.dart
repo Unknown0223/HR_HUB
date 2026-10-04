@@ -12,9 +12,12 @@ import 'liveness.dart';
 
 /// Front-camera liveness check. Calls [onPassed] with the final selfie.
 class LivenessCamera extends StatefulWidget {
-  const LivenessCamera({super.key, required this.onPassed});
+  const LivenessCamera({super.key, required this.onPassed, this.directions = 8});
 
   final void Function(XFile selfie, LivenessChallenge challenge) onPassed;
+
+  /// 4 = only left/right/up/down, 8 = also the diagonals (company setting).
+  final int directions;
 
   @override
   State<LivenessCamera> createState() => _LivenessCameraState();
@@ -53,7 +56,7 @@ class _LivenessCameraState extends State<LivenessCamera>
     vsync: this,
     duration: const Duration(milliseconds: 1800),
   )..repeat();
-  LivenessChallenge _challenge = LivenessChallenge.random();
+  late LivenessChallenge _challenge = LivenessChallenge.random(directions: widget.directions);
   bool _processing = false;
   bool _capturing = false;
   int _faces = 0;
@@ -265,7 +268,7 @@ class _LivenessCameraState extends State<LivenessCamera>
 
   void _restart() {
     setState(() {
-      _challenge = LivenessChallenge.random();
+      _challenge = LivenessChallenge.random(directions: widget.directions);
       _error = null;
     });
   }
@@ -284,7 +287,11 @@ class _LivenessCameraState extends State<LivenessCamera>
         final d = _challenge.current!;
         return (
           context.t('Boshingizni {0} buring', [context.t(d.label).toLowerCase()]),
-          context.t('Strelka yo‘nalishida sekin buriling'),
+          !d.isDiagonal
+              ? context.t('Strelka yo‘nalishida sekin buriling')
+              : d.isUp
+                  ? context.t('Yonga burilib, iyagingizni biroz ko‘taring')
+                  : context.t('Yonga burilib, iyagingizni biroz tushiring'),
           d.icon,
         );
       case LivenessPhase.back:
@@ -374,7 +381,11 @@ class _LivenessCameraState extends State<LivenessCamera>
                     ),
                   ),
                   if (turning != null)
-                    _DirectionArrow(direction: turning, anim: _anim),
+                    _DirectionArrow(
+                      direction: turning,
+                      anim: _anim,
+                      progress: _challenge.turnProgress,
+                    ),
                   Positioned(
                     top: 12,
                     left: 12,
@@ -660,10 +671,17 @@ class _FaceGuidePainter extends CustomPainter {
 }
 
 class _DirectionArrow extends StatelessWidget {
-  const _DirectionArrow({required this.direction, required this.anim});
+  const _DirectionArrow({
+    required this.direction,
+    required this.anim,
+    required this.progress,
+  });
 
   final HeadDirection direction;
   final Animation<double> anim;
+
+  /// 0–1: how far the head already moved toward [direction].
+  final double progress;
 
   @override
   Widget build(BuildContext context) {
@@ -677,20 +695,41 @@ class _DirectionArrow extends StatelessWidget {
             alignment: Alignment(v.dx * 0.82, -0.08 + v.dy * 0.78),
             child: Transform.translate(
               offset: v * bounce,
-              child: Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.accent,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accent.withValues(alpha: 0.6),
-                      blurRadius: 18,
+              child: SizedBox(
+                width: 78,
+                height: 78,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(end: progress),
+                        duration: const Duration(milliseconds: 180),
+                        builder: (_, value, _) => CircularProgressIndicator(
+                          value: value,
+                          strokeWidth: 5,
+                          color: Colors.white,
+                          backgroundColor: Colors.white.withValues(alpha: 0.25),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.accent,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.6),
+                            blurRadius: 18,
+                          ),
+                        ],
+                      ),
+                      child: Icon(direction.icon, color: Colors.white, size: 36),
                     ),
                   ],
                 ),
-                child: Icon(direction.icon, color: Colors.white, size: 36),
               ),
             ),
           );

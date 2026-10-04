@@ -116,7 +116,13 @@ class MemberAvatar extends ConsumerWidget {
           decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: ring, width: 2.5)),
           child: bytes == null
               ? AvatarCircle(name: name, radius: radius)
-              : CircleAvatar(radius: radius, backgroundImage: MemoryImage(bytes)),
+              : CircleAvatar(
+                  radius: radius,
+                  backgroundImage: ResizeImage(
+                    MemoryImage(bytes),
+                    width: (radius * 2 * MediaQuery.devicePixelRatioOf(context)).round(),
+                  ),
+                ),
         ),
         if (online)
           Positioned(

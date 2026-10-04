@@ -127,6 +127,18 @@ export class MeMobilePunchDto {
   comment?: string;
 }
 
+/** Selfie the phone's own face pre-check rejected; the server confirms or overrides. */
+export class MeFaceVerifyDto {
+  @ApiProperty({ enum: ['IN', 'OUT'] })
+  @IsIn(['IN', 'OUT'])
+  direction!: 'IN' | 'OUT';
+
+  @ApiProperty({ description: 'Liveness selfie JPEG (base64)' })
+  @IsString()
+  @MaxLength(3_000_000)
+  selfieBase64!: string;
+}
+
 export class MeMockLocationReportDto {
   @ApiProperty({ type: MeLocationIntegrityDto })
   @ValidateNested()

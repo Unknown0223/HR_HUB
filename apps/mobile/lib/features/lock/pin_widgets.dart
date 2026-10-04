@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/season.dart';
+import '../../shared/ambient_motion.dart';
 import '../../shared/seasonal_backdrop.dart';
 
 const kPinLength = 4;
@@ -23,11 +24,11 @@ class BrandBackdrop extends StatefulWidget {
 }
 
 class _BrandBackdropState extends State<BrandBackdrop>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _ambient = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 16),
-  )..repeat(reverse: true);
+  );
 
   @override
   void dispose() {
@@ -37,9 +38,7 @@ class _BrandBackdropState extends State<BrandBackdrop>
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.of(context).disableAnimations && _ambient.isAnimating) {
-      _ambient.stop();
-    }
+    syncAmbient(_ambient, reverse: true);
 
     Widget orb(double size, Color color, double alpha) => Container(
       width: size,
@@ -598,7 +597,10 @@ class PadKey extends StatefulWidget {
 class _PadKeyState extends State<PadKey> {
   bool _down = false;
 
-  void _set(bool v) => setState(() => _down = v);
+  void _set(bool v) {
+    if (v) AmbientMotion.poke();
+    setState(() => _down = v);
+  }
 
   @override
   Widget build(BuildContext context) {

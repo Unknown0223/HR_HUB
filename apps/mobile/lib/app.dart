@@ -4,9 +4,11 @@ import 'core/auth/auth_state.dart';
 import 'core/i18n/app_lang.dart';
 import 'core/router/app_router.dart';
 import 'core/security/app_permissions.dart';
+import 'core/security/location_guard.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/seasonal_backdrop.dart';
 import 'core/tracking/tracking_controller.dart';
+import 'features/attendance/face_verifier.dart';
 import 'features/lock/app_lock_screens.dart';
 
 class HrHubApp extends ConsumerStatefulWidget {
@@ -22,6 +24,11 @@ class _HrHubAppState extends ConsumerState<HrHubApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ref.listenManual(
+      authProvider.select((a) => a.user?.employee?['id']),
+      (_, _) => _prepareFaceCheck(),
+      fireImmediately: true,
+    );
   }
 
   bool _artCached = false;
@@ -48,6 +55,8 @@ class _HrHubAppState extends ConsumerState<HrHubApp>
           .read(permissionsProvider.notifier)
           .refresh()
           .then((_) => _syncTracking());
+    } else if (state == AppLifecycleState.paused) {
+      LocationGuard.stopWarmUp();
     }
   }
 
@@ -56,6 +65,15 @@ class _HrHubAppState extends ConsumerState<HrHubApp>
     if (auth.user?.employee == null) return;
     if (!ref.read(permissionsProvider).allGranted) return;
     ref.read(trackingControllerProvider).ensureStarted();
+    LocationGuard.warmUp();
+  }
+
+  /// Phone punches pre-check the face on the device: fetch the reference and load
+  /// the models right after sign-in so the punch itself does not wait for them.
+  void _prepareFaceCheck() {
+    if (ref.read(authProvider).user?.employee == null) return;
+    ref.read(faceReferenceProvider.future).ignore();
+    FaceVerifier.instance.warmUp();
   }
 
   @override

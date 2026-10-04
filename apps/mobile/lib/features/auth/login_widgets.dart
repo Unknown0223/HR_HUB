@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/ambient_motion.dart';
 
 const _deepGreen = Color(0xFF1F6F3A);
 
@@ -247,11 +248,12 @@ class GlowButton extends StatefulWidget {
   State<GlowButton> createState() => _GlowButtonState();
 }
 
-class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateMixin {
+class _GlowButtonState extends State<GlowButton>
+    with SingleTickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _sweep = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
-  )..repeat();
+  );
   bool _pressed = false;
 
   @override
@@ -266,7 +268,7 @@ class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.of(context).disableAnimations && _sweep.isAnimating) _sweep.stop();
+    syncAmbient(_sweep);
 
     return Semantics(
       button: true,
@@ -304,7 +306,7 @@ class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateM
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (!widget.busy)
+                  if (!widget.busy && _sweep.isAnimating)
                     AnimatedBuilder(
                       animation: _sweep,
                       builder: (context, _) {

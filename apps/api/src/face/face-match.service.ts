@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import sharp from 'sharp';
@@ -19,19 +19,38 @@ export type FaceEmbedding =
 const DETECT_SIZE = 640;
 const WORK_MAX_EDGE = 1024;
 const SCORE_THRESHOLD = 0.7;
-/** OpenCV's published SFace cosine threshold for "same person". */
-export const SFACE_MATCH_THRESHOLD = 0.363;
+/**
+ * Phone selfie vs profile photo. OpenCV's published SFace value (0.363) let look-alike
+ * colleagues through on real staff photos; 0.45 keeps strangers out with margin.
+ * Override with FACE_MATCH_THRESHOLD (0.3–0.8).
+ */
+export const FACE_MATCH_THRESHOLD_DEFAULT = 0.45;
 const CACHE_LIMIT = 300;
+
+function thresholdFromEnv(): number {
+  const raw = Number(process.env.FACE_MATCH_THRESHOLD);
+  return Number.isFinite(raw) && raw >= 0.3 && raw <= 0.8 ? raw : FACE_MATCH_THRESHOLD_DEFAULT;
+}
 
 /**
  * Face comparison with OpenCV Zoo models: YuNet (MIT) finds the face and its five
  * landmarks, SFace (Apache-2.0) turns the aligned face into a 128-d embedding.
  */
 @Injectable()
-export class FaceMatchService {
+export class FaceMatchService implements OnApplicationBootstrap {
   private readonly logger = new Logger(FaceMatchService.name);
   private sessions: Promise<{ detector: InferenceSession; recognizer: InferenceSession; ort: typeof import('onnxruntime-node') }> | null = null;
   private readonly cache = new Map<string, FaceEmbedding>();
+  readonly threshold = thresholdFromEnv();
+
+  /** Loads the models in the background so the first phone punch does not pay for it. */
+  onApplicationBootstrap() {
+    setImmediate(() => {
+      this.load().catch((e) =>
+        this.logger.warn(`Face models not loaded: ${e instanceof Error ? e.message : e}`),
+      );
+    });
+  }
 
   private modelPath(file: string) {
     const candidates = [
@@ -46,7 +65,11 @@ export class FaceMatchService {
     if (!this.sessions) {
       this.sessions = (async () => {
         const ort = await import('onnxruntime-node');
-        const opts: InferenceSession.SessionOptions = { intraOpNumThreads: 2, interOpNumThreads: 1 };
+        const opts: InferenceSession.SessionOptions = {
+          intraOpNumThreads: 2,
+          interOpNumThreads: 1,
+          logSeverityLevel: 3,
+        };
         const [detector, recognizer] = await Promise.all([
           ort.InferenceSession.create(this.modelPath('face_detection_yunet_2023mar.onnx'), opts),
           ort.InferenceSession.create(this.modelPath('face_recognition_sface_2021dec.onnx'), opts),

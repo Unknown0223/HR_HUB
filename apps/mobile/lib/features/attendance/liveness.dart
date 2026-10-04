@@ -17,6 +17,11 @@ enum HeadDirection {
   final String apiName;
   final String label;
   final IconData icon;
+
+  static const cardinal = [left, right, up, down];
+
+  bool get isDiagonal => !cardinal.contains(this);
+  bool get isUp => this == up || this == upLeft || this == upRight;
 }
 
 /// ML Kit Euler angles: [yaw] > 0 when the person turns to their left,
@@ -34,6 +39,20 @@ class HeadPose {
 
   HeadPose relativeTo(HeadPose base) => HeadPose(yaw - base.yaw, pitch - base.pitch);
 
+  /// People tilt the head up/down much less than they turn it, and ML Kit reports a
+  /// compressed pitch while the head is also turned, so pitch is scaled up before a
+  /// diagonal is judged as a single 2-D movement.
+  static const _pitchGain = 1.4;
+  static const _diagonalMinMagnitude = 17.0;
+  static const _diagonalMinComponent = 7.0;
+  static const _diagonalToleranceDeg = 30.0;
+
+  (double, double) _diagonalComponents(HeadDirection d) {
+    final x = d == HeadDirection.upLeft || d == HeadDirection.downLeft ? yaw : -yaw;
+    final y = d.isUp ? pitch * _pitchGain : -pitch * _pitchGain;
+    return (x, y);
+  }
+
   bool matches(HeadDirection d) {
     switch (d) {
       case HeadDirection.left:
@@ -45,31 +64,59 @@ class HeadPose {
       case HeadDirection.down:
         return pitch < -12 && yaw.abs() < 15;
       case HeadDirection.upLeft:
-        return yaw > 15 && pitch > 12;
       case HeadDirection.upRight:
-        return yaw < -15 && pitch > 12;
       case HeadDirection.downLeft:
-        return yaw > 15 && pitch < -10;
       case HeadDirection.downRight:
-        return yaw < -15 && pitch < -10;
+        final (x, y) = _diagonalComponents(d);
+        if (x < _diagonalMinComponent || y < _diagonalMinComponent) return false;
+        if (sqrt(x * x + y * y) < _diagonalMinMagnitude) return false;
+        final angle = atan2(y, x) * 180 / pi;
+        return (angle - 45).abs() <= _diagonalToleranceDeg;
     }
+  }
+
+  /// How far the head has moved toward [d] (0 = centered, 1 = enough to count).
+  double progressToward(HeadDirection d) {
+    final double p;
+    switch (d) {
+      case HeadDirection.left:
+        p = yaw / 22;
+      case HeadDirection.right:
+        p = -yaw / 22;
+      case HeadDirection.up:
+        p = pitch / 15;
+      case HeadDirection.down:
+        p = -pitch / 12;
+      case HeadDirection.upLeft:
+      case HeadDirection.upRight:
+      case HeadDirection.downLeft:
+      case HeadDirection.downRight:
+        final (x, y) = _diagonalComponents(d);
+        p = min(
+          (x + y) / sqrt2 / _diagonalMinMagnitude,
+          min(x, y) / _diagonalMinComponent,
+        );
+    }
+    return p.clamp(0.0, 1.0);
   }
 }
 
 enum LivenessPhase { center, turn, back, finalCenter, done, failed }
 
-/// Random head-movement challenge: 3–4 distinct directions out of 8 (the API needs at
-/// least 3). Each turn must be held for a few frames and followed by a return to
-/// center, so a still photo or a looping video cannot pass. Angles are measured from
-/// the neutral pose learned in the first phase.
+/// Random head-movement challenge: 3–4 distinct directions out of 8 (or only the 4
+/// straight ones — company setting; the API needs at least 3). Each turn must be held
+/// for a few frames and followed by a return to center, so a still photo or a looping
+/// video cannot pass. Angles are measured from the neutral pose learned in the first phase.
 class LivenessChallenge {
   LivenessChallenge(this.steps, {DateTime? now}) : _startedAt = now ?? DateTime.now();
 
-  factory LivenessChallenge.random({Random? rng, DateTime? now}) {
+  /// [directions] is 4 (left/right/up/down) or 8 (plus the diagonals).
+  factory LivenessChallenge.random({int directions = 8, Random? rng, DateTime? now}) {
     final r = rng ?? Random.secure();
     final count = 3 + r.nextInt(2);
-    final all = [...HeadDirection.values]..shuffle(r);
-    return LivenessChallenge(all.take(count).toList(), now: now);
+    final pool = [...(directions == 4 ? HeadDirection.cardinal : HeadDirection.values)]
+      ..shuffle(r);
+    return LivenessChallenge(pool.take(count).toList(), now: now);
   }
 
   static const _turnHoldFrames = 3;
@@ -88,8 +135,17 @@ class LivenessChallenge {
   double _neutralYawSum = 0;
   double _neutralPitchSum = 0;
   String? failReason;
+  HeadPose? _lastPose;
 
   HeadDirection? get current => index < steps.length ? steps[index] : null;
+
+  /// Progress of the current turn (0–1) for the on-screen hint.
+  double get turnProgress {
+    final d = current;
+    final p = _lastPose;
+    if (phase != LivenessPhase.turn || d == null || p == null) return 0;
+    return p.progressToward(d);
+  }
   DateTime? get phaseStartedAt => _phaseStartedAt;
   Duration elapsed(DateTime now) => now.difference(_startedAt);
   List<String> get apiSteps => steps.map((s) => s.apiName).toList();
@@ -107,6 +163,7 @@ class LivenessChallenge {
     }
     if (faces != 1 || pose == null) {
       _hold = 0;
+      _lastPose = null;
       return;
     }
     if (trackingId != null) {
@@ -122,6 +179,7 @@ class LivenessChallenge {
       return;
     }
     pose = pose.relativeTo(_neutral);
+    _lastPose = pose;
 
     switch (phase) {
       case LivenessPhase.center:
@@ -162,9 +220,11 @@ class LivenessChallenge {
     }
   }
 
+  /// A single jittery frame only takes one frame of progress back instead of
+  /// restarting the hold — ML Kit angles wobble by a few degrees frame to frame.
   void _advanceWhen(bool ok, int frames, LivenessPhase next, DateTime t) {
     if (!ok) {
-      _hold = 0;
+      if (_hold > 0) _hold--;
       return;
     }
     _hold++;

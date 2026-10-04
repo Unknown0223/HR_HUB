@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/api/me_repository.dart';
+import '../../core/api/screen_cache.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets.dart';
 
 final notificationsProvider = FutureProvider.autoDispose((ref) {
+  ref.cacheFor(screenCacheTtl);
   return ref.read(meRepositoryProvider).notifications();
 });
 

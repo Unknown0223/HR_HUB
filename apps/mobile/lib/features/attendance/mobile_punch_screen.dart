@@ -17,6 +17,7 @@ import '../home/home_screen.dart';
 import 'liveness.dart';
 import 'liveness_camera.dart';
 import 'dual_capture.dart';
+import 'face_verifier.dart';
 import 'photo_report.dart';
 import 'punch_widgets.dart';
 
@@ -28,7 +29,16 @@ const _mockWarningFallback =
     'Belgi qabul qilinmadi va bu holat HR bo‘limiga yuborildi. Takrorlansa, '
     'akkauntingiz qora ro‘yxatga tushirilishi va bloklanishi mumkin.';
 
-enum _Step { locating, located, liveness, photoReport, sending, done, failed }
+enum _Step {
+  locating,
+  located,
+  liveness,
+  verifying,
+  photoReport,
+  sending,
+  done,
+  failed,
+}
 
 /// Phone attendance: precise GPS → head-movement liveness → one-tap back +
 /// front photo report → automatic submit → 2 s confirmation → home.
@@ -54,6 +64,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
   Map<String, dynamic>? _fence;
   XFile? _selfie;
   List<String> _livenessSteps = const [];
+  int _livenessDirections = 8;
   int _livenessMs = 0;
   Uint8List? _photo;
   Uint8List? _faceSelfie;
@@ -71,6 +82,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
   void initState() {
     super.initState();
     _comment.addListener(() => setState(() {}));
+    FaceVerifier.instance.warmUp();
     WidgetsBinding.instance.addPostFrameCallback((_) => _locate());
   }
 
@@ -123,6 +135,7 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
         _autoTimeOff = !autoTime;
         _fix = fix;
         _fence = fence['configured'] == true ? fence : null;
+        _livenessDirections = fence['livenessDirections'] == 4 ? 4 : 8;
         _step = _Step.located;
       });
     } on LocationGuardException catch (e) {
@@ -182,13 +195,112 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// The server refused the selfie, so the photos are useless: the employee
+  /// starts again from the liveness check.
+  Future<void> _showFaceRejected(String title, String message, IconData icon) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        icon: Icon(icon, color: AppColors.danger, size: 48),
+        title: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.danger,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: Text(message, style: const TextStyle(height: 1.45)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop();
+            },
+            child: Text(ctx.t('Bosh sahifaga qaytish')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.t('Qayta urinish')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _photo = null;
+      _faceSelfie = null;
+      _selfie = null;
+      _error = null;
+      _step = _Step.liveness;
+    });
+  }
+
   void _onLivenessPassed(XFile selfie, LivenessChallenge challenge) {
     setState(() {
       _selfie = selfie;
+      _faceSelfie = null;
       _livenessSteps = challenge.apiSteps;
       _livenessMs = challenge.elapsed(DateTime.now()).inMilliseconds;
-      _step = _Step.photoReport;
+      _step = _Step.verifying;
+      _status = context.t('Yuz tekshirilmoqda…');
     });
+    _precheckFace(selfie);
+  }
+
+  /// Compares the selfie with the profile photo on the phone before the photo
+  /// report. Only a mismatch goes to the server, which confirms it (and alerts
+  /// HR) or overrides it; every accepted punch is verified on the server anyway.
+  Future<void> _precheckFace(XFile selfie) async {
+    final shrunk = await faceMatchSelfie(
+      selfie.path,
+    ).then<Uint8List?>((b) => b).catchError((_) => null);
+    _faceSelfie = shrunk;
+    var verdict = FacePrecheck.skipped;
+    if (shrunk != null) {
+      final reference = await ref
+          .read(faceReferenceProvider.future)
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      verdict = await FaceVerifier.instance.precheck(shrunk, reference);
+    }
+    if (verdict == FacePrecheck.mismatch && shrunk != null) {
+      await _confirmMismatch(shrunk);
+      return;
+    }
+    if (mounted && _selfie == selfie) {
+      setState(() => _step = _Step.photoReport);
+    }
+  }
+
+  Future<void> _confirmMismatch(Uint8List selfie) async {
+    Map<String, dynamic>? res;
+    try {
+      res = await ref
+          .read(meRepositoryProvider)
+          .verifyFace(
+            direction: widget.direction,
+            selfieBase64: base64Encode(selfie),
+          );
+    } catch (_) {}
+    if (!mounted) return;
+    switch (res?['status']) {
+      case 'mismatch':
+        await _showFaceRejected(
+          context.t('Yuz mos kelmadi'),
+          res?['message']?.toString() ?? '',
+          Icons.no_accounts_rounded,
+        );
+      case 'no_face_selfie':
+        await _showFaceRejected(
+          context.t('Yuz aniqlanmadi'),
+          res?['message']?.toString() ?? '',
+          Icons.face_retouching_off_rounded,
+        );
+      default:
+        setState(() => _step = _Step.photoReport);
+    }
   }
 
   Future<void> _onPhotosCaptured(XFile back, XFile? front) async {
@@ -207,9 +319,11 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
           '${two(now.hour)}:${two(now.minute)}:${two(now.second)}\n'
           'GPS ${fix.latitude.toStringAsFixed(5)}, ${fix.longitude.toStringAsFixed(5)} '
           '+-${fix.accuracy.toStringAsFixed(0)}m';
-      final faceSelfie = faceMatchSelfie(
-        _selfie!.path,
-      ).then<Uint8List?>((b) => b).catchError((_) => null);
+      final faceSelfie = _faceSelfie != null
+          ? Future<Uint8List?>.value(_faceSelfie)
+          : faceMatchSelfie(
+              _selfie!.path,
+            ).then<Uint8List?>((b) => b).catchError((_) => null);
       _photo = await composePhotoReport(
         backPath: back.path,
         selfiePath: (front ?? _selfie!).path,
@@ -277,6 +391,18 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
             _error = e.message;
             _step = _Step.liveness;
           });
+        case 'FACE_MISMATCH':
+          await _showFaceRejected(
+            context.t('Yuz mos kelmadi'),
+            e.message,
+            Icons.no_accounts_rounded,
+          );
+        case 'FACE_NOT_FOUND':
+          await _showFaceRejected(
+            context.t('Yuz aniqlanmadi'),
+            e.message,
+            Icons.face_retouching_off_rounded,
+          );
         default:
           setState(() {
             _error = e.message;
@@ -295,7 +421,10 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final locked = _step == _Step.sending || _step == _Step.done;
+    final locked =
+        _step == _Step.verifying ||
+        _step == _Step.sending ||
+        _step == _Step.done;
     return PopScope(
       canPop: !locked,
       child: Scaffold(
@@ -334,8 +463,13 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
       case _Step.liveness:
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-          child: LivenessCamera(onPassed: _onLivenessPassed),
+          child: LivenessCamera(
+            onPassed: _onLivenessPassed,
+            directions: _livenessDirections,
+          ),
         );
+      case _Step.verifying:
+        return _sendingView(icon: Icons.face_retouching_natural);
       case _Step.photoReport:
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -509,22 +643,28 @@ class _MobilePunchScreenState extends ConsumerState<MobilePunchScreen> {
     );
   }
 
-  Widget _sendingView() {
+  Widget _sendingView({IconData icon = Icons.collections_rounded}) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_photo != null)
+            if (_photo != null && _step == _Step.sending)
               ClipRRect(
                 borderRadius: BorderRadius.circular(18),
-                child: Image.memory(_photo!, height: 260, fit: BoxFit.cover),
+                child: Image.memory(
+                  _photo!,
+                  height: 260,
+                  cacheHeight: 780,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                ),
               )
             else
               PulseRings(
                 color: _directionColors(_isIn).last,
-                icon: Icons.collections_rounded,
+                icon: icon,
                 size: 180,
               ),
             const SizedBox(height: 24),

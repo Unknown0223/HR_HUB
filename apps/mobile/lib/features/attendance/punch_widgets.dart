@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/time/server_clock.dart';
+import '../../shared/ambient_motion.dart';
 
 /// Fades and slides [child] in after `index * step` delay.
 class StaggeredEntrance extends StatefulWidget {
@@ -50,12 +51,12 @@ class _StaggeredEntranceState extends State<StaggeredEntrance>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _t,
-      child: widget.child,
-      builder: (_, child) => Opacity(
-        opacity: _t.value,
-        child: Transform.translate(
+    return FadeTransition(
+      opacity: _t,
+      child: AnimatedBuilder(
+        animation: _t,
+        child: widget.child,
+        builder: (_, child) => Transform.translate(
           offset: Offset(0, 24 * (1 - _t.value)),
           child: child,
         ),
@@ -86,11 +87,11 @@ class PulseRings extends StatefulWidget {
 }
 
 class _PulseRingsState extends State<PulseRings>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2200),
-  )..repeat();
+  );
 
   @override
   void dispose() {
@@ -100,6 +101,7 @@ class _PulseRingsState extends State<PulseRings>
 
   @override
   Widget build(BuildContext context) {
+    syncAmbient(_c);
     return SizedBox.square(
       dimension: widget.size,
       child: AnimatedBuilder(
@@ -183,11 +185,11 @@ class ShimmerButton extends StatefulWidget {
 }
 
 class _ShimmerButtonState extends State<ShimmerButton>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
-  )..repeat();
+  );
   bool _pressed = false;
 
   @override
@@ -198,6 +200,7 @@ class _ShimmerButtonState extends State<ShimmerButton>
 
   @override
   Widget build(BuildContext context) {
+    syncAmbient(_c);
     final enabled = widget.onPressed != null;
     return AnimatedScale(
       scale: _pressed ? 0.97 : 1,
@@ -235,7 +238,7 @@ class _ShimmerButtonState extends State<ShimmerButton>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (enabled)
+                if (enabled && _c.isAnimating)
                   AnimatedBuilder(
                     animation: _c,
                     builder: (_, _) => FractionalTranslation(

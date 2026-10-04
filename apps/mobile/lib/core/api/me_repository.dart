@@ -98,6 +98,18 @@ class MeRepository {
     },
   );
 
+  /// `{available, embedding?, threshold, model, reason?}` — own profile photo only.
+  Future<Map<String, dynamic>> faceReference() => _api.get('/me/face/reference');
+
+  /// Server re-check of a selfie the phone rejected: `{status, message?}`.
+  Future<Map<String, dynamic>> verifyFace({
+    required String direction,
+    required String selfieBase64,
+  }) => _api.post(
+    '/me/face/verify',
+    data: {'direction': direction, 'selfieBase64': selfieBase64},
+  );
+
   /// `{ok, blocked, message}` — message is the warning to show the employee.
   Future<Map<String, dynamic>> reportMockLocation({
     required Map<String, dynamic> integrity,

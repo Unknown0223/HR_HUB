@@ -16,6 +16,7 @@ import {
   MeCreateAbsenceDto,
   MeCreateRequestDto,
   MeFacePunchDto,
+  MeFaceVerifyDto,
   MeGpsCheckDto,
   MeGpsPunchDto,
   MeMobilePunchDto,
@@ -131,6 +132,16 @@ export class MeController {
   @Post('punches/mobile')
   punchMobile(@CurrentUser() user: AuthUser, @Body() dto: MeMobilePunchDto) {
     return this.me.punchMobile(user, dto);
+  }
+
+  @Get('face/reference')
+  faceReference(@CurrentUser() user: AuthUser) {
+    return this.me.faceReference(user);
+  }
+
+  @Post('face/verify')
+  verifyFace(@CurrentUser() user: AuthUser, @Body() dto: MeFaceVerifyDto) {
+    return this.me.verifyFace(user, dto);
   }
 
   @Post('security/mock-location')

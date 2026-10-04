@@ -24,6 +24,78 @@ void main() {
     }
   });
 
+  test('4-direction mode draws only left/right/up/down', () {
+    final rng = Random(2);
+    for (var i = 0; i < 200; i++) {
+      final c = LivenessChallenge.random(directions: 4, rng: rng);
+      expect(c.steps.length, inInclusiveRange(3, 4));
+      expect(c.steps.toSet().length, c.steps.length);
+      expect(c.steps.any((s) => s.isDiagonal), isFalse);
+    }
+  });
+
+  test('natural diagonal turns count: mostly sideways with a small tilt', () {
+    // Real heads turn far more than they tilt; ML Kit also shrinks pitch while turned.
+    const natural = {
+      HeadDirection.upLeft: [HeadPose(14, 8), HeadPose(25, 6), HeadPose(10, 12)],
+      HeadDirection.upRight: [HeadPose(-14, 8), HeadPose(-25, 6), HeadPose(-10, 12)],
+      HeadDirection.downLeft: [HeadPose(14, -8), HeadPose(25, -6), HeadPose(10, -12)],
+      HeadDirection.downRight: [HeadPose(-14, -8), HeadPose(-25, -6), HeadPose(-10, -12)],
+    };
+    natural.forEach((dir, poses) {
+      for (final p in poses) {
+        expect(p.matches(dir), isTrue, reason: '$dir ${p.yaw}/${p.pitch}');
+        expect(p.progressToward(dir), 1.0);
+      }
+    });
+  });
+
+  test('diagonals reject pure turns, pure tilts and tiny movements', () {
+    for (final d in HeadDirection.values.where((d) => d.isDiagonal)) {
+      expect(const HeadPose(30, 0).matches(d), isFalse, reason: '$d pure left');
+      expect(const HeadPose(-30, 0).matches(d), isFalse, reason: '$d pure right');
+      expect(const HeadPose(0, 20).matches(d), isFalse, reason: '$d pure up');
+      expect(const HeadPose(0, -18).matches(d), isFalse, reason: '$d pure down');
+      expect(const HeadPose(6, 5).matches(d), isFalse, reason: '$d tiny');
+    }
+    expect(const HeadPose(14, 8).matches(HeadDirection.downLeft), isFalse);
+    expect(const HeadPose(14, 8).matches(HeadDirection.upRight), isFalse);
+  });
+
+  test('progress grows toward the target and is 0 the other way', () {
+    expect(const HeadPose(0, 0).progressToward(HeadDirection.upLeft), 0);
+    expect(const HeadPose(-20, -10).progressToward(HeadDirection.upLeft), 0);
+    final half = const HeadPose(7, 4).progressToward(HeadDirection.upLeft);
+    expect(half, inExclusiveRange(0.3, 1.0));
+    expect(const HeadPose(11, 0).progressToward(HeadDirection.left), closeTo(0.5, 1e-9));
+  });
+
+  test('one jittery frame does not restart the hold', () {
+    final t0 = DateTime(2026, 1, 1, 9);
+    var t = t0;
+    final c = LivenessChallenge(
+      [HeadDirection.upLeft, HeadDirection.left, HeadDirection.right],
+      now: t0,
+    );
+    void f(HeadPose p) {
+      t = t.add(const Duration(milliseconds: 150));
+      c.feed(p, faces: 1, trackingId: 1, now: t);
+    }
+
+    for (var i = 0; i < 3; i++) {
+      f(const HeadPose(0, 0));
+    }
+    const ok = HeadPose(16, 9);
+    const wobble = HeadPose(16, 3);
+    f(ok);
+    f(ok);
+    f(wobble);
+    f(ok);
+    expect(c.phase, LivenessPhase.turn);
+    f(ok);
+    expect(c.phase, LivenessPhase.back);
+  });
+
   test('each pose matches only its own direction', () {
     _poses.forEach((dir, pose) {
       for (final other in HeadDirection.values) {

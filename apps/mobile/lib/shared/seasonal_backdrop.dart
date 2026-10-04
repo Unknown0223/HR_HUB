@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme/season.dart';
+import 'ambient_motion.dart';
 
 /// Seasonal illustration with a light veil behind every page. It sits under the whole app,
 /// so it only moves when the route changes: a looping animation here would repaint the full
@@ -58,7 +59,9 @@ class SeasonalBackdrop extends StatelessWidget {
                   colors: [
                     season.veil.withValues(alpha: 0.22),
                     season.veil.withValues(alpha: scrim),
-                    season.veil.withValues(alpha: (scrim + 0.12).clamp(0, 0.92)),
+                    season.veil.withValues(
+                      alpha: (scrim + 0.12).clamp(0, 0.92),
+                    ),
                   ],
                   stops: const [0, 0.22, 1],
                 ),
@@ -72,7 +75,12 @@ class SeasonalBackdrop extends StatelessWidget {
 }
 
 /// Fades the art in once decoded; an image already in the cache shows immediately.
-Widget fadeInFrame(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded) {
+Widget fadeInFrame(
+  BuildContext context,
+  Widget child,
+  int? frame,
+  bool wasSynchronouslyLoaded,
+) {
   if (wasSynchronouslyLoaded) return child;
   return AnimatedOpacity(
     opacity: frame == null ? 0 : 1,
@@ -99,11 +107,12 @@ class SceneBackdrop extends StatefulWidget {
   State<SceneBackdrop> createState() => _SceneBackdropState();
 }
 
-class _SceneBackdropState extends State<SceneBackdrop> with SingleTickerProviderStateMixin {
+class _SceneBackdropState extends State<SceneBackdrop>
+    with SingleTickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _drift = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 14),
-  )..repeat(reverse: true);
+  );
 
   @override
   void dispose() {
@@ -113,7 +122,7 @@ class _SceneBackdropState extends State<SceneBackdrop> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.of(context).disableAnimations && _drift.isAnimating) _drift.stop();
+    syncAmbient(_drift, reverse: true);
     final season = SeasonX.now;
     final art = Image.asset(
       season.asset,
@@ -123,36 +132,46 @@ class _SceneBackdropState extends State<SceneBackdrop> with SingleTickerProvider
       gaplessPlayback: true,
       frameBuilder: fadeInFrame,
     );
-    return ColoredBox(
-      color: season.veil,
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final portrait = box.maxWidth / box.maxHeight < SceneBackdrop.sceneAspect;
-          final scene = portrait
-              ? Align(
-                  alignment: Alignment.topCenter,
-                  child: ShaderMask(
-                    blendMode: BlendMode.dstIn,
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.white, Colors.white, Colors.transparent],
-                      stops: [0, 0.74, 1],
-                    ).createShader(rect),
-                    child: AspectRatio(aspectRatio: SceneBackdrop.sceneAspect, child: art),
-                  ),
-                )
-              : SizedBox.expand(child: art);
-          return AnimatedBuilder(
-            animation: _drift,
-            builder: (context, child) => Transform.scale(
-              scale: 1.02 + 0.03 * Curves.easeInOut.transform(_drift.value),
-              alignment: Alignment.topCenter,
-              child: child,
-            ),
-            child: scene,
-          );
-        },
+    return RepaintBoundary(
+      child: ColoredBox(
+        color: season.veil,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final portrait =
+                box.maxWidth / box.maxHeight < SceneBackdrop.sceneAspect;
+            final scene = portrait
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (rect) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                        stops: [0, 0.74, 1],
+                      ).createShader(rect),
+                      child: AspectRatio(
+                        aspectRatio: SceneBackdrop.sceneAspect,
+                        child: art,
+                      ),
+                    ),
+                  )
+                : SizedBox.expand(child: art);
+            return AnimatedBuilder(
+              animation: _drift,
+              builder: (context, child) => Transform.scale(
+                scale: 1.02 + 0.03 * Curves.easeInOut.transform(_drift.value),
+                alignment: Alignment.topCenter,
+                child: child,
+              ),
+              child: scene,
+            );
+          },
+        ),
       ),
     );
   }
@@ -166,11 +185,12 @@ class SeasonFall extends StatefulWidget {
   State<SeasonFall> createState() => _SeasonFallState();
 }
 
-class _SeasonFallState extends State<SeasonFall> with SingleTickerProviderStateMixin {
+class _SeasonFallState extends State<SeasonFall>
+    with SingleTickerProviderStateMixin, AmbientMotionState {
   late final AnimationController _fall = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 14),
-  )..repeat();
+  );
 
   @override
   void dispose() {
@@ -180,8 +200,13 @@ class _SeasonFallState extends State<SeasonFall> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.of(context).disableAnimations) return const SizedBox.shrink();
+    if (MediaQuery.disableAnimationsOf(context)) return const SizedBox.shrink();
+    syncAmbient(_fall);
     final season = SeasonX.now;
+    return RepaintBoundary(child: _falling(season));
+  }
+
+  Widget _falling(Season season) {
     return AnimatedBuilder(
       animation: _fall,
       builder: (context, _) {
@@ -211,8 +236,16 @@ class _SeasonFallState extends State<SeasonFall> with SingleTickerProviderStateM
       child: Transform.rotate(
         angle: t * 4 + i,
         child: Container(
-          width: winter ? 6 : summer ? 7 : 9,
-          height: winter ? 6 : summer ? 7 : 12,
+          width: winter
+              ? 6
+              : summer
+              ? 7
+              : 9,
+          height: winter
+              ? 6
+              : summer
+              ? 7
+              : 12,
           decoration: BoxDecoration(
             color: season.bit.withValues(alpha: winter ? 0.9 : 0.75),
             borderRadius: BorderRadius.circular(winter || summer ? 20 : 8),

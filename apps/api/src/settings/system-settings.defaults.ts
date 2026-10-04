@@ -511,6 +511,8 @@ export type HrStaffSettings = {
   stageFace: boolean;
   stageEmotionEyes: boolean;
   stageEmotionSmile: boolean;
+  /** Phone liveness head turns: 4 = left/right/up/down, 8 = also the diagonals */
+  livenessDirections: 4 | 8;
   // requests
   allowAbsenceRequests: boolean;
   absenceRequestState: boolean;
@@ -555,6 +557,7 @@ export const DEFAULT_HR_STAFF_SETTINGS: HrStaffSettings = {
   stageFace: true,
   stageEmotionEyes: true,
   stageEmotionSmile: true,
+  livenessDirections: 8,
   allowAbsenceRequests: true,
   absenceRequestState: false,
   allowScheduleChangeRequests: true,
@@ -757,6 +760,8 @@ export function mergeSystemSettings(raw: unknown): SystemSettings {
     DEFAULT_HR_STAFF_SETTINGS as unknown as Record<string, unknown>,
     partial.hrStaff,
   ) as unknown as HrStaffSettings;
+  merged.hrStaff.livenessDirections =
+    Number(merged.hrStaff.livenessDirections) === 4 ? 4 : 8;
   merged.timepad = mergeObj(
     DEFAULT_TIMEPAD_SETTINGS as unknown as Record<string, unknown>,
     partial.timepad,

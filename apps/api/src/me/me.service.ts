@@ -31,6 +31,7 @@ import {
   MeGpsCheckDto,
   MeGpsPunchDto,
   MeLocationIntegrityDto,
+  MeFaceVerifyDto,
   MeMobilePunchDto,
   MeMockLocationReportDto,
   MeQrPunchDto,
@@ -539,6 +540,23 @@ export class MeService {
     return result;
   }
 
+  async faceReference(user: AuthUser) {
+    const { tenantId, employee } = await this.requireEmployee(user);
+    return this.attendance.faceReference(tenantId, employee.id);
+  }
+
+  async verifyFace(user: AuthUser, dto: MeFaceVerifyDto) {
+    const { tenantId, employee } = await this.requireEmployee(user);
+    const selfie = stripDataUrl(dto.selfieBase64);
+    if (!selfie) throw new BadRequestException('Selfi topilmadi');
+    return this.attendance.verifyFaceAttempt(
+      tenantId,
+      employee.id,
+      dto.direction === 'IN' ? PunchDirection.IN : PunchDirection.OUT,
+      selfie,
+    );
+  }
+
   /**
    * Fake-GPS detected on the phone: warn the employee and alert HR.
    * HR alerts are throttled to one per employee per 10 minutes.
@@ -599,19 +617,20 @@ export class MeService {
     return { ok: true, blocked: true, message: MOCK_LOCATION_WARNING };
   }
 
-  /** Pre-flight for the app: is this point inside a geofence (comment needed?). */
+  /**
+   * Pre-flight for the app before a phone punch: is this point inside a geofence
+   * (comment needed?) and how many head-turn directions the liveness check uses.
+   */
   async checkGps(user: AuthUser, dto: MeGpsCheckDto) {
     const { tenantId } = await this.requireEmployee(user);
-    const fence = await this.attendance.resolveGeofence(
-      tenantId,
-      dto.latitude,
-      dto.longitude,
-      dto.locationId,
-    );
+    const [fence, livenessDirections] = await Promise.all([
+      this.attendance.resolveGeofence(tenantId, dto.latitude, dto.longitude, dto.locationId),
+      this.attendance.livenessDirections(tenantId),
+    ]);
     if (!fence) {
-      return { configured: false, inside: false, commentRequired: false };
+      return { configured: false, inside: false, commentRequired: false, livenessDirections };
     }
-    return { configured: true, ...fence, commentRequired: !fence.inside };
+    return { configured: true, ...fence, commentRequired: !fence.inside, livenessDirections };
   }
 
   async punchQr(user: AuthUser, dto: MeQrPunchDto) {

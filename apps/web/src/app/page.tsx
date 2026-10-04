@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch, setSession, Session } from '@/lib/api';
@@ -15,7 +15,25 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [shake, setShake] = useState(0);
+  const cardRef = useRef<HTMLFormElement>(null);
+
+  // Shakes the card in place: remounting it would replay the fade-in of every field,
+  // and a throttled tab can leave them stuck at opacity 0.
+  function shakeCard() {
+    const card = cardRef.current;
+    if (!card || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    card.animate(
+      [
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-8px)' },
+        { transform: 'translateX(8px)' },
+        { transform: 'translateX(-5px)' },
+        { transform: 'translateX(4px)' },
+        { transform: 'translateX(0)' },
+      ],
+      { duration: 450, easing: 'linear' },
+    );
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,7 +49,7 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось выполнить вход. Проверьте данные.');
-      setShake((n) => n + 1);
+      shakeCard();
     } finally {
       setLoading(false);
     }
@@ -72,8 +90,8 @@ export default function LoginPage() {
         </header>
 
         <form
-          key={shake}
-          className={`${styles.card} ${error ? styles.cardShake : ''}`}
+          ref={cardRef}
+          className={styles.card}
           onSubmit={onSubmit}
           noValidate
         >
