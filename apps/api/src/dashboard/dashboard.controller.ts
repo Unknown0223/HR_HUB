@@ -22,6 +22,7 @@ export class DashboardController {
     @Query('scheduleIds') scheduleIds?: string | string[],
     @Query('gradeIds') gradeIds?: string | string[],
     @Query('locationIds') locationIds?: string | string[],
+    @Query('include') include?: string,
   ) {
     return this.dashboard.stats(this.dashboard.requireTenant(tenantId), {
       date,
@@ -30,6 +31,7 @@ export class DashboardController {
       scheduleIds,
       gradeIds,
       locationIds,
+      includeDistance: (include ?? '').split(',').includes('distance'),
     });
   }
 }

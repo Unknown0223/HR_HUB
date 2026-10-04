@@ -264,6 +264,8 @@ export class UpdateEmployeeContactsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() phoneExtra?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() emailCorp?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() fax?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() site?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() regionId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() street?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() house?: string;

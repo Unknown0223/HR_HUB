@@ -236,3 +236,10 @@ export function polylineM(coords: LatLng[]): number {
   }
   return m;
 }
+
+/** Distance travelled without road snapping: jitter at stops and silent gaps are not counted. */
+export function trackDistanceM(points: RawPoint[]): number {
+  const { points: compact } = collapseStops(cleanTrack(points));
+  const { runs } = splitAtGaps(compact);
+  return Math.round(runs.reduce((sum, run) => sum + polylineM(run.map((p) => [p.lat, p.lng])), 0));
+}

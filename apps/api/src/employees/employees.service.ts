@@ -929,6 +929,8 @@ export class EmployeesService {
       note: (p.note as string) || null,
       phoneExtra: (p.phoneExtra as string) || null,
       emailCorp: (p.emailCorp as string) || emp.email || null,
+      fax: (p.fax as string) || null,
+      site: (p.site as string) || null,
       street: (p.street as string) || null,
       house: (p.house as string) || null,
       apartment: (p.apartment as string) || null,
@@ -1653,6 +1655,8 @@ export class EmployeesService {
     if (dto.email !== undefined) push('E-mail', emp.email, dto.email);
     if (dto.emailCorp !== undefined)
       push('Корпоративный E-mail', extras.emailCorp, dto.emailCorp);
+    if (dto.fax !== undefined) push('Факс', extras.fax, dto.fax);
+    if (dto.site !== undefined) push('Сайт', extras.site, dto.site);
     if (dto.street !== undefined) push('Улица', extras.street, dto.street);
     if (dto.house !== undefined) push('Дом', extras.house, dto.house);
     if (dto.apartment !== undefined)
@@ -1702,6 +1706,8 @@ export class EmployeesService {
     await this.upsertProfileExtras(tenantId, employeeId, {
       phoneExtra: dto.phoneExtra ?? extras.phoneExtra,
       emailCorp: dto.emailCorp ?? extras.emailCorp,
+      fax: dto.fax ?? extras.fax,
+      site: dto.site ?? extras.site,
       street: dto.street ?? extras.street,
       house: dto.house ?? extras.house,
       apartment: dto.apartment ?? extras.apartment,

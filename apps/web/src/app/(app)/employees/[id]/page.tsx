@@ -437,6 +437,8 @@ type Detail = {
     note?: string | null;
     phoneExtra?: string | null;
     emailCorp?: string | null;
+    fax?: string | null;
+    site?: string | null;
     street?: string | null;
     house?: string | null;
     apartment?: string | null;
@@ -1143,6 +1145,8 @@ export default function EmployeeDetailPage() {
     phoneExtra: '',
     email: '',
     emailCorp: '',
+    fax: '',
+    site: '',
     regionId: '',
     street: '',
     house: '',
@@ -1673,6 +1677,8 @@ export default function EmployeeDetailPage() {
       phoneExtra: row.profileExtras?.phoneExtra || '',
       email: row.email || row.person?.email || '',
       emailCorp: row.profileExtras?.emailCorp || row.email || '',
+      fax: row.profileExtras?.fax || '',
+      site: row.profileExtras?.site || '',
       regionId: row.region?.id || '',
       street: row.profileExtras?.street || '',
       house: row.profileExtras?.house || '',
@@ -4697,6 +4703,18 @@ export default function EmployeeDetailPage() {
                         <label>Корпоративный E-mail</label>
                         <div className={styles.fieldValue}>
                           {row.profileExtras?.emailCorp || row.email || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Факс</label>
+                        <div className={styles.fieldValue}>
+                          {row.profileExtras?.fax || '—'}
+                        </div>
+                      </div>
+                      <div className={styles.field}>
+                        <label>Сайт</label>
+                        <div className={styles.fieldValue}>
+                          {row.profileExtras?.site || '—'}
                         </div>
                       </div>
                       <div className={styles.field}>
@@ -12389,6 +12407,27 @@ export default function EmployeeDetailPage() {
                         emailCorp: e.target.value,
                       }))
                     }
+                  />
+                </div>
+              </div>
+              <div className={styles.modalRow2}>
+                <div className={styles.modalField}>
+                  <label>Факс</label>
+                  <input
+                    value={contactsForm.fax}
+                    onChange={(e) =>
+                      setContactsForm((f) => ({ ...f, fax: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className={styles.modalField}>
+                  <label>Сайт</label>
+                  <input
+                    value={contactsForm.site}
+                    onChange={(e) =>
+                      setContactsForm((f) => ({ ...f, site: e.target.value }))
+                    }
+                    placeholder="https://…"
                   />
                 </div>
               </div>

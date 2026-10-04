@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DayStatus, EmploymentStatus, Prisma, RequestStatus } from '@prisma/client';
+import { DayStatus, EmploymentStatus, Prisma, RequestStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { minutesOfDay } from '../attendance/attendance-day';
+import { trackDistanceM, type RawPoint } from '../tracking/track-geometry';
 import { dayMetrics } from './day-metrics';
 
 /** Railway/API often runs in UTC — always show org local time (Tashkent). */
@@ -73,7 +74,34 @@ export type DashboardStatsFilters = {
   scheduleIds?: string | string[];
   gradeIds?: string | string[];
   locationIds?: string | string[];
+  /** Day GPS distance needs every track point of the day, so it is only computed on request. */
+  includeDistance?: boolean;
 };
+
+const ROLE_LABELS: Record<Role, string> = {
+  platform_admin: 'Администратор платформы',
+  tenant_admin: 'Администратор',
+  hr: 'HR-менеджер',
+  manager: 'Руководитель',
+  employee: 'Сотрудник',
+};
+
+type ProfileExtrasRow = {
+  employeeId: string;
+  inn: string | null;
+  inps: string | null;
+  address: string | null;
+  registeredAddress: string | null;
+  extraCode: string | null;
+  fax: string | null;
+  site: string | null;
+  login: string | null;
+  fingerprints: number | null;
+};
+
+function textOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
 
 @Injectable()
 export class DashboardService {
@@ -274,6 +302,7 @@ export class DashboardService {
         tabNumber: true,
         email: true,
         phone: true,
+        telegramUsername: true,
         status: true,
         employmentType: true,
         hiredAt: true,
@@ -293,45 +322,130 @@ export class DashboardService {
           select: {
             birthDate: true,
             gender: true,
+            pinfl: true,
+            inn: true,
+            inps: true,
+            code: true,
+            addressResidence: true,
+            addressRegistration: true,
           },
+        },
+        bankAccounts: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          take: 1,
+          select: { accountNumber: true },
         },
         faceProfile: { select: { photoUrl: true, photoKey: true } },
-        marks: {
-          where: { occurredAt: { gte: markFrom, lt: markTo } },
-          orderBy: { occurredAt: 'asc' },
-          take: 1,
-          select: {
-            device: { select: { location: { select: { name: true } } } },
-          },
-        },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
+    const empIds = employees.map((e) => e.id);
     const dayMarkWhere: Prisma.AttendanceMarkWhereInput = {
       tenantId,
       occurredAt: { gte: markFrom, lt: markTo },
-      employeeId: { in: employees.map((e) => e.id) },
+      employeeId: { in: empIds },
     };
-    const [markCounts, lastMarks] = employees.length
+    // App/GPS marks have no device: their geofence name lives in raw_payload.
+    const markLocations = (order: Prisma.Sql) =>
+      this.prisma.$queryRaw<{ employeeId: string; location: string | null }[]>`
+        SELECT DISTINCT ON (m.employee_id) m.employee_id AS "employeeId",
+               COALESCE(l.name, m.raw_payload->>'locationName') AS location
+        FROM attendance_marks m
+        LEFT JOIN devices d ON d.id = m.device_id
+        LEFT JOIN locations l ON l.id = d.location_id
+        WHERE m.tenant_id = ${tenantId}::uuid
+          AND m.employee_id = ANY(${empIds}::uuid[])
+          AND m.occurred_at >= ${markFrom} AND m.occurred_at < ${markTo}
+        ORDER BY m.employee_id, m.occurred_at ${order}`;
+    const [markCounts, firstLocs, lastLocs, extrasRows, users, trackPoints] = employees.length
       ? await Promise.all([
           this.prisma.attendanceMark.groupBy({
             by: ['employeeId'],
             where: dayMarkWhere,
             _count: { _all: true },
           }),
-          this.prisma.attendanceMark.findMany({
-            where: dayMarkWhere,
-            orderBy: [{ employeeId: 'asc' }, { occurredAt: 'desc' }],
-            distinct: ['employeeId'],
-            select: {
-              employeeId: true,
-              device: { select: { location: { select: { name: true } } } },
-            },
+          markLocations(Prisma.sql`ASC`),
+          markLocations(Prisma.sql`DESC`),
+          this.prisma.$queryRaw<ProfileExtrasRow[]>`
+            SELECT DISTINCT ON (employee_id) employee_id AS "employeeId",
+                   payload->>'inn' AS inn,
+                   payload->>'inps' AS inps,
+                   payload->>'address' AS address,
+                   payload->>'registeredAddress' AS "registeredAddress",
+                   payload->>'extraCode' AS "extraCode",
+                   payload->>'fax' AS fax,
+                   payload->>'site' AS site,
+                   payload->'userSettings'->>'login' AS login,
+                   CASE WHEN jsonb_typeof(payload->'fingerprints') = 'array'
+                        THEN jsonb_array_length(payload->'fingerprints') END AS fingerprints
+            FROM hr_documents
+            WHERE tenant_id = ${tenantId}::uuid
+              AND type = 'other' AND number = 'PROFILE_EXTRAS'
+              AND employee_id = ANY(${empIds}::uuid[])
+            ORDER BY employee_id, updated_at DESC`,
+          this.prisma.user.findMany({
+            where: { tenantId },
+            select: { email: true, role: true, isActive: true, meta: true },
           }),
+          filters.includeDistance
+            ? this.prisma.gpsTrackPoint.findMany({
+                where: { tenantId, employeeId: { in: empIds }, recordedAt: { gte: markFrom, lt: markTo } },
+                orderBy: { recordedAt: 'asc' },
+                select: {
+                  employeeId: true,
+                  latitude: true,
+                  longitude: true,
+                  recordedAt: true,
+                  accuracyM: true,
+                  speedMps: true,
+                },
+              })
+            : Promise.resolve([]),
         ])
-      : [[], []];
+      : [[], [], [], [], [], []];
     const marksByEmp = new Map(markCounts.map((m) => [m.employeeId, m._count._all]));
-    const lastMarkByEmp = new Map(lastMarks.map((m) => [m.employeeId, m]));
+    const firstLocByEmp = new Map(firstLocs.map((m) => [m.employeeId, m.location]));
+    const lastLocByEmp = new Map(lastLocs.map((m) => [m.employeeId, m.location]));
+    const extrasByEmp = new Map(extrasRows.map((x) => [x.employeeId, x]));
+
+    const userByEmpId = new Map<string, (typeof users)[number]>();
+    const userByEmail = new Map<string, (typeof users)[number]>();
+    for (const u of users) {
+      const meta = u.meta && typeof u.meta === 'object' && !Array.isArray(u.meta)
+        ? (u.meta as Record<string, unknown>)
+        : {};
+      if (typeof meta.employeeId === 'string') userByEmpId.set(meta.employeeId, u);
+      userByEmail.set(u.email.toLowerCase(), u);
+    }
+    const accountOf = (emp: { id: string; email: string | null }) => {
+      const u = userByEmpId.get(emp.id) ?? (emp.email ? userByEmail.get(emp.email.trim().toLowerCase()) : undefined);
+      if (!u) return null;
+      const meta = (u.meta ?? {}) as Record<string, unknown>;
+      const login = u.email.toLowerCase().endsWith('.local')
+        ? textOrNull(meta.login) ?? u.email.split('@')[0]
+        : u.email;
+      const level = ROLE_LABELS[u.role] ?? u.role;
+      return { login, accessLevel: u.isActive ? level : `${level} (заблокирован)` };
+    };
+
+    const pointsByEmp = new Map<string, RawPoint[]>();
+    for (const p of trackPoints) {
+      const list = pointsByEmp.get(p.employeeId) ?? [];
+      list.push({
+        lat: p.latitude,
+        lng: p.longitude,
+        at: p.recordedAt.getTime(),
+        accuracy: p.accuracyM,
+        speed: p.speedMps,
+      });
+      pointsByEmp.set(p.employeeId, list);
+    }
+    const distanceKm = (employeeId: string) => {
+      if (!filters.includeDistance) return null;
+      const points = pointsByEmp.get(employeeId);
+      return points ? Math.round(trackDistanceM(points) / 10) / 100 : null;
+    };
     const dayByEmp = new Map(days.map((d) => [d.employeeId, d]));
     const now = new Date();
     const viewingToday = toLocalYmd(today) === toLocalYmd(now);
@@ -379,8 +493,11 @@ export class DashboardService {
     for (const emp of employees) {
       const d = dayByEmp.get(emp.id);
       const status = (d?.status as DayStatus | undefined) ?? missingStatus;
-      const firstMark = emp.marks[0];
       const mgr = emp.division?.manager;
+      const extras = extrasByEmp.get(emp.id);
+      const account = accountOf(emp);
+      const fingerprintCount = extras?.fingerprints ?? 0;
+      const telegram = textOrNull(emp.telegramUsername)?.replace(/^@/, '');
       const row: Row = {
         employeeId: emp.id,
         id: emp.id,
@@ -407,23 +524,25 @@ export class DashboardService {
         hiredAt: emp.hiredAt ? toLocalYmd(emp.hiredAt) : null,
         birthDate: emp.person?.birthDate ? toLocalYmd(emp.person.birthDate) : null,
         gender: genderLabel(emp.person?.gender),
-        pinfl: null,
-        inn: null,
-        inps: null,
-        code: null,
-        addressResidence: null,
-        addressPostal: null,
-        bankAccount: null,
+        pinfl: textOrNull(emp.person?.pinfl),
+        inn: textOrNull(extras?.inn) ?? textOrNull(emp.person?.inn),
+        inps: textOrNull(extras?.inps) ?? textOrNull(emp.person?.inps),
+        code: textOrNull(emp.person?.code) ?? textOrNull(extras?.extraCode),
+        addressResidence:
+          textOrNull(extras?.address) ?? textOrNull(emp.person?.addressResidence),
+        addressPostal:
+          textOrNull(extras?.registeredAddress) ?? textOrNull(emp.person?.addressRegistration),
+        bankAccount: emp.bankAccounts[0]?.accountNumber || null,
         employmentType: employmentTypeLabel(emp.employmentType),
         workStatus: workStatusLabel(emp.status),
-        login: null,
-        telegram: null,
-        fax: null,
-        site: null,
-        fingerprints: null,
-        accessLevel: null,
-        arrivalLocation: firstMark?.device?.location?.name || null,
-        distanceKm: null,
+        login: account?.login ?? textOrNull(extras?.login),
+        telegram: telegram ? `@${telegram}` : null,
+        fax: textOrNull(extras?.fax),
+        site: textOrNull(extras?.site),
+        fingerprints: fingerprintCount > 0 ? `${fingerprintCount} из 10` : null,
+        accessLevel: account?.accessLevel ?? null,
+        arrivalLocation: firstLocByEmp.get(emp.id) || null,
+        distanceKm: distanceKm(emp.id),
         shiftStart: emp.schedule?.startTime ?? null,
         shiftEnd: emp.schedule?.endTime ?? null,
         lateMin: null,
@@ -459,7 +578,7 @@ export class DashboardService {
       row.overtimeMin = metrics.overtimeMin;
       row.onSite = metrics.onSite;
       if (d?.lastOutAt) {
-        row.departureLocation = lastMarkByEmp.get(emp.id)?.device?.location?.name || null;
+        row.departureLocation = lastLocByEmp.get(emp.id) || null;
       }
 
       byStatus[status] = (byStatus[status] ?? 0) + 1;

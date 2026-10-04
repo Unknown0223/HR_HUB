@@ -12,6 +12,7 @@ import {
   splitAtGaps,
   splitByOffline,
   STOP_MIN_MS,
+  trackDistanceM,
   travelMode,
 } from './track-geometry';
 
@@ -138,5 +139,15 @@ describe('track geometry', () => {
       [5, 6, 7],
     ]);
     assert.deepEqual(chunk([1, 2], 3), [[1, 2]]);
+  });
+
+  it('measures the day distance without stop jitter or silent gaps', () => {
+    const walk = [pt(0, 0), pt(2, 0.005), pt(4, 0.01)];
+    assert.ok(Math.abs(trackDistanceM(walk) - 1112) < 15, 'about 1.1 km walked');
+    const jitter = [0, 1, 2, 3, 4, 5, 6, 7].map((m) => pt(10 + m, m % 2 ? 0.0102 : 0.0098));
+    assert.ok(Math.abs(trackDistanceM([...walk, ...jitter]) - trackDistanceM(walk)) < 5, 'standing still adds nothing');
+    const silent = pt(4 + GAP_MS / 60_000 + 1, 0.05);
+    assert.equal(trackDistanceM([...walk, silent]), trackDistanceM(walk), 'no line through a gap');
+    assert.equal(trackDistanceM([]), 0);
   });
 });

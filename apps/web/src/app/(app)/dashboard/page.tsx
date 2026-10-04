@@ -1022,12 +1022,22 @@ export default function DashboardPage() {
 
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const wantDistance =
+    tableColumns.includes('distanceKm') ||
+    sortRules.some((r) => r.key === 'distanceKm' && r.dir !== 'none') ||
+    String(gridApplied.params.distance ?? '').trim() !== '';
+  const wantDistanceRef = useRef(wantDistance);
+  wantDistanceRef.current = wantDistance;
+  const distanceRequested = useRef(false);
+
   const fetchStats = useCallback(async (f: FilterState) => {
     setLoading(true);
     setError(null);
     try {
       const p = new URLSearchParams();
       p.set('date', f.date);
+      distanceRequested.current = wantDistanceRef.current;
+      if (wantDistanceRef.current) p.set('include', 'distance');
       if (f.divisionIds.length) p.set('divisionIds', f.divisionIds.join(','));
       if (f.positionIds.length) p.set('positionIds', f.positionIds.join(','));
       if (f.scheduleIds.length) p.set('scheduleIds', f.scheduleIds.join(','));
@@ -1090,6 +1100,14 @@ export default function DashboardPage() {
   }, [applied, fetchStats, fetchOptions]);
 
   useEffect(() => {
+    if (wantDistance && initialParallelDone.current && !distanceRequested.current) {
+      void fetchStats(applied);
+    }
+    // Refetch only when the distance column/filter is switched on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantDistance]);
+
+  useEffect(() => {
     function onDown(e: MouseEvent) {
       const t = e.target as HTMLElement;
       if (menuRef.current && !menuRef.current.contains(t)) setMenuOpen(false);
@@ -1144,9 +1162,14 @@ export default function DashboardPage() {
     if (quickFilter !== 'all') arr = arr.filter((r) => rowBucket(r) === quickFilter);
     const q = search.trim().toLowerCase();
     if (q) {
+      const qDigits = q.replace(/\D/g, '');
       arr = arr.filter((r) => {
         const keys = searchFields.length ? searchFields : (['fullName'] as EmployeeFieldKey[]);
-        return keys.some((k) => cellValue(r, k, statusLabelFn).toLowerCase().includes(q));
+        return keys.some((k) => {
+          const value = cellValue(r, k, statusLabelFn).toLowerCase();
+          if (value.includes(q)) return true;
+          return k === 'phone' && qDigits.length >= 3 && value.replace(/\D/g, '').includes(qDigits);
+        });
       });
     }
     if (isGridActive(gridApplied)) arr = arr.filter((r) => matchesGrid(r, gridApplied));
