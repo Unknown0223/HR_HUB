@@ -205,9 +205,13 @@ export const UZ: Record<string, string> = {
   'Удалить': 'O‘chirish',
   'Удалить уведомление': 'Bildirishnomani o‘chirish',
   'Профиль': 'Profil',
-  'Оставить отзыв': 'Fikr qoldirish',
   'Изменить пароль': 'Parolni o‘zgartirish',
-  'Мобильная версия': 'Mobil versiya',
+  'Аккаунт': 'Akkaunt',
+  'Интерфейс': 'Interfeys',
+  'Удалит сохранённые на этом компьютере настройки таблиц, фильтры и шаблоны':
+    'Bu kompyuterda saqlangan jadval sozlamalari, filtrlar va shablonlar o‘chiriladi',
+  'Выйти и удалить с этого компьютера сохранённые настройки таблиц, фильтры и шаблоны?':
+    'Chiqib, bu kompyuterdagi saqlangan jadval sozlamalari, filtrlar va shablonlarni o‘chirasizmi?',
   'Режим экрана': 'Ekran rejimi',
   'Светлый': 'Yorug‘',
   'Тёмный': 'Qorong‘i',

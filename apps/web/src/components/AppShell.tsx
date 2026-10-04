@@ -52,6 +52,14 @@ const BOTTOM_SHORTCUTS: { section: NavSectionId; label: string }[] = [
   { section: 'reports', label: 'Отчёты' },
 ];
 
+const ROLE_LABEL: Record<string, string> = {
+  platform_admin: 'Администратор платформы',
+  tenant_admin: 'Администратор',
+  hr: 'HR-менеджер',
+  manager: 'Руководитель',
+  employee: 'Сотрудник',
+};
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '?';
@@ -100,6 +108,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [openSections, setOpenSections] = useState<NavSectionId[]>([]);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const profileWrapRef = useRef<HTMLDivElement>(null);
+  const canOpenSettings = !access || access.bypass || isHrefAllowed('/settings', '', access.allowed, false);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!profileWrapRef.current?.contains(e.target as Node)) setProfileOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [profileOpen]);
 
   useLayoutEffect(() => {
     try {
@@ -534,11 +553,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     router.replace('/');
   }
 
-  function toggleScreenMode() {
+  function toggleScreenMode(closeMenu = true) {
     const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
     setThemeMode(next);
     applyTheme(next);
-    setProfileOpen(false);
+    if (closeMenu) setProfileOpen(false);
   }
 
   function closePasswordModal() {
@@ -655,7 +674,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               title={themeMode === 'light' ? t('Тёмная тема') : t('Светлая тема')}
               aria-label={themeMode === 'light' ? t('Тёмная тема') : t('Светлая тема')}
               aria-pressed={themeMode === 'dark'}
-              onClick={toggleScreenMode}
+              onClick={() => toggleScreenMode()}
             >
               <i className={`fas ${themeMode === 'light' ? 'fa-moon' : 'fa-sun'}`} aria-hidden />
             </button>
@@ -896,7 +915,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             </div>
             </div>
 
-            <div className={styles.profileWrap}>
+            <div className={styles.profileWrap} ref={profileWrapRef}>
               <button
                 type="button"
                 className={styles.profileBtn}
@@ -920,29 +939,32 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               {profileOpen ? (
                 <div className={styles.profileMenu} role="menu">
                   <div className={styles.profileMenuHead}>
-                    <strong>{session.user.fullName}</strong>
-                    <span>
-                      {session.tenant?.name || session.user.email || t('Организация')}
+                    <span className={styles.profileMenuAvatar}>
+                      {initials(session.user.fullName)}
                     </span>
+                    <div className={styles.profileMenuWho}>
+                      <strong title={session.user.fullName}>{session.user.fullName}</strong>
+                      {session.user.email ? (
+                        <span title={session.user.email}>{session.user.email}</span>
+                      ) : null}
+                      <div className={styles.profileMenuChips}>
+                        <span className={styles.profileChipRole}>
+                          {t(ROLE_LABEL[session.user.role] ?? session.user.role)}
+                        </span>
+                        {session.tenant?.name ? (
+                          <span className={styles.profileChip} title={session.tenant.name}>
+                            <i className="fas fa-building" aria-hidden />
+                            {session.tenant.name}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                  <Link
-                    href="/settings"
-                    className={styles.dropItemLink}
-                    onClick={() => setProfileOpen(false)}
-                  >
-                    <i className="fas fa-user" aria-hidden />
-                    {t('Профиль')}
-                  </Link>
-                  <a
-                    className={styles.dropItemLink}
-                    href="mailto:support@hrhub.local?subject=Отзыв%20HR%20HUB"
-                    onClick={() => setProfileOpen(false)}
-                  >
-                    <i className="fas fa-comment-dots" aria-hidden />
-                    {t('Оставить отзыв')}
-                  </a>
+
+                  <div className={styles.profileMenuSection}>{t('Аккаунт')}</div>
                   <button
                     type="button"
+                    role="menuitem"
                     className={styles.dropItem}
                     onClick={() => {
                       setProfileOpen(false);
@@ -953,41 +975,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     <i className="fas fa-key" aria-hidden />
                     {t('Изменить пароль')}
                   </button>
-                  <Link
-                    href="/m"
-                    className={styles.dropItemLink}
-                    onClick={() => setProfileOpen(false)}
-                  >
-                    <i className="fas fa-mobile-alt" aria-hidden />
-                    {t('Мобильная версия')}
-                  </Link>
                   <button
                     type="button"
-                    className={styles.dropItem}
-                    onClick={toggleScreenMode}
-                  >
-                    <i
-                      className={`fas ${themeMode === 'light' ? 'fa-moon' : 'fa-sun'}`}
-                      aria-hidden
-                    />
-                    {t('Режим экрана')}
-                    <span className={styles.dropHint}>
-                      {themeMode === 'light' ? t('Светлый') : t('Тёмный')}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.dropItem}
-                    onClick={() => setLang(lang === 'ru' ? 'uz' : 'ru')}
-                  >
-                    <i className="fas fa-language" aria-hidden />
-                    {t('Язык интерфейса')}
-                    <span className={styles.dropHint}>
-                      {LANGS.find((l) => l.id === lang)?.label}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
+                    role="menuitem"
                     className={styles.dropItem}
                     onClick={() => {
                       setProfileOpen(false);
@@ -997,15 +987,71 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     <i className="fas fa-lock" aria-hidden />
                     {t('Блокировка экрана')}
                   </button>
+                  {canOpenSettings ? (
+                    <Link
+                      href="/settings"
+                      role="menuitem"
+                      className={styles.dropItemLink}
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <i className="fas fa-cog" aria-hidden />
+                      {t('Настройки системы')}
+                    </Link>
+                  ) : null}
+
+                  <div className={styles.profileMenuSection}>{t('Интерфейс')}</div>
+                  <div className={styles.profilePrefRow}>
+                    <div className={styles.segmented} role="group" aria-label={t('Режим экрана')}>
+                      {(['light', 'dark'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={themeMode === mode}
+                          className={themeMode === mode ? styles.segmentedOn : undefined}
+                          onClick={() => {
+                            if (themeMode !== mode) toggleScreenMode(false);
+                          }}
+                        >
+                          <i className={`fas ${mode === 'light' ? 'fa-sun' : 'fa-moon'}`} aria-hidden />
+                          {mode === 'light' ? t('Светлый') : t('Тёмный')}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={styles.segmented} role="group" aria-label={t('Язык интерфейса')}>
+                      {LANGS.map((l) => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          aria-pressed={lang === l.id}
+                          title={l.label}
+                          className={lang === l.id ? styles.segmentedOn : undefined}
+                          onClick={() => setLang(l.id)}
+                        >
+                          {l.short}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className={styles.profileMenuSep} />
-                  <button type="button" className={styles.logout} onClick={logout}>
+                  <button type="button" role="menuitem" className={styles.logout} onClick={logout}>
                     <i className="fas fa-sign-out-alt" aria-hidden />
                     {t('Выйти')}
                   </button>
                   <button
                     type="button"
+                    role="menuitem"
                     className={styles.logoutDanger}
-                    onClick={logoutForgetDevice}
+                    title={t('Удалит сохранённые на этом компьютере настройки таблиц, фильтры и шаблоны')}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          t('Выйти и удалить с этого компьютера сохранённые настройки таблиц, фильтры и шаблоны?'),
+                        )
+                      ) {
+                        logoutForgetDevice();
+                      }
+                    }}
                   >
                     <i className="fas fa-unlink" aria-hidden />
                     {t('Выйти и забыть устройство')}
