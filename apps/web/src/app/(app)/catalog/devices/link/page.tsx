@@ -131,7 +131,7 @@ export default function DeviceLinkPage() {
       const m = cd.match(/filename="?([^"]+)"?/i);
       const filename =
         m?.[1] ||
-        `HRHUB-Link-${bind?.tenantCode || 'bind'}-bind.zip`;
+        `Worklyn-Link-${bind?.tenantCode || 'bind'}-bind.zip`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -177,7 +177,7 @@ export default function DeviceLinkPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'HRHUB-Link-Android.apk';
+      a.download = 'Worklyn-Link-Android.apk';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -323,7 +323,7 @@ export default function DeviceLinkPage() {
               title={
                 bind?.androidApkAvailable === false
                   ? 'Serverda Android APK hali yo‘q'
-                  : 'Android uchun HRHUB-Link APK'
+                  : 'Android uchun Worklyn Link APK'
               }
             >
               {apkBusy
@@ -336,11 +336,10 @@ export default function DeviceLinkPage() {
           <p className={styles.muted} style={{ marginTop: '0.75rem' }}>
             {bind?.fullPackageAvailable ? (
               <>
-                Windows: <code>HRHUB-Qurilma.exe</code> + shu webga
+                Windows: <code>Worklyn-Link-Setup.exe</code> + shu webga
                 moslashtirilgan <code>config.json</code> /{' '}
-                <code>connection.hrhub</code>. Ochib{' '}
-                <code>BOSHLASH.bat</code> ni ishga tushiring — pairing token
-                bilan Ulash.
+                <code>connection.hrhub</code>. Zipni oching, Setup ni ishga
+                tushiring — o‘rnatilgach pairing token bilan Ulash.
               </>
             ) : (
               <>

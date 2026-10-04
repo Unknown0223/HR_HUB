@@ -4583,11 +4583,11 @@ export class AttendanceService {
       `Tenant: ${bind.tenantCode}${bind.tenantName ? ` (${bind.tenantName})` : ''}`,
       '',
       'Qanday o‘rnatish:',
-      '1) HRHUB-Link-Setup.exe ni ishga tushiring.',
+      '1) Worklyn-Link-Setup.exe ni ishga tushiring.',
       '2) Shartlarga «Roziman» bosing, papkani tanlang, O‘rnatish.',
       '3) Setup yonidagi config.json va connection.hrhub avtomatik',
       '   o‘rnatilgan papkaga ko‘chiriladi (shu webga bog‘lanadi).',
-      '4) Ilovani oching в†’ Web dan pairing token в†’ Ulash.',
+      '4) Ilovani oching → Web dan pairing token → Ulash.',
       '',
       'Zipda endi yuzlab fayl YO‘Q — faqat Setup + bog‘lash fayllari.',
       '',
@@ -4608,7 +4608,7 @@ export class AttendanceService {
           'Worklyn Link — Setup ni ishga tushirib shartlarga rozilik bering.\n';
       }
       const zip = buildStoreZip([
-        { name: 'HRHUB-Link-Setup.exe', content: setup.buf },
+        { name: 'Worklyn-Link-Setup.exe', content: setup.buf },
         { name: 'config.json', content: configText },
         { name: 'connection.hrhub', content: connectionText },
         { name: 'OQISH.txt', content: setupReadme },
@@ -4616,7 +4616,7 @@ export class AttendanceService {
       ]);
       return {
         zip,
-        filename: `HRHUB-Link-${safeTenant}-Setup.zip`,
+        filename: `Worklyn-Link-${safeTenant}-Setup.zip`,
         bind,
         mode: 'setup' as const,
       };
@@ -4650,7 +4650,7 @@ export class AttendanceService {
       });
       return {
         zip,
-        filename: `HRHUB-Link-${safeTenant}-portable.zip`,
+        filename: `Worklyn-Link-${safeTenant}-portable.zip`,
         bind,
         mode: 'full' as const,
       };
@@ -4696,7 +4696,7 @@ export class AttendanceService {
     const zip = buildStoreZip(files);
     return {
       zip,
-      filename: `HRHUB-Link-${safeTenant}-bind.zip`,
+      filename: `Worklyn-Link-${safeTenant}-bind.zip`,
       bind,
       mode: 'config-only' as const,
     };

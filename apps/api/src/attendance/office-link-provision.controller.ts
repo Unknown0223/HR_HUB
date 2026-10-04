@@ -126,7 +126,7 @@ export class OfficeLinkProvisionController {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="HRHUB-Link-Android.apk"',
+      'attachment; filename="Worklyn-Link-Android.apk"',
     );
     res.setHeader('Content-Length', String(apk.buf.length));
     res.send(apk.buf);
