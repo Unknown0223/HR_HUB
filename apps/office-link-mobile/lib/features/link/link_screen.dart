@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/brand/worklyn_mark.dart';
 import '../../core/config/app_config.dart';
 import '../../core/device/hikvision_client.dart';
 import '../../core/security/auth_lock.dart';
@@ -852,13 +853,23 @@ class _LinkScreenState extends ConsumerState<LinkScreen> {
         }
         return Scaffold(
           appBar: AppBar(
-            title: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            titleSpacing: 12,
+            title: const Row(
               children: [
-                Text('Worklyn Link', style: TextStyle(fontWeight: FontWeight.w700)),
-                Text(
-                  'Ofis Face ID terminalini platformaga ulash',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+                WorklynMark(size: 34),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Worklyn Link', style: TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                        'Ofis Face ID terminalini platformaga ulash',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

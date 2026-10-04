@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
-from paths import bound_web_label, find_root, load_config, read_pairing_token, read_tunnel_url
+from paths import app_icon_names, bound_web_label, find_root, load_config, read_pairing_token, read_tunnel_url
 from session import OfficeLinkSession, SubmitResult
 from auth_lock import CONFIRM, LOCKED
 
@@ -1294,9 +1294,9 @@ def run_desktop() -> None:
     api = LinkApi(holder)
     icon = None
     for cand in (
-        Path(sys.executable).resolve().parent / "hrhub-link.ico",
-        find_root() / "hrhub-link.ico",
-        Path(__file__).resolve().parent / "hrhub-link.ico",
+        base / name
+        for base in (Path(sys.executable).resolve().parent, find_root(), Path(__file__).resolve().parent)
+        for name in app_icon_names("ico")
     ):
         if cand.is_file():
             icon = str(cand)

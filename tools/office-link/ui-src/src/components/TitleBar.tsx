@@ -1,17 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { WorklynMark } from "./icons";
 
 function AppIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="1" y="1" width="14" height="14" rx="3.5" fill="#1E3A5F" />
-      <path
-        d="M4.5 11.5v-7M4.5 8h3.5M8 11.5v-7"
-        stroke="#fff"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <circle cx="11.5" cy="8" r="1.4" fill="#5EB0FF" />
-    </svg>
+    <WorklynMark size={16} id="wl-title" />
   );
 }
 

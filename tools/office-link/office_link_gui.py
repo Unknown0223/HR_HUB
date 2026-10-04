@@ -10,7 +10,7 @@ from tkinter import messagebox, ttk
 
 from auth_lock import CONFIRM, LOCKED
 from discovery import OFFLINE, OK, TIMEOUT, UNAUTHORIZED
-from paths import find_root, read_link_key, read_pairing_token
+from paths import app_icon_names, find_root, read_link_key, read_pairing_token
 from session import RECONNECT_STEPS, OfficeLinkSession, SubmitResult
 
 TITLE = "Worklyn Link"
@@ -69,11 +69,11 @@ def _resource_path(*names: str) -> Path | None:
 
 
 def _icon_path() -> Path | None:
-    return _resource_path("hrhub-link.ico")
+    return _resource_path(*app_icon_names("ico"))
 
 
 def _png_icon_path() -> Path | None:
-    return _resource_path("hrhub-link-256.png")
+    return _resource_path(*app_icon_names("png"))
 
 
 def _set_app_user_model_id() -> None:

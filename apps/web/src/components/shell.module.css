@@ -83,19 +83,12 @@
 }
 
 .brandMark {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  background: var(--surface);
-  border: none;
-  color: #1f6f3a;
-  font-family: var(--font-body);
-  font-weight: 800;
-  font-size: 0.78rem;
-  margin: 0;
-  box-shadow: 0 6px 16px -6px rgba(21, 32, 24, 0.35);
+  display: block;
+  flex-shrink: 0;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.55),
+    0 6px 16px -6px rgba(21, 32, 24, 0.45);
 }
 
 .brandText {

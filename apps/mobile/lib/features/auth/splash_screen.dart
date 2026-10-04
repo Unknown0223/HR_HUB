@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../core/brand/worklyn_mark.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../lock/pin_widgets.dart';
@@ -127,28 +128,20 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 scale: pop,
                 child: Transform.rotate(
                   angle: (1 - pop) * -0.5,
-                  child: Container(
-                    width: size,
-                    height: size,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(size * 0.3),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.headerTop, AppColors.headerBottom, _deepGreen],
-                        stops: [0, 0.6, 1],
+                  child: Transform.translate(
+                    offset: Offset(0, math.sin(_loop.value * math.pi * 2) * 3),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(size * 18 / 64),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.4),
+                            blurRadius: 28,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.4),
-                          blurRadius: 28,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Transform.translate(
-                      offset: Offset(0, math.sin(_loop.value * math.pi * 2) * 3),
-                      child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 60),
+                      child: const WorklynMark(size: size),
                     ),
                   ),
                 ),

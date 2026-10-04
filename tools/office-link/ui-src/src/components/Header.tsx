@@ -1,4 +1,4 @@
-import { DeviceIcon, LinkIcon, CheckIcon } from "./icons";
+import { DeviceIcon, CheckIcon, WorklynMark } from "./icons";
 import type { StatusPayload } from "../bridge/linkApi";
 
 export function Header({
@@ -20,8 +20,8 @@ export function Header({
       <div className="pointer-events-none absolute -right-2 top-10 h-24 w-24 rounded-full border-[14px] border-white/[0.04]" />
 
       <div className="relative flex items-start gap-3.5">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
-          <LinkIcon width={22} height={22} strokeWidth={1.4} />
+        <div className="shrink-0 rounded-[13px] shadow-[0_6px_16px_-6px_rgba(0,0,0,0.55)] ring-1 ring-white/20">
+          <WorklynMark size={44} id="wl-header" />
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Worklyn Link</h1>

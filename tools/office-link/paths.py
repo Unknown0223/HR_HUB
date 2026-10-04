@@ -3,7 +3,21 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import date
 from pathlib import Path
+
+
+def season_name(today: date | None = None) -> str:
+    """Calendar season: Mar–May spring, Jun–Aug summer, Sep–Nov autumn, Dec–Feb winter."""
+    month = (today or date.today()).month
+    return ("winter", "spring", "summer", "autumn")[(month % 12) // 3]
+
+
+def app_icon_names(kind: str = "ico") -> tuple[str, str]:
+    """Window icon for the current season first, then the base icon."""
+    if kind == "png":
+        return (f"hrhub-link-{season_name()}-256.png", "hrhub-link-256.png")
+    return (f"hrhub-link-{season_name()}.ico", "hrhub-link.ico")
 
 
 def find_root() -> Path:

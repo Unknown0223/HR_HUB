@@ -31,6 +31,7 @@ import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
 import { applyTheme, storedTheme, type ThemeMode } from '@/lib/theme';
 import { I18nProvider, LANGS, useI18n } from '@/lib/i18n';
 import { SidebarNav } from './SidebarNav';
+import { BrandMark } from './BrandMark';
 import { formatDateTime, NotificationPrefsDialog, SessionsDialog } from './ProfileDialogs';
 import styles from './shell.module.css';
 import sb from './sidebar.module.css';
@@ -643,14 +644,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </button>
 
           <Link href="/dashboard" className={styles.brandLink}>
-            <span className={styles.brandMark} aria-hidden>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 10h.01" />
-                <path d="M15 10h.01" />
-                <path d="M12 2a8 8 0 0 0-8 8v1.5a2.5 2.5 0 0 0 2.5 2.5H9l3 5 3-5h2.5A2.5 2.5 0 0 0 20 11.5V10a8 8 0 0 0-8-8z" />
-                <path d="M8 21h8" />
-              </svg>
-            </span>
+            <BrandMark size={34} className={styles.brandMark} />
             <span className={styles.brandText}>
               <strong>Worklyn</strong>
               <small>{session.tenant?.name ?? 'Platform'}</small>

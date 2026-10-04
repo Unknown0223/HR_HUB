@@ -85,14 +85,10 @@
 }
 
 .brandMark {
-  width: 46px;
-  height: 46px;
+  display: block;
+  flex-shrink: 0;
   border-radius: 14px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, #7ed695, #34a853);
-  box-shadow: 0 6px 14px rgba(47, 163, 80, 0.35);
+  box-shadow: 0 6px 14px rgba(15, 118, 110, 0.35);
   animation: brandFloat 14s ease-in-out infinite;
 }
 

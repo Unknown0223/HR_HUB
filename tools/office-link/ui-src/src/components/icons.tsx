@@ -13,6 +13,43 @@ const base = (p: SVGProps<SVGSVGElement>) => ({
   ...p,
 });
 
+/** Mark colours per season (Mar–May, Jun–Aug, Sep–Nov, Dec–Feb) — same as scripts/brand/build-brand-icons.js. */
+const SEASON_MARK = [
+  { from: "#1E3A8A", to: "#38BDF8", accent: "#E0F2FE" },
+  { from: "#15803D", to: "#4ADE80", accent: "#F472B6" },
+  { from: "#0F766E", to: "#22C55E", accent: "#FACC15" },
+  { from: "#9A3412", to: "#F59E0B", accent: "#FDE047" },
+];
+
+function seasonMark(date = new Date()) {
+  return SEASON_MARK[Math.floor(((date.getMonth() + 1) % 12) / 3)];
+}
+
+/** Worklyn mark — same drawing as assets/brand/worklyn-mark.svg, coloured for the current season. */
+export const WorklynMark = ({ size = 32, id = "wl" }: { size?: number; id?: string }) => {
+  const c = seasonMark();
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={`${id}-g`} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop stopColor={c.from} />
+          <stop offset="1" stopColor={c.to} />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="18" fill={`url(#${id}-g)`} />
+      <path d="M0 18A18 18 0 0 1 18 0H64V14C34 14 14 34 14 64H0Z" fill="#fff" opacity="0.1" />
+      <path
+        d="M13 20.5 24.5 45 32 31 39.5 45 51 20.5"
+        stroke="#fff"
+        strokeWidth="5.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="51" cy="20.5" r="5.2" fill={c.accent} />
+    </svg>
+  );
+};
+
 export const KeyIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <circle cx="5.5" cy="10.5" r="3" />

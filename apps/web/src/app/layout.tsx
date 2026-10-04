@@ -16,6 +16,10 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: 'Worklyn',
   description: 'Multi-tenant HR + attendance + payroll',
+  icons: {
+    icon: [{ url: '/brand/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/brand/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 export const viewport: Viewport = {

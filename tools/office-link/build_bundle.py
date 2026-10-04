@@ -50,6 +50,7 @@ PACKAGE_FILES = [
     "config.json",
     "hrhub-link.ico",
     "hrhub-link-256.png",
+    *(f"hrhub-link-{s}{ext}" for s in ("spring", "summer", "autumn", "winter") for ext in (".ico", "-256.png")),
     "LICENSE.txt",
     "QOLLAMA.txt",
     "SERVICE.txt",

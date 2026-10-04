@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/brand/worklyn_mark.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/season.dart';
@@ -166,7 +167,7 @@ class BrandChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const LockBadge(icon: Icons.how_to_reg_rounded, size: 40),
+              const WorklynMark(size: 40),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

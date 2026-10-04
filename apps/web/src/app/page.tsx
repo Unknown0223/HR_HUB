@@ -4,6 +4,7 @@ import { FormEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch, setSession, Session } from '@/lib/api';
+import { BrandMark } from '@/components/BrandMark';
 import { SeasonalBackdrop } from '@/components/SeasonalBackdrop';
 import styles from './login.module.css';
 
@@ -61,28 +62,7 @@ export default function LoginPage() {
 
       <div className={styles.stage}>
         <header className={styles.brand}>
-          <span className={styles.brandMark} aria-hidden="true">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9.2 11.2a2.7 2.7 0 1 0 0-5.4 2.7 2.7 0 0 0 0 5.4Z"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              />
-              <path
-                d="M4.2 18.2c.5-2.4 2.4-3.8 5-3.8s4.5 1.4 5 3.8"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-              />
-              <path
-                d="M16.2 8.6l1.2 1.2 2.4-2.6"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
+          <BrandMark size={48} className={styles.brandMark} />
           <span>
             <span className={styles.brandTitle}>Worklyn</span>
             <span className={styles.brandTag}>Давомат · GPS · Кадры</span>
