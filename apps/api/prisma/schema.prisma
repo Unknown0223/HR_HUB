@@ -316,9 +316,26 @@ model User {
   tenant        Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   notifications Notification[]
   accessScopes  UserAccessScope[]
+  sessions      UserSession[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+/// One sign-in (web or app). The JWT carries its id as `sid`; revoking the row ends that session.
+model UserSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  userAgent  String?   @map("user_agent")
+  ip         String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("user_sessions")
 }
 
 /// Which employees a non-admin user may see: kind 'location' (required, ≥1)

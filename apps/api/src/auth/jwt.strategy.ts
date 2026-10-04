@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AUTH_COOKIE_NAME, readCookie } from './auth-cookie';
 import { resolveJwtSecret } from './jwt-secret';
+import { SessionsService } from './sessions.service';
 import { SCOPED_ROLES, setRequestScope } from '../common/data-scope';
 
 interface JwtPayload {
@@ -12,6 +13,7 @@ interface JwtPayload {
   email: string;
   role: string;
   tenantId: string | null;
+  sid?: string;
 }
 
 @Injectable()
@@ -19,6 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -32,11 +35,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-    });
+    const [user, sessionActive] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: payload.sub } }),
+      payload.sid ? this.sessions.isActive(payload.sid, payload.sub) : Promise.resolve(true),
+    ]);
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User inactive or not found');
+    }
+    if (!sessionActive) {
+      throw new UnauthorizedException('Сеанс завершён');
     }
     if (SCOPED_ROLES.has(user.role)) {
       const rows = await this.prisma.userAccessScope.findMany({
@@ -55,6 +62,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      sessionId: payload.sid ?? null,
     };
   }
 }

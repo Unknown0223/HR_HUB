@@ -9,6 +9,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { LoginRateLimitService } from './login-rate-limit.service';
+import { SessionsService } from './sessions.service';
 import { resolveJwtSecret } from './jwt-secret';
 
 @Module({
@@ -31,6 +32,7 @@ import { resolveJwtSecret } from './jwt-secret';
     AuthService,
     JwtStrategy,
     LoginRateLimitService,
+    SessionsService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto';
+import { SessionsService, type SessionClient } from './sessions.service';
 
 /** 400, not 401: clients treat 401 as an expired session and sign the user out. */
 export class WrongCurrentPasswordException extends BadRequestException {
@@ -22,9 +23,10 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly sessions: SessionsService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, client: SessionClient = {}) {
     const existing = await this.prisma.tenant.findUnique({
       where: { code: dto.tenantCode },
     });
@@ -59,10 +61,11 @@ export class AuthService {
       return { tenant, user };
     });
 
-    return this.tokenResponse(result.user, result.tenant);
+    const sid = await this.sessions.start(result.user.id, client);
+    return this.tokenResponse(result.user, result.tenant, sid);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, client: SessionClient = {}) {
     const user = await this.findLoginUser(dto.email);
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
@@ -73,7 +76,19 @@ export class AuthService {
     }
 
     await this.assertEmployeeAccess(user);
-    return this.tokenResponse(user, user.tenant);
+    const sid = await this.sessions.start(user.id, client);
+    return this.tokenResponse(user, user.tenant, sid);
+  }
+
+  /** Ends the session the token belongs to; an expired or foreign token is simply ignored. */
+  async logout(rawToken: string | null) {
+    if (!rawToken) return;
+    try {
+      const payload = this.jwt.verify<{ sub: string; sid?: string }>(rawToken, { ignoreExpiration: true });
+      if (payload.sid) await this.sessions.revoke(payload.sub, payload.sid);
+    } catch {
+      /* already ended or not ours */
+    }
   }
 
   /**
@@ -130,14 +145,15 @@ export class AuthService {
    * Sliding session for the mobile app: a still-valid token is exchanged for a fresh one,
    * re-checking everything login checks (dismissal, HR-closed access) except the password.
    */
-  async refresh(userId: string) {
+  async refresh(userId: string, sessionId: string | null, client: SessionClient = {}) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { tenant: true },
     });
     if (!user || !user.isActive) throw new UnauthorizedException();
     await this.assertEmployeeAccess(user);
-    return this.tokenResponse(user, user.tenant);
+    const sid = sessionId ?? (await this.sessions.start(user.id, client));
+    return this.tokenResponse(user, user.tenant, sid);
   }
 
   /** HR HUB: «Закрыть доступ к системе» — linked employee cannot sign in. */
@@ -183,7 +199,7 @@ export class AuthService {
     }
   }
 
-  async me(userId: string) {
+  async me(userId: string, sessionId: string | null = null) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { tenant: true },
@@ -196,6 +212,10 @@ export class AuthService {
     const catalogRoleIds = Array.isArray(meta.catalogRoleIds)
       ? meta.catalogRoleIds.filter((x): x is string => typeof x === 'string')
       : [];
+    const [employeeId, previousLoginAt] = await Promise.all([
+      this.linkedEmployeeId(user.tenantId, user.email, meta),
+      this.sessions.previousLoginAt(user.id, sessionId),
+    ]);
     return {
       id: user.id,
       email: user.email,
@@ -203,6 +223,8 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId,
       catalogRoleIds,
+      employeeId,
+      previousLoginAt,
       tenant: user.tenant
         ? {
             id: user.tenant.id,
@@ -211,6 +233,20 @@ export class AuthService {
           }
         : null,
     };
+  }
+
+  /** Same rule as MeService.resolveEmployee: explicit meta.employeeId link first, then e-mail. */
+  private async linkedEmployeeId(tenantId: string | null, email: string, meta: Record<string, unknown>) {
+    if (!tenantId) return null;
+    const linkedId =
+      typeof meta.employeeId === 'string' && /^[0-9a-f-]{36}$/i.test(meta.employeeId) ? meta.employeeId : null;
+    const emp = await this.prisma.employee.findFirst({
+      where: linkedId
+        ? { tenantId, id: linkedId }
+        : { tenantId, email: { equals: email, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return emp?.id ?? null;
   }
 
   private tokenResponse(
@@ -223,6 +259,7 @@ export class AuthService {
       meta?: unknown;
     },
     tenant: { id: string; code: string; name: string } | null,
+    sid: string,
   ) {
     const meta =
       user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
@@ -236,6 +273,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      sid,
     };
     return {
       accessToken: this.jwt.sign(payload),

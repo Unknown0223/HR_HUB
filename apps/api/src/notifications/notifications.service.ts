@@ -1,7 +1,24 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationKind, Role } from '@prisma/client';
+import { NotificationKind, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { runUnscoped } from '../common/data-scope';
+import {
+  NOTIFICATION_CATEGORIES,
+  readPrefs,
+  wantsNotification,
+  type NotificationCategory,
+} from './notification-prefs';
+
+type NotifyData = {
+  kind?: NotificationKind;
+  title: string;
+  body?: string;
+  entity?: string;
+  entityId?: string;
+  href?: string;
+};
+
+type Recipient = { id: string; meta: Prisma.JsonValue };
 
 @Injectable()
 export class NotificationsService {
@@ -12,93 +29,60 @@ export class NotificationsService {
     return tenantId;
   }
 
-  async notifyApprovers(
+  /** Skips users who switched this notification's category off. Returns who got it. */
+  private async deliver(
     tenantId: string,
-    data: {
-      kind?: NotificationKind;
-      title: string;
-      body?: string;
-      entity?: string;
-      entityId?: string;
-      href?: string;
-    },
+    users: Recipient[],
+    data: NotifyData,
+    defaultKind: NotificationKind,
   ) {
+    const recipients = users.filter((u) => wantsNotification(u.meta, data.entity));
+    if (!recipients.length) return [];
+    await this.prisma.notification.createMany({
+      data: recipients.map((u) => ({
+        tenantId,
+        userId: u.id,
+        kind: data.kind ?? defaultKind,
+        title: data.title,
+        body: data.body,
+        entity: data.entity,
+        entityId: data.entityId,
+        href: data.href,
+      })),
+    });
+    return recipients.map((u) => ({ id: u.id }));
+  }
+
+  async notifyApprovers(tenantId: string, data: NotifyData) {
     const users = await this.prisma.user.findMany({
       where: {
         tenantId,
         isActive: true,
         role: { in: [Role.tenant_admin, Role.hr, Role.manager] },
       },
-      select: { id: true },
+      select: { id: true, meta: true },
     });
-    if (!users.length) return [];
-    await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        tenantId,
-        userId: u.id,
-        kind: data.kind ?? NotificationKind.approval,
-        title: data.title,
-        body: data.body,
-        entity: data.entity,
-        entityId: data.entityId,
-        href: data.href,
-      })),
-    });
-    return users;
+    return this.deliver(tenantId, users, data, NotificationKind.approval);
   }
 
   /** Tenant admins only (e.g. device password / link confirmation). */
-  async notifyTenantAdmins(
-    tenantId: string,
-    data: {
-      kind?: NotificationKind;
-      title: string;
-      body?: string;
-      entity?: string;
-      entityId?: string;
-      href?: string;
-    },
-  ) {
+  async notifyTenantAdmins(tenantId: string, data: NotifyData) {
     const users = await this.prisma.user.findMany({
       where: {
         tenantId,
         isActive: true,
         role: { in: [Role.tenant_admin, Role.platform_admin] },
       },
-      select: { id: true },
+      select: { id: true, meta: true },
     });
-    if (!users.length) return [];
-    await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        tenantId,
-        userId: u.id,
-        kind: data.kind ?? NotificationKind.approval,
-        title: data.title,
-        body: data.body,
-        entity: data.entity,
-        entityId: data.entityId,
-        href: data.href,
-      })),
-    });
-    return users;
+    return this.deliver(tenantId, users, data, NotificationKind.approval);
   }
 
   /**
    * The employee's own login(s): linked via `users.meta.employeeId`, or by matching e-mail
    * (the same rule `MeService.resolveEmployee` uses). No-op when the employee has no account.
    */
-  async notifyEmployee(
-    tenantId: string,
-    employeeId: string,
-    data: {
-      kind?: NotificationKind;
-      title: string;
-      body?: string;
-      entity?: string;
-      entityId?: string;
-      href?: string;
-    },
-  ) {
+  async notifyEmployee(tenantId: string, employeeId: string, data: NotifyData) {
     const users = await runUnscoped(async () => {
       const emp = await this.prisma.employee.findFirst({
         where: { tenantId, id: employeeId },
@@ -114,54 +98,49 @@ export class NotificationsService {
             ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
           ],
         },
-        select: { id: true },
+        select: { id: true, meta: true },
       });
     });
-    if (!users.length) return 0;
-    await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        tenantId,
-        userId: u.id,
-        kind: data.kind ?? NotificationKind.info,
-        title: data.title,
-        body: data.body,
-        entity: data.entity,
-        entityId: data.entityId,
-        href: data.href,
-      })),
-    });
-    return users.length;
+    return (await this.deliver(tenantId, users, data, NotificationKind.info)).length;
   }
 
-  async notifyAllUsers(
-    tenantId: string,
-    data: {
-      kind?: NotificationKind;
-      title: string;
-      body?: string;
-      entity?: string;
-      entityId?: string;
-      href?: string;
-    },
-  ) {
+  async notifyAllUsers(tenantId: string, data: NotifyData) {
     const users = await this.prisma.user.findMany({
       where: { tenantId, isActive: true },
-      select: { id: true },
+      select: { id: true, meta: true },
     });
-    if (!users.length) return 0;
-    await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        tenantId,
-        userId: u.id,
-        kind: data.kind ?? NotificationKind.info,
-        title: data.title,
-        body: data.body,
-        entity: data.entity,
-        entityId: data.entityId,
-        href: data.href,
-      })),
+    return (await this.deliver(tenantId, users, data, NotificationKind.info)).length;
+  }
+
+  async preferences(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { meta: true } });
+    if (!user) throw new NotFoundException('User not found');
+    const prefs = readPrefs(user.meta);
+    return NOTIFICATION_CATEGORIES.map((c) => ({
+      id: c.id,
+      label: c.label,
+      hint: c.hint,
+      enabled: prefs[c.id],
+    }));
+  }
+
+  async updatePreferences(userId: string, patch: Record<string, unknown>) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { meta: true } });
+    if (!user) throw new NotFoundException('User not found');
+    const meta =
+      user.meta && typeof user.meta === 'object' && !Array.isArray(user.meta)
+        ? { ...(user.meta as Record<string, unknown>) }
+        : {};
+    const next = readPrefs(meta);
+    for (const c of NOTIFICATION_CATEGORIES) {
+      if (typeof patch[c.id] === 'boolean') next[c.id as NotificationCategory] = patch[c.id] as boolean;
+    }
+    const muted = Object.fromEntries(Object.entries(next).filter(([, on]) => !on).map(([id]) => [id, false]));
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { meta: { ...meta, notificationPrefs: muted } as Prisma.InputJsonValue },
     });
-    return users.length;
+    return this.preferences(userId);
   }
 
   list(tenantId: string, userId: string, unreadOnly?: boolean) {

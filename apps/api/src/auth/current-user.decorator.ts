@@ -5,6 +5,8 @@ export interface AuthUser {
   email: string;
   role: string;
   tenantId: string | null;
+  /** Null for tokens issued before sessions were tracked. */
+  sessionId?: string | null;
 }
 
 export const CurrentUser = createParamDecorator(

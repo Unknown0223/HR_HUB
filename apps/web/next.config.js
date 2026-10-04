@@ -2,8 +2,14 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:3002';
 
+const { version } = require('./package.json');
+
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_APP_BUILT_AT: new Date().toISOString(),
+  },
   // A production build writes to the same directory the dev server serves from,
   // which corrupts its chunk manifest ("Cannot find module './997.js'").
   // Set NEXT_DIST_DIR to verify a build while `dev:web` keeps running.

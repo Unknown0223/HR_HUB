@@ -1446,37 +1446,26 @@
   color: #7ed695;
 }
 
-.logout i,
-.logoutDanger i {
+.logout i {
   color: var(--accent);
   width: 1rem;
   text-align: center;
 }
 
-.logoutDanger i {
-  color: inherit;
+.dropTrail {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
 }
 
-.logoutDanger {
-  border: none;
-  background: transparent;
-  color: rgba(248, 113, 113, 0.75);
-  border-radius: 0;
-  padding: 0.45rem 1rem 0.6rem;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  width: 100%;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  font-family: inherit;
-}
-
-.logoutDanger:hover {
-  background: rgba(225, 29, 72, 0.08);
-  color: #e5484d;
+.profileMenuFoot {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem 1rem 0.6rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.42);
 }
 
 .lockOverlay {

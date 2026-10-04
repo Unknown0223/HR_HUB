@@ -1,10 +1,11 @@
-import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { NotificationsService } from './notifications.service';
 import { Roles } from '../auth/decorators';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
+import { SkipTenant } from '../tenant/decorators';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -31,6 +32,32 @@ export class NotificationsController {
       user.userId,
       unreadOnly === '1' || unreadOnly === 'true',
     );
+  }
+
+  @Roles(
+    Role.platform_admin,
+    Role.tenant_admin,
+    Role.hr,
+    Role.manager,
+    Role.employee,
+  )
+  @SkipTenant()
+  @Get('preferences')
+  preferences(@CurrentUser() user: AuthUser) {
+    return this.notifications.preferences(user.userId);
+  }
+
+  @Roles(
+    Role.platform_admin,
+    Role.tenant_admin,
+    Role.hr,
+    Role.manager,
+    Role.employee,
+  )
+  @SkipTenant()
+  @Put('preferences')
+  updatePreferences(@CurrentUser() user: AuthUser, @Body() body: Record<string, unknown>) {
+    return this.notifications.updatePreferences(user.userId, body ?? {});
   }
 
   @Roles(

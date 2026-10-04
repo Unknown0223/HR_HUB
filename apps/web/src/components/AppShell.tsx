@@ -31,6 +31,7 @@ import { CATALOG_SIBLING_KEY, FORM_SIBLINGS } from '@/lib/form-siblings';
 import { applyTheme, storedTheme, type ThemeMode } from '@/lib/theme';
 import { I18nProvider, LANGS, useI18n } from '@/lib/i18n';
 import { SidebarNav } from './SidebarNav';
+import { formatDateTime, NotificationPrefsDialog, SessionsDialog } from './ProfileDialogs';
 import styles from './shell.module.css';
 import sb from './sidebar.module.css';
 
@@ -51,6 +52,9 @@ const BOTTOM_SHORTCUTS: { section: NavSectionId; label: string }[] = [
   { section: 'attendance', label: 'Посещаемость' },
   { section: 'reports', label: 'Отчёты' },
 ];
+
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '—';
+const APP_BUILT_AT = process.env.NEXT_PUBLIC_APP_BUILT_AT || '';
 
 const ROLE_LABEL: Record<string, string> = {
   platform_admin: 'Администратор платформы',
@@ -78,6 +82,12 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [screenLocked, setScreenLocked] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [notifyPrefsOpen, setNotifyPrefsOpen] = useState(false);
+  const [account, setAccount] = useState<{
+    employeeId: string | null;
+    previousLoginAt: string | null;
+  }>({ employeeId: null, previousLoginAt: null });
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' });
   const [pwdMsg, setPwdMsg] = useState('');
@@ -110,6 +120,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const profileWrapRef = useRef<HTMLDivElement>(null);
   const canOpenSettings = !access || access.bypass || isHrefAllowed('/settings', '', access.allowed, false);
+  const myCardHref = account.employeeId ? `/employees/${account.employeeId}` : null;
+  const canOpenMyCard =
+    !!myCardHref && (!access || access.bypass || isHrefAllowed(myCardHref, '', access.allowed, false));
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -154,6 +167,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       tenantId: string | null;
       catalogRoleIds?: string[];
       tenant: { id: string; code: string; name: string } | null;
+      employeeId?: string | null;
+      previousLoginAt?: string | null;
     }>('/api/auth/me');
 
     const mediaP = getAccessToken()
@@ -180,6 +195,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         };
         setSession(next);
         setLocal(next);
+        setAccount({
+          employeeId: me.employeeId ?? null,
+          previousLoginAt: me.previousLoginAt ?? null,
+        });
         setAccess(myAccess);
         if (media?.accessToken) setMediaAccessToken(media.accessToken);
       })
@@ -533,20 +552,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   function logout() {
     void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
-    setSession(null);
-    setLocal(null);
-    setProfileOpen(false);
-    router.replace('/');
-  }
-
-  function logoutForgetDevice() {
-    void apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      /* ignore */
-    }
     setSession(null);
     setLocal(null);
     setProfileOpen(false);
@@ -962,6 +967,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                   </div>
 
                   <div className={styles.profileMenuSection}>{t('Аккаунт')}</div>
+                  {canOpenMyCard && myCardHref ? (
+                    <Link
+                      href={myCardHref}
+                      role="menuitem"
+                      className={styles.dropItemLink}
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <i className="fas fa-id-badge" aria-hidden />
+                      {t('Моя карточка сотрудника')}
+                    </Link>
+                  ) : null}
                   <button
                     type="button"
                     role="menuitem"
@@ -974,6 +990,30 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                   >
                     <i className="fas fa-key" aria-hidden />
                     {t('Изменить пароль')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.dropItem}
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setSessionsOpen(true);
+                    }}
+                  >
+                    <i className="fas fa-laptop-house" aria-hidden />
+                    {t('Активные сеансы')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.dropItem}
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setNotifyPrefsOpen(true);
+                    }}
+                  >
+                    <i className="fas fa-bell" aria-hidden />
+                    {t('Настройки уведомлений')}
                   </button>
                   <button
                     type="button"
@@ -1033,35 +1073,45 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
 
+                  <div className={styles.profileMenuSection}>{t('Справка')}</div>
+                  <a
+                    role="menuitem"
+                    className={styles.dropItemLink}
+                    href={lang === 'uz' ? '/guide/yoriqnoma-uz.pdf' : '/guide/rukovodstvo-ru.pdf'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setProfileOpen(false)}
+                  >
+                    <i className="fas fa-book-open" aria-hidden />
+                    {t('Руководство пользователя')}
+                    <i className={`fas fa-external-link-alt ${styles.dropTrail}`} aria-hidden />
+                  </a>
+
                   <div className={styles.profileMenuSep} />
                   <button type="button" role="menuitem" className={styles.logout} onClick={logout}>
                     <i className="fas fa-sign-out-alt" aria-hidden />
                     {t('Выйти')}
                   </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={styles.logoutDanger}
-                    title={t('Удалит сохранённые на этом компьютере настройки таблиц, фильтры и шаблоны')}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          t('Выйти и удалить с этого компьютера сохранённые настройки таблиц, фильтры и шаблоны?'),
-                        )
-                      ) {
-                        logoutForgetDevice();
-                      }
-                    }}
-                  >
-                    <i className="fas fa-unlink" aria-hidden />
-                    {t('Выйти и забыть устройство')}
-                  </button>
+                  <div className={styles.profileMenuFoot}>
+                    {account.previousLoginAt ? (
+                      <span>
+                        {t('Предыдущий вход')}: {formatDateTime(account.previousLoginAt)}
+                      </span>
+                    ) : null}
+                    <span>
+                      {t('Версия')} {APP_VERSION}
+                      {APP_BUILT_AT ? ` · ${t('сборка')} ${formatDateTime(APP_BUILT_AT)}` : ''}
+                    </span>
+                  </div>
                 </div>
               ) : null}
             </div>
           </div>
         </div>
       </header>
+
+      {sessionsOpen ? <SessionsDialog onClose={() => setSessionsOpen(false)} /> : null}
+      {notifyPrefsOpen ? <NotificationPrefsDialog onClose={() => setNotifyPrefsOpen(false)} /> : null}
 
       {screenLocked ? (
         <div className={styles.lockOverlay} role="dialog" aria-modal="true">

@@ -208,10 +208,43 @@ export const UZ: Record<string, string> = {
   'Изменить пароль': 'Parolni o‘zgartirish',
   'Аккаунт': 'Akkaunt',
   'Интерфейс': 'Interfeys',
-  'Удалит сохранённые на этом компьютере настройки таблиц, фильтры и шаблоны':
-    'Bu kompyuterda saqlangan jadval sozlamalari, filtrlar va shablonlar o‘chiriladi',
-  'Выйти и удалить с этого компьютера сохранённые настройки таблиц, фильтры и шаблоны?':
-    'Chiqib, bu kompyuterdagi saqlangan jadval sozlamalari, filtrlar va shablonlarni o‘chirasizmi?',
+  'Справка': 'Yordam',
+  'Руководство пользователя': 'Foydalanuvchi qo‘llanmasi',
+  'Моя карточка сотрудника': 'Mening xodim kartam',
+  'Предыдущий вход': 'Oldingi kirish',
+  'Версия': 'Versiya',
+  'сборка': 'yig‘ilgan',
+  'Активные сеансы': 'Faol seanslar',
+  'Этот сеанс': 'Shu seans',
+  'Вход': 'Kirish',
+  'Активность': 'Faollik',
+  'Завершить': 'Yakunlash',
+  'Завершить все другие': 'Boshqa hammasini yakunlash',
+  'Завершённый сеанс сразу выходит из системы на том устройстве':
+    'Yakunlangan seans o‘sha qurilmada darhol tizimdan chiqadi',
+  'Нет данных о сеансах — они появятся после следующего входа':
+    'Seanslar haqida ma’lumot yo‘q — keyingi kirishdan so‘ng paydo bo‘ladi',
+  'Не удалось загрузить сеансы': 'Seanslarni yuklab bo‘lmadi',
+  'Не удалось завершить сеанс': 'Seansni yakunlab bo‘lmadi',
+  'Не удалось завершить сеансы': 'Seanslarni yakunlab bo‘lmadi',
+  'Неизвестное устройство': 'Noma’lum qurilma',
+  'Яндекс Браузер': 'Yandex Brauzer',
+  'Настройки уведомлений': 'Bildirishnoma sozlamalari',
+  'Не удалось загрузить настройки': 'Sozlamalarni yuklab bo‘lmadi',
+  'Изменения сохраняются сразу. Системные уведомления приходят всегда.':
+    'O‘zgarishlar darhol saqlanadi. Tizim bildirishnomalari doim keladi.',
+  'Заявки и согласования': 'Arizalar va tasdiqlashlar',
+  'Отсутствия, кадровые заявки, авансы, анкеты из Telegram':
+    'Yo‘qliklar, kadrlar arizalari, avanslar, Telegram anketalari',
+  'Нарушения и безопасность': 'Qoidabuzarliklar va xavfsizlik',
+  'Подмена GPS, чужое лицо, подозрительные скачки, устройства':
+    'Soxta GPS, begona yuz, shubhali sakrashlar, qurilmalar',
+  'Отметки прихода': 'Kelish belgilari',
+  'Уведомление при каждой своей отметке прихода': 'Har bir o‘z kelish belgingiz haqida xabar',
+  'Проведённые документы, смена ФИО и оклада, истекающие документы':
+    'O‘tkazilgan hujjatlar, F.I.Sh. va maosh o‘zgarishi, muddati tugayotgan hujjatlar',
+  'Новости компании': 'Kompaniya yangiliklari',
+  'Публикации в разделе новостей': 'Yangiliklar bo‘limidagi e’lonlar',
   'Режим экрана': 'Ekran rejimi',
   'Светлый': 'Yorug‘',
   'Тёмный': 'Qorong‘i',
