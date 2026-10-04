@@ -12,11 +12,16 @@ const FILES = new Set([
 ]);
 
 /** Favicon / PWA icons for the current season: /brand/<file> → /icons/<season>/<file>. */
-export async function GET(request: Request, { params }: { params: Promise<{ file: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ file: string }> }) {
   const { file } = await params;
   if (!FILES.has(file)) return new NextResponse(null, { status: 404 });
   const season = seasonFromDate(new Date());
-  const res = NextResponse.redirect(new URL(`/icons/${season}/${file}`, request.url), 307);
-  res.headers.set('Cache-Control', 'public, max-age=21600');
-  return res;
+  // Relative Location: behind the proxy request.url is the container address (0.0.0.0:8080).
+  return new NextResponse(null, {
+    status: 307,
+    headers: {
+      Location: `/icons/${season}/${file}`,
+      'Cache-Control': 'public, max-age=21600',
+    },
+  });
 }
