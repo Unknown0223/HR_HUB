@@ -345,13 +345,20 @@ export class CorrectionMatrixBatchDto {
 }
 
 export class CopyMarksPreviewDto {
-  @ApiProperty({ type: [String] })
+  @ApiPropertyOptional({ type: [String], description: 'Omit to list all active employees' })
+  @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true })
-  employeeIds!: string[];
+  employeeIds?: string[];
 
   @ApiProperty() @IsDateString() from!: string;
   @ApiProperty() @IsDateString() to!: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() targetFrom?: string;
+  @ApiPropertyOptional({ description: 'Calendar window start for per-day mark totals' })
+  @IsOptional()
+  @IsDateString()
+  windowFrom?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() windowTo?: string;
 }
 
 export class CopyMarksDto {
@@ -364,6 +371,10 @@ export class CopyMarksDto {
   @ApiProperty() @IsDateString() to!: string;
   /** target period start (same length as from..to) */
   @ApiProperty() @IsDateString() targetFrom!: string;
+  @ApiPropertyOptional({ description: 'Skip marks already present at the same minute (default true)' })
+  @IsOptional()
+  @IsBoolean()
+  skipExisting?: boolean;
 }
 
 export class LocationTrackingQueryDto {

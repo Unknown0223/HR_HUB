@@ -97,6 +97,7 @@ import {
 import { applyLateAllowance, type LatenessRules } from './late-allowance';
 
 const GPS_OUTSIDE_COMMENT_MIN = 3;
+const COPY_MARKS_MAX_DAYS = 62;
 /** Sources whose result the employee already sees on the phone screen. */
 const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import']);
 /** Terminals sync old events after an outage; those must not ping the phone as "today". */
@@ -6488,15 +6489,65 @@ export class AttendanceService {
     return { ok: true, affected: marks.length };
   }
 
+  private copyMarksRange(fromRaw: string, toRaw: string, targetRaw?: string) {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const f = dayBoundsFromYmd(String(fromRaw).slice(0, 10));
+    const t = dayBoundsFromYmd(String(toRaw).slice(0, 10));
+    if (!f || !t || t.end < f.start) throw new BadRequestException('Некорректный период');
+    const days = Math.round((t.end.getTime() + 1 - f.start.getTime()) / DAY_MS);
+    if (days > COPY_MARKS_MAX_DAYS) {
+      throw new BadRequestException(`Период не может быть больше ${COPY_MARKS_MAX_DAYS} дней`);
+    }
+    let target: { start: Date; end: Date } | null = null;
+    if (targetRaw) {
+      const tb = dayBoundsFromYmd(String(targetRaw).slice(0, 10));
+      if (!tb) throw new BadRequestException('Некорректная дата копирования');
+      target = { start: tb.start, end: new Date(tb.start.getTime() + days * DAY_MS - 1) };
+    }
+    return { source: { start: f.start, end: t.end }, days, target };
+  }
+
+  private async markCountsByEmployee(
+    tenantId: string,
+    ids: string[],
+    range: { start: Date; end: Date } | null,
+  ) {
+    if (!range || !ids.length) return new Map<string, number>();
+    const rows = await this.prisma.attendanceMark.groupBy({
+      by: ['employeeId'],
+      where: { tenantId, employeeId: { in: ids }, occurredAt: { gte: range.start, lte: range.end } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((r) => [r.employeeId!, r._count._all]));
+  }
+
+  /**
+   * Copy-marks screen data: employees (all active ones, or the given ids) with their mark counts in
+   * the source period and in the matching target period, plus per-day totals for the calendar window.
+   */
   async copyMarksPreview(
     tenantId: string,
-    dto: { employeeIds: string[]; from: string; to: string },
+    dto: {
+      employeeIds?: string[];
+      from: string;
+      to: string;
+      targetFrom?: string;
+      windowFrom?: string;
+      windowTo?: string;
+    },
   ) {
-    const from = new Date(dto.from);
-    const to = new Date(dto.to);
-    to.setHours(23, 59, 59, 999);
+    const { source, days, target } = this.copyMarksRange(dto.from, dto.to, dto.targetFrom);
+    const onlyIds = dto.employeeIds?.length ? dto.employeeIds : null;
     const employees = await this.prisma.employee.findMany({
-      where: { tenantId, id: { in: dto.employeeIds } },
+      where: onlyIds
+        ? { tenantId, id: { in: onlyIds } }
+        : {
+            tenantId,
+            OR: [
+              { status: 'active' },
+              { marks: { some: { occurredAt: { gte: source.start, lte: source.end } } } },
+            ],
+          },
       select: {
         id: true,
         firstName: true,
@@ -6504,28 +6555,44 @@ export class AttendanceService {
         middleName: true,
         tabNumber: true,
         hiredAt: true,
-        division: { select: { name: true } },
+        division: { select: { id: true, name: true } },
         position: { select: { name: true } },
       },
-      orderBy: { lastName: 'asc' },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      take: 3000,
     });
-    const counts = await this.prisma.attendanceMark.groupBy({
-      by: ['employeeId'],
-      where: {
-        tenantId,
-        employeeId: { in: dto.employeeIds },
-        occurredAt: { gte: from, lte: to },
-      },
-      _count: { _all: true },
-    });
-    const countMap = new Map(
-      counts.map((c) => [c.employeeId!, c._count._all]),
-    );
-    return employees.map((e) => ({
-      ...e,
-      fullName: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' '),
-      marksCount: countMap.get(e.id) ?? 0,
-    }));
+    const ids = employees.map((e) => e.id);
+    const [sourceCounts, targetCounts] = await Promise.all([
+      this.markCountsByEmployee(tenantId, ids, source),
+      this.markCountsByEmployee(tenantId, ids, target),
+    ]);
+
+    const dayCounts: Record<string, number> = {};
+    const wf = dto.windowFrom ? dayBoundsFromYmd(String(dto.windowFrom).slice(0, 10)) : null;
+    const wt = dto.windowTo ? dayBoundsFromYmd(String(dto.windowTo).slice(0, 10)) : null;
+    if (wf && wt && wt.end >= wf.start && wt.end.getTime() - wf.start.getTime() < 100 * 86400000) {
+      const rows = await this.prisma.$queryRaw<Array<{ d: string; n: bigint }>>(Prisma.sql`
+        SELECT to_char((occurred_at AT TIME ZONE 'UTC') AT TIME ZONE ${ATTENDANCE_TZ}, 'YYYY-MM-DD') AS d, count(*) AS n
+        FROM attendance_marks
+        WHERE tenant_id = ${tenantId}::uuid
+          AND occurred_at BETWEEN ${wf.start} AND ${wt.end}
+          AND employee_id IS NOT NULL
+          ${onlyIds ? Prisma.sql`AND employee_id = ANY(${onlyIds}::uuid[])` : Prisma.empty}
+        GROUP BY 1`);
+      for (const r of rows) dayCounts[r.d] = Number(r.n);
+    }
+
+    return {
+      days,
+      targetTo: target ? ymdInTz(target.end) : null,
+      dayCounts,
+      employees: employees.map((e) => ({
+        ...e,
+        fullName: [e.lastName, e.firstName, e.middleName].filter(Boolean).join(' '),
+        marksCount: sourceCounts.get(e.id) ?? 0,
+        targetCount: targetCounts.get(e.id) ?? 0,
+      })),
+    };
   }
 
   async copyMarks(
@@ -6535,63 +6602,78 @@ export class AttendanceService {
       from: string;
       to: string;
       targetFrom: string;
+      skipExisting?: boolean;
     },
   ) {
-    const fromYmd = String(dto.from).slice(0, 10);
-    const toYmd = String(dto.to).slice(0, 10);
-    const targetYmd = String(dto.targetFrom).slice(0, 10);
-    const fromBounds = dayBoundsFromYmd(fromYmd);
-    const toBounds = dayBoundsFromYmd(toYmd);
-    const targetBounds = dayBoundsFromYmd(targetYmd);
-    if (!fromBounds || !toBounds || !targetBounds) {
-      throw new BadRequestException('Invalid date range');
+    const { source: range, target } = this.copyMarksRange(dto.from, dto.to, dto.targetFrom);
+    const dayShiftMs = target!.start.getTime() - range.start.getTime();
+    if (!dayShiftMs) {
+      throw new BadRequestException('Дата копирования совпадает с началом источника');
     }
-    const from = fromBounds.start;
-    const to = toBounds.end;
-    const targetFrom = targetBounds.start;
-    const sourceStart = fromBounds.start;
-    const dayShiftMs = targetFrom.getTime() - sourceStart.getTime();
 
     const source = await this.prisma.attendanceMark.findMany({
       where: {
         tenantId,
         employeeId: { in: dto.employeeIds },
-        occurredAt: { gte: from, lte: to },
+        occurredAt: { gte: range.start, lte: range.end },
       },
+      orderBy: { occurredAt: 'asc' },
     });
     if (!source.length) {
-      return { ok: false, copied: 0, message: 'Не найдены отметки для копирования' };
+      return { ok: false, copied: 0, skipped: 0, message: 'Не найдены отметки для копирования' };
     }
 
-    let copied = 0;
+    const minuteKey = (employeeId: string, direction: string, at: Date) =>
+      `${employeeId}|${direction}|${Math.floor(at.getTime() / 60000)}`;
+    const taken = new Set<string>();
+    if (dto.skipExisting !== false) {
+      const existing = await this.prisma.attendanceMark.findMany({
+        where: {
+          tenantId,
+          employeeId: { in: dto.employeeIds },
+          occurredAt: { gte: target!.start, lte: target!.end },
+        },
+        select: { employeeId: true, direction: true, occurredAt: true },
+      });
+      for (const m of existing) {
+        if (m.employeeId) taken.add(minuteKey(m.employeeId, m.direction, m.occurredAt));
+      }
+    }
+
+    const data: Prisma.AttendanceMarkCreateManyInput[] = [];
     const recalc = new Map<string, Date>();
+    let skipped = 0;
     for (const m of source) {
       if (!m.employeeId) continue;
       const occurredAt = new Date(m.occurredAt.getTime() + dayShiftMs);
+      const key = minuteKey(m.employeeId, m.direction, occurredAt);
+      if (taken.has(key)) {
+        skipped += 1;
+        continue;
+      }
+      taken.add(key);
       const payload =
         m.rawPayload && typeof m.rawPayload === 'object' && !Array.isArray(m.rawPayload)
           ? { ...(m.rawPayload as Record<string, unknown>), copiedFrom: m.id }
           : { copiedFrom: m.id };
-      await this.prisma.attendanceMark.create({
-        data: {
-          tenantId,
-          employeeId: m.employeeId,
-          deviceId: m.deviceId,
-          employeeExternalId: m.employeeExternalId,
-          direction: m.direction,
-          occurredAt,
-          source: 'manual',
-          rawPayload: payload as Prisma.InputJsonValue,
-        },
+      data.push({
+        tenantId,
+        employeeId: m.employeeId,
+        deviceId: m.deviceId,
+        employeeExternalId: m.employeeExternalId,
+        direction: m.direction,
+        occurredAt,
+        source: 'manual',
+        rawPayload: payload as Prisma.InputJsonValue,
       });
-      copied += 1;
       recalc.set(`${m.employeeId}:${ymdInTz(occurredAt)}`, occurredAt);
     }
+    if (data.length) await this.prisma.attendanceMark.createMany({ data });
     for (const [key, at] of recalc) {
       const empId = key.split(':')[0];
       await this.recalcDay(tenantId, empId, at);
     }
-    return { ok: true, copied };
+    return { ok: true, copied: data.length, skipped };
   }
 
   async listLatestMarks(tenantId: string, limit = 12) {
