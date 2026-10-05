@@ -317,9 +317,48 @@ model User {
   notifications Notification[]
   accessScopes  UserAccessScope[]
   sessions      UserSession[]
+  telegramLink  TelegramLink?
+  authTokens    AuthToken[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+/// The Telegram chat a user linked through a one-time deep link; the bot sends their notifications there.
+model TelegramLink {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  telegramUserId String   @map("telegram_user_id")
+  chatId         String   @map("chat_id")
+  username       String?
+  botUsername    String?  @map("bot_username")
+  linkedAt       DateTime @default(now()) @map("linked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([telegramUserId])
+  @@map("telegram_links")
+}
+
+/// Short-lived single-use secrets: Telegram link (`tg_link`), Telegram sign-in approval (`tg_login`),
+/// password reset code (`pwd_reset`). Only hashes are stored.
+model AuthToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  kind      String
+  tokenHash String    @unique @map("token_hash")
+  /// pending → approved/denied (tg_login) → used; expired after too many wrong codes
+  status    String    @default("pending")
+  attempts  Int       @default(0)
+  meta      Json?
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
+  @@map("auth_tokens")
 }
 
 /// One sign-in (web or app). The JWT carries its id as `sid`; revoking the row ends that session.

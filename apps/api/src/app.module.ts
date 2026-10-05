@@ -26,6 +26,7 @@ import { MobileModule } from './mobile/mobile.module';
 import { NewsModule } from './news/news.module';
 import { HireDocumentExceptionsModule } from './hire-document-exceptions/hire-document-exceptions.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { TelegramCoreModule } from './telegram/telegram-core.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { TeamModule } from './team/team.module';
 import { AccessModule } from './access/access.module';
@@ -37,6 +38,7 @@ import { AdvancesModule } from './advances/advances.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
+    TelegramCoreModule,
     HealthModule,
     // AuthModule must be imported before TenantModule: global guards run in
     // registration order, and TenantGuard needs the `req.user` that

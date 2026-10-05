@@ -11,13 +11,20 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
+import { TELEGRAM_UPDATES, TelegramBotClient, type TelegramBotConfig } from './telegram-bot.client';
+import {
+  LINK_START_PREFIX,
+  LOGIN_CALLBACK_PREFIX,
+  TelegramLinksService,
+} from './telegram-links.service';
 
-export type TelegramBotConfig = {
-  botToken: string;
-  botUsername: string;
-  webhookSecret: string;
-  publicApiUrl: string;
-  source: 'integration' | 'env' | 'none';
+export type { TelegramBotConfig } from './telegram-bot.client';
+
+type TgFrom = {
+  id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
 };
 
 type TgUpdate = {
@@ -25,14 +32,15 @@ type TgUpdate = {
   message?: {
     message_id: number;
     text?: string;
-    chat: { id: number };
-    from?: {
-      id: number;
-      username?: string;
-      first_name?: string;
-      last_name?: string;
-    };
+    chat: { id: number; type?: string };
+    from?: TgFrom;
     photo?: Array<{ file_id: string; file_unique_id?: string; file_size?: number }>;
+  };
+  callback_query?: {
+    id: string;
+    from: TgFrom;
+    data?: string;
+    message?: { message_id: number; chat: { id: number } };
   };
 };
 
@@ -66,108 +74,12 @@ export class TelegramService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly storage: StorageService,
+    private readonly bot: TelegramBotClient,
+    private readonly links: TelegramLinksService,
   ) {}
 
-  private envConfig(): TelegramBotConfig {
-    const botToken = (this.config.get<string>('TELEGRAM_BOT_TOKEN') ?? '').trim();
-    const botUsername = (this.config.get<string>('TELEGRAM_BOT_USERNAME') ?? '')
-      .trim()
-      .replace(/^@/, '');
-    const webhookSecret = (
-      this.config.get<string>('TELEGRAM_WEBHOOK_SECRET') ?? ''
-    ).trim();
-    const publicApiUrl = (
-      this.config.get<string>('API_PUBLIC_URL') ??
-      this.config.get<string>('PUBLIC_API_URL') ??
-      ''
-    )
-      .trim()
-      .replace(/\/$/, '');
-    return {
-      botToken,
-      botUsername,
-      webhookSecret,
-      publicApiUrl,
-      source: botToken ? 'env' : 'none',
-    };
-  }
-
-  async resolveConfig(tenantId?: string | null): Promise<TelegramBotConfig> {
-    const env = this.envConfig();
-    if (tenantId) {
-      const row = await this.prisma.externalIntegration.findFirst({
-        where: {
-          tenantId,
-          OR: [
-            { name: { equals: 'Telegram Bot', mode: 'insensitive' } },
-            { name: { contains: 'telegram', mode: 'insensitive' } },
-          ],
-        },
-        orderBy: { updatedAt: 'desc' },
-      });
-      if (row) {
-        const c = asCfg(row.config);
-        const sys = String(c.sys || '').toLowerCase();
-        if (sys && sys !== 'telegram') {
-          /* wrong integration — keep looking via env */
-        } else {
-          const botToken = String(c.botToken || c.token || '').trim() || env.botToken;
-          const botUsername = String(c.botUsername || c.username || '')
-            .trim()
-            .replace(/^@/, '') || env.botUsername;
-          const webhookSecret =
-            String(c.webhookSecret || '').trim() || env.webhookSecret;
-          const publicApiUrl =
-            String(c.publicApiUrl || '').trim().replace(/\/$/, '') ||
-            env.publicApiUrl;
-          if (botToken) {
-            return {
-              botToken,
-              botUsername,
-              webhookSecret,
-              publicApiUrl,
-              source: String(c.botToken || c.token || '').trim()
-                ? 'integration'
-                : 'env',
-            };
-          }
-        }
-      }
-    }
-
-    if (env.botToken) return env;
-
-    // Fallback: any tenant telegram row (webhook / single-bot setups)
-    const any = await this.prisma.externalIntegration.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { name: { equals: 'Telegram Bot', mode: 'insensitive' } },
-          { name: { contains: 'telegram', mode: 'insensitive' } },
-        ],
-      },
-      take: 20,
-      orderBy: { updatedAt: 'desc' },
-    });
-    for (const row of any) {
-      const c = asCfg(row.config);
-      if (String(c.sys || '').toLowerCase() === 'telegram' || !c.sys) {
-        const botToken = String(c.botToken || c.token || '').trim();
-        if (!botToken) continue;
-        return {
-          botToken,
-          botUsername: String(c.botUsername || '')
-            .trim()
-            .replace(/^@/, ''),
-          webhookSecret: String(c.webhookSecret || '').trim() || env.webhookSecret,
-          publicApiUrl:
-            String(c.publicApiUrl || '').trim().replace(/\/$/, '') ||
-            env.publicApiUrl,
-          source: 'integration',
-        };
-      }
-    }
-    return { ...env, source: 'none' };
+  resolveConfig(tenantId?: string | null): Promise<TelegramBotConfig> {
+    return this.bot.resolveConfig(tenantId);
   }
 
   async isEnabled(tenantId?: string | null): Promise<boolean> {
@@ -399,7 +311,7 @@ export class TelegramService {
     const webhookUrl = `${base}/api/telegram/webhook`;
     const body: Record<string, unknown> = {
       url: webhookUrl,
-      allowed_updates: ['message'],
+      allowed_updates: TELEGRAM_UPDATES,
       drop_pending_updates: true,
     };
     if (cfg.webhookSecret) {
@@ -458,6 +370,20 @@ export class TelegramService {
   }
 
   async handleWebhook(update: TgUpdate) {
+    const cb = update.callback_query;
+    if (cb) {
+      if (cb.data?.startsWith(LOGIN_CALLBACK_PREFIX)) {
+        const res = await this.links.answerLogin(cb.data, cb.from);
+        await this.bot.answerCallback(cb.id, res.text, res.tenantId);
+        if (res.edit && cb.message) {
+          await this.bot.editMessage(String(cb.message.chat.id), cb.message.message_id, res.edit, res.tenantId);
+        }
+      } else {
+        await this.bot.answerCallback(cb.id, 'Noma’lum amal');
+      }
+      return { ok: true };
+    }
+
     const msg = update.message;
     if (!msg?.chat?.id) return { ok: true };
     const chatId = String(msg.chat.id);
@@ -466,12 +392,35 @@ export class TelegramService {
     const username = msg.from?.username || null;
     const photoSizes = msg.photo || [];
 
+    if (text === '/stop') {
+      const n = msg.from ? await this.links.stopByTelegramUser(msg.from.id) : 0;
+      await this.sendMessage(
+        chatId,
+        n ? 'Akkaunt botdan uzildi. Qayta ulash uchun Worklyn’da «Telegram botga o‘tish» tugmasini bosing.' : 'Bu chatga hech qanday akkaunt ulanmagan.',
+      );
+      return { ok: true };
+    }
+
     if (text.startsWith('/start')) {
       const code = text.split(/\s+/)[1]?.trim();
+      if (code?.startsWith(LINK_START_PREFIX)) {
+        if (msg.chat.type && msg.chat.type !== 'private') {
+          await this.sendMessage(chatId, 'Akkauntni faqat bot bilan shaxsiy chatda ulash mumkin.');
+          return { ok: true };
+        }
+        const res = await this.links.consumeStart(
+          code.slice(LINK_START_PREFIX.length),
+          msg.from ?? { id: msg.chat.id },
+          chatId,
+        );
+        await this.sendMessage(chatId, res.text, res.tenantId);
+        return { ok: true };
+      }
       if (!code) {
         await this.sendMessage(
           chatId,
-          'Worklyn bot. Qo‘shilish uchun HR bergan havola orqali /start QODNI yuboring.',
+          'Worklyn bot. Akkauntni ulash uchun Worklyn saytida yoki ilovasida «Telegram botga o‘tish» tugmasini bosing. ' +
+            'Yangi xodim sifatida qo‘shilish uchun HR bergan havoladan foydalaning.',
         );
         return { ok: true };
       }
@@ -502,9 +451,12 @@ export class TelegramService {
 
     const draft = this.drafts.get(fromId);
     if (!draft) {
+      const linked = await this.prisma.telegramLink.count({ where: { telegramUserId: fromId } });
       await this.sendMessage(
         chatId,
-        'Sessiya yo‘q. HR havolasidan /start QOD bilan boshlang.',
+        linked
+          ? 'Bu chat Worklyn akkauntingizga ulangan: bildirishnomalar va kirish/chiqish xabarlari shu yerga keladi. Uzish: /stop'
+          : 'Akkauntni ulash uchun Worklyn saytida yoki ilovasida «Telegram botga o‘tish» tugmasini bosing.',
       );
       return { ok: true };
     }
@@ -693,29 +645,6 @@ export class TelegramService {
     text: string,
     tenantId?: string | null,
   ) {
-    const cfg = await this.resolveConfig(tenantId);
-    if (!cfg.botToken) return;
-    try {
-      const res = await fetch(
-        `https://api.telegram.org/bot${cfg.botToken}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text,
-            disable_web_page_preview: true,
-          }),
-        },
-      );
-      if (!res.ok) {
-        const body = await res.text();
-        this.logger.warn(`Telegram sendMessage ${res.status}: ${body}`);
-      }
-    } catch (e) {
-      this.logger.warn(
-        `Telegram sendMessage error: ${e instanceof Error ? e.message : e}`,
-      );
-    }
+    await this.bot.sendMessage(chatId, text, { tenantId });
   }
 }

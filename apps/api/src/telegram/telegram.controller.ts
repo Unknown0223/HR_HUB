@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -22,6 +23,7 @@ import { Roles, Public } from '../auth/decorators';
 import { SkipTenant } from '../tenant/decorators';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { TelegramService } from './telegram.service';
+import { TelegramLinksService } from './telegram-links.service';
 
 class ApproveJoinDto {
   @ApiProperty({ example: '0042' })
@@ -49,7 +51,10 @@ class SetupWebhookDto {
 @ApiTags('telegram')
 @Controller('telegram')
 export class TelegramController {
-  constructor(private readonly telegram: TelegramService) {}
+  constructor(
+    private readonly telegram: TelegramService,
+    private readonly links: TelegramLinksService,
+  ) {}
 
   private requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
@@ -127,6 +132,35 @@ export class TelegramController {
       id,
       user?.userId,
     );
+  }
+
+  /** The signed-in user's own bot link: drives the «connect Telegram» prompt on web and mobile. */
+  @ApiBearerAuth()
+  @SkipTenant()
+  @Get('me')
+  myLink(@CurrentUser() user: AuthUser) {
+    return this.links.status(user.userId, user.tenantId ?? null);
+  }
+
+  @ApiBearerAuth()
+  @SkipTenant()
+  @Post('me/link')
+  createMyLink(@CurrentUser() user: AuthUser) {
+    return this.links.createLink(user.userId, user.tenantId ?? null);
+  }
+
+  @ApiBearerAuth()
+  @SkipTenant()
+  @Post('me/snooze')
+  snoozePrompt(@CurrentUser() user: AuthUser) {
+    return this.links.snooze(user.userId);
+  }
+
+  @ApiBearerAuth()
+  @SkipTenant()
+  @Delete('me')
+  unlinkMe(@CurrentUser() user: AuthUser) {
+    return this.links.unlink(user.userId, user.tenantId ?? null);
   }
 
   /** Telegram Bot API webhook (set via Settings → Telegram → Webhook). */
