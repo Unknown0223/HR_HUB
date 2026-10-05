@@ -64,6 +64,7 @@ String punchSourceLabel(dynamic source) {
   final s = source?.toString().toLowerCase() ?? '';
   if (s.isEmpty) return '';
   if (s == 'mobile_app') return trText('Telefon');
+  if (s == 'manager_kiosk') return trText('Rahbar telefoni');
   if (s == 'gps') return 'GPS';
   if (s == 'qr') return 'QR';
   if (s.contains('face')) return 'Face ID';

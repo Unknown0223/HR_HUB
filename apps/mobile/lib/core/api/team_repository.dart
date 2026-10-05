@@ -41,6 +41,40 @@ class TeamRepository {
     query: {'year': '$year', 'month': '$month'},
   );
 
+  /// Device mode: `{manager, livenessDirections, total, faceReady, items: [{employeeId, fullName, faceReady, firstIn, lastOut, ...}]}`.
+  Future<Map<String, dynamic>> kiosk() => _api.get('/team/kiosk');
+
+  /// One employee in front of the manager's phone, identified by face on the server.
+  Future<Map<String, dynamic>> kioskPunch({
+    required String direction,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String selfieBase64,
+    required String photoBase64,
+    required List<String> livenessSteps,
+    required int livenessDurationMs,
+    required Map<String, dynamic> integrity,
+    String? comment,
+  }) => _api.post(
+    '/team/kiosk/punch',
+    data: {
+      'direction': direction,
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': accuracy,
+      'selfieBase64': selfieBase64,
+      'photoBase64': photoBase64,
+      'liveness': {
+        'passed': true,
+        'steps': livenessSteps,
+        'durationMs': livenessDurationMs,
+      },
+      'integrity': integrity,
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+    },
+  );
+
   /// Location is only present while the employee is inside working hours.
   Future<Map<String, dynamic>> live(String employeeId) =>
       _api.get('/team/$employeeId/live');

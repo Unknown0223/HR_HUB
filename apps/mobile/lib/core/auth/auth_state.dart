@@ -19,6 +19,7 @@ class AuthUser {
     this.tenant,
     this.employee,
     this.teamSize = 0,
+    this.teamKiosk = false,
     this.mustChangePassword = false,
   });
 
@@ -32,6 +33,9 @@ class AuthUser {
 
   /// Active employees in the divisions this user manages (org chart).
   final int teamSize;
+
+  /// HR granted this manager the phone «device mode» (marking their own staff by face).
+  final bool teamKiosk;
 
   /// Signed in with a one-time password from HR: the app is locked until a personal one is set.
   final bool mustChangePassword;
@@ -47,6 +51,7 @@ class AuthUser {
         tenant: tenant,
         employee: employee,
         teamSize: teamSize,
+        teamKiosk: teamKiosk,
       );
 
   bool get isApprover =>
@@ -80,6 +85,7 @@ class AuthUser {
           ? Map<String, dynamic>.from(json['employee'] as Map)
           : null,
       teamSize: (json['teamSize'] as num?)?.toInt() ?? 0,
+      teamKiosk: json['features'] is Map && (json['features'] as Map)['teamKiosk'] == true,
       mustChangePassword: json['mustChangePassword'] == true,
     );
   }

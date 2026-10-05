@@ -189,6 +189,7 @@ class ApiClient {
       statusCode: status,
       serverMessage: message,
       code: data is Map ? data['code']?.toString() : null,
+      details: data is Map ? Map<String, dynamic>.from(data) : null,
     );
   }
 }

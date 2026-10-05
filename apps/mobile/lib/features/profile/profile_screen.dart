@@ -47,6 +47,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => context.push('/team'),
                 ),
               ],
+              if (user?.teamKiosk == true) ...[
+                const SizedBox(height: 14),
+                _KioskCard(onTap: () => context.push('/team/kiosk')),
+              ],
               const SizedBox(height: 14),
               SectionCard(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -360,6 +364,79 @@ class _TeamCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       context.t('Tabel, statistika va jonli joylashuv'),
+                      style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.accent,
+                size: 28,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KioskCard extends StatelessWidget {
+  const _KioskCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.accent.withValues(alpha: 0.45),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.accentTint,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.camera_front_rounded,
+                  color: AppColors.accent,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr('Qurilma rejimi', 'Режим устройства'),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      context.tr(
+                        'Jamoangizni yuz orqali shu telefondan belgilang',
+                        'Отмечайте свою команду по лицу с этого телефона',
+                      ),
                       style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
                     ),
                   ],

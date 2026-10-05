@@ -17,6 +17,30 @@ Future<Uint8List> composePhotoReport({
   return compute(_compose, _ComposeArgs(back, selfie, stamp));
 }
 
+/// Front-camera photo of the employee with the stamp bar — the photo report of
+/// a mark made from the manager's phone.
+Future<Uint8List> stampedFacePhoto({
+  required String path,
+  required String stamp,
+}) async {
+  final bytes = await File(path).readAsBytes();
+  return compute(_stampOnly, _ComposeArgs(bytes, bytes, stamp));
+}
+
+Uint8List _stampOnly(_ComposeArgs a) {
+  final raw = img.decodeImage(a.back);
+  if (raw == null) throw StateError('Rasmni o‘qib bo‘lmadi');
+  var base = img.bakeOrientation(raw);
+  final longest = base.width > base.height ? base.width : base.height;
+  if (longest > _maxEdge) {
+    base = base.width >= base.height
+        ? img.copyResize(base, width: _maxEdge)
+        : img.copyResize(base, height: _maxEdge);
+  }
+  _drawStamp(base, a.stamp);
+  return img.encodeJpg(base, quality: 85);
+}
+
 /// Liveness selfie downsized for the server-side match with the profile photo.
 Future<Uint8List> faceMatchSelfie(String selfiePath) async {
   final bytes = await File(selfiePath).readAsBytes();
@@ -72,8 +96,12 @@ Uint8List _compose(_ComposeArgs a) {
     radius: 10,
   );
   img.compositeImage(base, inset, dstX: margin, dstY: margin);
+  _drawStamp(base, a.stamp);
+  return img.encodeJpg(base, quality: 85);
+}
 
-  final lines = a.stamp.split('\n');
+void _drawStamp(img.Image base, String stamp) {
+  final lines = stamp.split('\n');
   final font = base.width >= 1000 ? img.arial48 : img.arial24;
   final lineH = font.lineHeight + 6;
   final barH = lines.length * lineH + 16;
@@ -95,5 +123,4 @@ Uint8List _compose(_ComposeArgs a) {
       color: img.ColorRgb8(255, 255, 255),
     );
   }
-  return img.encodeJpg(base, quality: 85);
 }

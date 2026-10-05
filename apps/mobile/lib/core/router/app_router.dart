@@ -23,6 +23,7 @@ import '../../features/requests/inbox_screen.dart';
 import '../../features/requests/requests_screen.dart';
 import '../../features/settings/more_screens.dart';
 import '../../features/settings/settings_screens.dart';
+import '../../features/team/team_kiosk_screen.dart';
 import '../../features/team/team_member_screen.dart';
 import '../../features/team/team_screen.dart';
 import '../../features/tracking/gps_track_screen.dart';
@@ -112,6 +113,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/advance', builder: (_, _) => const AdvanceScreen()),
       GoRoute(path: '/inbox', builder: (_, __) => const InboxScreen()),
       GoRoute(path: '/team', builder: (_, _) => const TeamScreen()),
+      GoRoute(path: '/team/kiosk', builder: (_, _) => const TeamKioskScreen()),
       GoRoute(
         path: '/team/:id',
         builder: (_, state) =>

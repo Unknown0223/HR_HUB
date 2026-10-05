@@ -223,12 +223,15 @@ class ModulesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasTeam = ref.watch(authProvider).user?.hasTeam == true;
+    final teamKiosk = ref.watch(authProvider).user?.teamKiosk == true;
     final items = [
       (Icons.login_rounded, context.t('Kirish'), '/punch/in'),
       (Icons.logout_rounded, context.t('Chiqish'), '/punch/out'),
       (Icons.table_chart_outlined, context.t('Tabel'), '/tabel'),
       (Icons.assignment_outlined, context.t('So\'rovlar'), '/requests'),
       if (hasTeam) (Icons.groups_outlined, context.t('Jamoa'), '/team'),
+      if (teamKiosk)
+        (Icons.camera_front_outlined, context.tr('Qurilma rejimi', 'Режим устройства'), '/team/kiosk'),
       (Icons.payments_outlined, context.t('To\'lov'), '/payroll'),
       (Icons.note_alt_outlined, context.t('Qaydlar'), '/marks'),
     ];
