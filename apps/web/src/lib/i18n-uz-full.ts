@@ -195,6 +195,7 @@ export const UZ_FULL: UzDictionary = {
   "Поиск": "Qidiruv",
   "Глобальный поиск": "Umumiy qidiruv",
   "Сотрудник, физлицо, подразделение…": "Xodim, jismoniy shaxs, bo‘linma…",
+  "Раздел, сотрудник, физлицо, подразделение…": "Bo‘lim, xodim, jismoniy shaxs, bo‘linma…",
   "Поиск…": "Qidirilmoqda…",
   "Введите запрос": "So‘rovni kiriting",
   "Ничего не найдено": "Hech narsa topilmadi",

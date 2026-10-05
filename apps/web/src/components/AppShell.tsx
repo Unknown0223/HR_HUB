@@ -20,7 +20,8 @@ import {
   type NavSection,
   type NavSectionId,
 } from '@/lib/nav-registry';
-import { findReport, rememberRecentReport } from '@/lib/reports-registry';
+import { findReport, rememberRecentReport, REPORTS } from '@/lib/reports-registry';
+import { buildPageIndex, searchPages } from '@/lib/page-search';
 import { SeasonalBackdrop } from '@/components/SeasonalBackdrop';
 import {
   filterNavItems,
@@ -606,6 +607,20 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const authRole = session?.user.role;
+  const pageIndex = useMemo(() => {
+    if (!searchOpen || !authRole) return [];
+    const sections = NAV_SECTIONS.map((sec) => ({
+      ...sec,
+      groups: sec.groups.map((g) => ({ ...g, items: filterNavItems(g.items, access, authRole) })),
+    }));
+    return buildPageIndex(sections, filterNavItems(REPORTS, access, authRole), t);
+  }, [searchOpen, authRole, access, t]);
+  const pageHits = useMemo(() => searchPages(pageIndex, searchQ), [pageIndex, searchQ]);
+  const hasPeopleHits =
+    !!searchRes &&
+    (searchRes.employees.length > 0 || searchRes.persons.length > 0 || searchRes.divisions.length > 0);
+
   if (!session) {
     return <div className={styles.loading}>{t('Загрузка…')}</div>;
   }
@@ -713,23 +728,53 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                       autoFocus
                       type="search"
                       className={styles.searchInput}
-                      placeholder={t('Сотрудник, физлицо, подразделение…')}
+                      placeholder={t('Раздел, сотрудник, физлицо, подразделение…')}
                       value={searchQ}
                       onChange={(e) => setSearchQ(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        const first =
+                          pageHits[0]?.href ??
+                          searchRes?.employees[0]?.href ??
+                          searchRes?.persons[0]?.href ??
+                          searchRes?.divisions[0]?.href;
+                        if (!first) return;
+                        e.preventDefault();
+                        setSearchOpen(false);
+                        router.push(first);
+                      }}
                     />
                   </div>
                   <div className={styles.searchBody}>
-                    {searchBusy ? (
-                      <div className={styles.dropEmpty}>{t('Поиск…')}</div>
-                    ) : !searchRes || searchQ.trim().length < 1 ? (
+                    {searchQ.trim().length < 1 ? (
                       <div className={styles.dropEmpty}>{t('Введите запрос')}</div>
-                    ) : !searchRes.employees.length &&
-                      !searchRes.persons.length &&
-                      !searchRes.divisions.length ? (
-                      <div className={styles.dropEmpty}>{t('Ничего не найдено')}</div>
                     ) : (
                       <>
-                        {searchRes.employees.length ? (
+                        {pageHits.length ? (
+                          <div className={styles.searchGroup}>
+                            <div className={styles.searchGroupTitle}>{t('Разделы')}</div>
+                            {pageHits.map((h) => (
+                              <Link
+                                key={h.key}
+                                href={h.href}
+                                className={styles.searchHit}
+                                onClick={() => setSearchOpen(false)}
+                              >
+                                <i className={`fas ${h.faIcon}`} aria-hidden />
+                                <span className={styles.searchHitText}>
+                                  <span>{h.label}</span>
+                                  <span className={styles.searchHitPath}>{h.path}</span>
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : null}
+                        {searchBusy && !hasPeopleHits ? (
+                          <div className={styles.dropEmpty}>{t('Поиск…')}</div>
+                        ) : !pageHits.length && !hasPeopleHits && searchRes ? (
+                          <div className={styles.dropEmpty}>{t('Ничего не найдено')}</div>
+                        ) : null}
+                        {searchRes?.employees.length ? (
                           <div className={styles.searchGroup}>
                             <div className={styles.searchGroupTitle}>{t('Сотрудники')}</div>
                             {searchRes.employees.map((e) => (
@@ -745,7 +790,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                             ))}
                           </div>
                         ) : null}
-                        {searchRes.persons.length ? (
+                        {searchRes?.persons.length ? (
                           <div className={styles.searchGroup}>
                             <div className={styles.searchGroupTitle}>{t('Физические лица')}</div>
                             {searchRes.persons.map((p) => (
@@ -761,7 +806,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                             ))}
                           </div>
                         ) : null}
-                        {searchRes.divisions.length ? (
+                        {searchRes?.divisions.length ? (
                           <div className={styles.searchGroup}>
                             <div className={styles.searchGroupTitle}>{t('Подразделения')}</div>
                             {searchRes.divisions.map((d) => (
