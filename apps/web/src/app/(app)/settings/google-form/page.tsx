@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { API_ORIGIN, apiFetch, getSession } from '@/lib/api';
 import styles from '../../catalog/absence-types/page.module.css';
+import card from '../../catalog/report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
 
 type FormField = {
@@ -53,10 +54,10 @@ export default function GoogleFormEmployeesPage() {
   return (
     <div className={shared.wrap}>
       <PageSubnav groupKey="settings" />
-      <div className={styles.pageHeader}>
+      <div className={shared.pageHeader}>
         <div>
-          <h1 className={styles.title}>Google Form — yangi xodim</h1>
-          <p className={styles.subtitle}>
+          <h1 className={shared.pageTitle}>Google Form — yangi xodim</h1>
+          <p className={shared.pageSubtitle}>
             Form to‘ldiriladi → Apps Script → Worklyn bazaga xodim yoziladi
           </p>
         </div>
@@ -65,29 +66,29 @@ export default function GoogleFormEmployeesPage() {
       {loading ? <p className={styles.empty}>Загрузка…</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      <section className={styles.panel}>
-        <h2 className={styles.title}>1. Railway (API)</h2>
-        <p className={styles.subtitle}>
+      <section className={card.card} style={{ marginBottom: 14 }}>
+        <h2 className={card.cardTitle}>1. Railway (API)</h2>
+        <p className={shared.hint}>
           Env o‘zgaruvchi qo‘ying (Punch kalitidan alohida):
         </p>
-        <pre className={styles.subtitle}>
+        <pre className={shared.hint} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
           {`EMPLOYEE_FORM_INGEST_KEY=<uzun-random-sir>`}
         </pre>
-        <p className={styles.subtitle}>
+        <p className={shared.hint}>
           Endpoint:{' '}
           <code>
             {apiBase}/api/employee-form/ingest
           </code>
         </p>
-        <p className={styles.subtitle}>
+        <p className={shared.hint}>
           Header: <code>X-Employee-Form-Key</code> · Tenant:{' '}
           <code>{tenantHint}</code>
         </p>
       </section>
 
-      <section className={styles.panel}>
-        <h2 className={styles.title}>2. Google Form</h2>
-        <ol className={styles.subtitle}>
+      <section className={card.card} style={{ marginBottom: 14 }}>
+        <h2 className={card.cardTitle}>2. Google Form</h2>
+        <ol className={shared.hint}>
           <li>
             Google Drive → <b>New → Google Apps Script</b>
           </li>
@@ -136,13 +137,13 @@ export default function GoogleFormEmployeesPage() {
           </li>
           <li>Form linkini kandidatlarga yuboring</li>
         </ol>
-        <p className={styles.subtitle}>
+        <p className={shared.hint}>
           Batafsil: <code>docs/GOOGLE_FORM_EMPLOYEES.md</code>
         </p>
       </section>
 
-      <section className={styles.panel}>
-        <h2 className={styles.title}>3. Maydonlar</h2>
+      <section className={card.card} style={{ marginBottom: 14 }}>
+        <h2 className={card.cardTitle}>3. Maydonlar</h2>
         {!schema ? null : (
           <table className={styles.table}>
             <thead>
@@ -169,9 +170,9 @@ export default function GoogleFormEmployeesPage() {
         )}
       </section>
 
-      <section className={styles.panel}>
-        <h2 className={styles.title}>4. Curl sinov</h2>
-        <pre className={styles.subtitle}>
+      <section className={card.card} style={{ marginBottom: 14 }}>
+        <h2 className={card.cardTitle}>4. Curl sinov</h2>
+        <pre className={shared.hint} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
           {`curl -X POST "${apiBase}/api/employee-form/ingest" \\
   -H "Content-Type: application/json" \\
   -H "X-Employee-Form-Key: $EMPLOYEE_FORM_INGEST_KEY" \\

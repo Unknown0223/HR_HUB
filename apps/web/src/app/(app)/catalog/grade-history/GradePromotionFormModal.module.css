@@ -182,7 +182,7 @@
 }
 
 .gradeArrow {
-  color: #9ca3af;
+  color: var(--ink-faint);
   flex-shrink: 0;
   font-size: 0.75rem;
 }
@@ -210,7 +210,7 @@
 
 .lineEmpty {
   text-align: center;
-  color: #9ca3af;
+  color: var(--ink-faint);
   font-weight: 600;
   padding: 1.1rem 0.5rem !important;
 }

@@ -36,7 +36,7 @@
 }
 
 .monthBtn i {
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .monthPopup {
@@ -158,6 +158,6 @@
 
 .empty {
   text-align: center;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   padding: 1.5rem;
 }

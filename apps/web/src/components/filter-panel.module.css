@@ -462,7 +462,7 @@
 }
 
 .grip {
-  color: #9ca3af;
+  color: var(--ink-faint);
   font-size: 0.75rem;
   letter-spacing: -0.08em;
   cursor: grab;
@@ -539,7 +539,7 @@
 .searchIcon {
   position: absolute;
   left: 0.55rem;
-  color: #9ca3af;
+  color: var(--ink-faint);
   font-size: 0.95rem;
   pointer-events: none;
 }

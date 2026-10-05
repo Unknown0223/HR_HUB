@@ -42,7 +42,7 @@
 .hint {
   margin: 0;
   font-size: 0.72rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   line-height: 1.35;
 }
 

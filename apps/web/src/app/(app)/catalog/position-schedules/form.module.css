@@ -396,12 +396,12 @@
   font-size: 0.65rem;
   font-weight: 500;
   text-transform: lowercase;
-  color: #94a3b8;
+  color: var(--ink-faint);
 }
 
 .empty {
   padding: 2rem;
-  color: #94a3b8;
+  color: var(--ink-faint);
   text-align: center;
 }
 

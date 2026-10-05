@@ -35,7 +35,7 @@
 }
 
 .monthBtn i {
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .monthPopup {

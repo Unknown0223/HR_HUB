@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
-import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -90,41 +89,39 @@ export default function SmtpSettingsPage() {
   return (
     <div className={shared.wrap}>
       <PageSubnav groupKey="settings" />
-      <div className={styles.pageHeader}>
+      <div className={shared.pageHeader}>
         <div>
-          <h1 className={styles.title}>Почта (SMTP)</h1>
-          <p className={styles.subtitle}>
+          <h1 className={shared.pageTitle}>Почта (SMTP)</h1>
+          <p className={shared.pageSubtitle}>
             Сервер для писем с кодом восстановления пароля. Код также приходит в Telegram-бот, если аккаунт привязан.
           </p>
         </div>
       </div>
 
-      {!data && !error ? <p className={styles.empty}>Загрузка…</p> : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {ok ? <p className={styles.subtitle}>{ok}</p> : null}
+      {!data && !error ? <p className={shared.muted}>Загрузка…</p> : null}
+      {error ? <p className={shared.error}>{error}</p> : null}
+      {ok ? <p className={formStyles.ok} style={{ marginBottom: 12 }}>{ok}</p> : null}
 
       {data ? (
-        <div className={formStyles.formCard || styles.panel}>
-          <label className={formStyles.checkRow || styles.row}>
-            <input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />{' '}
+        <div className={formStyles.card} style={{ maxWidth: 760 }}>
+          <label className={formStyles.check}>
+            <input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />
             Использовать эти настройки
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px', gap: 12, marginTop: 12 }}>
-            <div className={formStyles.field || styles.field}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px', gap: 12 }}>
+            <div className={formStyles.field}>
               <label>SMTP-сервер</label>
               <input
-                className={formStyles.input}
                 value={form.host}
                 onChange={(e) => set('host', e.target.value)}
                 placeholder="smtp.gmail.com"
                 autoComplete="off"
               />
             </div>
-            <div className={formStyles.field || styles.field}>
+            <div className={formStyles.field}>
               <label>Порт</label>
               <input
-                className={formStyles.input}
                 type="number"
                 min={1}
                 max={65535}
@@ -137,15 +134,14 @@ export default function SmtpSettingsPage() {
             </div>
           </div>
 
-          <label className={formStyles.checkRow || styles.row} style={{ marginTop: 10 }}>
-            <input type="checkbox" checked={form.secure} onChange={(e) => set('secure', e.target.checked)} /> SSL/TLS
-            сразу (обычно порт 465; для 587 — выключено, используется STARTTLS)
+          <label className={formStyles.check}>
+            <input type="checkbox" checked={form.secure} onChange={(e) => set('secure', e.target.checked)} />
+            SSL/TLS сразу (обычно порт 465; для 587 — выключено, используется STARTTLS)
           </label>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Логин</label>
             <input
-              className={formStyles.input}
               value={form.user}
               onChange={(e) => set('user', e.target.value)}
               placeholder="noreply@company.uz"
@@ -153,10 +149,9 @@ export default function SmtpSettingsPage() {
             />
           </div>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Пароль{data.hasPassword ? ' (сохранён — оставьте пустым, чтобы не менять)' : ''}</label>
             <input
-              className={formStyles.input}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -165,27 +160,25 @@ export default function SmtpSettingsPage() {
             />
           </div>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Отправитель</label>
             <input
-              className={formStyles.input}
               value={form.from}
               onChange={(e) => set('from', e.target.value)}
               placeholder="Worklyn <noreply@company.uz>"
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-            <button type="button" className={styles.btnPrimary} disabled={saving} onClick={() => void save()}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className={shared.btn} disabled={saving} onClick={() => void save()}>
               {saving ? 'Сохранение…' : 'Сохранить'}
             </button>
           </div>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 20 }}>
+          <div className={formStyles.field} style={{ marginTop: 8 }}>
             <label>Проверка: отправить тестовое письмо</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
-                className={formStyles.input}
                 type="email"
                 value={testTo}
                 onChange={(e) => setTestTo(e.target.value)}
@@ -194,7 +187,7 @@ export default function SmtpSettingsPage() {
               />
               <button
                 type="button"
-                className={styles.btnSecondary}
+                className={shared.btnSecondary}
                 disabled={testing || !testTo.includes('@')}
                 onClick={() => void sendTest()}
               >
@@ -203,7 +196,7 @@ export default function SmtpSettingsPage() {
             </div>
           </div>
 
-          <p className={styles.subtitle} style={{ marginTop: 16 }}>
+          <p className={shared.muted} style={{ margin: 0 }}>
             Сейчас используется: {SOURCE_LABEL[data.effectiveSource]}
           </p>
         </div>

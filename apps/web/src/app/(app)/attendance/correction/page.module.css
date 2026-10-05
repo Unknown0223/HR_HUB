@@ -369,7 +369,7 @@
 .stAbsent { background: var(--tint-neutral, #e2e8f0); color: var(--tint-ink-muted, #64748b); }
 .stDayOff { background: #3b82f6; color: #fff; }
 .stLeave { background: #eab308; color: #422006; }
-.stEmpty { background: transparent; color: #94a3b8; }
+.stEmpty { background: transparent; color: var(--ink-faint); }
 
 .cellSelected {
   background: rgba(47, 163, 80, 0.14) !important;

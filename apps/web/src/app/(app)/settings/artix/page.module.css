@@ -239,7 +239,7 @@
 }
 
 .mapHandle {
-  color: #b5b5c3;
+  color: var(--ink-faint);
   cursor: grab;
   font-size: 1rem;
   line-height: 1;

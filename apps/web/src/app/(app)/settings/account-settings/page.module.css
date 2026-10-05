@@ -92,7 +92,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #9ca3af;
+  color: var(--ink-faint);
   font-size: 1.05rem;
   line-height: 1;
   cursor: pointer;

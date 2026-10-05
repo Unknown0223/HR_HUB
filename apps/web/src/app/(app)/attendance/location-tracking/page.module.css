@@ -188,7 +188,7 @@
 
 .empty {
   text-align: center;
-  color: #9ca3af;
+  color: var(--ink-faint);
   padding: 1rem !important;
 }
 

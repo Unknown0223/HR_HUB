@@ -109,7 +109,7 @@
 }
 
 .drag {
-  color: #a1a5b7;
+  color: var(--ink-faint);
   font-size: 0.85rem;
   text-align: center;
   cursor: grab;

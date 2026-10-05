@@ -211,7 +211,7 @@
 .optionsHint {
   margin: 0;
   font-size: 0.78rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .optionsArea {

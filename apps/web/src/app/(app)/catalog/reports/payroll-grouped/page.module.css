@@ -54,7 +54,7 @@
 }
 
 .monthBtn i {
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .monthPopup {
@@ -292,7 +292,7 @@
 
 .empty {
   text-align: center;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   padding: 1.5rem;
 }
 
@@ -439,7 +439,7 @@
 
 .pickEmpty {
   padding: 0.45rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   font-size: 0.82rem;
 }
 
@@ -527,7 +527,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   cursor: pointer;
   padding: 0.25rem 0.35rem;
 }
@@ -551,7 +551,7 @@
 .settingsHint {
   margin: 0.75rem 0 0;
   font-size: 0.78rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .savedOk {

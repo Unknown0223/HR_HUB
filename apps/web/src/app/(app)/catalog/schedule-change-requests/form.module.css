@@ -275,13 +275,13 @@
 
 .comboMeta {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--ink-faint);
 }
 
 .comboEmpty {
   padding: 0.65rem 0.75rem;
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--ink-faint);
 }
 
 .selectedHint {
@@ -350,7 +350,7 @@
 
 .swapArrow {
   font-size: 1.15rem;
-  color: #9ca3af;
+  color: var(--ink-faint);
   flex-shrink: 0;
   line-height: 1;
   user-select: none;

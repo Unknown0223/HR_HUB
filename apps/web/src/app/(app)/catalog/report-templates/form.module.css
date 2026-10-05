@@ -116,8 +116,9 @@
 
 .field label {
   display: block;
-  font-size: 0.72rem;
-  color: var(--tint-ink-muted, #95a5a6);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--tint-ink-muted, #5e6f62);
   margin-bottom: 0.22rem;
 }
 
@@ -242,8 +243,9 @@
 
 .fieldLabel {
   display: block;
-  font-size: 0.72rem;
-  color: var(--tint-ink-muted, #95a5a6);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--tint-ink-muted, #5e6f62);
   margin-bottom: 0.35rem;
 }
 
@@ -352,7 +354,7 @@
 
 .dropHint {
   font-size: 0.78rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .fileName {
@@ -417,7 +419,7 @@
 .varEmpty {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .addVar {

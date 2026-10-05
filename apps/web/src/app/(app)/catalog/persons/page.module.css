@@ -413,7 +413,7 @@
 }
 
 .photoPlaceholder {
-  color: #9ca3af;
+  color: var(--ink-faint);
   font-size: 0.85rem;
 }
 

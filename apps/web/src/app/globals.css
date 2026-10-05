@@ -10,7 +10,11 @@
   --ink: #1e2b22;
   --ink-strong: #152018;
   --ink-muted: #5e6f62;
-  --ink-faint: #98a89b;
+  /* Secondary text (labels, hints, column captions): keep ≥ 4.5:1 on white. */
+  --ink-faint: #66796a;
+  /* Page CSS modules write var(--tint-ink*, <literal>); many literals are too pale to read. */
+  --tint-ink: var(--ink);
+  --tint-ink-muted: var(--ink-muted);
   --line: #dcebdc;
   --line-soft: #dcebdc;
   --line-table: #dcebdc;

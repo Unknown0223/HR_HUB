@@ -16,7 +16,7 @@
 }
 
 .periodBtn i {
-  color: #b5b5c3;
+  color: var(--ink-faint);
   font-size: 13px;
 }
 
@@ -208,7 +208,7 @@
 
 .empty {
   text-align: center;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   padding: 1.5rem;
 }
 

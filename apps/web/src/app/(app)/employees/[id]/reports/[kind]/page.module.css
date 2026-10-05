@@ -222,7 +222,7 @@
 .toggleLabel em {
   font-style: normal;
   font-size: 0.72rem;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   font-weight: 600;
 }
 
@@ -391,7 +391,7 @@
 
 .empty {
   text-align: center;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   padding: 1.25rem !important;
 }
 
@@ -427,7 +427,7 @@
 }
 
 .muted {
-  color: #a1a5b7;
+  color: var(--ink-faint);
   font-size: 0.82rem;
 }
 

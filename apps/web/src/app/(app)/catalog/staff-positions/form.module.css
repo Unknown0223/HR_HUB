@@ -354,6 +354,6 @@
 
 .emptyCell {
   text-align: center;
-  color: #a1a5b7;
+  color: var(--ink-faint);
   padding: 0.85rem !important;
 }

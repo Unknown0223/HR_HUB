@@ -24,7 +24,7 @@
 }
 
 .mappedNo {
-  color: #b5b5c3;
+  color: var(--ink-faint);
   font-size: 0.82rem;
 }
 

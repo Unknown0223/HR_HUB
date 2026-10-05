@@ -283,7 +283,7 @@
 .batteryOk { color: #16a34a; }
 .batteryMid { color: #e39b0b; }
 .batteryLow { color: #dc2626; }
-.batteryNone { color: #9ca3af; font-size: 0.72rem; }
+.batteryNone { color: var(--ink-faint); font-size: 0.72rem; }
 
 /* ---------- map ---------- */
 
@@ -561,7 +561,7 @@
 }
 
 .empty {
-  color: #9ca3af;
+  color: var(--ink-faint);
   text-align: center;
   margin: 1.5rem 1rem;
   font-size: 0.82rem;
@@ -784,7 +784,7 @@
 
 .grpTitle span {
   font-size: 0.68rem;
-  color: #9ca3af;
+  color: var(--ink-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -866,7 +866,7 @@
 }
 
 .toolsHint {
-  color: #9ca3af;
+  color: var(--ink-faint);
   white-space: nowrap;
 }
 

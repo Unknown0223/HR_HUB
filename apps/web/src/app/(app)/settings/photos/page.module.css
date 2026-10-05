@@ -44,7 +44,7 @@
 }
 
 .folderBtnEmpty {
-  color: #a1a5b7;
+  color: var(--ink-faint);
 }
 
 .hidden {

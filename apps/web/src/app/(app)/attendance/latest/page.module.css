@@ -120,7 +120,7 @@
 }
 
 .empty {
-  color: #9ca3af;
+  color: var(--ink-faint);
   grid-column: 1 / -1;
   text-align: center;
   padding: 2rem;

@@ -11,6 +11,7 @@ import { apiFetch } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
 import { prefsConfigFromColumns } from '@/lib/table-field-defs/from-columns';
 import styles from '../marks/page.module.css';
+import shared from '../../../page-shared.module.css';
 import { AdminSessionDetails } from './AdminSessionDetails';
 
 type Problem = {
@@ -162,17 +163,17 @@ function ProblemsInner() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <span className={styles.pagerMeta}>
+          <span className={shared.pagerMeta}>
             {displayRows.length}/{rows.length}
           </span>
-          <button type="button" className={styles.btnGhost} onClick={() => void load()}>
+          <button type="button" className={shared.btnSecondary} onClick={() => void load()}>
             Обновить
           </button>
           <TablePrefsMenuButton prefs={prefs} onExport={exportCsv} />
         </div>
       </div>
       {error ? <p className={styles.error}>{error}</p> : null}
-      <div className={styles.panel}>
+      <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -200,7 +201,7 @@ function ProblemsInner() {
                       {r.reason === 'device_admin_login' ? (
                         <button
                           type="button"
-                          className={styles.btnGhost}
+                          className={`${shared.btnSecondary} ${shared.btnSm}`}
                           onClick={() => setOpenId(openId === r.id ? null : r.id)}
                         >
                           {openId === r.id ? 'Скрыть' : 'Подробнее'}
@@ -208,7 +209,7 @@ function ProblemsInner() {
                       ) : null}{' '}
                       <button
                         type="button"
-                        className={styles.btnBlue}
+                        className={`${shared.btn} ${shared.btnSm}`}
                         disabled={busy}
                         onClick={() => void resolve(r.id)}
                       >

@@ -182,7 +182,7 @@
 }
 
 .handle {
-  color: #94a3b8;
+  color: var(--ink-faint);
   text-align: center;
   letter-spacing: -2px;
   user-select: none;

@@ -16,7 +16,7 @@
 }
 
 .handle {
-  color: #a1a5b7;
+  color: var(--ink-faint);
   font-size: 1rem;
   letter-spacing: -1px;
 }

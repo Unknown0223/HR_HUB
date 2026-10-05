@@ -607,7 +607,7 @@
 
 .notifyItem span,
 .notifyItemUnread span {
-  color: #94a3b8;
+  color: var(--ink-faint);
   font-size: 11.5px;
 }
 
@@ -774,7 +774,7 @@
 
 .homeMegaDesc {
   font-size: 11.5px;
-  color: #94a3b8;
+  color: var(--ink-faint);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

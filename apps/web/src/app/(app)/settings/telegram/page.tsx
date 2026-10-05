@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PageSubnav } from '@/components/PageSubnav';
 import { apiFetch } from '@/lib/api';
-import styles from '../../catalog/absence-types/page.module.css';
 import formStyles from '../../catalog/report-templates/form.module.css';
 import shared from '../../../page-shared.module.css';
 
@@ -157,35 +156,34 @@ export default function TelegramSettingsPage() {
   return (
     <div className={shared.wrap}>
       <PageSubnav groupKey="settings" />
-      <div className={styles.pageHeader}>
+      <div className={shared.pageHeader}>
         <div>
-          <h1 className={styles.title}>Telegram Bot</h1>
-          <p className={styles.subtitle}>
+          <h1 className={shared.pageTitle}>Telegram Bot</h1>
+          <p className={shared.pageSubtitle}>
             Xodimlarni bot orqali qo‘shish: token, webhook va yuz rasmi
           </p>
         </div>
       </div>
 
-      {loading ? <p className={styles.empty}>Загрузка…</p> : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {ok ? <p className={styles.subtitle}>{ok}</p> : null}
+      {loading ? <p className={shared.muted}>Загрузка…</p> : null}
+      {error ? <p className={shared.error}>{error}</p> : null}
+      {ok ? <p className={formStyles.ok} style={{ marginBottom: 12 }}>{ok}</p> : null}
 
       {!loading && row ? (
-        <div className={formStyles.formCard || styles.panel}>
-          <label className={formStyles.checkRow || styles.row}>
+        <div className={formStyles.card} style={{ maxWidth: 760 }}>
+          <label className={formStyles.check}>
             <input
               type="checkbox"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
-            />{' '}
+            />
             Интеграция включена
           </label>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Bot token (от @BotFather)</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
-                className={formStyles.input}
                 type={showToken ? 'text' : 'password'}
                 value={cfg.botToken || ''}
                 onChange={(e) => setCfg((c) => ({ ...c, botToken: e.target.value }))}
@@ -195,7 +193,7 @@ export default function TelegramSettingsPage() {
               />
               <button
                 type="button"
-                className={styles.btnSecondary}
+                className={shared.btnSecondary}
                 onClick={() => setShowToken((v) => !v)}
               >
                 {showToken ? 'Скрыть' : 'Показать'}
@@ -203,20 +201,18 @@ export default function TelegramSettingsPage() {
             </div>
           </div>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Bot username</label>
             <input
-              className={formStyles.input}
               value={cfg.botUsername || ''}
               onChange={(e) => setCfg((c) => ({ ...c, botUsername: e.target.value }))}
               placeholder="HRHUBBot"
             />
           </div>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Webhook secret (рекомендуется)</label>
             <input
-              className={formStyles.input}
               type="password"
               value={cfg.webhookSecret || ''}
               onChange={(e) =>
@@ -227,26 +223,25 @@ export default function TelegramSettingsPage() {
             />
           </div>
 
-          <div className={formStyles.field || styles.field} style={{ marginTop: 12 }}>
+          <div className={formStyles.field}>
             <label>Публичный API URL</label>
             <input
-              className={formStyles.input}
               value={cfg.publicApiUrl || ''}
               onChange={(e) =>
                 setCfg((c) => ({ ...c, publicApiUrl: e.target.value }))
               }
               placeholder="https://hr-hubapi-production.up.railway.app"
             />
-            <p className={styles.subtitle} style={{ marginTop: 6 }}>
+            <p className={shared.hint} style={{ margin: '6px 0 0' }}>
               Webhook: {(cfg.publicApiUrl || '…').replace(/\/$/, '')}
               /api/telegram/webhook
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             <button
               type="button"
-              className={styles.btnPrimary}
+              className={shared.btn}
               disabled={saving}
               onClick={() => void save()}
             >
@@ -254,19 +249,19 @@ export default function TelegramSettingsPage() {
             </button>
             <button
               type="button"
-              className={styles.btnSecondary}
+              className={shared.btnSecondary}
               disabled={webhookBusy || !(cfg.botToken || '').trim()}
               onClick={() => void registerWebhook()}
             >
               {webhookBusy ? 'Webhook…' : 'Зарегистрировать webhook'}
             </button>
-            <Link href="/employees?panel=telegram" className={styles.btnSecondary}>
+            <Link href="/employees?panel=telegram" className={shared.btnSecondary}>
               Заявки сотрудников
             </Link>
           </div>
 
           {status ? (
-            <p className={styles.subtitle} style={{ marginTop: 16 }}>
+            <p className={shared.muted} style={{ margin: 0 }}>
               Статус: {status.enabled ? 'включён' : 'выключен'}
               {status.botUsername ? ` · @${status.botUsername}` : ''}
               {status.source ? ` · источник: ${status.source}` : ''}
