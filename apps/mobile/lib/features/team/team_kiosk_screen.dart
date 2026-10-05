@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/api/api_config.dart';
 import '../../core/api/me_repository.dart';
@@ -69,10 +70,12 @@ class _TeamKioskScreenState extends ConsumerState<TeamKioskScreen> {
     super.initState();
     _comment.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    unawaited(WakelockPlus.enable());
   }
 
   @override
   void dispose() {
+    unawaited(WakelockPlus.disable());
     _next?.cancel();
     _comment.dispose();
     super.dispose();
