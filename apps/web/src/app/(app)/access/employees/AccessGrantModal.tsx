@@ -60,7 +60,9 @@ export function AccessGrantModal({
     type?.resource === 'division' ? divisions : type?.resource === 'flag' ? options.flags : [];
   const resourceLabel = type?.resource === 'all'
     ? 'Вся организация'
-    : resourceOptions.find((o) => o.id === resource)?.label ?? '';
+    : type?.resource === 'feature'
+      ? 'Включено'
+      : resourceOptions.find((o) => o.id === resource)?.label ?? '';
   const sensitive = !!type && (type.global || (type.resource === 'flag' && SENSITIVE_FLAGS.has(resource)));
   const today = new Date().toISOString().slice(0, 10);
 
@@ -82,7 +84,7 @@ export function AccessGrantModal({
     if (!type) return;
     const payload: GrantPayload = {
       accessType: type.id,
-      resource: type.resource === 'all' ? undefined : resource,
+      resource: type.resource === 'all' || type.resource === 'feature' ? undefined : resource,
       expiresAt: action === 'grant' && expiresOn ? endOfDayIso(expiresOn) : undefined,
       reason: reason.trim(),
     };
@@ -165,6 +167,13 @@ export function AccessGrantModal({
               ))}
             </select>
           </label>
+          {type?.id === 'team_kiosk' ? (
+            <p className={styles.muted}>
+              Руководитель сможет отмечать приход и уход своих подчинённых со своего телефона: в мобильном
+              приложении появится «Режим устройства», сотрудник определяется по лицу. Без этого доступа раздел
+              в приложении скрыт.
+            </p>
+          ) : null}
           {resourceOptions.length ? (
             <label className={styles.field}>
               {type?.resource === 'division' ? 'Подразделение' : 'Ограничение'}

@@ -8,7 +8,7 @@ export type AccessTypeOption = {
   global: boolean;
   readOnly: boolean;
   allowExpiry: boolean;
-  resource: 'all' | 'division' | 'flag' | 'location' | 'employee';
+  resource: 'all' | 'division' | 'flag' | 'location' | 'employee' | 'feature';
   canGrant: boolean;
 };
 
