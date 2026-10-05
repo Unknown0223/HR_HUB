@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { apiFetch, setSession, Session } from '@/lib/api';
 import { BrandMark } from '@/components/BrandMark';
 import { SeasonalBackdrop } from '@/components/SeasonalBackdrop';
+import { TelegramLoginModal } from '@/components/auth/TelegramLoginModal';
+import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 import styles from './login.module.css';
 
 export default function LoginPage() {
@@ -15,6 +17,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [dialog, setDialog] = useState<'telegram' | 'forgot' | null>(null);
   const cardRef = useRef<HTMLFormElement>(null);
 
   // Shakes the card in place: remounting it would replay the fade-in of every field,
@@ -151,13 +154,7 @@ export default function LoginPage() {
               />
               <span>Запомнить сессию</span>
             </label>
-            <button
-              type="button"
-              className={styles.forgot}
-              onClick={() =>
-                setError('Для сброса пароля обратитесь к системному администратору вашей организации.')
-              }
-            >
+            <button type="button" className={styles.forgot} onClick={() => setDialog('forgot')}>
               Забыли пароль?
             </button>
           </div>
@@ -192,8 +189,48 @@ export default function LoginPage() {
               </>
             )}
           </button>
+
+          <button
+            type="button"
+            className={styles.telegram}
+            disabled={loading}
+            onClick={() => setDialog('telegram')}
+          >
+            <TelegramIcon />
+            <span>Войти через Telegram</span>
+          </button>
         </form>
       </div>
+
+      <TelegramLoginModal
+        open={dialog === 'telegram'}
+        initialLogin={email}
+        onClose={() => setDialog(null)}
+        onSignedIn={(session) => {
+          setDialog(null);
+          setSession(session);
+          router.replace('/dashboard');
+        }}
+      />
+      <ForgotPasswordModal
+        open={dialog === 'forgot'}
+        initialLogin={email}
+        onClose={() => setDialog(null)}
+        onDone={(login) => {
+          setDialog(null);
+          setEmail(login);
+          setPassword('');
+          setError('');
+        }}
+      />
     </main>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+    </svg>
   );
 }

@@ -148,6 +148,7 @@ export const CATALOG_NAV: NavGroup[] = [
       { href: '/settings/billz', label: 'Настройки Billz 2.0' },
       { href: '/settings/billz-sales', label: 'Продажи Billz 1.0' },
       { href: '/settings/telegram', label: 'Telegram Bot' },
+      { href: '/settings/smtp', label: 'Почта (SMTP)' },
       { href: '/settings/google-form', label: 'Google Form (сотрудники)' },
       { href: '/settings/payroll-calc', label: 'Расчет зарплаты' },
       { href: '/settings/account-settings', label: 'Настройки счетов' },

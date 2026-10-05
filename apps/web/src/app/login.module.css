@@ -424,6 +424,38 @@
   opacity: 0.9;
 }
 
+.telegram {
+  height: 48px;
+  border: 1.5px solid rgba(34, 158, 217, 0.35);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #1b7fb5;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
+  animation: itemIn 0.55s cubic-bezier(0.33, 1, 0.32, 1) 0.72s both;
+}
+
+.telegram:hover:not(:disabled) {
+  background: rgba(34, 158, 217, 0.08);
+  border-color: rgba(34, 158, 217, 0.6);
+}
+
+.telegram:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.telegram:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .sweep {
   position: absolute;
   inset: -40% -20%;

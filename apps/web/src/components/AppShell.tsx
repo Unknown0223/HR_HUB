@@ -33,6 +33,7 @@ import { I18nProvider, LANGS, useI18n } from '@/lib/i18n';
 import { SidebarNav } from './SidebarNav';
 import { BrandMark } from './BrandMark';
 import { formatDateTime, NotificationPrefsDialog, SessionsDialog } from './ProfileDialogs';
+import { TelegramConnectDialog, TelegramPrompt } from './TelegramConnect';
 import styles from './shell.module.css';
 import sb from './sidebar.module.css';
 
@@ -85,6 +86,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const [screenLocked, setScreenLocked] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [notifyPrefsOpen, setNotifyPrefsOpen] = useState(false);
+  const [telegramOpen, setTelegramOpen] = useState(false);
   const [account, setAccount] = useState<{
     employeeId: string | null;
     previousLoginAt: string | null;
@@ -1015,6 +1017,18 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
                     className={styles.dropItem}
                     onClick={() => {
                       setProfileOpen(false);
+                      setTelegramOpen(true);
+                    }}
+                  >
+                    <i className="fab fa-telegram-plane" aria-hidden />
+                    {t('Telegram-бот')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.dropItem}
+                    onClick={() => {
+                      setProfileOpen(false);
                       setScreenLocked(true);
                     }}
                   >
@@ -1106,6 +1120,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
       {sessionsOpen ? <SessionsDialog onClose={() => setSessionsOpen(false)} /> : null}
       {notifyPrefsOpen ? <NotificationPrefsDialog onClose={() => setNotifyPrefsOpen(false)} /> : null}
+      {telegramOpen ? <TelegramConnectDialog mode="manage" onClose={() => setTelegramOpen(false)} /> : null}
+      {session ? <TelegramPrompt /> : null}
 
       {screenLocked ? (
         <div className={styles.lockOverlay} role="dialog" aria-modal="true">

@@ -420,6 +420,7 @@ export const FORM_SIBLINGS: Record<string, SiblingGroup> = {
     siblings: [
       { label: 'Внешние системы', href: '/settings?tab=integrations' },
       { label: 'Telegram Bot', href: '/settings/telegram' },
+      { label: 'Почта (SMTP)', href: '/settings/smtp' },
       { label: 'Google Form', href: '/settings/google-form' },
       { label: 'ARTIX', href: '/settings/artix' },
       { label: 'IIKO', href: '/settings/iiko' },

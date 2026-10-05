@@ -1,0 +1,126 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.25rem 0.85rem;
+}
+
+.icon,
+.iconOk {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #37aee2 0%, #1e96c8 100%);
+  box-shadow: 0 8px 20px -6px rgba(30, 150, 200, 0.55);
+}
+
+.iconOk {
+  background: linear-gradient(135deg, #6ccb86 0%, #2fa350 100%);
+  box-shadow: 0 8px 20px -6px rgba(47, 163, 80, 0.55);
+  font-size: 1.5rem;
+}
+
+.heading {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink-strong, #111827);
+}
+
+.text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--tint-ink, #374151);
+}
+
+.list {
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--tint-ink, #374151);
+}
+
+.list li {
+  position: relative;
+  padding-left: 1.4rem;
+  line-height: 1.4;
+}
+
+.list li::before {
+  content: '';
+  position: absolute;
+  left: 0.2rem;
+  top: 0.38em;
+  width: 0.55rem;
+  height: 0.3rem;
+  border-left: 2px solid #2fa350;
+  border-bottom: 2px solid #2fa350;
+  transform: rotate(-45deg);
+}
+
+.muted {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--tint-ink-muted, #6b7280);
+}
+
+.waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e96c8;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1e96c8;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+}
+
+.goBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  background: #1e96c8 !important;
+}
+
+.goBtn[aria-disabled='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
