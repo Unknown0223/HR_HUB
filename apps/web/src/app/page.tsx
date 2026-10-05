@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch, setSession, Session } from '@/lib/api';
 import { BrandMark } from '@/components/BrandMark';
@@ -193,10 +192,6 @@ export default function LoginPage() {
               </>
             )}
           </button>
-
-          <Link href="/m" className={styles.portal}>
-            Мобильный портал сотрудника
-          </Link>
         </form>
       </div>
     </main>

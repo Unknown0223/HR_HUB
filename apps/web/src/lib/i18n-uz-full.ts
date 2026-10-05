@@ -1821,7 +1821,6 @@ export const UZ_FULL: UzDictionary = {
   "Многосменный график": "Ko‘p smenali jadval",
   "Мобильного аккаунта нет — задайте логин и пароль": "Mobil akkaunt yo‘q — login va parolni belgilang",
   "Мобильный аккаунт": "Mobil akkaunt",
-  "Мобильный портал сотрудника": "Xodimning mobil portali",
   "Модель": "Model",
   "Модель устройства": "Qurilma modeli",
   "Мои": "Meniki",

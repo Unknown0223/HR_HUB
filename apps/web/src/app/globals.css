@@ -82,34 +82,6 @@
   --dash-absent: #e5484d;
   --dash-dayoff: #98a89b;
   --dash-center: #1e2b22;
-
-  /* Mobile web client (/m) — same light-green skin as the Flutter app */
-  --m-bg: #f1f8f1;
-  --m-nav: #ffffff;
-  --m-card: #ffffff;
-  --m-card-elev: #ffffff;
-  --m-field: #ffffff;
-  --m-ink: #1e2b22;
-  --m-ink-muted: #5e6f62;
-  --m-ink-faint: #98a89b;
-  --m-accent: #2fa350;
-  --m-accent-hover: #268a42;
-  --m-accent-link: #1f6f3a;
-  --m-accent-soft: #e3f5e7;
-  --m-line: #dcebdc;
-  --m-ok: #2fa350;
-  --m-late: #e39b0b;
-  --m-absent: #e5484d;
-  --m-dayoff: #98a89b;
-  --m-radius: 16px;
-}
-
-/* The /m shell uses the same light-green plane as the Flutter app. */
-body[data-app='mobile'] {
-  background: var(--m-bg);
-  color: var(--m-ink);
-  overscroll-behavior-y: none;
-  color-scheme: light;
 }
 
 * {

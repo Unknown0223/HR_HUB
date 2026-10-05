@@ -447,20 +447,6 @@
   animation: spin 0.7s linear infinite;
 }
 
-.portal {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1f6f3a;
-  text-decoration: none;
-  padding: 4px 0 6px;
-}
-
-.portal:hover {
-  text-decoration: none;
-  color: #2fa350;
-}
-
 @keyframes photoDrift {
   from {
     transform: translate(0, 0) scale(1.01);
