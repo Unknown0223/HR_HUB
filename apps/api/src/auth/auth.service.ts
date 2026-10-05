@@ -96,7 +96,7 @@ export class AuthService {
    * a bare `login`, which must match exactly one account across all companies — never guess
    * between same-named accounts of different companies.
    */
-  private async findLoginUser(rawIdent: string) {
+  async findLoginUser(rawIdent: string) {
     const ident = rawIdent.trim().toLowerCase();
     const byEmail = (email: string) =>
       this.prisma.user.findUnique({ where: { email }, include: { tenant: true } });
@@ -121,6 +121,23 @@ export class AuthService {
     if (!user || !user.isActive) throw new UnauthorizedException();
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) throw new WrongCurrentPasswordException();
+    await this.storeNewPassword(user, newPassword);
+    return { ok: true };
+  }
+
+  /** Forgot-password: the caller has already verified a one-time code; every session is ended. */
+  async resetPassword(userId: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive) throw new UnauthorizedException();
+    await this.storeNewPassword(user, newPassword);
+    await this.sessions.revokeOthers(user.id, null);
+    return { ok: true };
+  }
+
+  private async storeNewPassword(
+    user: { id: string; passwordHash: string; meta: unknown },
+    newPassword: string,
+  ) {
     const next = newPassword.trim();
     if (next.length < 8) throw new BadRequestException('Пароль: минимум 8 символов');
     if (await bcrypt.compare(next, user.passwordHash)) {
@@ -138,7 +155,28 @@ export class AuthService {
         meta: { ...meta, passwordChangedAt: new Date().toISOString() } as Prisma.InputJsonValue,
       },
     });
-    return { ok: true };
+  }
+
+  /** Sign-in without a password, after the user approved it from the linked Telegram chat. */
+  async loginApproved(userId: string, client: SessionClient = {}) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { tenant: true },
+    });
+    if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
+    await this.assertEmployeeAccess(user);
+    const sid = await this.sessions.start(user.id, client);
+    return this.tokenResponse(user, user.tenant, sid);
+  }
+
+  /** Same gate as login (dismissed / HR-closed employees), without throwing. */
+  async canSignIn(user: { tenantId: string | null; role: Role; email: string; meta: unknown }) {
+    try {
+      await this.assertEmployeeAccess(user);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**

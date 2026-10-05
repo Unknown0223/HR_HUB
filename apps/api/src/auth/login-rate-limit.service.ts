@@ -18,6 +18,7 @@ type Bucket = { count: number; resetAt: number; limit: number };
 export class LoginRateLimitService {
   private readonly byEmailIp = new Map<string, Bucket>();
   private readonly byIp = new Map<string, Bucket>();
+  private readonly quotas = new Map<string, Bucket>();
 
   constructor(private readonly redis: RedisService) {}
 
@@ -84,6 +85,37 @@ export class LoginRateLimitService {
     }
   }
 
+  /**
+   * Counts every call (not only failures) against `limit` per `windowSec`; true while under it.
+   * Used for actions that send messages (sign-in requests, reset codes) so they cannot be spammed.
+   */
+  async takeQuota(key: string, limit: number, windowSec: number): Promise<boolean> {
+    const k = `quota:${key.trim().toLowerCase()}`;
+    if (this.redis.isReady) {
+      const n = await this.redis.incr(k);
+      if (n != null) {
+        if (n === 1) await this.redis.expire(k, windowSec);
+        return n <= limit;
+      }
+    }
+    const now = Date.now();
+    this.prune(now);
+    let bucket = this.quotas.get(k);
+    if (!bucket || now >= bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + windowSec * 1000, limit };
+      this.quotas.set(k, bucket);
+    }
+    bucket.count += 1;
+    return bucket.count <= limit;
+  }
+
+  /** {@link takeQuota} that answers 429 when exhausted. */
+  async assertQuota(key: string, limit: number, windowSec: number) {
+    if (!(await this.takeQuota(key, limit, windowSec))) {
+      throw new HttpException('Too many requests. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+  }
+
   async recordSuccess(req: Request, email: string) {
     const ip = this.clientIp(req);
     if (this.redis.isReady) {
@@ -123,7 +155,10 @@ export class LoginRateLimitService {
   }
 
   private prune(now: number) {
-    if (this.byEmailIp.size + this.byIp.size < 2000) return;
+    if (this.byEmailIp.size + this.byIp.size + this.quotas.size < 2000) return;
+    for (const [k, b] of this.quotas) {
+      if (now >= b.resetAt) this.quotas.delete(k);
+    }
     for (const [k, b] of this.byEmailIp) {
       if (now >= b.resetAt) this.byEmailIp.delete(k);
     }

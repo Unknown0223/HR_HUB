@@ -1275,9 +1275,16 @@ export class SettingsService {
 
   async listIntegrations(tenantId: string) {
     await this.ensureKnownIntegrations(tenantId);
-    return this.prisma.externalIntegration.findMany({
+    const rows = await this.prisma.externalIntegration.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
+    });
+    // SMTP password is write-only (managed via /mail/settings).
+    return rows.map((r) => {
+      const c = asMeta(r.config);
+      if (c.sys !== 'smtp' || !('password' in c)) return r;
+      const { password: _password, ...rest } = c;
+      return { ...r, config: { ...rest, hasPassword: Boolean(_password) } };
     });
   }
 

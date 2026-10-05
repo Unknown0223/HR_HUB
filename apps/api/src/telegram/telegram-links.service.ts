@@ -154,10 +154,13 @@ export class TelegramLinksService {
     return res.count;
   }
 
-  /** Approve / deny button on a sign-in request (`tl:<tokenId>:y|n`); only the linked Telegram user may answer. */
+  /**
+   * Number button on a sign-in request (`tl:<tokenId>:<nn>`, or `:n` for «not me»). Only the linked
+   * Telegram user may answer; picking a number other than the one shown on the sign-in screen denies it.
+   */
   async answerLogin(data: string, from: TgFrom) {
     const [, id, verdict] = data.split(':');
-    if (!id || !/^[0-9a-f-]{36}$/i.test(id) || (verdict !== 'y' && verdict !== 'n')) {
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id) || !(verdict === 'n' || /^\d{2}$/.test(verdict ?? ''))) {
       return { text: 'Noma’lum amal', edit: null as string | null, tenantId: null as string | null };
     }
     const token = await this.prisma.authToken.findUnique({
@@ -171,18 +174,22 @@ export class TelegramLinksService {
     if (token.status !== 'pending' || token.expiresAt.getTime() < Date.now()) {
       return { text: 'So‘rov muddati o‘tgan', edit: '⌛ Kirish so‘rovi muddati o‘tgan.', tenantId };
     }
-    const approved = verdict === 'y';
-    await this.prisma.authToken.updateMany({
+    const expected = metaOf(token.meta).code;
+    const approved = verdict !== 'n' && Number(verdict) === Number(expected);
+    const res = await this.prisma.authToken.updateMany({
       where: { id, status: 'pending' },
       data: { status: approved ? 'approved' : 'denied' },
     });
-    return approved
-      ? { text: 'Kirish tasdiqlandi', edit: '✅ Kirish tasdiqlandi.', tenantId }
-      : {
-          text: 'Kirish rad etildi',
-          edit: '❌ Kirish rad etildi. Agar bu siz bo‘lmasangiz, parolingizni almashtiring.',
-          tenantId,
-        };
+    if (!res.count) return { text: 'So‘rov allaqachon javoblangan', edit: null, tenantId };
+    if (approved) return { text: 'Kirish tasdiqlandi', edit: '✅ Kirish tasdiqlandi.', tenantId };
+    return {
+      text: 'Kirish rad etildi',
+      edit:
+        verdict === 'n'
+          ? '❌ Kirish rad etildi. Agar kimdir parolingizsiz kirishga urinayotgan bo‘lsa, xavotir olmang — tasdiqsiz kira olmaydi.'
+          : '❌ Noto‘g‘ri raqam tanlandi — kirish rad etildi. Qayta urinib ko‘ring.',
+      tenantId,
+    };
   }
 
   async linkOf(userId: string) {
