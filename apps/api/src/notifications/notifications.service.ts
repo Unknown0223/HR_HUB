@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { NotificationKind, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { runUnscoped } from '../common/data-scope';
+import { TelegramLinksService } from '../telegram/telegram-links.service';
 import {
   NOTIFICATION_CATEGORIES,
   readPrefs,
@@ -22,7 +23,10 @@ type Recipient = { id: string; meta: Prisma.JsonValue };
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly telegram: TelegramLinksService,
+  ) {}
 
   requireTenant(tenantId: string | null): string {
     if (!tenantId) throw new BadRequestException('Tenant required');
@@ -50,7 +54,43 @@ export class NotificationsService {
         href: data.href,
       })),
     });
+    // Arrival notices are covered by the per-punch Telegram message (sendPunchToTelegram).
+    if (data.entity !== 'attendance_arrival') {
+      const text = data.body ? `🔔 ${data.title}\n\n${data.body}` : `🔔 ${data.title}`;
+      void this.telegram.sendToUsers(recipients.map((u) => u.id), text, { tenantId });
+    }
     return recipients.map((u) => ({ id: u.id }));
+  }
+
+  /** Logins of one employee: `users.meta.employeeId` link, or matching e-mail. */
+  private employeeUsers(tenantId: string, employeeId: string) {
+    return runUnscoped(async () => {
+      const emp = await this.prisma.employee.findFirst({
+        where: { tenantId, id: employeeId },
+        select: { email: true },
+      });
+      const email = emp?.email?.trim();
+      return this.prisma.user.findMany({
+        where: {
+          tenantId,
+          isActive: true,
+          OR: [
+            { meta: { path: ['employeeId'], equals: employeeId } },
+            ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+          ],
+        },
+        select: { id: true, meta: true },
+      });
+    });
+  }
+
+  /**
+   * Telegram-only message to the employee's linked chat (no in-app row), honouring the same
+   * per-category switch as in-app notices — used for every attendance punch.
+   */
+  async telegramToEmployee(tenantId: string, employeeId: string, entity: string, text: string) {
+    const users = (await this.employeeUsers(tenantId, employeeId)).filter((u) => wantsNotification(u.meta, entity));
+    return this.telegram.sendToUsers(users.map((u) => u.id), text, { tenantId });
   }
 
   async notifyApprovers(tenantId: string, data: NotifyData) {
@@ -83,24 +123,7 @@ export class NotificationsService {
    * (the same rule `MeService.resolveEmployee` uses). No-op when the employee has no account.
    */
   async notifyEmployee(tenantId: string, employeeId: string, data: NotifyData) {
-    const users = await runUnscoped(async () => {
-      const emp = await this.prisma.employee.findFirst({
-        where: { tenantId, id: employeeId },
-        select: { email: true },
-      });
-      const email = emp?.email?.trim();
-      return this.prisma.user.findMany({
-        where: {
-          tenantId,
-          isActive: true,
-          OR: [
-            { meta: { path: ['employeeId'], equals: employeeId } },
-            ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
-          ],
-        },
-        select: { id: true, meta: true },
-      });
-    });
+    const users = await this.employeeUsers(tenantId, employeeId);
     return (await this.deliver(tenantId, users, data, NotificationKind.info)).length;
   }
 

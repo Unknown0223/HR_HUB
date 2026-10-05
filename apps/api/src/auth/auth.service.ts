@@ -10,6 +10,8 @@ import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto';
 import { SessionsService, type SessionClient } from './sessions.service';
+import { TelegramLinksService } from '../telegram/telegram-links.service';
+import { describeDevice, formatWhen } from './device-label';
 
 /** 400, not 401: clients treat 401 as an expired session and sign the user out. */
 export class WrongCurrentPasswordException extends BadRequestException {
@@ -24,7 +26,24 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly sessions: SessionsService,
+    private readonly telegram: TelegramLinksService,
   ) {}
+
+  /** Security notice to the linked Telegram chat; never blocks or fails the auth flow. */
+  private notifySecurity(user: { id: string; tenantId: string | null }, text: string) {
+    void this.telegram.sendToUser(user.id, text, { tenantId: user.tenantId }).catch(() => undefined);
+  }
+
+  private notifyNewLogin(user: { id: string; tenantId: string | null }, client: SessionClient, how: string) {
+    this.notifySecurity(
+      user,
+      `🔐 Akkauntingizga yangi kirish (${how})\n\n` +
+        `Qurilma: ${describeDevice(client.userAgent)}\n` +
+        `IP: ${client.ip || 'noma’lum'}\n` +
+        `Vaqt: ${formatWhen()}\n\n` +
+        'Agar bu siz bo‘lmasangiz, darhol parolni almashtiring va Profil → Seanslar bo‘limida begona seansni yoping.',
+    );
+  }
 
   async register(dto: RegisterDto, client: SessionClient = {}) {
     const existing = await this.prisma.tenant.findUnique({
@@ -77,6 +96,7 @@ export class AuthService {
 
     await this.assertEmployeeAccess(user);
     const sid = await this.sessions.start(user.id, client);
+    this.notifyNewLogin(user, client, 'parol bilan');
     return this.tokenResponse(user, user.tenant, sid);
   }
 
@@ -122,6 +142,11 @@ export class AuthService {
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) throw new WrongCurrentPasswordException();
     await this.storeNewPassword(user, newPassword);
+    this.notifySecurity(
+      user,
+      `🔐 Parolingiz o‘zgartirildi.\nVaqt: ${formatWhen()}\n\n` +
+        'Agar buni siz qilmagan bo‘lsangiz, darhol «Parolni unutdingizmi?» orqali tiklang yoki administratorga murojaat qiling.',
+    );
     return { ok: true };
   }
 
@@ -166,6 +191,7 @@ export class AuthService {
     if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
     await this.assertEmployeeAccess(user);
     const sid = await this.sessions.start(user.id, client);
+    this.notifyNewLogin(user, client, 'Telegram tasdig‘i bilan');
     return this.tokenResponse(user, user.tenant, sid);
   }
 

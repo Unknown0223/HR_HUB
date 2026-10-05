@@ -8808,7 +8808,63 @@ export class AttendanceService {
         this.logger.warn(`Terminal arrival notice failed: ${e instanceof Error ? e.message : e}`),
       );
     }
+    void this.sendPunchToTelegram(tenantId, employeeId, mark, day).catch((e) =>
+      this.logger.warn(`Telegram punch notice failed: ${e instanceof Error ? e.message : e}`),
+    );
     return { ok: true, markId: mark.id, deviceId, visitor };
+  }
+
+  /**
+   * Every live punch (terminal, phone, QR, HR-added) goes to the employee's linked Telegram chat.
+   * History a device uploads later and bulk imports are skipped so a sync does not flood the chat.
+   */
+  private async sendPunchToTelegram(
+    tenantId: string,
+    employeeId: string,
+    mark: { occurredAt: Date; source: string; deviceId: string | null; direction: PunchDirection; rawPayload: unknown },
+    day: { status: DayStatus; lateMinutes: number; firstInAt: Date | null; lastOutAt: Date | null } | null,
+  ) {
+    if (mark.source === 'import') return;
+    if (Date.now() - mark.occurredAt.getTime() > TERMINAL_NOTICE_MAX_AGE_MS) return;
+
+    const device = mark.deviceId
+      ? await this.prisma.device.findFirst({
+          where: { id: mark.deviceId, tenantId },
+          select: { name: true, location: { select: { name: true } } },
+        })
+      : null;
+    const place = device?.location?.name || device?.name || '';
+    const time = new Intl.DateTimeFormat('ru-RU', {
+      timeZone: ATTENDANCE_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(mark.occurredAt);
+    const at = mark.occurredAt.getTime();
+    const firstIn = day?.firstInAt?.getTime() === at;
+    const isIn =
+      mark.direction === PunchDirection.IN || (mark.direction === PunchDirection.AUTO && firstIn);
+    const isOut =
+      mark.direction === PunchDirection.OUT ||
+      (mark.direction === PunchDirection.AUTO && !firstIn && day?.lastOutAt?.getTime() === at);
+    const head = isIn ? '🟢 Kirish' : isOut ? '🔴 Chiqish' : '📍 Belgi';
+    const via = device
+      ? 'Terminal'
+      : mark.source === 'qr'
+        ? 'QR-kod'
+        : mark.source === 'manual'
+          ? 'Qo‘lda qo‘shildi (HR)'
+          : 'Telefon';
+
+    const lines = [`${head} qayd etildi · ${time}`, `${via}${place ? `: ${place}` : ''}`];
+    if (isIn && firstIn && day) {
+      lines.push(day.status === DayStatus.late ? `⚠️ ${day.lateMinutes} daqiqa kechikish` : '✅ O‘z vaqtida');
+    }
+    const payload = this.asMeta(mark.rawPayload);
+    if (payload.isValid === false) {
+      const note = typeof payload.note === 'string' && payload.note ? `: ${payload.note}` : '';
+      lines.push(`❗ Tabelda hisobga olinmadi${note}`);
+    }
+    await this.notifications.telegramToEmployee(tenantId, employeeId, 'attendance_arrival', lines.join('\n'));
   }
 
   async recalcDay(tenantId: string, employeeId: string, when: Date) {
