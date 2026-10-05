@@ -7,9 +7,11 @@ export type AccessTypeId =
   | 'org_subordinate'
   | 'profile_flag'
   | 'location'
-  | 'reports_to';
+  | 'reports_to'
+  | 'team_kiosk';
 
-export type AccessResourceKind = 'all' | 'division' | 'flag' | 'location' | 'employee';
+/** `feature`: an on/off capability of the employee themselves; stored with resource `*`. */
+export type AccessResourceKind = 'all' | 'division' | 'flag' | 'location' | 'employee' | 'feature';
 
 export type AccessTypeRule = {
   label: string;
@@ -35,6 +37,13 @@ export const ACCESS_TYPES: Record<AccessTypeId, AccessTypeRule> = {
   profile_flag: { label: 'Ограничение профиля', global: false, readOnly: false, allowExpiry: false, resource: 'flag' },
   location: { label: 'Локация', global: false, readOnly: true, allowExpiry: false, resource: 'location' },
   reports_to: { label: 'Руководитель', global: false, readOnly: true, allowExpiry: false, resource: 'employee' },
+  team_kiosk: {
+    label: 'Отметка сотрудников с телефона руководителя',
+    global: false,
+    readOnly: false,
+    allowExpiry: true,
+    resource: 'feature',
+  },
 };
 
 export const PROFILE_FLAGS: Record<string, string> = {
@@ -110,7 +119,7 @@ export function checkGrantInput(input: GrantInput, role: string, now: Date = new
   }
 
   let resource = String(input.resource ?? '').trim();
-  if (rule.resource === 'all') resource = '*';
+  if (rule.resource === 'all' || rule.resource === 'feature') resource = '*';
   if (rule.resource === 'flag' && !PROFILE_FLAGS[resource]) {
     return { ok: false, error: 'Неизвестное ограничение профиля' };
   }

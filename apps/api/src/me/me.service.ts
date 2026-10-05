@@ -50,21 +50,21 @@ import { StorageService } from '../storage/storage.service';
 import { summarizePayroll } from './payroll-summary';
 import { decodeDataUrl, photoRef } from './photo-ref';
 
-const MAX_GPS_ACCURACY_M = 100;
+export const MAX_GPS_ACCURACY_M = 100;
 /** ~15 KB JPEG — anything smaller cannot hold a back photo plus a selfie inset. */
 const MIN_PHOTO_REPORT_B64 = 20_000;
 
-const MOCK_LOCATION_WARNING =
+export const MOCK_LOCATION_WARNING =
   'Telefoningizda soxta lokatsiya (uchinchi tomon ilovasi yoki o‘zgartirilgan GPS) aniqlandi. ' +
   'Siz ruxsatsiz tizimdan foydalanib davomat qoidalarini aylanib o‘tishga urindingiz — belgi qabul qilinmadi. ' +
   'Bu holat HR bo‘limiga yuborildi; takrorlansa akkauntingiz qora ro‘yxatga tushirilishi va bloklanishi mumkin. ' +
   'Soxta GPS ilovasini o‘chirib, «Dasturchi sozlamalari»dagi mock lokatsiyani bekor qiling.';
 
-function integrityFlagged(i?: MeLocationIntegrityDto): boolean {
+export function integrityFlagged(i?: MeLocationIntegrityDto): boolean {
   return !!i && (i.mockLocation === true || !!i.activeMockApp?.trim());
 }
 
-function stripDataUrl(b64: string): string {
+export function stripDataUrl(b64: string): string {
   const raw = (b64 ?? '').trim();
   return raw.startsWith('data:') && raw.includes(',')
     ? raw.slice(raw.indexOf(',') + 1)
@@ -192,7 +192,23 @@ export class MeService {
     return { ...resolved, employee: resolved.employee };
   }
 
-  private async assertMarksAllowed(tenantId: string, employeeId: string) {
+  /** Granted on «Доступы сотрудников»; only meaningful for someone who leads a team. */
+  async teamKioskEnabled(tenantId: string, employeeId: string) {
+    const now = new Date();
+    const grant = await this.prisma.employeeAccessGrant.findFirst({
+      where: {
+        tenantId,
+        employeeId,
+        accessType: 'team_kiosk',
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      select: { id: true },
+    });
+    return !!grant;
+  }
+
+  async assertMarksAllowed(tenantId: string, employeeId: string) {
     const blocked = await this.prisma.employeeAccessGrant.findFirst({
       where: {
         tenantId,
@@ -211,10 +227,11 @@ export class MeService {
 
   async getProfile(user: AuthUser) {
     const { tenantId, dbUser, employee } = await this.resolveEmployee(user);
-    const [tenant, team, photoUrl] = await Promise.all([
+    const [tenant, team, photoUrl, teamKiosk] = await Promise.all([
       this.prisma.tenant.findUnique({ where: { id: tenantId } }),
       employee ? this.subordinateIds(tenantId, employee.id) : Promise.resolve([]),
       employee ? this.employeePhoto(tenantId, employee.id) : Promise.resolve(null),
+      employee ? this.teamKioskEnabled(tenantId, employee.id) : Promise.resolve(false),
     ]);
 
     return {
@@ -246,6 +263,7 @@ export class MeService {
           }
         : null,
       teamSize: team.length,
+      features: { teamKiosk: teamKiosk && team.length > 0 },
     };
   }
 

@@ -440,6 +440,7 @@ export class AccessService {
     const rule = isAccessType(g.accessType) ? ACCESS_TYPES[g.accessType] : null;
     let resourceLabel = labels.get(g.resource) ?? g.resource;
     if (rule?.resource === 'all') resourceLabel = 'Вся организация';
+    if (rule?.resource === 'feature') resourceLabel = 'Включено';
     if (rule?.resource === 'flag') resourceLabel = PROFILE_FLAGS[g.resource] ?? g.resource;
     return {
       id: g.id,

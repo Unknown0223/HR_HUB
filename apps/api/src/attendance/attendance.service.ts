@@ -98,8 +98,8 @@ import { applyLateAllowance, type LatenessRules } from './late-allowance';
 
 const GPS_OUTSIDE_COMMENT_MIN = 3;
 const COPY_MARKS_MAX_DAYS = 62;
-/** Sources whose result the employee already sees on the phone screen. */
-const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import']);
+/** Sources whose result the employee already sees on the phone screen (or gets a dedicated notice for). */
+const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import', 'manager_kiosk']);
 /** Terminals sync old events after an outage; those must not ping the phone as "today". */
 const TERMINAL_NOTICE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
@@ -114,6 +114,25 @@ type MobileFaceMatch = {
   source?: 'selfie' | 'report';
   threshold: number;
   checkedAt: string;
+};
+
+export type PhonePunchInput = {
+  employeeId: string;
+  direction: PunchDirection;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  photoBase64: string;
+  selfieBase64?: string;
+  liveness: { steps: string[]; durationMs?: number };
+  comment?: string;
+  integrity?: Record<string, unknown>;
+};
+
+export type PhonePunchFence = {
+  fence: Awaited<ReturnType<AttendanceService['resolveGeofence']>>;
+  outside: boolean;
+  comment: string;
 };
 
 @Injectable()
@@ -5507,34 +5526,8 @@ export class AttendanceService {
    * The selfie must match the employee's profile photo before anything is stored;
    * the fence is optional — without one the punch is accepted as-is.
    */
-  async punchMobile(
-    tenantId: string,
-    dto: {
-      employeeId: string;
-      direction: PunchDirection;
-      latitude: number;
-      longitude: number;
-      accuracy: number;
-      photoBase64: string;
-      selfieBase64?: string;
-      liveness: { steps: string[]; durationMs?: number };
-      comment?: string;
-      integrity?: Record<string, unknown>;
-    },
-  ) {
-    const fence = await this.resolveGeofence(tenantId, dto.latitude, dto.longitude);
-    const outside = fence ? !fence.inside : false;
-    const comment = (dto.comment ?? '').trim();
-    if (fence && outside && comment.length < GPS_OUTSIDE_COMMENT_MIN) {
-      throw new BadRequestException({
-        statusCode: 400,
-        code: 'GPS_OUTSIDE_COMMENT_REQUIRED',
-        message: `Hududdan tashqaridasiz: ${fence.distanceM} m (ruxsat ${fence.radiusM} m). Izoh majburiy.`,
-        distanceM: fence.distanceM,
-        radiusM: fence.radiusM,
-        locationName: fence.locationName,
-      });
-    }
+  async punchMobile(tenantId: string, dto: PhonePunchInput) {
+    const geo = await this.phonePunchFence(tenantId, dto);
 
     const faceMatch = await this.checkMobileFace(tenantId, dto.employeeId, {
       selfieBase64: dto.selfieBase64,
@@ -5556,6 +5549,61 @@ export class AttendanceService {
       });
     }
 
+    return this.savePhonePunch(tenantId, dto, geo, {
+      source: 'mobile_app',
+      identificationType: 'Телефон: лицо + фотоотчёт',
+      deviceType: 'Мобильное приложение',
+      extra: { faceMatch },
+    });
+  }
+
+  /**
+   * A manager's phone marks one of their subordinates, identified by face on the server.
+   * Same fence, photo and storage rules as the employee's own phone punch.
+   */
+  async punchByManager(
+    tenantId: string,
+    dto: PhonePunchInput & {
+      markedBy: { employeeId: string; name: string };
+      faceMatch: Record<string, unknown>;
+    },
+    geo: PhonePunchFence,
+  ) {
+    return this.savePhonePunch(tenantId, dto, geo, {
+      source: 'manager_kiosk',
+      identificationType: 'Телефон руководителя: лицо + фотоотчёт',
+      deviceType: `Телефон руководителя: ${dto.markedBy.name}`,
+      extra: { markedBy: dto.markedBy, faceMatch: dto.faceMatch },
+    });
+  }
+
+  /** Fence of a phone punch; outside it a comment is required, without any fence the punch is accepted. */
+  async phonePunchFence(
+    tenantId: string,
+    dto: { latitude: number; longitude: number; comment?: string },
+  ): Promise<PhonePunchFence> {
+    const fence = await this.resolveGeofence(tenantId, dto.latitude, dto.longitude);
+    const outside = fence ? !fence.inside : false;
+    const comment = (dto.comment ?? '').trim();
+    if (fence && outside && comment.length < GPS_OUTSIDE_COMMENT_MIN) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'GPS_OUTSIDE_COMMENT_REQUIRED',
+        message: `Hududdan tashqaridasiz: ${fence.distanceM} m (ruxsat ${fence.radiusM} m). Izoh majburiy.`,
+        distanceM: fence.distanceM,
+        radiusM: fence.radiusM,
+        locationName: fence.locationName,
+      });
+    }
+    return { fence, outside, comment };
+  }
+
+  private async savePhonePunch(
+    tenantId: string,
+    dto: PhonePunchInput,
+    { fence, outside, comment }: PhonePunchFence,
+    how: { source: string; identificationType: string; deviceType: string; extra: Record<string, unknown> },
+  ) {
     const stored = await this.storeCapturePhoto(tenantId, dto.photoBase64, {
       maxEdge: 1600,
       quality: 80,
@@ -5570,13 +5618,13 @@ export class AttendanceService {
       employeeId: dto.employeeId,
       direction: dto.direction,
       occurredAt,
-      source: 'mobile_app',
+      source: how.source,
       raw: {
         latitude: dto.latitude,
         longitude: dto.longitude,
         accuracyM: Math.round(dto.accuracy),
-        identificationType: 'Телефон: лицо + фотоотчёт',
-        deviceType: 'Мобильное приложение',
+        identificationType: how.identificationType,
+        deviceType: how.deviceType,
         requestedDirection: dto.direction,
         photoReport: true,
         photoUrl: stored.url,
@@ -5604,7 +5652,7 @@ export class AttendanceService {
             }
           : {}),
         ...(dto.integrity ? { locationIntegrity: dto.integrity } : {}),
-        faceMatch,
+        ...how.extra,
       },
     });
 
@@ -8833,7 +8881,13 @@ export class AttendanceService {
           select: { name: true, location: { select: { name: true } } },
         })
       : null;
-    const place = device?.location?.name || device?.name || '';
+    const payload = this.asMeta(mark.rawPayload);
+    const byManager = mark.source === 'manager_kiosk';
+    const markedBy = this.asMeta(payload.markedBy);
+    const place =
+      device?.location?.name ||
+      device?.name ||
+      (byManager && typeof payload.locationName === 'string' ? payload.locationName : '');
     const time = new Intl.DateTimeFormat('ru-RU', {
       timeZone: ATTENDANCE_TZ,
       hour: '2-digit',
@@ -8849,17 +8903,18 @@ export class AttendanceService {
     const head = isIn ? '🟢 Kirish' : isOut ? '🔴 Chiqish' : '📍 Belgi';
     const via = device
       ? 'Terminal'
-      : mark.source === 'qr'
-        ? 'QR-kod'
-        : mark.source === 'manual'
-          ? 'Qo‘lda qo‘shildi (HR)'
-          : 'Telefon';
+      : byManager
+        ? `Rahbar telefoni${typeof markedBy.name === 'string' && markedBy.name ? ` (${markedBy.name})` : ''}`
+        : mark.source === 'qr'
+          ? 'QR-kod'
+          : mark.source === 'manual'
+            ? 'Qo‘lda qo‘shildi (HR)'
+            : 'Telefon';
 
     const lines = [`${head} qayd etildi · ${time}`, `${via}${place ? `: ${place}` : ''}`];
     if (isIn && firstIn && day) {
       lines.push(day.status === DayStatus.late ? `⚠️ ${day.lateMinutes} daqiqa kechikish` : '✅ O‘z vaqtida');
     }
-    const payload = this.asMeta(mark.rawPayload);
     if (payload.isValid === false) {
       const note = typeof payload.note === 'string' && payload.note ? `: ${payload.note}` : '';
       lines.push(`❗ Tabelda hisobga olinmadi${note}`);
