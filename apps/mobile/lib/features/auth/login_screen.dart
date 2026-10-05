@@ -14,6 +14,7 @@ import '../../core/theme/season.dart';
 import '../../shared/ambient_motion.dart';
 import '../../shared/seasonal_backdrop.dart';
 import '../lock/pin_widgets.dart';
+import 'account_recovery_sheets.dart';
 import 'login_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -148,6 +149,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _forgotPassword() async {
+    final login = await showForgotPasswordSheet(
+      context,
+      initialLogin: _email.text.trim(),
+      ensureServer: _applyServer,
+    );
+    if (login == null || !mounted) return;
+    setState(() {
+      _email.text = login;
+      _password.clear();
+      _error = null;
+    });
+    _passwordFocus.requestFocus();
   }
 
   @override
@@ -443,7 +459,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 animation: _items[4],
                 child: GlowButton(label: context.tr('Kirish', 'Войти'), busy: _busy, onPressed: _submit),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              _Reveal(
+                animation: _items[4],
+                child: OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => showTelegramLoginSheet(
+                            context,
+                            initialLogin: _email.text.trim(),
+                            ensureServer: _applyServer,
+                          ),
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: Text(context.tr('Telegram orqali kirish', 'Войти через Telegram')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1E96C8),
+                    side: BorderSide(color: const Color(0xFF1E96C8).withValues(alpha: 0.4), width: 1.4),
+                    backgroundColor: Colors.white.withValues(alpha: 0.6),
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                ),
+              ),
+              Center(
+                child: TextButton(
+                  onPressed: _busy ? null : _forgotPassword,
+                  child: Text(
+                    context.tr('Parolni unutdingizmi?', 'Забыли пароль?'),
+                    style: const TextStyle(color: Color(0xFF1F6F3A), fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

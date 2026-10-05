@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/season.dart';
 import '../../shared/widgets.dart';
 import '../notifications/inbox_watcher.dart';
+import '../telegram/telegram_connect.dart';
 
 String seasonLabel(Season s) => switch (s) {
   Season.spring => 'Bahor',
@@ -219,6 +220,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         'Только внутри приложения',
                       ),
                 onTap: () => context.push('/settings/notifications'),
+              ),
+              const Divider(height: 1, color: AppColors.line),
+              MenuTile(
+                icon: Icons.send_rounded,
+                label: context.tr('Telegram bot', 'Telegram-бот'),
+                subtitle: context.tr(
+                  'Xabarlar, kirish tasdig‘i va parolni tiklash',
+                  'Уведомления, подтверждение входа и сброс пароля',
+                ),
+                onTap: () => showTelegramConnectDialog(context),
               ),
             ],
           ),

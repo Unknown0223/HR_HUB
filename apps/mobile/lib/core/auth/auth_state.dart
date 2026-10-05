@@ -188,6 +188,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '/auth/login',
         data: {'email': email.trim(), 'password': password},
       );
+      await signInWithSession(res);
+    } catch (e) {
+      state = AuthState(loading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Stores a session the server already issued (password login or a Telegram-approved sign-in).
+  Future<void> signInWithSession(Map<String, dynamic> res) async {
+    state = state.copyWith(clearError: true);
+    try {
       final accessToken = res['accessToken']?.toString();
       final tenant = res['tenant'];
       final tenantId = tenant is Map

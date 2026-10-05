@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/i18n/app_lang.dart';
 import '../../core/theme/app_theme.dart';
 import '../notifications/inbox_watcher.dart';
+import '../telegram/telegram_connect.dart';
 
 class ShellScreen extends ConsumerWidget {
   const ShellScreen({super.key, required this.navigationShell});
@@ -13,6 +14,7 @@ class ShellScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InboxWatcher(
+      child: TelegramPromptGate(
       child: Scaffold(
       backgroundColor: Colors.transparent,
       body: navigationShell,
@@ -55,6 +57,7 @@ class ShellScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
       ),
     );
