@@ -284,7 +284,7 @@
 
 .empty {
   padding: 28px 12px !important;
-  text-align: center;
+  text-align: center !important;
   color: var(--ink-muted);
 }
 

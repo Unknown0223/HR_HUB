@@ -701,7 +701,7 @@
   align-items: center;
   gap: 0.6rem;
   padding: 2.5rem 1rem;
-  text-align: center;
+  text-align: center !important;
   font-size: 0.85rem;
   color: var(--ink-muted);
 }

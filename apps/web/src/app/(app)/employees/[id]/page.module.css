@@ -1422,7 +1422,7 @@ button.calCell {
 
 .empty {
   color: var(--ink-faint);
-  text-align: center;
+  text-align: center !important;
   padding: 1.35rem !important;
 }
 

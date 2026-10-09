@@ -183,7 +183,7 @@
 }
 
 .empty {
-  text-align: center;
+  text-align: center !important;
   color: var(--ink-400);
   padding: 2rem 1rem !important;
   font-weight: 600;

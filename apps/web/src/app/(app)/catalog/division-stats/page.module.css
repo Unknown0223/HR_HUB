@@ -427,7 +427,7 @@
 }
 
 .empty {
-  text-align: center;
+  text-align: center !important;
   color: var(--ink-muted);
   padding: 3rem 1rem !important;
   font-weight: 600;

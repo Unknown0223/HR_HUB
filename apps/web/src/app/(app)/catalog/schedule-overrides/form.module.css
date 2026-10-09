@@ -402,7 +402,7 @@
 .empty {
   padding: 2rem;
   color: var(--ink-faint);
-  text-align: center;
+  text-align: center !important;
 }
 
 /* Modals */

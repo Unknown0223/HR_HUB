@@ -122,6 +122,6 @@
 .empty {
   color: var(--ink-faint);
   grid-column: 1 / -1;
-  text-align: center;
+  text-align: center !important;
   padding: 2rem;
 }

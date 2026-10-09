@@ -645,7 +645,7 @@
 
 /* Empty */
 .empty {
-  text-align: center;
+  text-align: center !important;
   color: var(--ink-500);
   padding: 2.5rem 1.2rem;
   font-size: 13.5px;

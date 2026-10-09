@@ -85,7 +85,7 @@
 }
 
 .empty {
-  text-align: center;
+  text-align: center !important;
   color: var(--ink-faint);
   padding: 1.5rem;
 }

@@ -947,7 +947,7 @@
 
 .empty {
   padding: 60px 24px;
-  text-align: center;
+  text-align: center !important;
   color: var(--ink-muted);
   font-size: 0.9rem;
   font-weight: 650;

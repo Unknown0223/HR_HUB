@@ -562,7 +562,7 @@
 
 .empty {
   color: var(--ink-faint);
-  text-align: center;
+  text-align: center !important;
   margin: 1.5rem 1rem;
   font-size: 0.82rem;
 }
