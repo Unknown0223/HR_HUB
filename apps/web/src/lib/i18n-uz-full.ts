@@ -5150,6 +5150,7 @@ export const UZ_FULL: UzDictionary = {
   "Обучение": "O‘qitish",
   "Ограничение профиля": "Profil cheklovi",
   "Отметка сотрудников с телефона руководителя": "Xodimlarni rahbar telefoni orqali belgilash",
+  "Видео-отметка с телефона": "Telefondan video bilan belgilash",
   "Включено": "Yoqilgan",
   "Руководитель сможет отмечать приход и уход своих подчинённых со своего телефона: в мобильном приложении появится «Режим устройства», сотрудник определяется по лицу. Без этого доступа раздел в приложении скрыт.":
     "Rahbar o‘z xodimlarining kelish va ketishini o‘z telefonidan belgilay oladi: mobil ilovada «Qurilma rejimi» paydo bo‘ladi, xodim yuzi orqali aniqlanadi. Bu ruxsat bo‘lmasa, ilovada bo‘lim ko‘rinmaydi.",

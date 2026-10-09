@@ -66,11 +66,15 @@
   padding-left: 2px;
 }
 
+.barField,
+.barControl {
+  overflow: visible;
+}
+
 .barControl {
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
 }
 
 .barControl .input,
@@ -581,6 +585,7 @@
   align-items: center;
   gap: 8px;
   min-height: 38px;
+  min-width: 0;
   padding: 0 10px 0 12px;
   border: 1px solid var(--tint-line, #d8e0ea);
   border-radius: 10px;
@@ -902,11 +907,8 @@
 }
 
 .lookupMenu {
-  position: absolute;
-  z-index: 50;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
+  position: fixed;
+  z-index: 2000;
   min-width: 220px;
   max-height: 280px;
   overflow: auto;
@@ -1039,4 +1041,152 @@
   text-align: center;
   color: var(--ink-faint);
   font-size: 0.84rem;
+}
+
+.dateField {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.dateBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--tint-line, #d8e0ea);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.periodRange .dateBtn {
+  height: 28px;
+  padding: 0 2px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.periodRange .dateBtn i {
+  display: none;
+}
+
+.dateBtn i {
+  color: var(--ink-faint);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.datePlaceholder {
+  color: var(--ink-faint);
+}
+
+.dateValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datePop {
+  position: fixed;
+  z-index: 2000;
+  width: 248px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px -16px rgba(21, 32, 24, 0.45);
+}
+
+.dateNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.dateNav strong {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.dateNav button,
+.dateClear {
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.dateNav button {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.dateNav button:hover,
+.dateClear:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dateDow {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--ink-faint);
+  padding: 2px 0;
+}
+
+.dateDay {
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.dateDay:hover {
+  background: var(--bg-hover);
+}
+
+.dateDayToday {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.dateDayOn {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dateClear {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 0;
+  font-size: 0.72rem;
+  border-radius: 8px;
 }

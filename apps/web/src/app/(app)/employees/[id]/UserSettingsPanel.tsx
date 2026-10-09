@@ -168,7 +168,47 @@ export function UserSettingsPanel({
   }, []);
   const loginSuffix = loginSuffixProp || tenantCode || 'kompaniya';
   const [form, setForm] = useState<UserSettings>(() => mergeSettings(initial));
+  const [videoOn, setVideoOn] = useState(false);
+  const [videoCode, setVideoCode] = useState(true);
+  const [videoBusy, setVideoBusy] = useState(false);
   const [savedSnap, setSavedSnap] = useState(() => JSON.stringify(mergeSettings(initial)));
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch<{ items: { enabled: boolean; codeRequired: boolean }[] }>(
+      `/api/settings/punch-video/staff?employeeId=${encodeURIComponent(employeeId)}`,
+    )
+      .then((res) => {
+        if (!alive) return;
+        const row = res.items[0];
+        setVideoOn(row?.enabled === true);
+        setVideoCode(row?.codeRequired !== false);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [employeeId]);
+
+  async function setVideo(enabled: boolean, codeRequired: boolean) {
+    if (videoBusy) return;
+    setVideoBusy(true);
+    const prevOn = videoOn;
+    const prevCode = videoCode;
+    setVideoOn(enabled);
+    setVideoCode(codeRequired);
+    try {
+      await apiFetch('/api/settings/punch-video/staff', {
+        method: 'PUT',
+        body: JSON.stringify({ employeeIds: [employeeId], enabled, codeRequired }),
+      });
+    } catch {
+      setVideoOn(prevOn);
+      setVideoCode(prevCode);
+    } finally {
+      setVideoBusy(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -493,6 +533,20 @@ export function UserSettingsPanel({
             }
             onToggle={() => setFlag('marksEnabled', !form.marksEnabled)}
           />
+          <Toggle
+            on={videoOn}
+            label={videoOn ? 'Отметка с телефона: видео' : 'Отметка с телефона: фото'}
+            onToggle={() => void setVideo(!videoOn, videoOn ? videoCode : true)}
+          />
+          {videoOn ? (
+            <div className={styles.usNested}>
+              <Check
+                checked={videoCode}
+                label="Называть код в видео (100–999)"
+                onChange={() => void setVideo(true, !videoCode)}
+              />
+            </div>
+          ) : null}
           {form.marksEnabled ? (
             <div className={styles.usNested}>
               <Check

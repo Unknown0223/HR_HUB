@@ -171,6 +171,173 @@ export function useFilterFromUrl(keys: readonly string[]): Record<string, string
   }, [keys, searchParams]);
 }
 
+const WEEKDAYS = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+
+function parseIso(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toIso(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+function showDate(value: string): string {
+  const d = parseIso(value);
+  if (!d) return '';
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+/** Compact date control: the whole field opens the calendar, not only the icon. */
+function DateField({
+  value,
+  onChange,
+  ariaLabel,
+  placeholder = 'kk.oo.yyyy',
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  ariaLabel: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = parseIso(value);
+  const [cursor, setCursor] = useState(() => selected ?? new Date());
+  const rootRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = 248;
+      const height = 292;
+      let left = r.left;
+      if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
+      let top = r.bottom + 6;
+      if (top + height > window.innerHeight - 8) top = Math.max(8, r.top - height - 6);
+      setBox({ top, left });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7;
+  const count = new Date(year, month + 1, 0).getDate();
+  const cells: Array<number | null> = [
+    ...Array.from({ length: lead }, () => null),
+    ...Array.from({ length: count }, (_, i) => i + 1),
+  ];
+  const today = new Date();
+  const monthName = cursor.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+
+  return (
+    <div className={styles.dateField} ref={rootRef}>
+      <button
+        type="button"
+        className={styles.dateBtn}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => {
+          setCursor(selected ?? new Date());
+          setOpen((v) => !v);
+        }}
+      >
+        <span className={value ? styles.dateValue : styles.datePlaceholder}>
+          {value ? showDate(value) : placeholder}
+        </span>
+        <i className="fas fa-calendar-alt" aria-hidden />
+      </button>
+      {open && box && typeof document !== 'undefined'
+        ? createPortal(
+        <div
+          ref={popRef}
+          className={styles.datePop}
+          role="dialog"
+          aria-label={ariaLabel}
+          style={{ top: box.top, left: box.left }}
+        >
+          <div className={styles.dateNav}>
+            <button type="button" onClick={() => setCursor(new Date(year, month - 1, 1))} aria-label="Oldingi oy">
+              ‹
+            </button>
+            <strong>{monthName}</strong>
+            <button type="button" onClick={() => setCursor(new Date(year, month + 1, 1))} aria-label="Keyingi oy">
+              ›
+            </button>
+          </div>
+          <div className={styles.dateGrid}>
+            {WEEKDAYS.map((d) => (
+              <span key={d} className={styles.dateDow}>
+                {d}
+              </span>
+            ))}
+            {cells.map((day, i) => {
+              if (!day) return <span key={`e${i}`} />;
+              const iso = toIso(new Date(year, month, day));
+              const isSel = value === iso;
+              const isToday =
+                today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  className={[styles.dateDay, isSel ? styles.dateDayOn : '', isToday ? styles.dateDayToday : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => {
+                    onChange(iso);
+                    setOpen(false);
+                  }}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className={styles.dateClear}
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+          >
+            Tozalash
+          </button>
+        </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
 export function FilterPanel({
   open = false,
   onToggle,
@@ -410,12 +577,11 @@ export function FilterPanel({
           <div className={styles.periodFields}>
             <label className={styles.periodSlot}>
               <span className={styles.periodSlotLabel}>с</span>
-              <input
-                className={styles.periodInput}
-                type="date"
+              <DateField
                 value={draft[fromKey] ?? ''}
-                onChange={(e) => setField(fromKey, e.target.value)}
-                aria-label={`${fieldLabel(field)} с`}
+                ariaLabel={`${fieldLabel(field)} с`}
+                placeholder="sana"
+                onChange={(next) => setField(fromKey, next)}
               />
             </label>
             <span className={styles.periodDash} aria-hidden>
@@ -423,12 +589,11 @@ export function FilterPanel({
             </span>
             <label className={styles.periodSlot}>
               <span className={styles.periodSlotLabel}>по</span>
-              <input
-                className={styles.periodInput}
-                type="date"
+              <DateField
                 value={draft[toKey] ?? ''}
-                onChange={(e) => setField(toKey, e.target.value)}
-                aria-label={`${fieldLabel(field)} по`}
+                ariaLabel={`${fieldLabel(field)} по`}
+                placeholder="sana"
+                onChange={(next) => setField(toKey, next)}
               />
             </label>
           </div>
@@ -438,12 +603,10 @@ export function FilterPanel({
 
     if (field.type === 'dateFrom' || field.type === 'dateTo') {
       return (
-        <input
-          className={styles.input}
-          type="date"
+        <DateField
           value={value}
-          onChange={(e) => setField(key, e.target.value)}
-          aria-label={fieldLabel(field)}
+          ariaLabel={fieldLabel(field)}
+          onChange={(next) => setField(key, next)}
         />
       );
     }

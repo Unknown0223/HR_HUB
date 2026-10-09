@@ -224,9 +224,18 @@ class ModulesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasTeam = ref.watch(authProvider).user?.hasTeam == true;
     final teamKiosk = ref.watch(authProvider).user?.teamKiosk == true;
+    final punchVideo = ref.watch(authProvider).user?.punchVideo == true;
     final items = [
-      (Icons.login_rounded, context.t('Kirish'), '/punch/in'),
-      (Icons.logout_rounded, context.t('Chiqish'), '/punch/out'),
+      (
+        punchVideo ? Icons.videocam_outlined : Icons.login_rounded,
+        punchVideo ? context.tr('Video kirish', 'Видео приход') : context.t('Kirish'),
+        punchVideo ? '/punch/video-in' : '/punch/in',
+      ),
+      (
+        punchVideo ? Icons.videocam_outlined : Icons.logout_rounded,
+        punchVideo ? context.tr('Video chiqish', 'Видео уход') : context.t('Chiqish'),
+        punchVideo ? '/punch/video-out' : '/punch/out',
+      ),
       (Icons.table_chart_outlined, context.t('Tabel'), '/tabel'),
       (Icons.assignment_outlined, context.t('So\'rovlar'), '/requests'),
       if (hasTeam) (Icons.groups_outlined, context.t('Jamoa'), '/team'),

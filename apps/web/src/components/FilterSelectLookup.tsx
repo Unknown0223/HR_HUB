@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './filter-panel.module.css';
 
 export type FilterSelectOption = { value: string; label: string };
@@ -39,6 +40,8 @@ export function FilterSelectLookup({
   onChange: (next: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ top: number; left: number; width: number } | null>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -62,8 +65,33 @@ export function FilterSelectLookup({
   }, [options, selectedIds, draft, multiple]);
 
   useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const el = wrapRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = Math.max(r.width, 220);
+      const height = 280;
+      let left = r.left;
+      if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
+      let top = r.bottom + 6;
+      if (top + height > window.innerHeight - 8 && r.top > height) top = r.top - height - 6;
+      setBox({ top, left, width });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
+
+  useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
@@ -137,8 +165,14 @@ export function FilterSelectLookup({
         </span>
       </button>
 
-      {open ? (
-        <div className={styles.lookupMenu} role="listbox">
+      {open && box && typeof document !== 'undefined'
+        ? createPortal(
+        <div
+          ref={menuRef}
+          className={styles.lookupMenu}
+          role="listbox"
+          style={{ top: box.top, left: box.left, width: box.width }}
+        >
           {searchable ? (
             <div className={styles.lookupSearch}>
               <span aria-hidden>⌕</span>
@@ -228,8 +262,10 @@ export function FilterSelectLookup({
               );
             })
           )}
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

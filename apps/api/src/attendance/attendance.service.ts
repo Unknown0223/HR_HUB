@@ -99,7 +99,7 @@ import { applyLateAllowance, type LatenessRules } from './late-allowance';
 const GPS_OUTSIDE_COMMENT_MIN = 3;
 const COPY_MARKS_MAX_DAYS = 62;
 /** Sources whose result the employee already sees on the phone screen (or gets a dedicated notice for). */
-const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import', 'manager_kiosk']);
+const PHONE_PUNCH_SOURCES = new Set(['mobile_app', 'mobile_face', 'gps', 'qr', 'manual', 'import', 'manager_kiosk', 'mobile_video']);
 /** Terminals sync old events after an outage; those must not ping the phone as "today". */
 const TERMINAL_NOTICE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 

@@ -14,6 +14,7 @@ import { PassportScanModal } from '@/components/PassportScanModal';
 import { ModalPortal } from '@/components/ModalPortal';
 import fmStyles from '@/components/form-modal.module.css';
 import styles from './page.module.css';
+import { PunchVideoSwitch } from './PunchVideoSwitch';
 import { UserSettingsPanel } from './UserSettingsPanel';
 type TabKey =
   | 'main'
@@ -9029,6 +9030,7 @@ export default function EmployeeDetailPage() {
                         Сохранить
                       </button>
                     </div>
+                    <PunchVideoSwitch employeeId={id} />
                     <div className={styles.extraGrid}>
                       <div className={styles.extraCol}>
                         <div className={styles.modalField}>

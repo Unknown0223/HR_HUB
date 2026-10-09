@@ -8,7 +8,8 @@ export type AccessTypeId =
   | 'profile_flag'
   | 'location'
   | 'reports_to'
-  | 'team_kiosk';
+  | 'team_kiosk'
+  | 'punch_video';
 
 /** `feature`: an on/off capability of the employee themselves; stored with resource `*`. */
 export type AccessResourceKind = 'all' | 'division' | 'flag' | 'location' | 'employee' | 'feature';
@@ -39,6 +40,13 @@ export const ACCESS_TYPES: Record<AccessTypeId, AccessTypeRule> = {
   reports_to: { label: 'Руководитель', global: false, readOnly: true, allowExpiry: false, resource: 'employee' },
   team_kiosk: {
     label: 'Отметка сотрудников с телефона руководителя',
+    global: false,
+    readOnly: false,
+    allowExpiry: true,
+    resource: 'feature',
+  },
+  punch_video: {
+    label: 'Видео-отметка с телефона',
     global: false,
     readOnly: false,
     allowExpiry: true,

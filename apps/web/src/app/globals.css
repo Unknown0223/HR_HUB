@@ -119,6 +119,23 @@ body {
   background: rgba(47, 163, 80, 0.22);
 }
 
+/* Native date fields: the whole input opens the calendar, not only the tiny icon. */
+input[type='date'] {
+  position: relative;
+  min-height: 38px;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: #b7cdb9 transparent;

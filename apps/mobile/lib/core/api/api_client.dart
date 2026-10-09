@@ -103,6 +103,23 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> postForm(String path, FormData data) async {
+    try {
+      final res = await _dio.post(
+        path,
+        data: data,
+        options: Options(
+          contentType: 'multipart/form-data',
+          sendTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 60),
+        ),
+      );
+      return _asMap(res.data);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, dynamic>? query,

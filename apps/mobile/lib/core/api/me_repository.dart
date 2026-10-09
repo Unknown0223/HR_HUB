@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 
@@ -65,6 +66,35 @@ class MeRepository {
     '/me/punches/gps/check',
     data: {'latitude': latitude, 'longitude': longitude},
   );
+
+  Future<Map<String, dynamic>> punchVideoToday() => _api.get('/me/punch-video');
+
+  Future<Map<String, dynamic>> punchVideo({
+    required String direction,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required int durationSec,
+    required String captureMode,
+    required String frontPath,
+    String? backPath,
+    int? spokenCode,
+    String? comment,
+  }) {
+    final form = FormData.fromMap({
+      'direction': direction,
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': accuracy,
+      'durationSec': durationSec,
+      'captureMode': captureMode,
+      if (spokenCode != null) 'spokenCode': spokenCode,
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      'front': MultipartFile.fromFileSync(frontPath, filename: 'front.mp4'),
+      if (backPath != null) 'back': MultipartFile.fromFileSync(backPath, filename: 'back.mp4'),
+    });
+    return _api.postForm('/me/punch-video', form);
+  }
 
   /// Phone punch: explicit IN/OUT, composite photo report, liveness steps.
   Future<Map<String, dynamic>> punchMobile({

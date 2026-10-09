@@ -17,6 +17,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
+import { parsePunchVideoSettings, spokenCodeRequired } from './punch-video';
 import {
   startOfLocalDay,
   startOfNextLocalDay,
@@ -263,8 +264,30 @@ export class MeService {
           }
         : null,
       teamSize: team.length,
-      features: { teamKiosk: teamKiosk && team.length > 0 },
+      features: {
+        teamKiosk: teamKiosk && team.length > 0,
+        ...(await this.punchVideoFlags(tenantId, employee?.id ?? null)),
+      },
     };
+  }
+
+  private async punchVideoFlags(tenantId: string | null, employeeId: string | null) {
+    if (!tenantId || !employeeId) return { punchVideo: false, punchVideoCode: false };
+    const row = await this.prisma.tenantSetting.findUnique({ where: { tenantId }, select: { extras: true } });
+    const s = parsePunchVideoSettings(row?.extras);
+    if (!s.enabled) return { punchVideo: false, punchVideoCode: false };
+    const allowed = await this.prisma.employeeAccessGrant.findFirst({
+      where: {
+        tenantId,
+        employeeId,
+        accessType: 'punch_video',
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { note: true },
+    });
+    if (!allowed) return { punchVideo: false, punchVideoCode: false };
+    return { punchVideo: true, punchVideoCode: spokenCodeRequired(allowed.note, s.codeRequired) };
   }
 
   async todayAttendance(user: AuthUser) {

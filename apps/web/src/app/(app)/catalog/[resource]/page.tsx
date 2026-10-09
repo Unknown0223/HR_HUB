@@ -985,16 +985,16 @@ export default function CatalogResourcePage() {
           titleOverride={title}
         />
       ) : null}
-      <div className={styles.header}>
-        <div>
-          {!CATALOG_SIBLING_KEY[resource] ? (
-            <h1 className={styles.h1}>{title}</h1>
-          ) : null}
-          <p className={styles.lead}>
+      <div className={styles.pageHeader}>
+        <div className={styles.pageHeaderText}>
+          <h1 className={styles.pageTitle}>{title}</h1>
+          <p className={styles.pageSubtitle}>
             Каталог · {resource}
             {urlType ? ` · type=${urlType}` : ''} · {displayRows.length} строк
           </p>
         </div>
+      </div>
+      <div className={styles.toolLine}>
         <div className={styles.rowActions}>
           <button
             type="button"
@@ -1023,13 +1023,6 @@ export default function CatalogResourcePage() {
               Создать
             </button>
           )}
-          <FilterPanel
-            inline
-            open={filterOpen}
-            onToggle={() => setFilterOpen((v) => !v)}
-            fields={filterFields}
-            onApply={() => load()}
-          />
           <TablePrefsMenuButton
             prefs={prefs}
             onExport={() => {
@@ -1038,6 +1031,13 @@ export default function CatalogResourcePage() {
             }}
           />
         </div>
+        <FilterPanel
+          inline
+          open={filterOpen}
+          onToggle={() => setFilterOpen((v) => !v)}
+          fields={filterFields}
+          onApply={() => load()}
+        />
       </div>
 
       {resource === 'payroll-lines' ? (

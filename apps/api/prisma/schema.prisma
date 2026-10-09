@@ -954,6 +954,21 @@ model AttendanceMark {
   @@map("attendance_marks")
 }
 
+/// One spoken code per employee per work day (1..999), unique inside the tenant that day.
+model PunchDayCode {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  workDate   DateTime @map("work_date") @db.Date
+  code       Int
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, employeeId, workDate])
+  @@unique([tenantId, workDate, code])
+  @@index([tenantId, workDate])
+  @@map("punch_day_codes")
+}
+
 model AttendanceDay {
   id         String    @id @default(uuid()) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid

@@ -484,6 +484,7 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
           { id: 'join-requests', label: 'Заявки из Telegram', href: '/employees/join-requests', faIcon: 'fa-user-clock' },
           { id: 'telegram', label: 'Telegram Bot', href: '/settings/telegram', faIcon: 'fa-paper-plane' },
+          { id: 'punch-video', label: 'Видео-отметка', href: '/settings/punch-video', faIcon: 'fa-video' },
           { id: 'smtp', label: 'Почта (SMTP)', href: '/settings/smtp', faIcon: 'fa-envelope' },
           { id: 'google-form', label: 'Google Form', href: '/settings/google-form', faIcon: 'fa-wpforms' },
         ],

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/advance/advance_screen.dart';
 import '../../features/attendance/marks_screen.dart';
 import '../../features/attendance/mobile_punch_screen.dart';
+import '../../features/attendance/video_punch_screen.dart';
 import '../../features/attendance/tabel_screen.dart';
 import '../../features/auth/force_password_screen.dart';
 import '../../features/auth/login_screen.dart';
@@ -94,6 +95,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/punch/video-in',
+        builder: (_, _) => const VideoPunchScreen(direction: 'IN'),
+      ),
+      GoRoute(
+        path: '/punch/video-out',
+        builder: (_, _) => const VideoPunchScreen(direction: 'OUT'),
       ),
       GoRoute(
         path: '/punch/in',

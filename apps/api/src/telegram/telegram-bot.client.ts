@@ -208,6 +208,35 @@ export class TelegramBotClient implements OnApplicationBootstrap {
     return sent?.message_id ?? null;
   }
 
+  /** Video clip (mp4) with a caption. Returns null when the bot or the chat rejects it. */
+  async sendVideo(
+    chatId: string,
+    video: Buffer,
+    caption: string,
+    tenantId?: string | null,
+    filename = 'punch.mp4',
+  ): Promise<number | null> {
+    const cfg = await this.resolveConfig(tenantId);
+    if (!cfg.botToken || !chatId) return null;
+    const form = new FormData();
+    form.append('chat_id', chatId);
+    form.append('caption', caption.slice(0, 1000));
+    form.append('supports_streaming', 'true');
+    form.append('video', new Blob([new Uint8Array(video)], { type: 'video/mp4' }), filename);
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendVideo`, { method: 'POST', body: form });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { message_id?: number }; description?: string };
+      if (!res.ok || data.ok === false) {
+        this.logger.warn(`Telegram sendVideo ${res.status}: ${data.description ?? ''}`);
+        return null;
+      }
+      return data.result?.message_id ?? null;
+    } catch (e) {
+      this.logger.warn(`Telegram sendVideo error: ${e instanceof Error ? e.message : e}`);
+      return null;
+    }
+  }
+
   async editMessage(
     chatId: string,
     messageId: number,

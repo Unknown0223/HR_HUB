@@ -20,6 +20,8 @@ class AuthUser {
     this.employee,
     this.teamSize = 0,
     this.teamKiosk = false,
+    this.punchVideo = false,
+    this.punchVideoCode = false,
     this.mustChangePassword = false,
   });
 
@@ -37,6 +39,12 @@ class AuthUser {
   /// HR granted this manager the phone «device mode» (marking their own staff by face).
   final bool teamKiosk;
 
+  /// Tenant turned on the 5–10s front+back video punch.
+  final bool punchVideo;
+
+  /// The employee must say the daily code while recording.
+  final bool punchVideoCode;
+
   /// Signed in with a one-time password from HR: the app is locked until a personal one is set.
   final bool mustChangePassword;
 
@@ -52,6 +60,8 @@ class AuthUser {
         employee: employee,
         teamSize: teamSize,
         teamKiosk: teamKiosk,
+        punchVideo: punchVideo,
+        punchVideoCode: punchVideoCode,
       );
 
   bool get isApprover =>
@@ -86,6 +96,8 @@ class AuthUser {
           : null,
       teamSize: (json['teamSize'] as num?)?.toInt() ?? 0,
       teamKiosk: json['features'] is Map && (json['features'] as Map)['teamKiosk'] == true,
+      punchVideo: json['features'] is Map && (json['features'] as Map)['punchVideo'] == true,
+      punchVideoCode: json['features'] is Map && (json['features'] as Map)['punchVideoCode'] == true,
       mustChangePassword: json['mustChangePassword'] == true,
     );
   }
