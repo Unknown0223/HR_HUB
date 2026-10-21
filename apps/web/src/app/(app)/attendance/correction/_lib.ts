@@ -5,6 +5,8 @@ export type CorrectionStatus =
   | 'absent'
   | 'day_off'
   | 'leave'
+  | 'sick'
+  | 'trip'
   | 'not_started';
 
 export type CorrectionCell = {
@@ -15,6 +17,14 @@ export type CorrectionCell = {
   earlyLeaveMinutes: number;
   firstInAt?: string | null;
   lastOutAt?: string | null;
+  reason?: string;
+  history?: Array<{
+    reason: string;
+    oldStatus: string | null;
+    newStatus: string;
+    createdAt: string;
+  }>;
+  outside?: boolean;
   /** Late, but inside the company's monthly excused allowance. */
   lateExcused?: boolean;
   /** False for a late day beyond the allowance: not a full working day until corrected. */
@@ -25,6 +35,9 @@ export type CorrectionRow = {
   employeeId: string;
   fullName: string;
   tabNumber: string;
+  hiredAt?: string | null;
+  dismissedAt?: string | null;
+  locked?: boolean;
   division: string | null;
   position: string | null;
   schedule: string | null;
@@ -56,25 +69,25 @@ export type StatusMeta = {
 /** Toolbar quick values: replaces SALEC 1 / 0.5 / 0 */
 export const QUICK_STATUSES: CorrectionStatus[] = ['on_time', 'late', 'absent'];
 
-export const SPECIAL_STATUSES: CorrectionStatus[] = ['day_off', 'leave'];
+export const SPECIAL_STATUSES: CorrectionStatus[] = ['day_off', 'leave', 'sick', 'trip'];
 
 export const STATUS_META: Record<CorrectionStatus, StatusMeta> = {
   on_time: {
     code: '1',
-    short: 'Вр',
-    label: 'Вовремя',
+    short: '1',
+    label: 'Работал',
     cellClass: 'stOnTime',
   },
   late: {
     code: '0.5',
-    short: 'Оп',
-    label: 'Опоздание',
+    short: '0.5',
+    label: 'Полдня / опоздание',
     cellClass: 'stLate',
   },
   absent: {
     code: '0',
-    short: 'Н',
-    label: 'Не пришел',
+    short: '0',
+    label: 'Отсутствовал',
     cellClass: 'stAbsent',
   },
   day_off: {
@@ -89,6 +102,18 @@ export const STATUS_META: Record<CorrectionStatus, StatusMeta> = {
     label: 'Отпуск',
     cellClass: 'stLeave',
   },
+  sick: {
+    code: '4',
+    short: 'Б',
+    label: 'Больничный',
+    cellClass: 'stSick',
+  },
+  trip: {
+    code: '5',
+    short: 'К',
+    label: 'Командировка',
+    cellClass: 'stTrip',
+  },
   not_started: {
     code: '',
     short: '—',
@@ -102,14 +127,11 @@ export function statusMeta(s: string): StatusMeta {
 }
 
 export function cellShort(c: CorrectionCell): string {
-  if (c.status === 'late' && c.lateMinutes > 0) {
-    return String(c.lateMinutes);
-  }
   return statusMeta(c.status).short;
 }
 
 export function workValue(status: string): number {
-  if (status === 'on_time') return 1;
+  if (status === 'on_time' || status === 'trip') return 1;
   if (status === 'late') return 0.5;
   return 0;
 }

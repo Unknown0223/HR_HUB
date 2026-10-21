@@ -329,7 +329,7 @@ export class CorrectionMatrixEntryDto {
   @ApiProperty() @IsUUID('4') employeeId!: string;
   @ApiProperty({ example: '2026-09-24' }) @IsDateString() date!: string;
   @ApiProperty({
-    enum: ['on_time', 'late', 'absent', 'day_off', 'leave', 'not_started'],
+    enum: ['on_time', 'late', 'absent', 'day_off', 'leave', 'not_started', 'sick', 'trip'],
   })
   @IsString()
   status!: string;

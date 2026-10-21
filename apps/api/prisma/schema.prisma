@@ -45,6 +45,8 @@ enum DayStatus {
   not_started
   day_off
   leave
+  sick
+  trip
 }
 
 enum RequestStatus {

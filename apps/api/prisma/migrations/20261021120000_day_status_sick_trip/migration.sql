@@ -1,0 +1,2 @@
+ALTER TYPE "DayStatus" ADD VALUE IF NOT EXISTS 'sick';
+ALTER TYPE "DayStatus" ADD VALUE IF NOT EXISTS 'trip';

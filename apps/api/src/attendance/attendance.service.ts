@@ -7487,8 +7487,16 @@ export class AttendanceService {
 
     const employeeWhere: Prisma.EmployeeWhereInput = {
       tenantId,
-      status: 'active',
       employmentType: 'staff',
+      AND: [
+        { OR: [{ hiredAt: null }, { hiredAt: { lte: to } }] },
+        {
+          OR: [
+            { status: 'active', dismissedAt: null },
+            { dismissedAt: { gte: from } },
+          ],
+        },
+      ],
     };
     const divisionIds = parseIds(opts.divisionIds);
     const positionIds = parseIds(opts.positionIds);
@@ -7542,6 +7550,8 @@ export class AttendanceService {
         lastName: true,
         middleName: true,
         tabNumber: true,
+        hiredAt: true,
+        dismissedAt: true,
         division: { select: { id: true, name: true } },
         position: { select: { id: true, name: true } },
         schedule: {
@@ -7578,13 +7588,65 @@ export class AttendanceService {
               earlyLeaveMinutes: true,
             },
           });
-
     const dayKey = (empId: string, ymd: string) => `${empId}|${ymd}`;
+    const reasonRows =
+      empIds.length === 0
+        ? []
+        : await this.prisma.timesheetAdjustment.findMany({
+            where: {
+              tenantId,
+              employeeId: { in: empIds },
+              workDate: { gte: from, lte: to },
+            },
+            select: {
+              employeeId: true,
+              workDate: true,
+              reason: true,
+              oldStatus: true,
+              newStatus: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+    const reasonByKey = new Map<string, string>();
+    const historyByKey = new Map<
+      string,
+      Array<{ reason: string; oldStatus: string | null; newStatus: string; createdAt: string }>
+    >();
+    for (const r of reasonRows) {
+      const ymd = r.workDate.toISOString().slice(0, 10);
+      const key = dayKey(r.employeeId, ymd);
+      if (!reasonByKey.has(key)) reasonByKey.set(key, r.reason);
+      const list = historyByKey.get(key) || [];
+      if (list.length < 8) {
+        list.push({
+          reason: r.reason,
+          oldStatus: r.oldStatus,
+          newStatus: r.newStatus,
+          createdAt: r.createdAt.toISOString(),
+        });
+        historyByKey.set(key, list);
+      }
+    }
+
     const byKey = new Map<string, (typeof dayRows)[0]>();
     for (const d of dayRows) {
       const ymd = d.workDate.toISOString().slice(0, 10);
       byKey.set(dayKey(d.employeeId, ymd), d);
     }
+
+    const postedSheets = await this.prisma.timesheetSheet.findMany({
+      where: {
+        tenantId,
+        status: 'posted',
+        month: { gte: from, lte: to },
+      },
+      select: { divisionId: true },
+    });
+    const monthLocked = postedSheets.some((s) => !s.divisionId);
+    const lockedDivisionIds = new Set(
+      postedSheets.map((s) => s.divisionId).filter((id): id is string => Boolean(id)),
+    );
 
     const rules = await this.latenessRules(tenantId);
     const rows = employees.map((e) => {
@@ -7594,12 +7656,18 @@ export class AttendanceService {
         const ymd = `${month}-${String(day).padStart(2, '0')}`;
         const rec = byKey.get(dayKey(e.id, ymd));
         const workDate = workDateOnly(new Date(`${ymd}T12:00:00+05:00`));
+        const hiredYmd = e.hiredAt ? e.hiredAt.toISOString().slice(0, 10) : null;
+        const firedYmd = e.dismissedAt ? e.dismissedAt.toISOString().slice(0, 10) : null;
+        const outside =
+          Boolean(hiredYmd && ymd < hiredYmd) || Boolean(firedYmd && ymd > firedYmd);
         const off = isDayOffByPattern(workDate, pattern);
-        const status = rec?.status
-          ? String(rec.status)
-          : off
-            ? DayStatus.day_off
-            : DayStatus.not_started;
+        const status = outside
+          ? DayStatus.day_off
+          : rec?.status
+            ? String(rec.status)
+            : off
+              ? DayStatus.day_off
+              : DayStatus.not_started;
         return {
           day,
           date: ymd,
@@ -7608,6 +7676,9 @@ export class AttendanceService {
           earlyLeaveMinutes: rec?.earlyLeaveMinutes ?? 0,
           firstInAt: rec?.firstInAt?.toISOString() ?? null,
           lastOutAt: rec?.lastOutAt?.toISOString() ?? null,
+          reason: reasonByKey.get(dayKey(e.id, ymd)) ?? '',
+          history: historyByKey.get(dayKey(e.id, ymd)) ?? [],
+          outside,
         };
       });
       const cells = applyLateAllowance(baseCells, rules);
@@ -7621,6 +7692,11 @@ export class AttendanceService {
           .filter(Boolean)
           .join(' '),
         tabNumber: e.tabNumber,
+        hiredAt: e.hiredAt ? e.hiredAt.toISOString().slice(0, 10) : null,
+        dismissedAt: e.dismissedAt ? e.dismissedAt.toISOString().slice(0, 10) : null,
+        locked:
+          monthLocked ||
+          Boolean(e.division?.id && lockedDivisionIds.has(e.division.id)),
         division: e.division?.name ?? null,
         position: e.position?.name ?? null,
         schedule: e.schedule?.name ?? null,
@@ -7675,7 +7751,9 @@ export class AttendanceService {
 
     const allowed = new Set<string>(Object.values(DayStatus));
     let updated = 0;
+    const skipped: string[] = [];
     const seen = new Set<string>();
+    const todayYmd = ymdInTz(new Date());
 
     for (const raw of entries) {
       const empId = String(raw.employeeId || '');
@@ -7688,11 +7766,38 @@ export class AttendanceService {
       if (seen.has(key)) continue;
       seen.add(key);
 
+      if (ymd > todayYmd) {
+        skipped.push(`${ymd}: kelajak kun`);
+        continue;
+      }
+
       const emp = await this.prisma.employee.findFirst({
         where: { id: empId, tenantId },
-        select: { id: true },
+        select: { id: true, hiredAt: true, dismissedAt: true, divisionId: true },
       });
       if (!emp) continue;
+      const hiredYmd = emp.hiredAt ? emp.hiredAt.toISOString().slice(0, 10) : null;
+      const firedYmd = emp.dismissedAt ? emp.dismissedAt.toISOString().slice(0, 10) : null;
+      if ((hiredYmd && ymd < hiredYmd) || (firedYmd && ymd > firedYmd)) {
+        skipped.push(`${ymd}: ish davridan tashqari`);
+        continue;
+      }
+      const posted = await this.prisma.timesheetSheet.findFirst({
+        where: {
+          tenantId,
+          status: 'posted',
+          month: {
+            gte: workDateOnly(new Date(`${ymd.slice(0, 7)}-01T12:00:00+05:00`)),
+            lte: workDateOnly(new Date(`${ymd}T12:00:00+05:00`)),
+          },
+          OR: [{ divisionId: null }, { divisionId: emp.divisionId }],
+        },
+        select: { id: true },
+      });
+      if (posted) {
+        skipped.push(`${ymd}: tabel yopilgan`);
+        continue;
+      }
 
       const workDate = workDateOnly(new Date(`${ymd}T12:00:00+05:00`));
       const existing = await this.prisma.attendanceDay.findUnique({
@@ -7713,6 +7818,8 @@ export class AttendanceService {
         status === DayStatus.absent ||
         status === DayStatus.day_off ||
         status === DayStatus.leave ||
+        status === DayStatus.sick ||
+        status === DayStatus.trip ||
         status === DayStatus.not_started
       ) {
         lateMinutes = 0;
@@ -7750,7 +7857,7 @@ export class AttendanceService {
       updated += 1;
     }
 
-    return { ok: true, updated };
+    return { ok: true, updated, skipped };
   }
 
   async listDays(
